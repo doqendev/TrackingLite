@@ -7,7 +7,7 @@ import { z } from "zod";
 
 const CreateWorkspaceSchema = z.object({
   name: z.string().min(1).max(100),
-  domain: z.string().optional(),
+  domain: z.string().min(1, "Store URL is required"),
   metaPixelId: z.string().optional(),
   metaAccessToken: z.string().optional(),
   metaTestEventCode: z.string().optional(),

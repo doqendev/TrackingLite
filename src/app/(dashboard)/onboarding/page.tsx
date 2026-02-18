@@ -43,6 +43,10 @@ export default function OnboardingPage() {
       setStep0Error("Workspace name is required.");
       return;
     }
+    if (!storeUrl.trim()) {
+      setStep0Error("Store URL is required.");
+      return;
+    }
     setSavingStep0(true);
     setStep0Error("");
     try {
@@ -203,7 +207,7 @@ export default function OnboardingPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="storeUrl">
-                    Store URL <span className="text-muted-foreground font-normal">(optional)</span>
+                    Store URL
                   </Label>
                   <Input
                     id="storeUrl"
@@ -211,6 +215,7 @@ export default function OnboardingPage() {
                     value={storeUrl}
                     onChange={(e) => setStoreUrl(e.target.value)}
                     placeholder="mystore.myshopify.com"
+                    required
                   />
                 </div>
 
@@ -280,30 +285,33 @@ export default function OnboardingPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-foreground">Your JS Snippet</p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopySnippet}
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="h-4 w-4" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        Copy snippet
-                      </>
-                    )}
-                  </Button>
+                <div className="relative">
+                  <div className="bg-zinc-900 rounded-lg overflow-hidden">
+                    <pre className="p-4 text-xs text-zinc-400 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
+                      {snippet || "Loading snippet..."}
+                    </pre>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-900 via-zinc-900/95 to-transparent pt-12 pb-3 px-4 rounded-b-lg">
+                      <Button
+                        type="button"
+                        variant="brand"
+                        className="w-full"
+                        onClick={handleCopySnippet}
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="h-4 w-4 mr-2" />
+                            Copied to clipboard!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Snippet Code
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <pre className="bg-zinc-900 text-zinc-100 rounded-lg p-4 text-xs overflow-x-auto leading-relaxed font-mono whitespace-pre-wrap break-all">
-                  {snippet || "Loading snippet..."}
-                </pre>
               </div>
 
               <Alert className="border-brand-500/20 bg-brand-500/10">
