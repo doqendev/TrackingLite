@@ -22,11 +22,13 @@ RUN pnpm next build
 
 # ---- Stage 3: Run ----
 FROM node:20-alpine AS run
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV AUTH_TRUST_HOST=true
 
 # Copy standalone output
 COPY --from=build /app/.next/standalone ./
