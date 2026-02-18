@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// AUTH (managed by NextAuth.js v5)
+// ============================================================
+
+model User {
+  id              String         @id @default(cuid())
+  name            String?
+  email           String         @unique
+  emailVerified   DateTime?
+  hashedPassword  String?        // null if signed up via Google OAuth
+  image           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  accounts        Account[]
+  sessions        Session[]
+  workspaces      Workspace[]
+  subscription    Subscription?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================
+// CORE BUSINESS
+// ============================================================
+
+model Workspace {
+  id                        String          @id @default(cuid())
+  userId                    String
+  user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                      String          // e.g., "My Shopify Store"
+  domain                    String?         // e.g., "mystore.myshopify.com" (optional, for display)
+  platform                  Platform        @default(SHOPIFY)
+  apiKey                    String          @unique // Unique API key for this workspace (used in JS snippet)
+  metaPixelId               String?         // Meta Pixel ID
+  metaAccessTokenEncrypted  String?         // AES-256-GCM encrypted
+  metaAccessTokenIv         String?         // IV for decryption
+  metaAccessTokenTag        String?         // Auth tag for decryption
+  metaTestEventCode         String?         // For testing in Meta Events Manager
+  consentMode               ConsentMode     @default(STRICT)
+  isActive                  Boolean         @default(true)
+  enablePageView            Boolean         @default(true)
+  enableViewContent         Boolean         @default(true)
+  enableAddToCart           Boolean         @default(true)
+  enableInitiateCheckout    Boolean         @default(true)
+  enablePurchase            Boolean         @default(true)
+  eventsForwardedCount      Int             @default(0)
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+  events                    EventLog[]
+
+  @@index([userId])
+  @@index([apiKey])
+}
+
+model EventLog {
+  id             String      @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventName      EventName
+  eventId        String      // dedup event_id (UUID from JS snippet)
+  status         EventStatus @default(PENDING)
+  metaResponse   Json?       // Raw Meta CAPI response
+  errorMessage   String?
+  retryCount     Int         @default(0)
+  payload        Json?       // Sanitized payload (no raw PII)
+  customerIp     String?
+  userAgent      String?
+  fbp            String?     // _fbp cookie value
+  fbc            String?     // _fbc cookie value
+  pageUrl        String?     // URL where event occurred
+  createdAt      DateTime    @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, eventName])
+  @@index([eventId])
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String             @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 BillingPlan        @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  trialEndsAt          DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Platform {
+  SHOPIFY
+  WOOCOMMERCE
+  BIGCOMMERCE
+  CUSTOM
+}
+
+enum EventName {
+  PageView
+  ViewContent
+  AddToCart
+  InitiateCheckout
+  Purchase
+}
+
+enum EventStatus {
+  PENDING
+  SENT
+  FAILED
+  RETRYING
+}
+
+enum ConsentMode {
+  STRICT
+  LAX
+}
+
+enum BillingPlan {
+  FREE
+  STARTER
+  GROWTH
+  SCALE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}

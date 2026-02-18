@@ -1,0 +1,26 @@
+export interface SnippetEventPayload {
+  eventName: string;
+  eventId: string;
+  timestamp: number;
+  url?: string;
+  referrer?: string;
+  fbp?: string | null;
+  fbc?: string | null;
+  userAgent?: string;
+  customData?: Record<string, unknown>;
+  userData?: {
+    email?: string;
+    phone?: string;
+    firstName?: string;
+    lastName?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    countryCode?: string;
+  };
+  consent?: {
+    analytics?: boolean;
+    marketing?: boolean;
+  };
+}
+
