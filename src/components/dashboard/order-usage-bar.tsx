@@ -9,15 +9,20 @@ interface OrderUsageBarProps {
   ordersUsed: number;
   ordersLimit: number;
   usagePercent: number;
+  hasEvents: boolean;
 }
 
 function getSubtitleMessage(
   ordersUsed: number,
   usagePercent: number,
-  plan: string
+  plan: string,
+  hasEvents: boolean
 ): string {
   if (ordersUsed === 0) {
-    return "Install your snippet to start tracking purchases.";
+    if (!hasEvents) {
+      return "Install your snippet to start tracking purchases.";
+    }
+    return "No purchases tracked yet this month. Other events are flowing.";
   }
   if (usagePercent >= 90) {
     if (plan === "FREE") {
@@ -54,8 +59,9 @@ export function OrderUsageBar({
   ordersUsed,
   ordersLimit,
   usagePercent,
+  hasEvents,
 }: OrderUsageBarProps) {
-  const subtitle = getSubtitleMessage(ordersUsed, usagePercent, plan);
+  const subtitle = getSubtitleMessage(ordersUsed, usagePercent, plan, hasEvents);
   const barColor = getBarColor(usagePercent);
   const planLabel = PLAN_LABELS[plan] ?? plan;
 

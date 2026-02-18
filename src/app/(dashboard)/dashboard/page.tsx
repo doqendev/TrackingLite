@@ -101,6 +101,7 @@ export default async function DashboardPage() {
         ordersUsed={analytics.billing.ordersUsed}
         ordersLimit={analytics.billing.ordersLimit}
         usagePercent={analytics.billing.usagePercent}
+        hasEvents={analytics.health.lastEventAt !== null}
       />
 
       {/* Revenue cards */}
