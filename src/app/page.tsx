@@ -18,13 +18,7 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* ───────────────────────── Navigation ───────────────────────── */}
-      <header
-        className="sticky top-0 z-50 border-b border-transparent bg-background/80 backdrop-blur-md"
-        style={{
-          borderImage:
-            "linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1",
-        }}
-      >
+      <header className="relative z-10 bg-transparent">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link
             href="/"
@@ -67,31 +61,57 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* ───────────────────────── Hero ───────────────────────── */}
-        <section
-          className="relative overflow-hidden"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)",
-            backgroundSize: "24px 24px",
-          }}
-        >
-          {/* Layered gradient overlays */}
-          <div
-            className="pointer-events-none absolute inset-0"
+        <div className="px-3 pt-2 sm:px-5 sm:pt-3">
+          <section
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl"
             style={{
-              background:
-                "radial-gradient(ellipse at center top, rgba(59,130,246,0.08) 0%, transparent 60%)",
+              backgroundImage:
+                "radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
             }}
-          />
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(ellipse at 70% 20%, rgba(20,184,166,0.05) 0%, transparent 50%)",
-            }}
-          />
+          >
+            {/* Layer 1: Deep sky glow at center-top */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 120% 70% at 50% -10%, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0.06) 40%, transparent 70%)",
+              }}
+            />
+            {/* Layer 2: Horizon glow */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 100% 50% at 50% 30%, rgba(99,164,255,0.08) 0%, transparent 60%)",
+              }}
+            />
+            {/* Layer 3: Cloud-like elliptical accents */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 60% 30% at 25% 25%, rgba(147,197,253,0.06) 0%, transparent 50%), radial-gradient(ellipse 50% 25% at 75% 20%, rgba(96,165,250,0.05) 0%, transparent 50%)",
+              }}
+            />
+            {/* Layer 4: Teal accent */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 80% 40% at 60% 15%, rgba(20,184,166,0.04) 0%, transparent 50%)",
+              }}
+            />
+            {/* Layer 5: Bottom fade */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to bottom, transparent 60%, hsl(222,47%,7%) 100%)",
+              }}
+            />
 
-          <div className="mx-auto max-w-6xl px-6 pb-28 pt-32 sm:pb-36 sm:pt-36">
+            <div className="mx-auto max-w-6xl px-6 pb-16 pt-24 sm:pb-20 sm:pt-28">
             <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
               <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
                 Your Meta Pixel misses
@@ -106,9 +126,9 @@ export default function HomePage() {
               </p>
 
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <Button variant="brand" size="lg" asChild className="gap-2">
+                <Button variant="brand" size="lg" asChild className="gap-2 rounded-full px-8">
                   <Link href="/signup">
-                    Get Started
+                    Get Started Free
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -116,14 +136,98 @@ export default function HomePage() {
                   variant="outline"
                   size="lg"
                   asChild
-                  className="border-white/[0.08] bg-transparent hover:bg-white/[0.03]"
+                  className="rounded-full border-white/[0.10] bg-transparent px-8 hover:bg-white/[0.04]"
                 >
                   <Link href="#how-it-works">See how it works</Link>
                 </Button>
               </div>
             </div>
-          </div>
-        </section>
+
+            {/* ── Product Visual (Railway-style dashboard mockup) ── */}
+            <div className="relative mx-auto mt-16 max-w-4xl sm:mt-20">
+              {/* Glow behind the card */}
+              <div
+                className="pointer-events-none absolute -inset-4 rounded-2xl opacity-40"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at center, rgba(59,130,246,0.15) 0%, transparent 70%)",
+                }}
+              />
+              <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[hsl(222,47%,7%)] shadow-2xl shadow-blue-500/[0.04]">
+                {/* Mock header bar */}
+                <div className="flex items-center gap-1 border-b border-white/[0.06] px-4 py-2.5">
+                  <div className="flex items-center gap-1.5 mr-4">
+                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                  </div>
+                  {["Dashboard", "Events", "Settings"].map((tab, i) => (
+                    <span
+                      key={tab}
+                      className={`rounded-md px-3 py-1 text-[11px] font-medium ${
+                        i === 0
+                          ? "bg-white/[0.06] text-foreground"
+                          : "text-muted-foreground/50"
+                      }`}
+                    >
+                      {tab}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Pipeline cards */}
+                <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-3">
+                  {[
+                    {
+                      name: "Shopify Snippet",
+                      status: "Connected",
+                      icon: "\uD83D\uDED2",
+                      events: "5 event types",
+                    },
+                    {
+                      name: "Track Clear API",
+                      status: "Processing events",
+                      icon: "\u26A1",
+                      events: "142ms avg",
+                    },
+                    {
+                      name: "Meta CAPI",
+                      status: "Forwarding",
+                      icon: "\uD83C\uDFAF",
+                      events: "99.9% delivery",
+                    },
+                  ].map((card, i) => (
+                    <div
+                      key={card.name}
+                      className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-lg">{card.icon}</span>
+                        <span className="flex items-center gap-1.5 text-[11px] text-emerald-400/80">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          {card.status}
+                        </span>
+                      </div>
+                      <div className="text-sm font-medium text-foreground">
+                        {card.name}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground/50">
+                        {card.events}
+                      </div>
+                      {/* Connector arrow (except last card) */}
+                      {i < 2 && (
+                        <div className="absolute -right-3 top-1/2 hidden -translate-y-1/2 text-muted-foreground/20 sm:block">
+                          {"\u2192"}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            </div>
+          </section>
+        </div>
 
         {/* ───────────────────────── Stats Strip ───────────────────────── */}
         <section className="border-y border-white/[0.06] bg-white/[0.015]">
