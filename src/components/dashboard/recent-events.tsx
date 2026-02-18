@@ -43,6 +43,8 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
       status: true,
       pageUrl: true,
       errorMessage: true,
+      value: true,
+      currency: true,
       createdAt: true,
     },
   });
@@ -73,6 +75,7 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event ID</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Status</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Value</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Page</TableHead>
             </TableRow>
           </TableHeader>
@@ -106,6 +109,15 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
                     <Badge className={status.className}>
                       {status.label}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="px-5 py-3">
+                    {event.value != null ? (
+                      <span className="text-xs font-medium text-foreground tabular-nums">
+                        {event.currency ?? "USD"} {event.value.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="px-5 py-3 max-w-[200px]">
                     <span className="text-xs text-muted-foreground truncate block" title={event.pageUrl ?? ""}>

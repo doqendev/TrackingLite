@@ -18,11 +18,55 @@ export interface WorkspaceWithStats {
   };
 }
 
-export interface DashboardStats {
+// --- Dashboard Analytics Types ---
+
+export interface HealthMetrics {
+  status: "healthy" | "degraded" | "down" | "inactive";
+  successRate: number;
   totalEvents24h: number;
   sentEvents24h: number;
   failedEvents24h: number;
-  pendingEvents24h: number;
-  successRate: number;
   lastEventAt: Date | null;
+}
+
+export interface TimeComparison {
+  today: number;
+  yesterday: number;
+  currency: string;
+}
+
+export interface RevenueMetrics {
+  addToCartValue: TimeComparison;
+  checkoutValue: TimeComparison;
+  purchaseValue: TimeComparison;
+  ordersToday: number;
+  ordersYesterday: number;
+}
+
+export interface EventCount {
+  today: number;
+  yesterday: number;
+}
+
+export interface EventBreakdown {
+  PageView: EventCount;
+  ViewContent: EventCount;
+  AddToCart: EventCount;
+  InitiateCheckout: EventCount;
+  Purchase: EventCount;
+}
+
+export interface BillingUsage {
+  plan: string;
+  ordersUsed: number;
+  ordersLimit: number;
+  usagePercent: number;
+}
+
+export interface DashboardAnalytics {
+  health: HealthMetrics;
+  revenue: RevenueMetrics;
+  eventBreakdown: EventBreakdown;
+  billing: BillingUsage;
+  retentionDays: number;
 }

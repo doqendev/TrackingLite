@@ -2,14 +2,25 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import Link from "next/link";
-import { StatsCards } from "@/components/dashboard/stats-cards";
+import { computeDashboardAnalytics } from "@/lib/analytics";
+import { getCachedAnalytics } from "@/lib/analytics-cache";
+import { OrderUsageBar } from "@/components/dashboard/order-usage-bar";
+import { RevenueCards } from "@/components/dashboard/revenue-cards";
+import { EventFunnel } from "@/components/dashboard/event-funnel";
+import { DeliveryStats } from "@/components/dashboard/delivery-stats";
 import { RecentEvents } from "@/components/dashboard/recent-events";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Settings, AlertTriangle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+const HEALTH_CONFIG = {
+  healthy: { dot: "bg-green-500", label: "Healthy", labelColor: "text-green-400" },
+  degraded: { dot: "bg-amber-500", label: "Degraded", labelColor: "text-amber-400" },
+  down: { dot: "bg-red-500", label: "Down", labelColor: "text-red-400" },
+  inactive: { dot: "bg-muted-foreground", label: "Inactive", labelColor: "text-muted-foreground" },
+} as const;
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -23,9 +34,6 @@ export default async function DashboardPage() {
       domain: true,
       metaPixelId: true,
       metaAccessTokenEncrypted: true,
-      apiKey: true,
-      eventsForwardedCount: true,
-      createdAt: true,
     },
   });
 
@@ -34,17 +42,32 @@ export default async function DashboardPage() {
   }
 
   const hasMetaCredentials = !!(workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-  const apiKeyPrefix = workspace.apiKey.slice(0, 8) + "...";
+
+  const analytics = await getCachedAnalytics(workspace.id, () =>
+    computeDashboardAnalytics(workspace.id, session.user!.id!)
+  );
+
+  const healthConfig = HEALTH_CONFIG[analytics.health.status];
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
+      {/* Page header with health badge */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{workspace.name}</h1>
-          {workspace.domain && (
-            <p className="text-sm text-muted-foreground mt-0.5">{workspace.domain}</p>
-          )}
+        <div className="flex items-center gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-foreground">{workspace.name}</h1>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary">
+                <span className={`w-2 h-2 rounded-full ${healthConfig.dot}`} />
+                <span className={`text-xs font-medium ${healthConfig.labelColor}`}>
+                  {healthConfig.label}
+                </span>
+              </div>
+            </div>
+            {workspace.domain && (
+              <p className="text-sm text-muted-foreground mt-0.5">{workspace.domain}</p>
+            )}
+          </div>
         </div>
         <Button variant="ghost" size="sm" asChild>
           <Link href="/settings" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
@@ -54,7 +77,7 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {/* Setup banner — shown when Meta credentials are missing */}
+      {/* Setup banner -- shown when Meta credentials are missing */}
       {!hasMetaCredentials && (
         <Alert className="border-amber-500/20 bg-amber-500/5 border-l-2 border-l-amber-500/40 flex items-start gap-4">
           <div className="flex-shrink-0 p-1.5 bg-amber-500/10 rounded-md">
@@ -72,31 +95,24 @@ export default async function DashboardPage() {
         </Alert>
       )}
 
-      {/* Stats cards */}
-      <StatsCards workspaceId={workspace.id} />
+      {/* Order usage progress bar */}
+      <OrderUsageBar
+        plan={analytics.billing.plan}
+        ordersUsed={analytics.billing.ordersUsed}
+        ordersLimit={analytics.billing.ordersLimit}
+        usagePercent={analytics.billing.usagePercent}
+      />
 
-      {/* Quick info row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">API Key</p>
-            <p className="text-sm font-mono text-foreground mt-1">{apiKeyPrefix}</p>
-          </CardContent>
-        </Card>
-        <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Forwarded</p>
-            <p className="text-sm font-semibold text-foreground mt-1">{workspace.eventsForwardedCount.toLocaleString()} events</p>
-          </CardContent>
-        </Card>
-        <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Workspace Since</p>
-            <p className="text-sm font-semibold text-foreground mt-1">
-              {workspace.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Revenue cards */}
+      <RevenueCards revenue={analytics.revenue} />
+
+      {/* Event funnel + Delivery stats side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <EventFunnel eventBreakdown={analytics.eventBreakdown} />
+        <DeliveryStats
+          health={analytics.health}
+          eventBreakdown={analytics.eventBreakdown}
+        />
       </div>
 
       {/* Recent events */}

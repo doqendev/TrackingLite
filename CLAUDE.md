@@ -21,8 +21,8 @@ Small-to-mid Shopify stores running Meta ads. Free plan (50 orders/mo), paid pla
 ## Current State
 
 **MVP is functionally complete.** All core features are implemented and working:
-- Build: 19 routes, compiles clean
-- Unit tests: 204/204 passing (11 test files)
+- Build: 20 routes, compiles clean
+- Unit tests: 239/239 passing (13 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 errors
 - Lint: 0 warnings/errors
@@ -118,6 +118,7 @@ src/
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
       workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD
       workspaces/[id]/rotate-key/route.ts  # POST: rotate API key
+      workspaces/[id]/analytics/route.ts   # GET: dashboard analytics (cached 60s)
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet for workspace
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
@@ -127,8 +128,11 @@ src/
     ui/                               # 14 shadcn/ui components (see list below)
     dashboard/
       sidebar-nav.tsx                 # Desktop sidebar + MobileNav (Sheet drawer)
-      stats-cards.tsx                 # 4 stat cards (total, success rate, failed, last event)
-      recent-events.tsx               # Last 10 events mini-table
+      order-usage-bar.tsx             # Order usage progress bar with plan badge (client component)
+      revenue-cards.tsx               # 3 revenue cards: AddToCart, Checkout, Purchase with yesterday delta
+      event-funnel.tsx                # 5-row event funnel with horizontal bars
+      delivery-stats.tsx              # 24h delivery metrics: success rate, delivered/failed
+      recent-events.tsx               # Last 10 events mini-table with value column
     settings/
       settings-form.tsx               # All settings in one client component (5 cards)
     billing/
@@ -147,6 +151,8 @@ src/
     constants.ts                      # BILLING_PLANS (order-based), AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG, META_API_*
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case)
+    analytics.ts                      # Dashboard analytics computation (parallel Prisma queries)
+    analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL)
     queue.ts                          # Lazy BullMQ queue (meta-events), MetaEventJob interface
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
     api-key-cache.ts                  # Redis-cached workspace lookup (UNUSED - see known issues)
@@ -212,7 +218,7 @@ pnpm worker
 # Build for production
 pnpm build
 
-# Run unit tests (177 tests, 10 files)
+# Run unit tests (239 tests, 13 files)
 pnpm test
 
 # Run a single test file
@@ -262,6 +268,7 @@ All documented in `.env.example`. Critical ones:
 | `GET/POST /api/workspaces` | GET, POST | List/create workspaces |
 | `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
+| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing) |
 | `GET /api/snippet/:workspaceId` | GET | Generate JS snippet |
 | `POST /api/stripe/checkout` | POST | Create Stripe checkout session |
 | `POST /api/stripe/portal` | POST | Create Stripe billing portal session |
@@ -297,6 +304,7 @@ Header: Content-Type: application/json
 - **Workspace model:** Each merchant has a workspace with a unique API key (unlimited per user, shared order pool).
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
+- **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.
 
 ## Must NOT Have (scope guardrails)
 

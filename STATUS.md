@@ -1,13 +1,13 @@
 # TrackingLite --- Project Status & Audit
 
-Last updated: 2026-02-18 (post billing model migration)
+Last updated: 2026-02-18 (post dashboard analytics feature)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
-| Build (`pnpm build`) | 19 routes, compiles clean |
-| Tests (`pnpm test`) | 177/177 passing (10 files) |
+| Build (`pnpm build`) | 20 routes, compiles clean |
+| Tests (`pnpm test`) | 239/239 passing (13 files) |
 | TypeScript | 0 errors |
 | ESLint | 0 warnings/errors |
 
@@ -21,7 +21,7 @@ Last updated: 2026-02-18 (post billing model migration)
 | `/login` | Public | Working | Email/password + Google OAuth |
 | `/signup` | Public | Working | Registration with auto-login, redirects to onboarding |
 | `/forgot-password` | Public | **Stub** | Honest "not yet available" message, links to login/signup |
-| `/dashboard` | Protected | Working | Stats cards, recent events, setup banner if Meta not configured |
+| `/dashboard` | Protected | Working | Rich analytics: revenue cards, event funnel, delivery stats, order usage bar, health badge, recent events |
 | `/events` | Protected | Working | Paginated event log with type/status filters (50/page) |
 | `/settings` | Protected | Working | Meta credentials, event toggles, consent mode, snippet display |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
@@ -41,9 +41,10 @@ Last updated: 2026-02-18 (post billing model migration)
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout (no trial, free plan instead) |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
+| `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics: health, revenue, event breakdown, billing usage (60s Redis cache) |
 | `/api/health` | GET | - | Working | DB ping, returns status + uptime |
 
-### Core Library Modules (15 files in src/lib/)
+### Core Library Modules (17 files in src/lib/)
 
 | Module | Status | What it does |
 |--------|--------|-------------|
@@ -62,6 +63,8 @@ Last updated: 2026-02-18 (post billing model migration)
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case |
 | `queue.ts` | Working | Lazy BullMQ queue, MetaEventJob interface, 3 retries with backoff |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
+| `analytics.ts` | Working | Dashboard analytics computation: health, revenue, event breakdown, billing (parallel Prisma queries) |
+| `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection) |
 | `api-key-cache.ts` | **Dead code** | Redis-cached workspace lookup, never imported anywhere |
 
 ### Worker (2 files in src/workers/)
@@ -71,9 +74,9 @@ Last updated: 2026-02-18 (post billing model migration)
 | `start-worker.ts` | Working | Entry point, graceful shutdown (SIGTERM/SIGINT) |
 | `meta-event-processor.ts` | Working | BullMQ worker, concurrency 10: decrypt -> normalize -> send to Meta -> update EventLog |
 
-### Test Coverage (15 files, 222 tests)
+### Test Coverage (17 files, 284 tests)
 
-#### Unit Tests (10 files, 177 tests)
+#### Unit Tests (13 files, 239 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -86,6 +89,9 @@ Last updated: 2026-02-18 (post billing model migration)
 | `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
 | `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
 | `consent.test.ts` | 10 | STRICT/LAX mode combinations |
+| `extract-custom-data.test.ts` | 27 | Custom data extraction from event payloads |
+| `analytics.test.ts` | 28 | Health status computation, revenue aggregation, event breakdown, billing usage |
+| `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
 
 #### Integration Tests (5 files, 45 tests)
@@ -108,8 +114,11 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 
 **Custom components:**
 - `dashboard/sidebar-nav.tsx` --- Desktop sidebar + Sheet-based mobile nav with active state
-- `dashboard/stats-cards.tsx` --- 4 stat cards (total/success rate/failed/last event)
-- `dashboard/recent-events.tsx` --- Last 10 events mini-table
+- `dashboard/order-usage-bar.tsx` --- Order usage progress bar with plan badge and trust-building messaging
+- `dashboard/revenue-cards.tsx` --- 3 revenue metric cards (AddToCart, Checkout, Purchase) with yesterday comparison
+- `dashboard/event-funnel.tsx` --- 5-row event funnel with horizontal bars and yesterday deltas
+- `dashboard/delivery-stats.tsx` --- 24h delivery metrics: total events, success rate bar, delivered/failed breakdown
+- `dashboard/recent-events.tsx` --- Last 10 events mini-table with value column
 - `settings/settings-form.tsx` --- All settings in one component (5 cards)
 - `billing/plan-cards.tsx` --- 4-tier plan comparison (FREE/STARTER/GROWTH/SCALE) with subscribe buttons
 
