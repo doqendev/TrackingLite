@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 function generateSnippet(workspaceId: string, pixelScriptUrl: string): string {
-  return `!function(d){var s=d.createElement("script");s.async=!0;s.src="${pixelScriptUrl}/api/pixel/${workspaceId}";d.head.appendChild(s)}(document);`;
+  return `!function(d){var s=d.createElement("script");s.async=!0;s.src="${pixelScriptUrl}/api/s/${workspaceId}";d.head.appendChild(s)}(document);`;
 }
 
 export async function GET(
