@@ -9,20 +9,51 @@ import {
   Shield,
   BarChart3,
   Smartphone,
+  DollarSign,
+  Activity,
+  HeartPulse,
 } from "lucide-react";
 
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* ── Sticky Nav ── */}
-      <header className="sticky top-0 z-50 border-b border-transparent bg-background/80 backdrop-blur-md" style={{ borderImage: 'linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1' }}>
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
+      {/* ───────────────────────── Navigation ───────────────────────── */}
+      <header
+        className="sticky top-0 z-50 border-b border-transparent bg-background/80 backdrop-blur-md"
+        style={{
+          borderImage:
+            "linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1",
+        }}
+      >
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link
             href="/"
             className="text-sm font-semibold tracking-tight text-foreground"
           >
             <span className="text-brand-500">Track</span>&thinsp;Clear
           </Link>
+
+          <nav className="hidden items-center gap-8 sm:flex">
+            <a
+              href="#features"
+              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Features
+            </a>
+            <a
+              href="#how-it-works"
+              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              How it Works
+            </a>
+            <a
+              href="#pricing"
+              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Pricing
+            </a>
+          </nav>
+
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/login">Log in</Link>
@@ -35,7 +66,7 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1">
-        {/* ── Hero ── */}
+        {/* ───────────────────────── Hero ───────────────────────── */}
         <section
           className="relative overflow-hidden"
           style={{
@@ -44,9 +75,24 @@ export default function HomePage() {
             backgroundSize: "24px 24px",
           }}
         >
-          <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at center top, rgba(20,184,166,0.06) 0%, transparent 60%)' }} />
-          <div className="mx-auto max-w-5xl px-6 pb-28 pt-24 sm:pb-32 sm:pt-28">
-            <div className="mx-auto max-w-2xl text-center animate-fade-in-up">
+          {/* Layered gradient overlays */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse at center top, rgba(59,130,246,0.08) 0%, transparent 60%)",
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse at 70% 20%, rgba(20,184,166,0.05) 0%, transparent 50%)",
+            }}
+          />
+
+          <div className="mx-auto max-w-6xl px-6 pb-28 pt-32 sm:pb-36 sm:pt-36">
+            <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
               <Badge
                 variant="outline"
                 className="mb-8 rounded-full border-white/[0.10] bg-white/[0.03] px-3.5 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm"
@@ -54,28 +100,23 @@ export default function HomePage() {
                 Server-side Meta CAPI for Shopify
               </Badge>
 
-              <h1 className="mb-6 text-4xl font-bold leading-[1.08] tracking-tighter text-foreground sm:text-5xl md:text-[3.5rem]">
-                Your Meta Pixel misses
+              <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
+                Nothing blocked.
                 <br />
-                20-40% of conversions.
-                <br />
-                <span className="text-gradient">We catch them.</span>
+                <span className="text-gradient">Everything clear.</span>
               </h1>
 
-              <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
-                Ad blockers silently drop requests to{" "}
-                <code className="rounded bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs text-foreground/70">
-                  connect.facebook.net
-                </code>{" "}
-                before your pixel fires. Track Clear captures every event
-                server-side and forwards it to Meta&apos;s Conversions API. Setup
-                takes 10 minutes. No developer needed.
+              <p className="mx-auto mb-10 max-w-xl text-base leading-relaxed text-muted-foreground">
+                Ad blockers silently kill 20&ndash;40% of your Meta Pixel data.
+                Track Clear captures every conversion server-side and forwards
+                it to Meta&apos;s Conversions API &mdash; bypassing blockers
+                entirely.
               </p>
 
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <Button variant="brand" size="lg" asChild className="gap-2">
                   <Link href="/signup">
-                    Start free — no card needed
+                    Start free
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -96,177 +137,33 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Event Flow Terminal ── */}
-        <section className="border-t border-white/[0.06]">
-          <div className="mx-auto max-w-5xl px-6 py-24">
-            <div className="mb-8 text-center">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-                Live event pipeline
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Every event, every time
-              </h2>
-            </div>
-
-            <div className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02]">
-              {/* Terminal chrome */}
-              <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
-                <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                <span className="ml-2 text-[11px] text-muted-foreground/40">
-                  trackclear &mdash; event pipeline
-                </span>
-              </div>
-
-              {/* Terminal content */}
-              <pre className="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-relaxed">
-                <code>
-                  <span className="text-muted-foreground/50">{"// "}PageView from shop.example.com</span>
-                  {"\n"}
-                  <span className="text-foreground/90">{"\u2192"} PageView captured</span>
-                  <span className="text-muted-foreground/40">{"          0.2ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u251C"} PII hashed (SHA-256)</span>
-                  <span className="text-muted-foreground/40">{"     0.1ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u251C"} Phone normalized (E.164)</span>
-                  <span className="text-muted-foreground/40">{" 0.1ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u2514"} Sent to Meta CAPI</span>
-                  <span className="text-muted-foreground/40">{"        142ms  "}</span>
-                  <span className="text-brand-500"><span className="animate-pulse-glow">{"\u2713"}</span>{" 200 OK"}</span>
-                  {"\n\n"}
-                  <span className="text-muted-foreground/50">{"// "}Purchase $127.50 &mdash; order #4891</span>
-                  {"\n"}
-                  <span className="text-foreground/90">{"\u2192"} Purchase captured</span>
-                  <span className="text-muted-foreground/40">{"          0.3ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u251C"} PII hashed (SHA-256)</span>
-                  <span className="text-muted-foreground/40">{"     0.1ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u251C"} Dedup: event_id matched</span>
-                  <span className="text-muted-foreground/40">{" 0.0ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u2514"} Sent to Meta CAPI</span>
-                  <span className="text-muted-foreground/40">{"        138ms  "}</span>
-                  <span className="text-brand-500"><span className="animate-pulse-glow">{"\u2713"}</span>{" 200 OK"}</span>
-                  {"\n\n"}
-                  <span className="text-muted-foreground/50">{"// "}AddToCart &mdash; SKU-8812 x2</span>
-                  {"\n"}
-                  <span className="text-foreground/90">{"\u2192"} AddToCart captured</span>
-                  <span className="text-muted-foreground/40">{"         0.2ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u251C"} PII hashed (SHA-256)</span>
-                  <span className="text-muted-foreground/40">{"     0.1ms"}</span>
-                  {"\n"}
-                  <span className="text-muted-foreground/60">{"  \u2514"} Sent to Meta CAPI</span>
-                  <span className="text-muted-foreground/40">{"        129ms  "}</span>
-                  <span className="text-brand-500"><span className="animate-pulse-glow">{"\u2713"}</span>{" 200 OK"}</span>
-                </code>
-              </pre>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Split Panel: Snippet + Explanation ── */}
-        <section className="border-t border-white/[0.06]">
-          <div className="mx-auto max-w-5xl px-6 py-24">
-            <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
-              {/* Left: Code snippet */}
-              <div className="overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02]">
-                <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
-                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                  <span className="ml-2 text-[11px] text-muted-foreground/40">
-                    custom-pixel.js
-                  </span>
+        {/* ───────────────────────── Stats Strip ───────────────────────── */}
+        <section className="border-y border-white/[0.06] bg-white/[0.015]">
+          <div className="mx-auto max-w-6xl px-6 py-14">
+            <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+              {[
+                { value: "18M+", label: "Events forwarded" },
+                { value: "99.9%", label: "API uptime" },
+                { value: "<150ms", label: "Avg. processing" },
+                { value: "10 min", label: "Setup to first event" },
+              ].map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums sm:text-3xl">
+                    {stat.value}
+                  </div>
+                  <div className="mt-1.5 text-xs text-muted-foreground/60">
+                    {stat.label}
+                  </div>
                 </div>
-                <pre className="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-relaxed">
-                  <code>
-                    <span className="text-muted-foreground/50">{"// Shopify Custom Pixel"}</span>
-                    {"\n"}
-                    <span className="text-brand-500">{"analytics"}</span>
-                    <span className="text-foreground/70">{".subscribe("}</span>
-                    <span className="text-amber-400/80">{'"all_events"'}</span>
-                    <span className="text-foreground/70">{", (event) => {"}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"  "}</span>
-                    <span className="text-brand-500">{"fetch"}</span>
-                    <span className="text-foreground/70">{"("}</span>
-                    <span className="text-amber-400/80">{'"https://api.trackclear.io"'}</span>
-                    <span className="text-foreground/70">{", {"}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"    method: "}</span>
-                    <span className="text-amber-400/80">{'"POST"'}</span>
-                    <span className="text-foreground/70">{","}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"    body: "}</span>
-                    <span className="text-brand-500">{"JSON"}</span>
-                    <span className="text-foreground/70">{".stringify({"}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"      event_name: event.name,"}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"      event_id: "}</span>
-                    <span className="text-brand-500">{"crypto"}</span>
-                    <span className="text-foreground/70">{".randomUUID(),"}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"      pixel_id: "}</span>
-                    <span className="text-amber-400/80">{'"YOUR_PIXEL_ID"'}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"    })"}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"  });"}</span>
-                    {"\n"}
-                    <span className="text-foreground/70">{"});"}</span>
-                  </code>
-                </pre>
-              </div>
-
-              {/* Right: Explanation */}
-              <div className="py-2 lg:py-6">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-                  Integration
-                </p>
-                <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                  One snippet.
-                  <br />
-                  Complete tracking.
-                </h2>
-                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                  Paste a single JavaScript snippet into Shopify&apos;s Custom Pixel
-                  settings. No theme changes, no app install, no developer. The
-                  snippet hooks into Shopify&apos;s{" "}
-                  <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-xs text-foreground/70">
-                    analytics.subscribe()
-                  </code>{" "}
-                  API and captures every event automatically.
-                </p>
-                <ul className="mt-6 space-y-3">
-                  {[
-                    "PageView, ViewContent, AddToCart, InitiateCheckout, Purchase",
-                    "Automatic event_id generation for pixel deduplication",
-                    "Consent-aware via Shopify Customer Privacy API",
-                    "Works alongside your existing Meta browser pixel",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
-                      <span className="text-sm leading-relaxed text-muted-foreground">
-                        {item}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* ── Problem Section ── */}
-        <section className="border-t border-white/[0.06]">
-          <div className="mx-auto max-w-5xl px-6 py-24">
-            <div className="mb-12 text-center">
+        {/* ───────────────────────── Problem Section ───────────────────────── */}
+        <section id="features" className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
+            <div className="mb-14 text-center">
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                 The problem
               </p>
@@ -324,151 +221,358 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── How It Works ── */}
-        <section
-          id="how-it-works"
-          className="border-t border-white/[0.06]"
-        >
-          <div className="mx-auto max-w-5xl px-6 py-24">
-            <div className="mb-12 text-center">
+        {/* ───────────── Feature: Capture Everything (content LEFT, visual RIGHT) ───────────── */}
+        <section className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
+            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
+              {/* Left: Content */}
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+                  How it works
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  Capture every event, every time
+                </h2>
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  Our JavaScript snippet hooks into Shopify&apos;s{" "}
+                  <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-xs text-foreground/70">
+                    analytics.subscribe()
+                  </code>{" "}
+                  API inside their Custom Pixel sandbox. Every browser event is
+                  captured with full context &mdash; cookies, user agent, URL
+                  &mdash; and sent to our servers where ad blockers can&apos;t
+                  reach.
+                </p>
+                <ul className="mt-6 space-y-3">
+                  {[
+                    "PageView, ViewContent, AddToCart, InitiateCheckout, Purchase",
+                    "Automatic event_id for pixel deduplication",
+                    "Consent-aware via Shopify Customer Privacy API",
+                    "Works alongside your existing Meta browser pixel",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                      <span className="text-sm leading-relaxed text-muted-foreground">
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Right: Event Pipeline Terminal */}
+              <div className="overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02]">
+                {/* Terminal chrome */}
+                <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                  <span className="ml-2 text-[11px] text-muted-foreground/40">
+                    trackclear &mdash; event pipeline
+                  </span>
+                </div>
+
+                {/* Terminal content */}
+                <pre className="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-relaxed">
+                  <code>
+                    <span className="text-muted-foreground/50">
+                      {"// "}PageView from shop.example.com
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/90">
+                      {"\u2192"} PageView captured
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"          0.2ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u251C"} PII hashed (SHA-256)
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"     0.1ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u251C"} Phone normalized (E.164)
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {" 0.1ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u2514"} Sent to Meta CAPI
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"        142ms  "}
+                    </span>
+                    <span className="text-brand-500">
+                      <span className="animate-pulse-glow">{"\u2713"}</span>
+                      {" 200 OK"}
+                    </span>
+                    {"\n\n"}
+                    <span className="text-muted-foreground/50">
+                      {"// "}Purchase $127.50 &mdash; order #4891
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/90">
+                      {"\u2192"} Purchase captured
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"          0.3ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u251C"} PII hashed (SHA-256)
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"     0.1ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u251C"} Dedup: event_id matched
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {" 0.0ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u2514"} Sent to Meta CAPI
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"        138ms  "}
+                    </span>
+                    <span className="text-brand-500">
+                      <span className="animate-pulse-glow">{"\u2713"}</span>
+                      {" 200 OK"}
+                    </span>
+                    {"\n\n"}
+                    <span className="text-muted-foreground/50">
+                      {"// "}AddToCart &mdash; SKU-8812 x2
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/90">
+                      {"\u2192"} AddToCart captured
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"         0.2ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u251C"} PII hashed (SHA-256)
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"     0.1ms"}
+                    </span>
+                    {"\n"}
+                    <span className="text-muted-foreground/60">
+                      {"  \u2514"} Sent to Meta CAPI
+                    </span>
+                    <span className="text-muted-foreground/40">
+                      {"        129ms  "}
+                    </span>
+                    <span className="text-brand-500">
+                      <span className="animate-pulse-glow">{"\u2713"}</span>
+                      {" 200 OK"}
+                    </span>
+                  </code>
+                </pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ───────────── Feature: Server-Side Forwarding (visual LEFT, content RIGHT) ───────────── */}
+        <section id="how-it-works" className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
+            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
+              {/* Left: Code Snippet Visual */}
+              <div className="overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02] lg:order-1">
+                <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
+                  <span className="ml-2 text-[11px] text-muted-foreground/40">
+                    custom-pixel.js
+                  </span>
+                </div>
+                <pre className="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-relaxed">
+                  <code>
+                    <span className="text-muted-foreground/50">
+                      {"// Shopify Custom Pixel"}
+                    </span>
+                    {"\n"}
+                    <span className="text-brand-500">{"analytics"}</span>
+                    <span className="text-foreground/70">{".subscribe("}</span>
+                    <span className="text-amber-400/80">
+                      {"\"all_events\""}
+                    </span>
+                    <span className="text-foreground/70">
+                      {", (event) => {"}
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/70">{"  "}</span>
+                    <span className="text-brand-500">{"fetch"}</span>
+                    <span className="text-foreground/70">{"("}</span>
+                    <span className="text-amber-400/80">
+                      {"\"https://api.trackclear.io\""}
+                    </span>
+                    <span className="text-foreground/70">{", {"}</span>
+                    {"\n"}
+                    <span className="text-foreground/70">
+                      {"    method: "}
+                    </span>
+                    <span className="text-amber-400/80">{"\"POST\""}</span>
+                    <span className="text-foreground/70">{","}</span>
+                    {"\n"}
+                    <span className="text-foreground/70">{"    body: "}</span>
+                    <span className="text-brand-500">{"JSON"}</span>
+                    <span className="text-foreground/70">
+                      {".stringify({"}
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/70">
+                      {"      event_name: event.name,"}
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/70">
+                      {"      event_id: "}
+                    </span>
+                    <span className="text-brand-500">{"crypto"}</span>
+                    <span className="text-foreground/70">
+                      {".randomUUID(),"}
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/70">
+                      {"      pixel_id: "}
+                    </span>
+                    <span className="text-amber-400/80">
+                      {"\"YOUR_PIXEL_ID\""}
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/70">{"    })"}
+                    </span>
+                    {"\n"}
+                    <span className="text-foreground/70">{"  });"}</span>
+                    {"\n"}
+                    <span className="text-foreground/70">{"});"}</span>
+                  </code>
+                </pre>
+              </div>
+
+              {/* Right: Content */}
+              <div className="lg:order-2">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+                  Integration
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  One snippet. Complete tracking.
+                </h2>
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  Paste a single JavaScript snippet into Shopify&apos;s Custom
+                  Pixel settings. The snippet hooks into Shopify&apos;s{" "}
+                  <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-xs text-foreground/70">
+                    analytics.subscribe()
+                  </code>{" "}
+                  API and captures every event automatically.
+                </p>
+                <ul className="mt-6 space-y-3">
+                  {[
+                    "No theme changes, no app install, no developer",
+                    "Events route through our servers \u2014 invisible to ad blockers",
+                    "PII hashed with SHA-256, phones normalized to E.164",
+                    "Automatic dedup via shared event_id with browser pixel",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                      <span className="text-sm leading-relaxed text-muted-foreground">
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ───────────── Feature: Monitor & Dashboard (3 cards) ───────────── */}
+        <section className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
+            <div className="mb-14 text-center">
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-                How it works
+                Visibility
               </p>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Three steps to complete data
+                Complete tracking visibility
               </h2>
+              <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+                Everything you need to know your tracking is working.
+              </p>
             </div>
 
-            <div className="mx-auto max-w-xl space-y-0">
-              {/* Step 1 */}
-              <div className="flex gap-6 pb-10">
-                <div className="flex flex-col items-center">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-foreground">
-                    1
-                  </div>
-                  <div className="mt-3 w-px flex-1 bg-gradient-to-b from-white/[0.08] to-white/[0.02]" />
-                </div>
-                <div className="pb-2 pt-1">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+                <CardContent className="p-6">
+                  <DollarSign className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Paste a snippet into Shopify
+                    Revenue tracking
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Copy your unique tracking snippet from the Track Clear
-                    dashboard. Paste it in Shopify Admin under Settings &rsaquo;
-                    Customer Events &rsaquo; Add Custom Pixel. No theme edits, no
-                    app install.
+                    See exactly how much revenue flows through your funnel
+                    &mdash; AddToCart, Checkout, and Purchase values with daily
+                    comparisons.
                   </p>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Step 2 */}
-              <div className="flex gap-6 pb-10">
-                <div className="flex flex-col items-center">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-foreground">
-                    2
-                  </div>
-                  <div className="mt-3 w-px flex-1 bg-gradient-to-b from-white/[0.08] to-white/[0.02]" />
-                </div>
-                <div className="pb-2 pt-1">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+                <CardContent className="p-6">
+                  <Activity className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Events route through our servers
+                    Event funnel
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    The snippet captures events via Shopify&apos;s analytics API
-                    and sends them to{" "}
-                    <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-xs text-foreground/70">
-                      api.trackclear.io
-                    </code>{" "}
-                    &mdash; a domain ad blockers don&apos;t target. We hash PII
-                    with SHA-256, normalize phones to E.164, and queue the event.
+                    Watch events flow from PageView to Purchase. Know exactly how
+                    many events fire at each stage, compared to yesterday.
                   </p>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Step 3 */}
-              <div className="flex gap-6">
-                <div className="flex flex-col items-center">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/10 text-xs font-semibold text-brand-400 shadow-sm shadow-brand-500/20">
-                    3
-                  </div>
-                </div>
-                <div className="pb-2 pt-1">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+                <CardContent className="p-6">
+                  <HeartPulse className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Meta gets complete, deduplicated data
+                    Delivery health
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    We forward every event server-to-server to Meta&apos;s
-                    Conversions API. A shared{" "}
-                    <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-xs text-foreground/70">
-                      event_id
-                    </code>{" "}
-                    ensures Meta deduplicates against your browser pixel
-                    automatically. No double-counting, no gaps.
+                    Real-time success rates with green/yellow/red status
+                    indicators. Know instantly if something breaks.
                   </p>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </section>
 
-        {/* ── Metrics Strip ── */}
-        <section className="border-y border-white/[0.06] bg-white/[0.015]">
-          <div className="mx-auto max-w-5xl px-6 py-14">
-            <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
-                  18M+
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground/60">
-                  Events forwarded
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
-                  99.9%
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground/60">
-                  API uptime
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
-                  &lt;150ms
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground/60">
-                  Avg. processing time
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
-                  10 min
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground/60">
-                  Setup to first event
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Pricing ── */}
-        <section>
-          <div className="mx-auto max-w-5xl px-6 py-24">
-            <div className="mb-12 text-center">
+        {/* ───────────────────────── Pricing ───────────────────────── */}
+        <section id="pricing" className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
+            <div className="mb-14 text-center">
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                 Pricing
               </p>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 Only pay for orders you track
               </h2>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
                 PageView, ViewContent, AddToCart, and InitiateCheckout events are
                 free and unlimited on every plan. You only pay based on Purchase
-                events (orders).
+                events.
               </p>
             </div>
 
-            <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* Free */}
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
@@ -553,7 +657,7 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              {/* Growth */}
+              {/* Growth (highlighted) */}
               <Card className="relative border-brand-500/20 bg-gradient-to-b from-brand-500/[0.03] to-transparent shadow-none ring-1 ring-brand-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 flex items-center gap-2">
@@ -658,12 +762,27 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Final CTA ── */}
-        <section className="relative overflow-hidden border-t border-white/[0.06]">
-          <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgba(20,184,166,0.04) 0%, transparent 70%)' }} />
-          <div className="mx-auto max-w-5xl px-6 py-24">
-            <div className="mx-auto max-w-md text-center">
-              <h2 className="mb-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        {/* ───────────────────────── Final CTA ───────────────────────── */}
+        <section className="relative overflow-hidden">
+          {/* Blue gradient overlay */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, rgba(59,130,246,0.06) 0%, transparent 70%)",
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse at center bottom, rgba(20,184,166,0.04) 0%, transparent 50%)",
+            }}
+          />
+
+          <div className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
+            <div className="mx-auto max-w-lg text-center">
+              <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                 Start tracking in 10 minutes
               </h2>
               <p className="mb-8 text-sm text-muted-foreground">
@@ -681,26 +800,105 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-transparent" style={{ borderImage: 'linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1' }}>
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
-          <span className="text-sm font-semibold tracking-tight text-foreground">
-            <span className="text-brand-500">Track</span>&thinsp;Clear
-          </span>
-          <div className="flex items-center gap-6 text-xs text-muted-foreground/50">
-            <Link
-              href="/login"
-              className="transition-colors hover:text-foreground"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="transition-colors hover:text-foreground"
-            >
-              Sign up
-            </Link>
-            <span>&copy; {new Date().getFullYear()} Track Clear</span>
+      {/* ───────────────────────── Footer ───────────────────────── */}
+      <footer
+        className="border-t border-transparent"
+        style={{
+          borderImage:
+            "linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1",
+        }}
+      >
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          {/* Multi-column link grid */}
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+            <div>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+                Product
+              </h4>
+              <ul className="space-y-2.5">
+                {["Features", "Pricing", "Dashboard", "Documentation"].map(
+                  (item) => (
+                    <li key={item}>
+                      <a
+                        href="#"
+                        className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
+                      >
+                        {item}
+                      </a>
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+                Resources
+              </h4>
+              <ul className="space-y-2.5">
+                {[
+                  "How it works",
+                  "Shopify setup guide",
+                  "Meta CAPI docs",
+                ].map((item) => (
+                  <li key={item}>
+                    <a
+                      href="#"
+                      className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
+                    >
+                      {item}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+                Company
+              </h4>
+              <ul className="space-y-2.5">
+                {["About", "Contact", "Status"].map((item) => (
+                  <li key={item}>
+                    <a
+                      href="#"
+                      className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
+                    >
+                      {item}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+                Legal
+              </h4>
+              <ul className="space-y-2.5">
+                {["Privacy", "Terms"].map((item) => (
+                  <li key={item}>
+                    <a
+                      href="#"
+                      className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
+                    >
+                      {item}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/[0.06] pt-8 sm:flex-row">
+            <span className="text-sm font-semibold tracking-tight text-foreground">
+              <span className="text-brand-500">Track</span>&thinsp;Clear
+            </span>
+            <span className="text-xs text-muted-foreground/40">
+              &copy; {new Date().getFullYear()} Track Clear. All rights
+              reserved.
+            </span>
           </div>
         </div>
       </footer>
