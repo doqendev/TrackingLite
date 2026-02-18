@@ -306,6 +306,10 @@ Header: Content-Type: application/json
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.
 
+## Style Rules
+
+- **No emojis** — never use emojis in code, UI text, commit messages, or comments
+
 ## Must NOT Have (scope guardrails)
 
 - Shopify OAuth, Shopify session tokens, `@shopify/shopify-app-remix`

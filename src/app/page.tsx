@@ -63,7 +63,7 @@ export default function HomePage() {
         {/* ───────────────────────── Hero ───────────────────────── */}
         <div className="px-3 pt-2 sm:px-5 sm:pt-3">
           <section
-            className="relative overflow-hidden rounded-2xl sm:rounded-3xl"
+            className="relative overflow-hidden rounded-t-2xl sm:rounded-t-3xl"
             style={{
               backgroundImage:
                 "radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px)",
@@ -181,19 +181,16 @@ export default function HomePage() {
                     {
                       name: "Shopify Snippet",
                       status: "Connected",
-                      icon: "\uD83D\uDED2",
                       events: "5 event types",
                     },
                     {
                       name: "Track Clear API",
                       status: "Processing events",
-                      icon: "\u26A1",
                       events: "142ms avg",
                     },
                     {
                       name: "Meta CAPI",
                       status: "Forwarding",
-                      icon: "\uD83C\uDFAF",
                       events: "99.9% delivery",
                     },
                   ].map((card, i) => (
@@ -202,7 +199,6 @@ export default function HomePage() {
                       className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
                     >
                       <div className="mb-3 flex items-center justify-between">
-                        <span className="text-lg">{card.icon}</span>
                         <span className="flex items-center gap-1.5 text-[11px] text-emerald-400/80">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                           {card.status}
