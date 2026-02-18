@@ -93,30 +93,22 @@ export default function HomePage() {
 
           <div className="mx-auto max-w-6xl px-6 pb-28 pt-32 sm:pb-36 sm:pt-36">
             <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
-              <Badge
-                variant="outline"
-                className="mb-8 rounded-full border-white/[0.10] bg-white/[0.03] px-3.5 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm"
-              >
-                Server-side Meta CAPI for Shopify
-              </Badge>
-
               <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
-                Nothing blocked.
+                Your Meta Pixel misses
                 <br />
-                <span className="text-gradient">Everything clear.</span>
+                20&ndash;40% of conversions.
+                <br />
+                <span className="text-gradient">We catch them.</span>
               </h1>
 
-              <p className="mx-auto mb-10 max-w-xl text-base leading-relaxed text-muted-foreground">
-                Ad blockers silently kill 20&ndash;40% of your Meta Pixel data.
-                Track Clear captures every conversion server-side and forwards
-                it to Meta&apos;s Conversions API &mdash; bypassing blockers
-                entirely.
+              <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
+                Server-side tracking for Shopify &mdash; setup takes 10 minutes
               </p>
 
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <Button variant="brand" size="lg" asChild className="gap-2">
                   <Link href="/signup">
-                    Start free
+                    Get Started
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -129,10 +121,6 @@ export default function HomePage() {
                   <Link href="#how-it-works">See how it works</Link>
                 </Button>
               </div>
-
-              <p className="mt-5 text-xs text-muted-foreground/60">
-                Free forever up to 50 orders/mo &middot; No credit card required
-              </p>
             </div>
           </div>
         </section>
@@ -782,6 +770,9 @@ export default function HomePage() {
 
           <div className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
             <div className="mx-auto max-w-lg text-center">
+              <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-500/80">
+                Nothing blocked. Everything clear.
+              </p>
               <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                 Start tracking in 10 minutes
               </h2>
