@@ -35,12 +35,11 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
-# Copy prisma for db push at startup
+# Copy prisma CLI + schema for db push at startup
 COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /app/node_modules/.pnpm/prisma@*/node_modules/prisma ./node_modules/prisma
-COPY --from=build /app/node_modules/.pnpm/@prisma+engines@*/node_modules/@prisma/engines ./node_modules/@prisma/engines
+COPY --from=build /app/node_modules/prisma ./node_modules/prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node server.js"]
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js db push --accept-data-loss && node server.js"]
