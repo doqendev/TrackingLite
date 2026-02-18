@@ -1,13 +1,16 @@
 # ---- Stage 1: Dependencies ----
 FROM node:20-alpine AS deps
+RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
 # ---- Stage 2: Build ----
 FROM node:20-alpine AS build
+RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
