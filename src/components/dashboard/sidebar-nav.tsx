@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardList, Settings, CreditCard, Menu } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Settings, CreditCard, Menu, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -45,6 +46,28 @@ export function SidebarNav({ userEmail, workspaceName }: SidebarNavProps) {
   );
 }
 
+export function SidebarFooter({ userEmail, workspaceName }: SidebarNavProps) {
+  return (
+    <div className="p-4 border-t border-white/[0.06] space-y-3">
+      <div>
+        <p className="text-sm text-muted-foreground truncate font-medium">{userEmail}</p>
+        {workspaceName && (
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{workspaceName}</p>
+        )}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full justify-start text-muted-foreground hover:text-foreground"
+        onClick={() => signOut({ callbackUrl: "/login" })}
+      >
+        <LogOut className="h-4 w-4 mr-2" />
+        Log out
+      </Button>
+    </div>
+  );
+}
+
 export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -84,11 +107,22 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
               );
             })}
           </nav>
-          <div className="p-4 border-t border-white/[0.06]">
-            <p className="text-sm text-muted-foreground truncate font-medium">{userEmail}</p>
-            {workspaceName && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{workspaceName}</p>
-            )}
+          <div className="p-4 border-t border-white/[0.06] space-y-3">
+            <div>
+              <p className="text-sm text-muted-foreground truncate font-medium">{userEmail}</p>
+              {workspaceName && (
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{workspaceName}</p>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-muted-foreground hover:text-foreground"
+              onClick={() => { signOut({ callbackUrl: "/login" }); setOpen(false); }}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Log out
+            </Button>
           </div>
         </SheetContent>
       </Sheet>

@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import Link from "next/link";
-import { SidebarNav, MobileNav } from "@/components/dashboard/sidebar-nav";
+import { SidebarNav, SidebarFooter, MobileNav } from "@/components/dashboard/sidebar-nav";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -26,12 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </Link>
         </div>
         <SidebarNav userEmail={userEmail} workspaceName={workspaceName} />
-        <div className="p-4 border-t border-white/[0.06]">
-          <p className="text-sm text-muted-foreground truncate font-medium">{userEmail}</p>
-          {workspaceName && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5">{workspaceName}</p>
-          )}
-        </div>
+        <SidebarFooter userEmail={userEmail} workspaceName={workspaceName} />
       </aside>
 
       {/* Mobile header */}
