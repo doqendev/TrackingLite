@@ -64,163 +64,228 @@ export default function HomePage() {
         <div className="px-3 pt-2 sm:px-5 sm:pt-3">
           <section
             className="relative overflow-hidden rounded-t-2xl sm:rounded-t-3xl"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px)",
-              backgroundSize: "24px 24px",
-            }}
+            style={{ background: "linear-gradient(180deg, hsl(180,30%,6%) 0%, hsl(200,40%,5%) 100%)" }}
           >
-            {/* Layer 1: Deep sky glow at center-top */}
+            {/* Dot grid */}
             <div
-              className="pointer-events-none absolute inset-0"
+              className="pointer-events-none absolute inset-0 opacity-30"
               style={{
-                background:
-                  "radial-gradient(ellipse 120% 70% at 50% -10%, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0.06) 40%, transparent 70%)",
-              }}
-            />
-            {/* Layer 2: Horizon glow */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 100% 50% at 50% 30%, rgba(99,164,255,0.08) 0%, transparent 60%)",
-              }}
-            />
-            {/* Layer 3: Cloud-like elliptical accents */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 60% 30% at 25% 25%, rgba(147,197,253,0.06) 0%, transparent 50%), radial-gradient(ellipse 50% 25% at 75% 20%, rgba(96,165,250,0.05) 0%, transparent 50%)",
-              }}
-            />
-            {/* Layer 4: Teal accent */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 80% 40% at 60% 15%, rgba(20,184,166,0.04) 0%, transparent 50%)",
-              }}
-            />
-            {/* Layer 5: Bottom fade */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(to bottom, transparent 60%, hsl(222,47%,7%) 100%)",
+                backgroundImage:
+                  "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
               }}
             />
 
-            <div className="mx-auto max-w-6xl px-6 pb-16 pt-24 sm:pb-20 sm:pt-28">
-            <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
-              <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
-                Your Meta Pixel misses
-                <br />
-                20&ndash;40% of conversions.
-                <br />
-                <span className="text-gradient">We catch them.</span>
-              </h1>
+            {/* Teal atmospheric glow — center top */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 110% 60% at 50% -5%, rgba(20,184,166,0.14) 0%, rgba(16,185,129,0.04) 40%, transparent 70%)",
+              }}
+            />
+            {/* Secondary glow — right side */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 60% 80% at 90% 30%, rgba(16,185,129,0.08) 0%, transparent 60%)",
+              }}
+            />
+            {/* Subtle glow — left bottom */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 50% 50% at 10% 70%, rgba(20,184,166,0.05) 0%, transparent 50%)",
+              }}
+            />
 
-              <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
-                Server-side tracking for Shopify &mdash; setup takes 10 minutes
-              </p>
+            {/* ── Circuit board traces (SVG) ── */}
+            <svg
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              xmlns="http://www.w3.org/2000/svg"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="traceGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="rgba(16,185,129,0)" />
+                  <stop offset="30%" stopColor="rgba(16,185,129,0.3)" />
+                  <stop offset="70%" stopColor="rgba(16,185,129,0.3)" />
+                  <stop offset="100%" stopColor="rgba(16,185,129,0)" />
+                </linearGradient>
+                <linearGradient id="traceGradV" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(16,185,129,0)" />
+                  <stop offset="40%" stopColor="rgba(16,185,129,0.25)" />
+                  <stop offset="100%" stopColor="rgba(16,185,129,0)" />
+                </linearGradient>
+              </defs>
+              {/* Right-side horizontal traces */}
+              <line x1="65%" y1="18%" x2="100%" y2="18%" stroke="url(#traceGrad)" strokeWidth="1" />
+              <line x1="70%" y1="25%" x2="100%" y2="25%" stroke="url(#traceGrad)" strokeWidth="1" />
+              <line x1="75%" y1="32%" x2="100%" y2="15%" stroke="url(#traceGrad)" strokeWidth="0.5" />
+              {/* Right diagonal */}
+              <line x1="80%" y1="8%" x2="100%" y2="28%" stroke="url(#traceGrad)" strokeWidth="0.5" />
+              {/* Left-side traces */}
+              <line x1="0%" y1="65%" x2="30%" y2="65%" stroke="url(#traceGrad)" strokeWidth="1" />
+              <line x1="0%" y1="72%" x2="25%" y2="72%" stroke="url(#traceGrad)" strokeWidth="0.5" />
+              <line x1="5%" y1="58%" x2="20%" y2="75%" stroke="url(#traceGradV)" strokeWidth="0.5" />
+              {/* Vertical traces */}
+              <line x1="88%" y1="0%" x2="88%" y2="35%" stroke="url(#traceGradV)" strokeWidth="0.5" />
+              <line x1="92%" y1="5%" x2="92%" y2="40%" stroke="url(#traceGradV)" strokeWidth="0.5" />
+              {/* Connection nodes */}
+              <circle cx="88%" cy="18%" r="2.5" fill="rgba(16,185,129,0.4)" />
+              <circle cx="92%" cy="25%" r="2" fill="rgba(16,185,129,0.35)" />
+              <circle cx="80%" cy="18%" r="2" fill="rgba(16,185,129,0.3)" />
+              <circle cx="25%" cy="65%" r="2.5" fill="rgba(16,185,129,0.35)" />
+              <circle cx="20%" cy="72%" r="2" fill="rgba(16,185,129,0.3)" />
+              <circle cx="15%" cy="65%" r="1.5" fill="rgba(16,185,129,0.25)" />
+              {/* Right lower trace */}
+              <line x1="75%" y1="80%" x2="100%" y2="70%" stroke="url(#traceGrad)" strokeWidth="0.5" />
+              <circle cx="85%" cy="76%" r="1.5" fill="rgba(16,185,129,0.25)" />
+            </svg>
 
-              <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <Button variant="brand" size="lg" asChild className="gap-2 rounded-full px-8">
-                  <Link href="/signup">
-                    Get Started Free
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  asChild
-                  className="rounded-full border-white/[0.10] bg-transparent px-8 hover:bg-white/[0.04]"
-                >
-                  <Link href="#how-it-works">See how it works</Link>
-                </Button>
-              </div>
-            </div>
+            {/* Bottom fade to page background */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to bottom, transparent 70%, hsl(200,40%,5%) 100%)",
+              }}
+            />
 
-            {/* ── Product Visual (Railway-style dashboard mockup) ── */}
-            <div className="relative mx-auto mt-16 max-w-4xl sm:mt-20">
-              {/* Glow behind the card */}
-              <div
-                className="pointer-events-none absolute -inset-4 rounded-2xl opacity-40"
-                style={{
-                  background:
-                    "radial-gradient(ellipse at center, rgba(59,130,246,0.15) 0%, transparent 70%)",
-                }}
-              />
-              <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[hsl(222,47%,7%)] shadow-2xl shadow-blue-500/[0.04]">
-                {/* Mock header bar */}
-                <div className="flex items-center gap-1 border-b border-white/[0.06] px-4 py-2.5">
-                  <div className="flex items-center gap-1.5 mr-4">
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
-                  </div>
-                  {["Dashboard", "Events", "Settings"].map((tab, i) => (
-                    <span
-                      key={tab}
-                      className={`rounded-md px-3 py-1 text-[11px] font-medium ${
-                        i === 0
-                          ? "bg-white/[0.06] text-foreground"
-                          : "text-muted-foreground/50"
-                      }`}
-                    >
-                      {tab}
-                    </span>
-                  ))}
+            <div className="relative mx-auto max-w-6xl px-6 pb-8 pt-24 sm:pb-12 sm:pt-28">
+              <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
+                <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
+                  Your Meta Pixel misses
+                  <br />
+                  20&ndash;40% of conversions.
+                  <br />
+                  <span className="text-gradient">We catch them.</span>
+                </h1>
+
+                <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
+                  Server-side tracking for Shopify &mdash; setup takes 10 minutes
+                </p>
+
+                <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+                  <Button variant="brand" size="lg" asChild className="gap-2 rounded-full px-8">
+                    <Link href="/signup">
+                      Get Started Free
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    asChild
+                    className="rounded-full border-white/[0.10] bg-transparent px-8 hover:bg-white/[0.04]"
+                  >
+                    <Link href="#how-it-works">See how it works</Link>
+                  </Button>
                 </div>
+              </div>
 
-                {/* Pipeline cards */}
-                <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-3">
-                  {[
-                    {
-                      name: "Shopify Snippet",
-                      status: "Connected",
-                      events: "5 event types",
-                    },
-                    {
-                      name: "Track Clear API",
-                      status: "Processing events",
-                      events: "142ms avg",
-                    },
-                    {
-                      name: "Meta CAPI",
-                      status: "Forwarding",
-                      events: "99.9% delivery",
-                    },
-                  ].map((card, i) => (
-                    <div
-                      key={card.name}
-                      className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
-                    >
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-[11px] text-emerald-400/80">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                          {card.status}
-                        </span>
-                      </div>
-                      <div className="text-sm font-medium text-foreground">
-                        {card.name}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground/50">
-                        {card.events}
-                      </div>
-                      {/* Connector arrow (except last card) */}
-                      {i < 2 && (
-                        <div className="absolute -right-3 top-1/2 hidden -translate-y-1/2 text-muted-foreground/20 sm:block">
-                          {"\u2192"}
-                        </div>
-                      )}
+              {/* ── Product Visual ── */}
+              <div className="relative mx-auto mt-16 max-w-4xl sm:mt-20">
+                {/* Glow behind the card */}
+                <div
+                  className="pointer-events-none absolute -inset-6 rounded-2xl"
+                  style={{
+                    background:
+                      "radial-gradient(ellipse at center, rgba(16,185,129,0.10) 0%, transparent 70%)",
+                  }}
+                />
+                <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02] shadow-2xl shadow-emerald-500/[0.03] backdrop-blur-sm">
+                  {/* Mock header bar */}
+                  <div className="flex items-center gap-1 border-b border-white/[0.06] px-4 py-2.5">
+                    <div className="flex items-center gap-1.5 mr-4">
+                      <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
                     </div>
-                  ))}
+                    {["Dashboard", "Events", "Settings"].map((tab, i) => (
+                      <span
+                        key={tab}
+                        className={`rounded-md px-3 py-1 text-[11px] font-medium ${
+                          i === 0
+                            ? "bg-white/[0.06] text-foreground"
+                            : "text-muted-foreground/50"
+                        }`}
+                      >
+                        {tab}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Pipeline cards with connectors */}
+                  <div className="relative p-5">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                      {[
+                        {
+                          name: "Shopify Snippet",
+                          status: "Connected",
+                          detail: "5 event types",
+                        },
+                        {
+                          name: "Track Clear API",
+                          status: "Processing events",
+                          detail: "142ms avg",
+                          highlight: true,
+                        },
+                        {
+                          name: "Meta CAPI",
+                          status: "Forwarding",
+                          detail: "99.9% delivery",
+                        },
+                      ].map((card) => (
+                        <div
+                          key={card.name}
+                          className={`relative rounded-lg border p-4 ${
+                            card.highlight
+                              ? "border-emerald-500/20 bg-emerald-500/[0.03]"
+                              : "border-white/[0.06] bg-white/[0.02]"
+                          }`}
+                        >
+                          <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            {card.status}
+                          </div>
+                          <div className="text-sm font-medium text-foreground">
+                            {card.name}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground/50">
+                            {card.detail}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Connector lines between cards (desktop only) */}
+                    <svg
+                      className="pointer-events-none absolute inset-0 hidden h-full w-full sm:block"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      {/* Line from card 1 to card 2 */}
+                      <line
+                        x1="34.5%" y1="50%" x2="37%" y2="50%"
+                        stroke="rgba(16,185,129,0.3)"
+                        strokeWidth="2"
+                        strokeDasharray="4 3"
+                      />
+                      <circle cx="37%" cy="50%" r="3" fill="rgba(16,185,129,0.5)" />
+                      {/* Line from card 2 to card 3 */}
+                      <line
+                        x1="64.5%" y1="50%" x2="67%" y2="50%"
+                        stroke="rgba(16,185,129,0.3)"
+                        strokeWidth="2"
+                        strokeDasharray="4 3"
+                      />
+                      <circle cx="67%" cy="50%" r="3" fill="rgba(16,185,129,0.5)" />
+                    </svg>
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           </section>
         </div>
