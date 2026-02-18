@@ -46,8 +46,8 @@ export default async function DashboardPage() {
             <p className="text-sm text-muted-foreground mt-0.5">{workspace.domain}</p>
           )}
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/settings" className="inline-flex items-center gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/settings" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
             <Settings className="h-4 w-4" />
             Settings
           </Link>
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
 
       {/* Setup banner — shown when Meta credentials are missing */}
       {!hasMetaCredentials && (
-        <Alert className="border-amber-500/20 bg-amber-500/10 flex items-start gap-4">
+        <Alert className="border-amber-500/20 bg-amber-500/5 border-l-2 border-l-amber-500/40 flex items-start gap-4">
           <div className="flex-shrink-0 p-1.5 bg-amber-500/10 rounded-md">
             <AlertTriangle className="h-5 w-5 text-amber-400" />
           </div>
@@ -77,19 +77,19 @@ export default async function DashboardPage() {
 
       {/* Quick info row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
+        <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">API Key</p>
             <p className="text-sm font-mono text-foreground mt-1">{apiKeyPrefix}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Forwarded</p>
             <p className="text-sm font-semibold text-foreground mt-1">{workspace.eventsForwardedCount.toLocaleString()} events</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Workspace Since</p>
             <p className="text-sm font-semibold text-foreground mt-1">

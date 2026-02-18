@@ -147,10 +147,10 @@ export default async function BillingPage() {
               </span>
               <span className="text-muted-foreground">{usagePercent}%</span>
             </div>
-            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+            <div className={`h-2 rounded-full bg-secondary overflow-hidden ${usagePercent >= 80 ? 'shadow-sm shadow-amber-500/20' : ''}`}>
               <div
                 className={`h-full rounded-full transition-all ${
-                  usagePercent >= 90 ? "bg-red-500" : usagePercent >= 70 ? "bg-amber-500" : "bg-brand-500"
+                  usagePercent >= 90 ? "bg-gradient-to-r from-red-600 to-red-400" : usagePercent >= 70 ? "bg-gradient-to-r from-amber-600 to-amber-400" : "bg-gradient-to-r from-brand-600 to-brand-400"
                 }`}
                 style={{ width: `${usagePercent}%` }}
               />

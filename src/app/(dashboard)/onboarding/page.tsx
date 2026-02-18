@@ -136,18 +136,21 @@ export default function OnboardingPage() {
   // This avoids needing a separate route group while still giving onboarding
   // a clean, distraction-free full-page appearance.
   return (
-    <div className="fixed inset-0 z-50 bg-muted overflow-y-auto flex flex-col items-center justify-start py-12 px-4">
+    <div className="fixed inset-0 z-50 bg-background overflow-y-auto flex flex-col items-center justify-start py-12 px-4">
+      {/* Background effects */}
+      <div className="pointer-events-none fixed inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      <div className="pointer-events-none fixed inset-0" style={{ background: 'radial-gradient(ellipse at center top, rgba(20,184,166,0.06) 0%, transparent 60%)' }} />
       {/* Logo */}
-      <div className="mb-8">
-        <span className="text-2xl font-bold text-brand-500">TrackingLite</span>
+      <div className="mb-8 relative z-10">
+        <span className="text-2xl font-bold text-foreground tracking-tight"><span className="text-brand-500">T</span>rackingLite</span>
       </div>
 
       {/* Progress indicator */}
-      <div className="w-full max-w-xl mb-8">
+      <div className="w-full max-w-xl mb-8 relative z-10">
         <div className="flex items-center justify-between relative">
           <div className="absolute top-4 left-0 right-0 h-0.5 bg-border z-0" />
           <div
-            className="absolute top-4 left-0 h-0.5 bg-brand-500 z-0 transition-all duration-500"
+            className="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-brand-600 to-brand-400 z-0 transition-all duration-500"
             style={{ width: step === 0 ? "0%" : step === 1 ? "50%" : "100%" }}
           />
           {STEPS.map((label, i) => (
@@ -157,7 +160,7 @@ export default function OnboardingPage() {
                   i < step
                     ? "bg-brand-600 border-brand-600 text-white"
                     : i === step
-                    ? "bg-card border-brand-500 text-brand-500"
+                    ? "bg-card border-brand-500 text-brand-500 shadow-md shadow-brand-500/20"
                     : "bg-card border-border text-muted-foreground"
                 }`}
               >
@@ -180,7 +183,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Step content */}
-      <div className="w-full max-w-xl">
+      <div className="w-full max-w-xl relative z-10">
         {/* Step 0 — Workspace & Meta credentials */}
         {step === 0 && (
           <Card>
@@ -257,9 +260,9 @@ export default function OnboardingPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => router.push("/dashboard")}
+                    onClick={() => router.push("/")}
                   >
-                    Skip for now
+                    Back to home
                   </Button>
                   <Button
                     type="submit"
@@ -286,11 +289,11 @@ export default function OnboardingPage() {
             <CardContent className="space-y-5">
               <div>
                 <div className="relative">
-                  <div className="bg-zinc-900 rounded-lg overflow-hidden">
-                    <pre className="p-4 text-xs text-zinc-400 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
+                  <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
+                    <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
                       {snippet || "Loading snippet..."}
                     </pre>
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-900 via-zinc-900/95 to-transparent pt-12 pb-3 px-4 rounded-b-lg">
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pt-12 pb-3 px-4 rounded-b-lg">
                       <Button
                         type="button"
                         variant="brand"
@@ -395,7 +398,7 @@ export default function OnboardingPage() {
               </Button>
 
               {verifyResult === "success" && (
-                <Alert className="border-green-500/20 bg-green-500/10">
+                <Alert className="border-green-500/20 bg-green-500/10 shadow-sm shadow-green-500/10">
                   <CheckCircle2 className="h-5 w-5 text-green-400" />
                   <AlertDescription className="text-green-400">
                     <p className="font-semibold">It&apos;s working!</p>
@@ -424,7 +427,7 @@ export default function OnboardingPage() {
                 </Button>
                 <Button
                   type="button"
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  variant="brand"
                   onClick={handleFinish}
                 >
                   Go to Dashboard

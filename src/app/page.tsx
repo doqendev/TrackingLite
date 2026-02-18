@@ -8,19 +8,20 @@ import {
   Check,
   Shield,
   BarChart3,
+  Smartphone,
 } from "lucide-react";
 
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* ── Sticky Nav ── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-transparent bg-background/80 backdrop-blur-md" style={{ borderImage: 'linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1' }}>
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
           <Link
             href="/"
             className="text-sm font-semibold tracking-tight text-foreground"
           >
-            TrackingLite
+            <span className="text-brand-500">T</span>rackingLite
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
@@ -43,11 +44,12 @@ export default function HomePage() {
             backgroundSize: "24px 24px",
           }}
         >
+          <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at center top, rgba(20,184,166,0.06) 0%, transparent 60%)' }} />
           <div className="mx-auto max-w-5xl px-6 pb-28 pt-24 sm:pb-32 sm:pt-28">
-            <div className="mx-auto max-w-2xl text-center">
+            <div className="mx-auto max-w-2xl text-center animate-fade-in-up">
               <Badge
                 variant="outline"
-                className="mb-8 rounded-full border-white/[0.08] bg-white/[0.03] px-3.5 py-1 text-xs font-medium text-muted-foreground"
+                className="mb-8 rounded-full border-white/[0.10] bg-white/[0.03] px-3.5 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm"
               >
                 Server-side Meta CAPI for Shopify
               </Badge>
@@ -57,7 +59,7 @@ export default function HomePage() {
                 <br />
                 20-40% of conversions.
                 <br />
-                <span className="text-brand-500">We catch them.</span>
+                <span className="text-gradient">We catch them.</span>
               </h1>
 
               <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
@@ -106,7 +108,7 @@ export default function HomePage() {
               </h2>
             </div>
 
-            <div className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.02]">
+            <div className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02]">
               {/* Terminal chrome */}
               <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
@@ -133,7 +135,7 @@ export default function HomePage() {
                   {"\n"}
                   <span className="text-muted-foreground/60">{"  \u2514"} Sent to Meta CAPI</span>
                   <span className="text-muted-foreground/40">{"        142ms  "}</span>
-                  <span className="text-brand-500">{"\u2713"} 200 OK</span>
+                  <span className="text-brand-500"><span className="animate-pulse-glow">{"\u2713"}</span>{" 200 OK"}</span>
                   {"\n\n"}
                   <span className="text-muted-foreground/50">{"// "}Purchase $127.50 &mdash; order #4891</span>
                   {"\n"}
@@ -148,7 +150,7 @@ export default function HomePage() {
                   {"\n"}
                   <span className="text-muted-foreground/60">{"  \u2514"} Sent to Meta CAPI</span>
                   <span className="text-muted-foreground/40">{"        138ms  "}</span>
-                  <span className="text-brand-500">{"\u2713"} 200 OK</span>
+                  <span className="text-brand-500"><span className="animate-pulse-glow">{"\u2713"}</span>{" 200 OK"}</span>
                   {"\n\n"}
                   <span className="text-muted-foreground/50">{"// "}AddToCart &mdash; SKU-8812 x2</span>
                   {"\n"}
@@ -160,7 +162,7 @@ export default function HomePage() {
                   {"\n"}
                   <span className="text-muted-foreground/60">{"  \u2514"} Sent to Meta CAPI</span>
                   <span className="text-muted-foreground/40">{"        129ms  "}</span>
-                  <span className="text-brand-500">{"\u2713"} 200 OK</span>
+                  <span className="text-brand-500"><span className="animate-pulse-glow">{"\u2713"}</span>{" 200 OK"}</span>
                 </code>
               </pre>
             </div>
@@ -172,7 +174,7 @@ export default function HomePage() {
           <div className="mx-auto max-w-5xl px-6 py-24">
             <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
               {/* Left: Code snippet */}
-              <div className="overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.02]">
+              <div className="overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02]">
                 <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
                   <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
                   <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
@@ -274,7 +276,7 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
                 <CardContent className="p-6">
                   <Shield className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -291,9 +293,9 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
                 <CardContent className="p-6">
-                  <Shield className="mb-4 h-5 w-5 text-brand-500" />
+                  <Smartphone className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
                     iOS 14+ breaks attribution
                   </h3>
@@ -305,7 +307,7 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
                 <CardContent className="p-6">
                   <BarChart3 className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -344,7 +346,7 @@ export default function HomePage() {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-foreground">
                     1
                   </div>
-                  <div className="mt-3 w-px flex-1 bg-white/[0.06]" />
+                  <div className="mt-3 w-px flex-1 bg-gradient-to-b from-white/[0.08] to-white/[0.02]" />
                 </div>
                 <div className="pb-2 pt-1">
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -365,7 +367,7 @@ export default function HomePage() {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-foreground">
                     2
                   </div>
-                  <div className="mt-3 w-px flex-1 bg-white/[0.06]" />
+                  <div className="mt-3 w-px flex-1 bg-gradient-to-b from-white/[0.08] to-white/[0.02]" />
                 </div>
                 <div className="pb-2 pt-1">
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -386,7 +388,7 @@ export default function HomePage() {
               {/* Step 3 */}
               <div className="flex gap-6">
                 <div className="flex flex-col items-center">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/10 text-xs font-semibold text-brand-400">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/10 text-xs font-semibold text-brand-400 shadow-sm shadow-brand-500/20">
                     3
                   </div>
                 </div>
@@ -414,7 +416,7 @@ export default function HomePage() {
           <div className="mx-auto max-w-5xl px-6 py-14">
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
               <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground">
+                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
                   18M+
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground/60">
@@ -422,7 +424,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground">
+                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
                   99.9%
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground/60">
@@ -430,7 +432,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground">
+                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
                   &lt;150ms
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground/60">
@@ -438,7 +440,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold tracking-tight text-foreground">
+                <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
                   10 min
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground/60">
@@ -468,7 +470,7 @@ export default function HomePage() {
 
             <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* Free */}
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                     Free
@@ -508,7 +510,7 @@ export default function HomePage() {
               </Card>
 
               {/* Starter */}
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                     Starter
@@ -552,7 +554,7 @@ export default function HomePage() {
               </Card>
 
               {/* Growth */}
-              <Card className="relative border-brand-500/20 bg-white/[0.02] shadow-none ring-1 ring-brand-500/20">
+              <Card className="relative border-brand-500/20 bg-gradient-to-b from-brand-500/[0.03] to-transparent shadow-none ring-1 ring-brand-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 flex items-center gap-2">
                     <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
@@ -560,7 +562,7 @@ export default function HomePage() {
                     </span>
                     <Badge
                       variant="outline"
-                      className="rounded-full border-brand-500/20 bg-brand-500/10 px-2 py-0 text-[10px] font-medium text-brand-400"
+                      className="rounded-full border-brand-500/20 bg-brand-500/10 px-2 py-0 text-[10px] font-medium text-brand-400 glow-brand"
                     >
                       Most popular
                     </Badge>
@@ -604,7 +606,7 @@ export default function HomePage() {
               </Card>
 
               {/* Scale */}
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                     Scale
@@ -657,7 +659,8 @@ export default function HomePage() {
         </section>
 
         {/* ── Final CTA ── */}
-        <section className="border-t border-white/[0.06]">
+        <section className="relative overflow-hidden border-t border-white/[0.06]">
+          <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgba(20,184,166,0.04) 0%, transparent 70%)' }} />
           <div className="mx-auto max-w-5xl px-6 py-24">
             <div className="mx-auto max-w-md text-center">
               <h2 className="mb-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -679,10 +682,10 @@ export default function HomePage() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-white/[0.06]">
+      <footer className="border-t border-transparent" style={{ borderImage: 'linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1' }}>
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
           <span className="text-sm font-semibold tracking-tight text-foreground">
-            TrackingLite
+            <span className="text-brand-500">T</span>rackingLite
           </span>
           <div className="flex items-center gap-6 text-xs text-muted-foreground/50">
             <Link

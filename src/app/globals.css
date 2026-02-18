@@ -24,28 +24,38 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+    --chart-1: 173 58% 39%;
+    --chart-2: 197 37% 24%;
+    --chart-3: 43 74% 66%;
+    --chart-4: 27 87% 67%;
+    --chart-5: 12 76% 61%;
   }
 
   .dark {
-    --background: 228 16% 4%;
+    --background: 240 15% 3.5%;
     --foreground: 220 15% 96%;
-    --card: 228 14% 7%;
+    --card: 235 14% 6%;
     --card-foreground: 220 15% 96%;
-    --popover: 228 14% 7%;
+    --popover: 235 14% 6%;
     --popover-foreground: 220 15% 96%;
     --primary: 220 15% 96%;
-    --primary-foreground: 228 16% 4%;
-    --secondary: 225 12% 11%;
+    --primary-foreground: 240 15% 3.5%;
+    --secondary: 230 12% 10%;
     --secondary-foreground: 220 15% 90%;
-    --muted: 225 12% 11%;
+    --muted: 230 10% 8%;
     --muted-foreground: 220 8% 46%;
-    --accent: 225 12% 11%;
+    --accent: 230 12% 10%;
     --accent-foreground: 220 15% 90%;
     --destructive: 0 63% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 225 10% 11%;
-    --input: 225 10% 14%;
+    --border: 230 8% 10%;
+    --input: 230 10% 14%;
     --ring: 172 66% 40%;
+    --chart-1: 173 58% 39%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 43 74% 66%;
+    --chart-4: 27 87% 67%;
+    --chart-5: 12 76% 61%;
   }
 }
 
@@ -53,7 +63,100 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground;
+  }
+  ::selection {
+    @apply bg-brand-500/20 text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Glow effects */
+  .glow-brand {
+    box-shadow: 0 0 20px rgba(20, 184, 166, 0.15), 0 0 60px rgba(20, 184, 166, 0.05);
+  }
+  .glow-brand-lg {
+    box-shadow: 0 0 30px rgba(20, 184, 166, 0.2), 0 0 80px rgba(20, 184, 166, 0.08);
+  }
+  .glow-card {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 24px rgba(0, 0, 0, 0.3);
+  }
+  .glow-card-hover {
+    box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.12), 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 40px rgba(20, 184, 166, 0.04);
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 50%, #0d9488 100%);
+  }
+
+  /* Animations */
+  .animate-fade-in {
+    animation: fade-in 0.6s ease-out both;
+  }
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s ease-out both;
+  }
+  .animate-slide-in-left {
+    animation: slide-in-left 0.3s ease-out both;
+  }
+
+  /* Tabular numbers for stats */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
   }
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, ArrowRight } from "lucide-react";
 
 interface RecentEventsProps {
   workspaceId: string;
@@ -61,19 +61,19 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between px-5 py-4">
         <h3 className="text-sm font-semibold text-foreground">Recent Events</h3>
-        <Link href="/events" className="text-xs text-brand-500 hover:text-brand-400 font-medium">
-          View all
+        <Link href="/events" className="text-xs text-brand-500 hover:text-brand-400 font-medium inline-flex items-center gap-1 group">
+          View all <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </CardHeader>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs font-medium uppercase tracking-wider px-5 py-3">Time</TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wider px-5 py-3">Event</TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wider px-5 py-3">Event ID</TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wider px-5 py-3">Status</TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wider px-5 py-3">Page</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Time</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event ID</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Status</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Page</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -90,7 +90,7 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
                 : "—";
 
               return (
-                <TableRow key={event.id}>
+                <TableRow key={event.id} className="transition-colors hover:bg-white/[0.02]">
                   <TableCell className="px-5 py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {formatRelativeTime(event.createdAt)}
                   </TableCell>

@@ -129,6 +129,7 @@ export default async function EventsPage({
             <Button
               variant={!filterEventName ? "brand" : "secondary"}
               size="sm"
+              className="rounded-full"
               asChild
             >
               <Link href={buildHref({ eventName: undefined, page: "1" })}>
@@ -140,6 +141,7 @@ export default async function EventsPage({
                 key={name}
                 variant={filterEventName === name ? "brand" : "secondary"}
                 size="sm"
+                className="rounded-full"
                 asChild
               >
                 <Link href={buildHref({ eventName: name, page: "1" })}>
@@ -154,8 +156,9 @@ export default async function EventsPage({
           {/* Status filter */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <Button
-              variant={!filterStatus ? "default" : "secondary"}
+              variant={!filterStatus ? "brand" : "secondary"}
               size="sm"
+              className="rounded-full"
               asChild
             >
               <Link href={buildHref({ status: undefined, page: "1" })}>
@@ -167,8 +170,9 @@ export default async function EventsPage({
               return (
                 <Button
                   key={s}
-                  variant={filterStatus === s ? "default" : "secondary"}
+                  variant={filterStatus === s ? "brand" : "secondary"}
                   size="sm"
+                  className="rounded-full"
                   asChild
                 >
                   <Link href={buildHref({ status: s, page: "1" })}>
@@ -184,8 +188,8 @@ export default async function EventsPage({
       {/* Events table */}
       {events.length === 0 ? (
         <Card className="p-12 text-center">
-          <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-base font-medium text-muted-foreground">No events found</p>
+          <ClipboardList className="h-14 w-14 text-brand-500/30 mx-auto mb-4" />
+          <p className="text-base font-semibold text-foreground">No events found</p>
           <p className="text-sm text-muted-foreground mt-1">
             {filterEventName || filterStatus
               ? "Try adjusting your filters"
@@ -194,7 +198,7 @@ export default async function EventsPage({
           {(filterEventName || filterStatus) && (
             <Link
               href="/events"
-              className="mt-4 inline-flex items-center gap-1 text-sm text-brand-500 hover:text-brand-400 font-medium"
+              className="mt-4 inline-flex items-center gap-1 text-sm text-brand-500 hover:text-brand-400 font-medium underline underline-offset-4"
             >
               Clear filters
             </Link>
@@ -227,7 +231,7 @@ export default async function EventsPage({
                   }
 
                   return (
-                    <TableRow key={event.id}>
+                    <TableRow key={event.id} className="transition-colors hover:bg-white/[0.02]">
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {formatRelativeTime(event.createdAt)}
                       </TableCell>
@@ -258,7 +262,7 @@ export default async function EventsPage({
                       <TableCell className="max-w-[200px]">
                         {event.errorMessage ? (
                           <span
-                            className="text-xs text-red-600 truncate block"
+                            className="text-xs text-red-400 truncate block"
                             title={event.errorMessage}
                           >
                             {event.errorMessage.length > 35
@@ -277,7 +281,7 @@ export default async function EventsPage({
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06] bg-muted">
+          <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06] bg-card/50">
             <p className="text-xs text-muted-foreground">
               Page {page} of {totalPages} &middot; {total.toLocaleString()} events
             </p>

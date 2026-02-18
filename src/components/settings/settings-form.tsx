@@ -191,8 +191,9 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
               />
             </div>
             <div>
-              <Label htmlFor="accessToken" className="mb-1">
+              <Label htmlFor="accessToken" className="mb-1 flex items-center gap-2">
                 Access Token
+                <span className="text-[10px] font-medium text-brand-500/70 bg-brand-500/10 px-1.5 py-0.5 rounded">encrypted at rest</span>
               </Label>
               <Input
                 id="accessToken"
@@ -237,7 +238,10 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
               {eventToggleItems.map(({ key, label, description }) => (
                 <div key={key} className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor={key}>{label}</Label>
+                    <Label htmlFor={key} className="flex items-center gap-2">
+                      <span className={`h-1.5 w-1.5 rounded-full ${toggles[key] ? 'bg-green-500' : 'bg-muted-foreground/30'}`} />
+                      {label}
+                    </Label>
                     <p className="text-xs text-muted-foreground">{description}</p>
                   </div>
                   <Switch
@@ -312,7 +316,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
           </Button>
         </CardHeader>
         <CardContent>
-          <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto leading-relaxed font-mono whitespace-pre-wrap break-all">
+          <pre className="bg-black/40 text-foreground/80 rounded-lg p-4 text-xs overflow-x-auto leading-relaxed font-mono whitespace-pre-wrap break-all border border-white/[0.06]">
             {snippet || "Loading snippet\u2026"}
           </pre>
           <p className="text-xs text-muted-foreground mt-3">
@@ -322,10 +326,10 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
       </Card>
 
       {/* 5. Danger Zone */}
-      <Card className="border-red-500/20">
-        <CardHeader className="bg-red-500/10 border-b border-red-500/20">
-          <CardTitle className="text-destructive">Danger Zone</CardTitle>
-          <CardDescription className="text-destructive/80">These actions are irreversible or disruptive.</CardDescription>
+      <Card className="border-red-500/10 border-l-2 border-l-red-500/30">
+        <CardHeader className="border-b border-red-500/10">
+          <CardTitle className="text-red-400">Danger Zone</CardTitle>
+          <CardDescription className="text-red-400/60">These actions are irreversible or disruptive.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-start justify-between gap-4">

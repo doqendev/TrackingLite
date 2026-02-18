@@ -158,17 +158,17 @@ function PlanCard({
 
   return (
     <Card
-      className={`relative border-2 p-6 flex flex-col ${
+      className={`relative border-2 p-6 flex flex-col transition-all duration-300 hover:-translate-y-0.5 ${
         highlighted
-          ? "border-brand-500 shadow-md"
+          ? "border-brand-500 shadow-md hover:shadow-lg hover:shadow-brand-500/10"
           : isCurrentPlan
-          ? "border-green-400"
-          : ""
+          ? "border-green-500/30"
+          : "hover:border-white/[0.12]"
       }`}
     >
       {highlighted && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <Badge className="bg-brand-500 text-white">Most Popular</Badge>
+          <Badge className="bg-brand-500 text-white glow-brand">Most Popular</Badge>
         </div>
       )}
 
@@ -192,11 +192,11 @@ function PlanCard({
         <h3 className="text-lg font-bold text-foreground">{plan.name}</h3>
         <div className="flex items-baseline gap-1 mt-2">
           {plan.priceMonthly === 0 ? (
-            <span className="text-3xl font-extrabold text-foreground">Free</span>
+            <span className="text-4xl font-extrabold text-foreground">Free</span>
           ) : (
             <>
-              <span className="text-3xl font-extrabold text-foreground">${plan.priceMonthly}</span>
-              <span className="text-sm text-muted-foreground">/month</span>
+              <span className="text-4xl font-extrabold text-foreground tabular-nums">${plan.priceMonthly}</span>
+              <span className="text-xs text-muted-foreground/60">/month</span>
             </>
           )}
         </div>
@@ -205,7 +205,7 @@ function PlanCard({
       <ul className="space-y-2.5 flex-1 mb-4">
         {plan.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2.5 text-sm text-foreground">
-            <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+            <Check className="h-4 w-4 text-brand-500 flex-shrink-0 mt-0.5" />
             {feature}
           </li>
         ))}

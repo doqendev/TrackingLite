@@ -49,7 +49,7 @@ export async function StatsCards({ workspaceId }: StatsCardsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Total Events */}
-      <Card>
+      <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-muted-foreground">Total Events (24h)</p>
@@ -57,13 +57,13 @@ export async function StatsCards({ workspaceId }: StatsCardsProps) {
               <Zap className="h-4 w-4 text-brand-500" />
             </span>
           </div>
-          <p className="text-3xl font-bold text-foreground">{totalEvents.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-foreground tabular-nums">{totalEvents.toLocaleString()}</p>
           <p className="text-xs text-muted-foreground mt-1">Events received in last 24 hours</p>
         </CardContent>
       </Card>
 
       {/* Success Rate */}
-      <Card>
+      <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
@@ -71,13 +71,13 @@ export async function StatsCards({ workspaceId }: StatsCardsProps) {
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             </span>
           </div>
-          <p className={`text-3xl font-bold ${successRateColor}`}>{successRate}%</p>
+          <p className={`text-3xl font-bold tabular-nums ${successRateColor}`}>{successRate}%</p>
           <p className="text-xs text-muted-foreground mt-1">{sentEvents} of {totalEvents} delivered to Meta</p>
         </CardContent>
       </Card>
 
       {/* Failed Events */}
-      <Card>
+      <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-muted-foreground">Failed Events</p>
@@ -85,7 +85,7 @@ export async function StatsCards({ workspaceId }: StatsCardsProps) {
               <AlertCircle className={`h-4 w-4 ${failedEvents > 0 ? "text-red-500" : "text-muted-foreground"}`} />
             </span>
           </div>
-          <p className={`text-3xl font-bold ${failedEvents > 0 ? "text-red-600" : "text-foreground"}`}>
+          <p className={`text-3xl font-bold tabular-nums ${failedEvents > 0 ? "text-red-600" : "text-foreground"}`}>
             {failedEvents.toLocaleString()}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -95,7 +95,7 @@ export async function StatsCards({ workspaceId }: StatsCardsProps) {
       </Card>
 
       {/* Last Event */}
-      <Card>
+      <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-muted-foreground">Last Event</p>
@@ -103,7 +103,7 @@ export async function StatsCards({ workspaceId }: StatsCardsProps) {
               <Clock className="h-4 w-4 text-purple-500" />
             </span>
           </div>
-          <p className="text-3xl font-bold text-foreground">
+          <p className="text-3xl font-bold text-foreground tabular-nums">
             {formatRelativeTime(lastEvent?.createdAt ?? null)}
           </p>
           <p className="text-xs text-muted-foreground mt-1">

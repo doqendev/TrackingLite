@@ -39,10 +39,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="rounded-2xl bg-card px-8 py-10 shadow-lg ring-1 ring-white/[0.06]">
+    <div className="rounded-2xl bg-card px-8 py-10 shadow-lg ring-1 ring-white/[0.06] glow-card border-t-2 border-brand-500/40">
       {/* Branding */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">TrackingLite</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground"><span className="text-brand-500">T</span>rackingLite</h1>
         <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
       </div>
 
@@ -50,7 +50,7 @@ export default function LoginPage() {
       <Button
         type="button"
         variant="outline"
-        className="w-full"
+        className="w-full transition-shadow hover:shadow-md hover:shadow-black/20"
         onClick={handleGoogleSignIn}
         disabled={loading}
       >
@@ -64,9 +64,9 @@ export default function LoginPage() {
       </Button>
 
       <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
+        <div className="h-px flex-1 bg-border/50" />
         <span className="text-xs text-muted-foreground">or continue with email</span>
-        <div className="h-px flex-1 bg-border" />
+        <div className="h-px flex-1 bg-border/50" />
       </div>
 
       {/* Error */}
