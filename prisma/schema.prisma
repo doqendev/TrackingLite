@@ -109,6 +109,10 @@ model EventLog {
   fbp            String?     // _fbp cookie value
   fbc            String?     // _fbc cookie value
   pageUrl        String?     // URL where event occurred
+  value          Float?      // monetary value (e.g., cart total, purchase amount)
+  currency       String?     // ISO 4217 currency code (e.g., "USD", "BRL")
+  numItems       Int?        // number of items in cart/order
+  orderId        String?     // Shopify order ID (for dedup)
   createdAt      DateTime    @default(now())
 
   @@index([workspaceId, createdAt])

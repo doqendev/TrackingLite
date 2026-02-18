@@ -87,6 +87,8 @@ export default async function EventsPage({
         pageUrl: true,
         errorMessage: true,
         retryCount: true,
+        value: true,
+        currency: true,
         createdAt: true,
       },
     }),
@@ -214,6 +216,7 @@ export default async function EventsPage({
                   <TableHead className="whitespace-nowrap">Event Type</TableHead>
                   <TableHead className="whitespace-nowrap">Event ID</TableHead>
                   <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap">Value</TableHead>
                   <TableHead className="whitespace-nowrap">Page URL</TableHead>
                   <TableHead className="whitespace-nowrap">Error</TableHead>
                 </TableRow>
@@ -250,6 +253,16 @@ export default async function EventsPage({
                             <span className="opacity-70">({event.retryCount}x)</span>
                           )}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {event.value !== null ? (
+                          <span className="text-sm font-medium text-foreground tabular-nums">
+                            {event.currency ? `${event.currency} ` : '$'}
+                            {event.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="max-w-[200px]">
                         <span

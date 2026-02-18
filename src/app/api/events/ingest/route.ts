@@ -4,6 +4,7 @@ import { getEventQueue } from "@/lib/queue";
 import { shouldSendEvent } from "@/lib/consent";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkOrderLimits, incrementOrderCount } from "@/lib/billing";
+import { extractCustomData } from "@/lib/extract-custom-data";
 import { z } from "zod";
 
 const IngestPayloadSchema = z.object({
@@ -130,7 +131,10 @@ export async function POST(request: NextRequest) {
                      "unknown";
     const userAgent = request.headers.get("user-agent") || "";
 
-    // 10. Create EventLog record
+    // 10. Extract monetary fields from customData
+    const extracted = extractCustomData(payload.customData);
+
+    // 11. Create EventLog record
     const eventLog = await db.eventLog.create({
       data: {
         workspaceId: workspace.id,
@@ -147,10 +151,14 @@ export async function POST(request: NextRequest) {
         fbp: payload.fbp || null,
         fbc: payload.fbc || null,
         pageUrl: payload.url || null,
+        value: extracted.value,
+        currency: extracted.currency,
+        numItems: extracted.numItems,
+        orderId: extracted.orderId,
       },
     });
 
-    // 11. Queue Meta CAPI send
+    // 12. Queue Meta CAPI send
     await getEventQueue().add("send-meta-event", {
       workspaceId: workspace.id,
       pixelId: workspace.metaPixelId,
@@ -174,12 +182,12 @@ export async function POST(request: NextRequest) {
       eventLogId: eventLog.id,
     });
 
-    // 12. Increment order count only for Purchase events
+    // 13. Increment order count only for Purchase events
     if (payload.eventName === "Purchase") {
       await incrementOrderCount(workspace.userId);
     }
 
-    // 13. Return success
+    // 14. Return success
     const response: any = { success: true, eventId: payload.eventId };
     if (billing.upgraded) {
       response.upgraded = true;
