@@ -42,7 +42,7 @@ export default function LoginPage() {
     <div className="rounded-2xl bg-card px-8 py-10 shadow-lg ring-1 ring-white/[0.06] glow-card border-t-2 border-brand-500/40">
       {/* Branding */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground"><span className="text-brand-500">T</span>rackingLite</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground"><span className="text-brand-500">Track</span>&thinsp;Clear</h1>
         <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
       </div>
 

@@ -74,7 +74,7 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
 
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 z-10 h-14 bg-background/80 backdrop-blur-md border-b border-white/[0.06] flex items-center justify-between px-4">
-      <Link href="/dashboard" className="text-lg font-bold text-foreground tracking-tight"><span className="text-brand-500">T</span>rackingLite</Link>
+      <Link href="/dashboard" className="text-lg font-bold text-foreground tracking-tight"><span className="text-brand-500">Track</span>&thinsp;Clear</Link>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" aria-label="Open navigation menu">
@@ -83,7 +83,7 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0">
           <div className="flex h-16 items-center px-6 border-b border-white/[0.06]">
-            <span className="text-xl font-bold text-foreground tracking-tight"><span className="text-brand-500">T</span>rackingLite</span>
+            <span className="text-xl font-bold text-foreground tracking-tight"><span className="text-brand-500">Track</span>&thinsp;Clear</span>
           </div>
           <nav className="flex-1 p-4 space-y-1">
             {navItems.map(({ href, label, icon: Icon }) => {

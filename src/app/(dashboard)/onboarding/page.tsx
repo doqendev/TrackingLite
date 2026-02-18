@@ -142,7 +142,7 @@ export default function OnboardingPage() {
       <div className="pointer-events-none fixed inset-0" style={{ background: 'radial-gradient(ellipse at center top, rgba(20,184,166,0.06) 0%, transparent 60%)' }} />
       {/* Logo */}
       <div className="mb-8 relative z-10">
-        <span className="text-2xl font-bold text-foreground tracking-tight"><span className="text-brand-500">T</span>rackingLite</span>
+        <span className="text-2xl font-bold text-foreground tracking-tight"><span className="text-brand-500">Track</span>&thinsp;Clear</span>
       </div>
 
       {/* Progress indicator */}

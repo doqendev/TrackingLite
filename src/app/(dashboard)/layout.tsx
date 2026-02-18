@@ -22,7 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <aside className="hidden md:flex md:w-64 md:flex-col border-r border-white/[0.06] bg-gradient-to-b from-card/60 to-card/40 backdrop-blur-md">
         <div className="flex h-14 items-center px-6 border-b border-white/[0.08]">
           <Link href="/dashboard" className="text-lg font-semibold text-foreground tracking-tight">
-            <span className="text-brand-500">T</span>rackingLite
+            <span className="text-brand-500">Track</span>&thinsp;Clear
           </Link>
         </div>
         <SidebarNav userEmail={userEmail} workspaceName={workspaceName} />
