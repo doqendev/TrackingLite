@@ -22,7 +22,7 @@ Small-to-mid Shopify stores running Meta ads. Free plan (50 orders/mo), paid pla
 
 **MVP is functionally complete.** All core features are implemented and working:
 - Build: 19 routes, compiles clean
-- Unit tests: 177/177 passing (10 test files)
+- Unit tests: 204/204 passing (11 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 errors
 - Lint: 0 warnings/errors
@@ -150,6 +150,7 @@ src/
     queue.ts                          # Lazy BullMQ queue (meta-events), MetaEventJob interface
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
     api-key-cache.ts                  # Redis-cached workspace lookup (UNUSED - see known issues)
+    extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
   types/
     meta-capi.ts                      # MetaCapiEvent, MetaUserData, MetaCustomData, etc.
     events.ts                         # SnippetEventPayload
@@ -186,6 +187,7 @@ prisma/
 - User has many Workspaces (unlimited), one Subscription
 - Workspace has many EventLogs
 - Workspace stores encrypted Meta credentials (metaAccessTokenEncrypted + Iv + Tag)
+- EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 
 **Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), EventName (5 events), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus (TRIALING/ACTIVE/PAST_DUE/CANCELED/UNPAID)
 
