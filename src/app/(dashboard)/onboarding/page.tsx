@@ -323,7 +323,7 @@ export default function OnboardingPage() {
                   <ol className="list-decimal list-inside space-y-1.5 text-sm text-brand-300">
                     <li>Go to <strong>Settings &rarr; Customer Events</strong> in your Shopify admin</li>
                     <li>Click <strong>Add Custom Pixel</strong></li>
-                    <li>Give it a name (e.g. &quot;TrackingLite&quot;) and paste the snippet above</li>
+                    <li>Give it a name (e.g. &quot;Track Clear&quot;) and paste the snippet above</li>
                     <li>Click <strong>Save &amp; Connect</strong></li>
                   </ol>
                 </AlertDescription>

@@ -1,4 +1,4 @@
-# TrackingLite --- Project Status & Audit
+# Track Clear --- Project Status & Audit
 
 Last updated: 2026-02-18 (post dashboard analytics feature)
 

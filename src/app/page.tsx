@@ -21,7 +21,7 @@ export default function HomePage() {
             href="/"
             className="text-sm font-semibold tracking-tight text-foreground"
           >
-            <span className="text-brand-500">T</span>rackingLite
+            <span className="text-brand-500">Track</span>&thinsp;Clear
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
@@ -67,7 +67,7 @@ export default function HomePage() {
                 <code className="rounded bg-white/[0.04] px-1.5 py-0.5 font-mono text-xs text-foreground/70">
                   connect.facebook.net
                 </code>{" "}
-                before your pixel fires. TrackingLite captures every event
+                before your pixel fires. Track Clear captures every event
                 server-side and forwards it to Meta&apos;s Conversions API. Setup
                 takes 10 minutes. No developer needed.
               </p>
@@ -115,7 +115,7 @@ export default function HomePage() {
                 <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
                 <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
                 <span className="ml-2 text-[11px] text-muted-foreground/40">
-                  trackinglite &mdash; event pipeline
+                  trackclear &mdash; event pipeline
                 </span>
               </div>
 
@@ -195,7 +195,7 @@ export default function HomePage() {
                     <span className="text-foreground/70">{"  "}</span>
                     <span className="text-brand-500">{"fetch"}</span>
                     <span className="text-foreground/70">{"("}</span>
-                    <span className="text-amber-400/80">{'"https://api.trackinglite.com"'}</span>
+                    <span className="text-amber-400/80">{'"https://api.trackclear.io"'}</span>
                     <span className="text-foreground/70">{", {"}</span>
                     {"\n"}
                     <span className="text-foreground/70">{"    method: "}</span>
@@ -353,7 +353,7 @@ export default function HomePage() {
                     Paste a snippet into Shopify
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Copy your unique tracking snippet from the TrackingLite
+                    Copy your unique tracking snippet from the Track Clear
                     dashboard. Paste it in Shopify Admin under Settings &rsaquo;
                     Customer Events &rsaquo; Add Custom Pixel. No theme edits, no
                     app install.
@@ -377,7 +377,7 @@ export default function HomePage() {
                     The snippet captures events via Shopify&apos;s analytics API
                     and sends them to{" "}
                     <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-xs text-foreground/70">
-                      api.trackinglite.com
+                      api.trackclear.io
                     </code>{" "}
                     &mdash; a domain ad blockers don&apos;t target. We hash PII
                     with SHA-256, normalize phones to E.164, and queue the event.
@@ -685,7 +685,7 @@ export default function HomePage() {
       <footer className="border-t border-transparent" style={{ borderImage: 'linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1' }}>
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
           <span className="text-sm font-semibold tracking-tight text-foreground">
-            <span className="text-brand-500">T</span>rackingLite
+            <span className="text-brand-500">Track</span>&thinsp;Clear
           </span>
           <div className="flex items-center gap-6 text-xs text-muted-foreground/50">
             <Link
@@ -700,7 +700,7 @@ export default function HomePage() {
             >
               Sign up
             </Link>
-            <span>&copy; {new Date().getFullYear()} TrackingLite</span>
+            <span>&copy; {new Date().getFullYear()} Track Clear</span>
           </div>
         </div>
       </footer>

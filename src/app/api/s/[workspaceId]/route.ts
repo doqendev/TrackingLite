@@ -38,7 +38,7 @@ export async function GET(
 
   const ingestUrl =
     process.env.NEXT_PUBLIC_INGEST_URL ||
-    "https://api.trackinglite.com/api/events/ingest";
+    "https://api.trackclear.io/api/events/ingest";
 
   const script = generateTrackingScript(workspace.apiKey, workspace.metaPixelId, ingestUrl);
 

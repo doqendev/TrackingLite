@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TrackingLite - Server-Side Tracking for Shopify",
+  title: "Track Clear - Server-Side Tracking for Shopify",
   description:
     "Fix your Meta tracking in 10 minutes. Accurate server-side event tracking for Shopify stores.",
   keywords: ["shopify", "meta tracking", "server-side tracking", "facebook pixel", "capi"],

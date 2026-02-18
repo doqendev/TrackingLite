@@ -6,13 +6,13 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**TrackingLite** is a standalone SaaS that enables Shopify merchants to send ecommerce events server-side to Meta (Conversions API). Primary value: "Fix your Meta tracking in 10 minutes."
+**Track Clear** is a standalone SaaS that enables Shopify merchants to send ecommerce events server-side to Meta (Conversions API). Primary value: "Fix your Meta tracking in 10 minutes."
 
 **This is NOT a Shopify embedded app.** It is a standalone web application with its own auth, dashboard, and billing. Shopify integration is via a JS snippet pasted into Shopify's Custom Pixel feature.
 
 ### Why It Exists
 
-Browser-only Meta Pixels lose 20-40% of conversion data to ad blockers (which block `connect.facebook.net`). TrackingLite captures events via a custom JS snippet, sends them to our server (`api.trackinglite.com` --- not on any block list), and forwards server-to-server to Meta CAPI, bypassing ad blockers entirely.
+Browser-only Meta Pixels lose 20-40% of conversion data to ad blockers (which block `connect.facebook.net`). Track Clear captures events via a custom JS snippet, sends them to our server (`api.trackclear.io` --- not on any block list), and forwards server-to-server to Meta CAPI, bypassing ad blockers entirely.
 
 ### Target Users
 
@@ -48,7 +48,7 @@ See `STATUS.md` for the full audit, known bugs, and remaining work.
 
 ### How It Works
 
-1. Merchant signs up on **trackinglite.com** (email/password or Google SSO)
+1. Merchant signs up on **trackclear.io** (email/password or Google SSO)
 2. Creates a "workspace" for their store
 3. Enters Meta Pixel ID + Conversions API access token (encrypted at rest with AES-256-GCM)
 4. Gets a unique **JS snippet** with embedded API key
@@ -343,7 +343,7 @@ All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII
 
 ## Plans
 
-- Original plan: `.omc/plans/trackinglite-saas-v3.md` (10 phases, all executed)
-- MVP fixes plan: `.omc/plans/trackinglite-mvp-next-steps.md` (6 phases, all executed)
+- Original plan: `.omc/plans/trackclear-saas-v3.md` (10 phases, all executed)
+- MVP fixes plan: `.omc/plans/trackclear-mvp-next-steps.md` (6 phases, all executed)
 - UI migration plan: `.omc/plans/shadcn-ui-implementation.md` (9 phases, all executed)
 - Billing model plan: `.omc/plans/purchase-based-billing.md` (10 phases, all executed)

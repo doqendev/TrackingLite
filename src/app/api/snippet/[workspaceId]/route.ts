@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 function generateSnippet(apiKey: string, pixelId: string | null, ingestUrl: string): string {
-  return `// TrackingLite - Server-Side Meta CAPI
+  return `// Track Clear - Server-Side Meta CAPI
 (function(){
 var K="${apiKey}",E="${ingestUrl}";
 ${pixelId ? `var P="${pixelId}";` : ""}
@@ -40,7 +40,7 @@ export async function GET(
 
   const ingestUrl =
     process.env.NEXT_PUBLIC_INGEST_URL ||
-    "https://api.trackinglite.com/api/events/ingest";
+    "https://api.trackclear.io/api/events/ingest";
 
   const snippet = generateSnippet(workspace.apiKey, workspace.metaPixelId, ingestUrl);
 
