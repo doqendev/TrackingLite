@@ -362,7 +362,7 @@ export default function OnboardingPage() {
               <Card className="bg-muted shadow-none">
                 <CardContent className="p-4">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Your API Key</p>
-                  <code className="text-sm font-mono text-foreground">{createdWorkspace.apiKey}</code>
+                  <code className="text-sm font-mono text-foreground break-all">{createdWorkspace.apiKey}</code>
                 </CardContent>
               </Card>
 
