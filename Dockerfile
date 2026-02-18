@@ -27,4 +27,4 @@ ENV AUTH_TRUST_HOST=true
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "pnpm prisma db push --accept-data-loss && node .next/standalone/server.js"]
+CMD ["sh", "-c", "pnpm prisma db push --accept-data-loss && pnpm start"]
