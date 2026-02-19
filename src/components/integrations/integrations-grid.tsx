@@ -18,6 +18,7 @@ export interface IntegrationWorkspace {
   googleAdsCustomerId: string | null;
   googleAdsConversionAction: string | null;
   hasGoogleAdsAccessToken: boolean;
+  hasGoogleAdsRefreshToken: boolean;
   googleAdsDeveloperToken: string | null;
   enableGoogleAds: boolean;
   // TikTok
@@ -123,6 +124,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     workspace.googleAdsConversionAction ?? ""
   );
   const [googleAccessToken, setGoogleAccessToken] = useState("");
+  const [googleRefreshToken, setGoogleRefreshToken] = useState("");
   const [googleDeveloperToken, setGoogleDeveloperToken] = useState(
     workspace.googleAdsDeveloperToken ?? ""
   );
@@ -211,6 +213,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         enableGoogleAds: googleEnabled,
       };
       if (googleAccessToken) body.googleAdsAccessToken = googleAccessToken;
+      if (googleRefreshToken) body.googleAdsRefreshToken = googleRefreshToken;
 
       const res = await fetch(`/api/workspaces/${workspace.id}`, {
         method: "PATCH",
@@ -220,6 +223,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       if (!res.ok) throw new Error("Failed to save");
       toast.success("Google Ads credentials saved");
       setGoogleAccessToken("");
+      setGoogleRefreshToken("");
     } catch {
       toast.error("Failed to save Google Ads credentials");
     } finally {
@@ -457,14 +461,17 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="google-conversion-action" className="text-xs">
-                  Conversion Action
+                  Conversion Action Resource Name
                 </Label>
                 <Input
                   id="google-conversion-action"
                   value={googleConversionAction}
                   onChange={(e) => setGoogleConversionAction(e.target.value)}
-                  placeholder="e.g. Purchase"
+                  placeholder="e.g. customers/1234567890/conversionActions/123456"
                 />
+                <p className="text-[10px] text-muted-foreground">
+                  Find this in Google Ads &gt; Goals &gt; Conversions &gt; Details
+                </p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
@@ -484,6 +491,28 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                       : "ya29.xxx..."
                   }
                 />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="google-refresh-token" className="text-xs">
+                    Refresh Token
+                  </Label>
+                  {workspace.hasGoogleAdsRefreshToken && <EncryptedBadge />}
+                </div>
+                <Input
+                  id="google-refresh-token"
+                  type="password"
+                  value={googleRefreshToken}
+                  onChange={(e) => setGoogleRefreshToken(e.target.value)}
+                  placeholder={
+                    workspace.hasGoogleAdsRefreshToken
+                      ? "leave blank to keep current"
+                      : "1//0xxxxxx..."
+                  }
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Required for automatic token refresh when access token expires
+                </p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">

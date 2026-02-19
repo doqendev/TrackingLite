@@ -1,8 +1,9 @@
-import { decrypt } from "@/lib/encryption";
+import { decrypt, encrypt } from "@/lib/encryption";
 import { hashPii } from "@/lib/hash-pii";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 
 const GOOGLE_ADS_API_VERSION = "v18";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 export interface GoogleAdsConversionEvent {
   conversion_action: string;
@@ -155,5 +156,58 @@ export async function sendToGoogleAds(
   }
 
   return result;
+}
+
+export interface RefreshResult {
+  accessToken: string;
+  encrypted: string;
+  iv: string;
+  tag: string;
+}
+
+export async function refreshGoogleAdsToken(
+  refreshToken: string
+): Promise<RefreshResult> {
+  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error("GOOGLE_ADS_CLIENT_ID and GOOGLE_ADS_CLIENT_SECRET must be set for token refresh");
+  }
+
+  const response = await fetch(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+    }),
+  });
+
+  const result = (await response.json()) as {
+    access_token?: string;
+    error?: string;
+    error_description?: string;
+  };
+
+  if (!response.ok || !result.access_token) {
+    throw new GoogleAdsError(
+      result.error_description || result.error || "Token refresh failed",
+      response.status,
+      result
+    );
+  }
+
+  // Encrypt the new access token for storage
+  const enc = encrypt(result.access_token);
+
+  return {
+    accessToken: result.access_token,
+    encrypted: enc.encrypted,
+    iv: enc.iv,
+    tag: enc.tag,
+  };
 }
 

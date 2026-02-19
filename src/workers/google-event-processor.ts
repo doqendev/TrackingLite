@@ -4,6 +4,7 @@ import { decrypt } from "@/lib/encryption";
 import {
   normalizeToGoogleAdsEvent,
   sendToGoogleAds,
+  refreshGoogleAdsToken,
   GoogleAdsError,
 } from "@/lib/destinations/google-ads";
 import { db } from "@/lib/db";
@@ -15,7 +16,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
 
   try {
     // Decrypt access token
-    const accessToken = decrypt(
+    let accessToken = decrypt(
       credentials.accessToken,
       credentials.accessTokenIv,
       credentials.accessTokenTag
@@ -49,13 +50,57 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
       return;
     }
 
-    // Send to Google Ads Offline Conversion Upload API
-    const response = await sendToGoogleAds(
-      credentials.customerId,
-      accessToken,
-      credentials.developerToken,
-      [googleEvent]
-    );
+    // Send to Google Ads — retry once with refreshed token on 401
+    let response: unknown;
+    try {
+      response = await sendToGoogleAds(
+        credentials.customerId,
+        accessToken,
+        credentials.developerToken,
+        [googleEvent]
+      );
+    } catch (err) {
+      if (
+        err instanceof GoogleAdsError &&
+        err.statusCode === 401 &&
+        credentials.refreshToken &&
+        credentials.refreshTokenIv &&
+        credentials.refreshTokenTag
+      ) {
+        // Token expired — attempt refresh
+        console.log(`[GoogleWorker] Job ${job.id}: access token expired, refreshing...`);
+        const refreshToken = decrypt(
+          credentials.refreshToken,
+          credentials.refreshTokenIv,
+          credentials.refreshTokenTag
+        );
+
+        const refreshed = await refreshGoogleAdsToken(refreshToken);
+        accessToken = refreshed.accessToken;
+
+        // Persist the new encrypted access token to the workspace
+        await db.workspace.update({
+          where: { id: workspaceId },
+          data: {
+            googleAdsAccessTokenEncrypted: refreshed.encrypted,
+            googleAdsAccessTokenIv: refreshed.iv,
+            googleAdsAccessTokenTag: refreshed.tag,
+          },
+        });
+
+        console.log(`[GoogleWorker] Job ${job.id}: token refreshed, retrying...`);
+
+        // Retry with new token
+        response = await sendToGoogleAds(
+          credentials.customerId,
+          accessToken,
+          credentials.developerToken,
+          [googleEvent]
+        );
+      } else {
+        throw err;
+      }
+    }
 
     // Update EventLog to SENT
     await db.eventLog.update({

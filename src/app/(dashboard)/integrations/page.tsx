@@ -21,6 +21,7 @@ export default async function IntegrationsPage() {
       googleAdsCustomerId: true,
       googleAdsConversionAction: true,
       googleAdsAccessTokenEncrypted: true,
+      googleAdsRefreshTokenEncrypted: true,
       googleAdsDeveloperToken: true,
       enableGoogleAds: true,
       // TikTok
@@ -49,6 +50,7 @@ export default async function IntegrationsPage() {
     googleAdsCustomerId: workspace.googleAdsCustomerId,
     googleAdsConversionAction: workspace.googleAdsConversionAction,
     hasGoogleAdsAccessToken: !!workspace.googleAdsAccessTokenEncrypted,
+    hasGoogleAdsRefreshToken: !!workspace.googleAdsRefreshTokenEncrypted,
     googleAdsDeveloperToken: workspace.googleAdsDeveloperToken,
     enableGoogleAds: workspace.enableGoogleAds,
     // TikTok
