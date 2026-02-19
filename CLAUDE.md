@@ -20,15 +20,15 @@ Small-to-mid Shopify stores running ads on Meta, Google, TikTok, and more. Free 
 
 ## Current State
 
-**Feature-complete with multi-destination support.** All core features + 3 phases of feature expansion implemented:
+**Feature-complete with multi-destination support.** All core features + 4 phases of feature expansion implemented:
 - Build: compiles clean
 - Unit tests: 239/239 passing (13 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors
 - Lint: 0 warnings/errors
 - 5 destinations: Meta CAPI, Google Ads, TikTok, GA4, Klaviyo
-- Dashboard: conversion accuracy, revenue cards, event funnel, delivery stats
-- Extras: event replay, password reset, email alerts (4 alert types)
+- Dashboard: conversion accuracy, revenue cards, event funnel, delivery stats, campaign performance
+- Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue
 
 See `STATUS.md` for the full audit and remaining work.
 
@@ -87,6 +87,12 @@ Workers (separate process) --> Dequeue from per-destination queues
 Alert Checker (hourly repeatable job)
   |-- Evaluate tracking health, error rates, order limits
   |-- Send email alerts via Resend (24h cooldown per alert type)
+
+Stale Pending Requeue (every 5 minutes)
+  |-- Find PENDING EventLogs older than 5 minutes (up to 100)
+  |-- Look up workspace credentials per destination
+  |-- Re-queue to appropriate destination queue
+  |-- Mark FAILED if workspace inactive or credentials missing
 ```
 
 ### Deduplication Strategy
@@ -112,8 +118,8 @@ src/
       reset-password/page.tsx         # Token-based password reset with confirmation
     (dashboard)/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
-      dashboard/page.tsx              # Rich analytics: revenue, conversion accuracy, event funnel, delivery, recent events
-      events/page.tsx                 # Event log table with filters + pagination (50/page) + event replay
+      dashboard/page.tsx              # Rich analytics: revenue, conversion accuracy, event funnel, delivery, campaign performance, recent events
+      events/page.tsx                 # Event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
       settings/page.tsx               # 6 destination cards, event toggles, consent, snippet, alerts, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
@@ -131,7 +137,7 @@ src/
       workspaces/[id]/analytics/route.ts   # GET: dashboard analytics (cached 60s)
       workspaces/[id]/replay/route.ts # POST: re-queue failed events (500 max, 5min cooldown)
       alerts/preferences/route.ts     # GET/PUT: alert notification preferences
-      snippet/[workspaceId]/route.ts  # GET: generate JS snippet for workspace
+      snippet/[workspaceId]/route.ts  # GET: generate JS snippet (captures ttclid, UTMs, gclid)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
       stripe/webhook/route.ts         # POST: handle Stripe webhooks (5 event types)
@@ -147,6 +153,7 @@ src/
       conversion-accuracy.tsx         # Purchase delivery accuracy (7d/30d toggle)
       recent-events.tsx               # Last 10 events mini-table with value column
       replay-button.tsx               # Retry failed events button (bulk + per-event)
+      campaign-performance.tsx        # Top campaigns by revenue with per-platform tabs (30d)
     settings/
       settings-form.tsx               # All settings: 6 destination cards + toggles + consent + snippet + danger zone
       alert-preferences.tsx           # Email alert notification toggles
@@ -166,7 +173,7 @@ src/
     constants.ts                      # BILLING_PLANS (order-based), AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG, META_API_*
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case)
-    analytics.ts                      # Dashboard analytics computation (parallel Prisma queries)
+    analytics.ts                      # Dashboard analytics computation (parallel Prisma queries, campaign performance)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL)
     queue.ts                          # Lazy BullMQ queues (5 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
@@ -187,13 +194,14 @@ src/
     app.ts                            # WorkspaceWithStats, DashboardStats
     next-auth.d.ts                    # Module augmentation (adds id to Session.user)
   workers/
-    start-worker.ts                   # Entry point: starts all 6 workers, graceful shutdown
+    start-worker.ts                   # Entry point: starts all 7 workers, graceful shutdown
     meta-event-processor.ts           # BullMQ worker: decrypt, normalize, send to Meta CAPI
     google-event-processor.ts         # BullMQ worker: Google Ads Conversion Upload
     tiktok-event-processor.ts         # BullMQ worker: TikTok Events API
     ga4-event-processor.ts            # BullMQ worker: GA4 Measurement Protocol
     klaviyo-event-processor.ts        # BullMQ worker: Klaviyo Events API
     alert-checker.ts                  # Hourly repeatable job: evaluate alerts, send emails
+    stale-pending-requeue.ts          # Every 5min: re-queue stale PENDING events to destination queues
   middleware.ts                       # Auth redirect for protected routes
 tests/
   unit/
@@ -223,6 +231,7 @@ prisma/
 - Workspace has many EventLogs, stores encrypted credentials for all 5 destinations
 - EventLog has a `destination` field (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
+- EventLog stores UTM attribution data (utmSource, utmMedium, utmCampaign, utmContent, utmTerm, gclid)
 
 **Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), EventName (5 events), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO)
 
@@ -300,9 +309,9 @@ All documented in `.env.example`. Critical ones:
 | `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
 | `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown) |
-| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing, accuracy) |
+| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing, accuracy, campaigns) |
 | `GET/PUT /api/alerts/preferences` | GET, PUT | Alert notification preferences |
-| `GET /api/snippet/:workspaceId` | GET | Generate JS snippet (includes ttclid capture) |
+| `GET /api/snippet/:workspaceId` | GET | Generate JS snippet (captures ttclid, UTMs, gclid) |
 | `POST /api/stripe/checkout` | POST | Create Stripe checkout session |
 | `POST /api/stripe/portal` | POST | Create Stripe billing portal session |
 
@@ -321,6 +330,13 @@ Header: Content-Type: application/json
   referrer?: string,
   fbp?: string | null,      // _fbp cookie
   fbc?: string | null,      // _fbc cookie
+  ttclid?: string | null,   // TikTok click ID
+  utmSource?: string | null,
+  utmMedium?: string | null,
+  utmCampaign?: string | null,
+  utmContent?: string | null,
+  utmTerm?: string | null,
+  gclid?: string | null,    // Google Click ID
   consent?: { analyticsAllowed?: boolean, marketingAllowed?: boolean },
   userData?: { email?, phone?, firstName?, lastName?, city?, state?, zip?, countryCode? },
   customData?: Record<string, unknown>  // camelCase keys (contentIds, numItems, etc.)
@@ -341,6 +357,8 @@ Header: Content-Type: application/json
 - **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.
 - **Klaviyo raw email:** Klaviyo requires unhashed email for profile matching, unlike Meta/Google/TikTok which all use SHA-256.
 - **Email alerts:** Hourly BullMQ repeatable job evaluates tracking health, error rates, and order limits. 24h cooldown per alert type per user.
+- **UTM attribution:** Snippet captures UTM params + gclid once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
+- **Stale pending requeue:** BullMQ repeatable job every 5 minutes finds PENDING events older than 5 minutes and re-queues them to the appropriate destination queue, preventing events from getting stuck after Redis restarts.
 
 ## Style Rules
 

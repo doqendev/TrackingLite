@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-02-19 (post feature expansion: Phases 1-3)
+Last updated: 2026-02-19 (post feature expansion: Phases 1-4)
 
 ## Build Health
 
@@ -22,8 +22,8 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-3)
 | `/signup` | Public | Working | Registration with auto-login, redirects to onboarding |
 | `/forgot-password` | Public | Working | Sends password reset email via Resend |
 | `/reset-password` | Public | Working | Token-based password reset with confirmation |
-| `/dashboard` | Protected | Working | Rich analytics: revenue cards, event funnel, delivery stats, order usage, health badge, conversion accuracy, recent events |
-| `/events` | Protected | Working | Paginated event log with type/status filters, retry failed events |
+| `/dashboard` | Protected | Working | Rich analytics: revenue cards, event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events |
+| `/events` | Protected | Working | Paginated event log with type/status filters, Source/Campaign columns, retry failed events |
 | `/settings` | Protected | Working | 6 destination credential cards (Meta, Google Ads, TikTok, GA4, Klaviyo), event toggles, consent mode, snippet, alert preferences, danger zone |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
 | `/onboarding` | Protected | Working | 3-step wizard: create workspace, copy snippet, test event |
@@ -43,7 +43,7 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-3)
 | `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown) |
 | `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics (60s Redis cache) |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
-| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid) |
+| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, UTMs, gclid) |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
@@ -87,7 +87,7 @@ Each destination has:
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case |
 | `queue.ts` | Working | Lazy BullMQ queues (5 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
-| `analytics.ts` | Working | Dashboard analytics: health, revenue, event breakdown, billing, conversion accuracy |
+| `analytics.ts` | Working | Dashboard analytics: health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
 | `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection) |
 | `email.ts` | Working | Resend client for password reset + alert emails |
 | `alerts.ts` | Working | Alert evaluation: tracking down, high error rate, order limit warnings |
@@ -100,17 +100,18 @@ Each destination has:
 | `destinations/klaviyo.ts` | Working | Klaviyo normalizer + API client (raw email, not hashed) |
 | `api-key-cache.ts` | **Dead code** | Redis-cached workspace lookup, never imported anywhere |
 
-### Workers (8 files in src/workers/)
+### Workers (9 files in src/workers/)
 
 | File | Status | What it does |
 |------|--------|-------------|
-| `start-worker.ts` | Working | Entry point, starts all 6 workers, graceful shutdown |
+| `start-worker.ts` | Working | Entry point, starts all 7 workers, graceful shutdown |
 | `meta-event-processor.ts` | Working | Meta CAPI worker: decrypt, normalize, send, update EventLog |
 | `google-event-processor.ts` | Working | Google Ads worker: decrypt, normalize, send, update EventLog |
 | `tiktok-event-processor.ts` | Working | TikTok worker: decrypt, normalize, send, update EventLog |
 | `ga4-event-processor.ts` | Working | GA4 worker: decrypt API secret, normalize, send, update EventLog |
 | `klaviyo-event-processor.ts` | Working | Klaviyo worker: decrypt API key, normalize, send, update EventLog |
 | `alert-checker.ts` | Working | Hourly repeatable job: evaluates alerts, sends email notifications |
+| `stale-pending-requeue.ts` | Working | Every 5min: finds stale PENDING events, re-queues to destination queues |
 
 ### Dashboard Analytics Components
 
@@ -122,6 +123,7 @@ Each destination has:
 | `delivery-stats.tsx` | 24h delivery metrics: success rate, delivered/failed |
 | `order-usage-bar.tsx` | Order usage progress bar with plan badge |
 | `recent-events.tsx` | Last 10 events mini-table with value column |
+| `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
 ### Test Coverage (17 files, 284 tests)
 
@@ -161,7 +163,7 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 
 **7 enums:** Platform, EventName, EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO)
 
-**Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[eventId]`. AlertLog on `[userId, alertType, sentAt]`.
+**Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[eventId]`. AlertLog on `[userId, alertType, sentAt]`.
 
 ---
 
@@ -213,6 +215,12 @@ None currently tracked.
 1. **GA4** - Measurement Protocol integration for server-side Google Analytics
 2. **Klaviyo** - Server-side events for email/SMS automation (raw email, not hashed)
 3. **Email Alerts** - Proactive notifications for tracking health, error rates, order limits
+
+### Phase 4: Attribution & Reliability (2026-02-19)
+1. **UTM Parameter Capture** - Snippet captures utm_source/medium/campaign/content/term from landing page URL, stored on EventLog
+2. **gclid Capture** - Google Click ID captured from URL params alongside UTMs
+3. **Campaign Performance Dashboard** - Top campaigns by revenue with per-platform tabs, Source/Campaign columns on events page
+4. **Stale Pending Auto-Requeue** - BullMQ job every 5min re-queues PENDING events older than 5min to destination queues
 
 ---
 
