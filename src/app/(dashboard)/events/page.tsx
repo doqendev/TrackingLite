@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { EventName, EventStatus } from "@prisma/client";
+import { EventName, EventStatus, Destination } from "@prisma/client";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +20,14 @@ const statusConfig: Record<EventStatus, { label: string; className: string }> = 
   SENT: { label: "Sent", className: "bg-green-500/10 text-green-400" },
   FAILED: { label: "Failed", className: "bg-red-500/10 text-red-400" },
   RETRYING: { label: "Retrying", className: "bg-orange-500/10 text-orange-400" },
+};
+
+const destinationLabels: Record<Destination, { label: string; className: string }> = {
+  META: { label: "Meta", className: "text-blue-400" },
+  GOOGLE_ADS: { label: "Google", className: "text-amber-400" },
+  TIKTOK: { label: "TikTok", className: "text-pink-400" },
+  GA4: { label: "GA4", className: "text-orange-400" },
+  KLAVIYO: { label: "Klaviyo", className: "text-emerald-400" },
 };
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;
@@ -85,6 +93,7 @@ export default async function EventsPage({
         eventName: true,
         eventId: true,
         status: true,
+        destination: true,
         pageUrl: true,
         utmSource: true,
         utmCampaign: true,
@@ -222,6 +231,7 @@ export default async function EventsPage({
                   <TableHead className="whitespace-nowrap">Time</TableHead>
                   <TableHead className="whitespace-nowrap">Event Type</TableHead>
                   <TableHead className="whitespace-nowrap">Event ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Dest</TableHead>
                   <TableHead className="whitespace-nowrap">Status</TableHead>
                   <TableHead className="whitespace-nowrap">Value</TableHead>
                   <TableHead className="whitespace-nowrap">Page URL</TableHead>
@@ -255,6 +265,11 @@ export default async function EventsPage({
                         <code className="text-xs text-muted-foreground font-mono" title={event.eventId}>
                           {event.eventId.slice(0, 12)}...
                         </code>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <span className={`text-xs font-medium ${destinationLabels[event.destination].className}`}>
+                          {destinationLabels[event.destination].label}
+                        </span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <Badge className={`inline-flex items-center gap-1 ${status.className}`}>

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { EventStatus } from "@prisma/client";
+import { EventStatus, Destination } from "@prisma/client";
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +24,14 @@ function formatRelativeTime(date: Date): string {
   return `${diffDays}d ago`;
 }
 
+const destinationLabels: Record<Destination, { label: string; className: string }> = {
+  META: { label: "Meta", className: "text-blue-400" },
+  GOOGLE_ADS: { label: "Google", className: "text-amber-400" },
+  TIKTOK: { label: "TikTok", className: "text-pink-400" },
+  GA4: { label: "GA4", className: "text-orange-400" },
+  KLAVIYO: { label: "Klaviyo", className: "text-emerald-400" },
+};
+
 const statusConfig: Record<EventStatus, { label: string; className: string }> = {
   PENDING: { label: "Pending", className: "bg-yellow-500/10 text-yellow-400" },
   SENT: { label: "Sent", className: "bg-green-500/10 text-green-400" },
@@ -41,6 +49,7 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
       eventName: true,
       eventId: true,
       status: true,
+      destination: true,
       pageUrl: true,
       errorMessage: true,
       value: true,
@@ -74,6 +83,7 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Time</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event ID</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Dest</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Status</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Value</TableHead>
               <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Page</TableHead>
@@ -104,6 +114,11 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
                     <code className="text-xs text-muted-foreground font-mono">
                       {event.eventId.slice(0, 8)}...
                     </code>
+                  </TableCell>
+                  <TableCell className="px-5 py-3">
+                    <span className={`text-xs font-medium ${destinationLabels[event.destination].className}`}>
+                      {destinationLabels[event.destination].label}
+                    </span>
                   </TableCell>
                   <TableCell className="px-5 py-3">
                     <Badge className={status.className}>
