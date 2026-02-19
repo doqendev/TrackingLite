@@ -221,44 +221,45 @@ export default function HomePage() {
                   {/* Pipeline cards with connectors */}
                   <div className="relative p-5">
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                      {[
-                        {
-                          name: "Shopify Snippet",
-                          status: "Connected",
-                          detail: "5 event types",
-                        },
-                        {
-                          name: "Track Clear API",
-                          status: "Processing events",
-                          detail: "142ms avg",
-                          highlight: true,
-                        },
-                        {
-                          name: "Meta CAPI",
-                          status: "Forwarding",
-                          detail: "99.9% delivery",
-                        },
-                      ].map((card) => (
-                        <div
-                          key={card.name}
-                          className={`relative rounded-lg border p-4 ${
-                            card.highlight
-                              ? "border-emerald-500/20 bg-emerald-500/[0.03]"
-                              : "border-white/[0.06] bg-white/[0.02]"
-                          }`}
-                        >
-                          <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            {card.status}
-                          </div>
-                          <div className="text-sm font-medium text-foreground">
-                            {card.name}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground/50">
-                            {card.detail}
-                          </div>
+                      {/* Shopify card */}
+                      <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+                        <div className="absolute right-3 top-3">
+                          <svg viewBox="0 0 32 32" className="h-5 w-5 text-emerald-400/60" fill="currentColor">
+                            <path d="M20.919 4.546c-0.025 0-0.075 0.026-0.097 0.026s-0.361 0.094-0.892 0.262c-0.529-1.541-1.47-2.962-3.134-2.962h-0.144c-0.356-0.5-0.921-0.832-1.564-0.868l-0.005-0c-3.881 0-5.736 4.845-6.317 7.305-1.492 0.456-2.578 0.795-2.699 0.842-0.844 0.266-0.867 0.29-0.965 1.087-0.094 0.577-2.287 17.574-2.287 17.574l16.946 3.183zM17.18 2.935c0.867 0.092 1.426 1.083 1.786 2.193-0.436 0.142-0.919 0.289-1.447 0.457v-0.315c0.001-0.049 0.002-0.107 0.002-0.165 0-0.777-0.125-1.524-0.355-2.224l0.014 0.050zM16.506 5.727v0.169c-0.942 0.29-1.978 0.605-2.992 0.92 0.264-1.607 1.237-2.944 2.58-3.699l0.026-0.013c0.248 0.705 0.391 1.518 0.391 2.365 0 0.091-0.002 0.182-0.005 0.273l0-0.013zM14.963 2.042c0 0 0.001 0 0.001 0 0.19 0 0.366 0.063 0.507 0.17l-0.002-0.002c-1.749 1.048-2.947 2.861-3.132 4.964l-0.002 0.024c-0.82 0.266-1.616 0.506-2.361 0.722 0.648-2.231 2.216-5.867 4.988-5.867z" />
+                          </svg>
                         </div>
-                      ))}
+                        <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Connected
+                        </div>
+                        <div className="text-sm font-medium text-foreground">Shopify Snippet</div>
+                        <div className="mt-1 text-xs text-muted-foreground/50">5 event types</div>
+                      </div>
+
+                      {/* Track Clear API card (highlighted) */}
+                      <div className="relative rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-4">
+                        <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Processing events
+                        </div>
+                        <div className="text-sm font-medium text-foreground">Track Clear API</div>
+                        <div className="mt-1 text-xs text-muted-foreground/50">142ms avg</div>
+                      </div>
+
+                      {/* Meta CAPI card */}
+                      <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+                        <div className="absolute right-3 top-3">
+                          <svg viewBox="0 0 24 24" className="h-5 w-5 text-emerald-400/60" fill="currentColor">
+                            <path d="M8.069 5.002c-1.594-.11-2.864.816-3.752 1.979C3.424 8.15 2.795 9.702 2.448 11.249c-.347 1.547-.434 3.189-.154 4.564.271 1.336.964 2.71 2.42 3.145 1.388.415 2.635-.175 3.587-.976.954-.802 1.78-1.946 2.446-3.051.522-.868.968-1.751 1.318-2.505.35.754.796 1.637 1.318 2.505.665 1.105 1.492 2.249 2.446 3.051.952.801 2.198 1.391 3.587.976 1.456-.435 2.149-1.809 2.42-3.145.28-1.375.193-3.017-.154-4.564-.347-1.547-.977-3.099-1.87-4.268-.887-1.163-2.157-2.09-3.752-1.979-1.734.12-2.97 1.468-3.687 2.488-.11.157-.213.313-.308.464a11.725 11.725 0 00-.308-.464c-.716-1.02-1.953-2.368-3.687-2.488zm2.85 5.024c-.282.716-.969 2.349-1.887 3.874-.621 1.033-1.313 1.958-2.019 2.552-.708.596-1.262.729-1.726.59-.396-.118-.817-.56-1.034-1.627-.208-1.027-.157-2.375.146-3.728.304-1.353.838-2.614 1.508-3.492.676-.885 1.369-1.243 2.024-1.198.766.053 1.53.705 2.188 1.642.368.523.642 1.052.8 1.387zm2.289 0c.282.716.969 2.349 1.887 3.874.621 1.033 1.313 1.958 2.019 2.552.708.596 1.263.729 1.726.59.396-.118.817-.56 1.034-1.627.208-1.027.157-2.375-.146-3.728-.304-1.353-.838-2.614-1.508-3.492-.676-.885-1.369-1.243-2.024-1.198-.766.053-1.53.705-2.188 1.642-.368.523-.642 1.052-.8 1.387z" />
+                          </svg>
+                        </div>
+                        <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Forwarding
+                        </div>
+                        <div className="text-sm font-medium text-foreground">Meta CAPI</div>
+                        <div className="mt-1 text-xs text-muted-foreground/50">99.9% delivery</div>
+                      </div>
                     </div>
 
                     {/* Connector lines between cards (desktop only) */}
@@ -286,25 +287,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Floating Shopify icon — left side (outside overflow-hidden) */}
-                <div className="absolute -left-8 top-1/2 z-10 hidden -translate-y-1/2 lg:block">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-500/20 bg-[hsl(180,30%,8%)] shadow-lg shadow-emerald-500/[0.08]">
-                    <svg viewBox="0 0 109.5 124.5" className="h-6 w-6 text-emerald-400" fill="currentColor">
-                      <path d="M74.7 14.8s-1.4.4-3.7 1.1c-.4-1.3-1-2.8-1.8-4.4-2.6-5-6.5-7.7-11.1-7.7-.3 0-.6 0-1 .1-.1-.2-.3-.3-.4-.5-2-2.2-4.6-3.2-7.7-3.1-6 .2-12 4.5-16.8 12.2-3.4 5.4-6 12.2-6.7 17.5-6.9 2.1-11.7 3.6-11.8 3.7-3.5 1.1-3.6 1.2-4 4.5C9.4 40.5 0 111.2 0 111.2l75.6 13V14.6c-.3 0-.6.1-.9.2zm-13.4 4.1c-4.2 1.3-8.7 2.7-13.2 4.1 1.3-4.9 3.7-9.8 6.7-13 1.1-1.2 2.7-2.5 4.5-3.3 1.7 3.5 2.1 8.5 2 12.2zm-7.4-16.3c1.5 0 2.7.3 3.7 1-1.7.9-3.3 2.2-4.8 3.9-4 4.2-7 10.7-8.2 17-3.7 1.1-7.3 2.3-10.7 3.3 2.1-9.8 10.1-24.7 20-25.2z" />
-                      <path d="M78.2 14.5c-.3 0-.6.1-.9.2v.1l-2.8.9c-.8-3.8-3.5-7.3-7.5-7.3h-.3c-1.1-1.4-2.5-2-3.7-2-9.2.3-13.5 11.5-14.9 17.4l-8.2 2.5c1.7-6.5 5.8-15.7 12.8-19.7-3.2-2-7.5-.7-11.2 3.2.3-.1.6-.2 1-.3 1.5-.4 2 1.2.8 1.6-1.5.4-2.2 2.4-2.2 2.4s-1.8-1-1.6-2.6c.2-1.6 1.3-4.2 1.3-4.2S33 12.3 28.5 20.4c-3.4 5.4-6 12.2-6.7 17.5l-6.1 1.9c2-9.2 8.8-25.7 21.4-30C52.5 4.4 62 7.6 66.6 14.4c.1.1.2.3.3.5l3.2-1c.8-3.8 3.3-7.3 7.4-7.3h.3c.1 0 .2.1.4.1V14.5z" opacity=".15" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Floating Meta icon — right side (outside overflow-hidden) */}
-                <div className="absolute -right-8 top-1/2 z-10 hidden -translate-y-1/2 lg:block">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-500/20 bg-[hsl(180,30%,8%)] shadow-lg shadow-emerald-500/[0.08]">
-                    <svg viewBox="0 0 36 36" className="h-6 w-6 text-emerald-400" fill="none">
-                      <path d="M9.3 6C5.7 6 3.6 9.6 3.6 14.4c0 3.3 1.2 7.2 3.6 10.2C9 27.3 11.7 30 15 30c1.5 0 2.7-.6 3.6-1.5-.9.3-1.8.3-2.4.3-4.2 0-7.2-4.8-7.2-10.2 0-5.7 2.1-12.6 7.5-12.6.6 0 1.2.1 1.8.3C17.4 5.1 15.9 6 15 6H9.3z" fill="currentColor" opacity=".3"/>
-                      <path d="M18 10.5c-2.4 0-4.5 1.8-6 4.5-1.5 2.7-2.1 6-2.1 8.7 0 1.8.3 3.3 1.2 4.5.9 1.2 2.1 1.8 3.6 1.8 1.2 0 2.1-.3 3-1.2 1.5-1.5 3-3.9 4.5-7.2 1.5 3.3 3 5.7 4.5 7.2.9.9 1.8 1.2 3 1.2 1.5 0 2.7-.6 3.6-1.8.9-1.2 1.2-2.7 1.2-4.5 0-2.7-.6-6-2.1-8.7-1.5-2.7-3.6-4.5-6-4.5-1.2 0-2.1.3-3 1.2C22.2 12 21 13.8 19.8 16.5l-1.8.3c1.2-2.7 2.4-4.5 3.6-5.1.9-.9 1.8-1.2 3-1.2h-6.6z" fill="currentColor"/>
-                    </svg>
-                  </div>
-                </div>
               </div>
             </div>
           </section>
