@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function SignupPage() {
+  const t = useTranslations("auth");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,12 +23,12 @@ export default function SignupPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(t("passwordsNoMatch"));
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("passwordMinLength"));
       return;
     }
 
@@ -42,7 +44,7 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong. Please try again.");
+        setError(data.error ?? t("somethingWentWrong"));
         setLoading(false);
         return;
       }
@@ -55,13 +57,13 @@ export default function SignupPage() {
       });
 
       if (result?.error) {
-        setError("Account created but sign-in failed. Please log in manually.");
+        setError(t("accountCreatedSignInFailed"));
         setLoading(false);
       } else {
         window.location.href = "/onboarding";
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("networkError"));
       setLoading(false);
     }
   }
@@ -76,7 +78,7 @@ export default function SignupPage() {
       {/* Branding */}
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-bold tracking-tight text-foreground"><span className="text-brand-500">Track</span>&thinsp;Clear</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Create your account</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t("createAccount")}</p>
       </div>
 
       {/* Google */}
@@ -93,12 +95,12 @@ export default function SignupPage() {
           <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
           <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
         </svg>
-        Sign up with Google
+        {t("signUpWithGoogle")}
       </Button>
 
       <div className="my-6 flex items-center gap-3">
         <div className="h-px flex-1 bg-border/50" />
-        <span className="text-xs text-muted-foreground">or continue with email</span>
+        <span className="text-xs text-muted-foreground">{t("orContinueWithEmail")}</span>
         <div className="h-px flex-1 bg-border/50" />
       </div>
 
@@ -113,7 +115,7 @@ export default function SignupPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="name" className="mb-1.5 block">
-            Full name
+            {t("fullName")}
           </Label>
           <Input
             id="name"
@@ -128,7 +130,7 @@ export default function SignupPage() {
 
         <div>
           <Label htmlFor="email" className="mb-1.5 block">
-            Email
+            {t("email")}
           </Label>
           <Input
             id="email"
@@ -143,7 +145,7 @@ export default function SignupPage() {
 
         <div>
           <Label htmlFor="password" className="mb-1.5 block">
-            Password
+            {t("password")}
           </Label>
           <Input
             id="password"
@@ -158,7 +160,7 @@ export default function SignupPage() {
 
         <div>
           <Label htmlFor="confirmPassword" className="mb-1.5 block">
-            Confirm password
+            {t("confirmPassword")}
           </Label>
           <Input
             id="confirmPassword"
@@ -172,14 +174,14 @@ export default function SignupPage() {
         </div>
 
         <Button variant="brand" className="mt-2 w-full" type="submit" disabled={loading}>
-          {loading ? "Creating account…" : "Create account"}
+          {loading ? t("creatingAccount") : t("createAccountBtn")}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
+        {t("alreadyHaveAccount")}{" "}
         <Link href="/login" className="font-medium text-brand-500 hover:text-brand-400">
-          Sign in
+          {t("signIn")}
         </Link>
       </p>
     </div>

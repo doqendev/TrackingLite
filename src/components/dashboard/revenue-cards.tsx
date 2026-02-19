@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ShoppingBag,
@@ -41,13 +44,14 @@ function getPercentChange(today: number, yesterday: number) {
 }
 
 function DeltaIndicator({ today, yesterday }: { today: number; yesterday: number }) {
+  const t = useTranslations("common");
   const change = getPercentChange(today, yesterday);
 
   if (change.type === "neutral") {
     return (
       <div className="flex items-center gap-1 text-muted-foreground">
         <Minus className="h-3 w-3" />
-        <span className="text-xs">No change</span>
+        <span className="text-xs">{t("noChange")}</span>
       </div>
     );
   }
@@ -56,7 +60,7 @@ function DeltaIndicator({ today, yesterday }: { today: number; yesterday: number
     return (
       <div className="flex items-center gap-1 text-green-400">
         <ArrowUp className="h-3 w-3" />
-        <span className="text-xs">New today</span>
+        <span className="text-xs">{t("newToday")}</span>
       </div>
     );
   }
@@ -65,7 +69,7 @@ function DeltaIndicator({ today, yesterday }: { today: number; yesterday: number
     return (
       <div className="flex items-center gap-1 text-green-400">
         <ArrowUp className="h-3 w-3" />
-        <span className="text-xs">+{change.value}% vs yest.</span>
+        <span className="text-xs">+{change.value}% {t("vsYesterday")}</span>
       </div>
     );
   }
@@ -73,7 +77,7 @@ function DeltaIndicator({ today, yesterday }: { today: number; yesterday: number
   return (
     <div className="flex items-center gap-1 text-red-400">
       <ArrowDown className="h-3 w-3" />
-      <span className="text-xs">-{change.value}% vs yest.</span>
+      <span className="text-xs">-{change.value}% {t("vsYesterday")}</span>
     </div>
   );
 }
@@ -85,6 +89,8 @@ interface RevenueCardProps {
 }
 
 function RevenueCard({ label, icon, data }: RevenueCardProps) {
+  const t = useTranslations("common");
+
   return (
     <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
       <CardContent className="p-5">
@@ -95,7 +101,7 @@ function RevenueCard({ label, icon, data }: RevenueCardProps) {
         <p className="text-3xl font-bold text-foreground tabular-nums">
           {formatCurrency(data.today, data.currency)}
         </p>
-        <p className="text-xs text-muted-foreground mt-1">today</p>
+        <p className="text-xs text-muted-foreground mt-1">{t("today")}</p>
         <div className="mt-2">
           <DeltaIndicator today={data.today} yesterday={data.yesterday} />
         </div>
@@ -105,20 +111,22 @@ function RevenueCard({ label, icon, data }: RevenueCardProps) {
 }
 
 export function RevenueCards({ revenue }: RevenueCardsProps) {
+  const t = useTranslations("dashboard");
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <RevenueCard
-        label="Added to Cart"
+        label={t("addedToCart")}
         icon={<ShoppingBag className="h-4 w-4 text-brand-500" />}
         data={revenue.addToCartValue}
       />
       <RevenueCard
-        label="Checkout Value"
+        label={t("checkoutValue")}
         icon={<CreditCard className="h-4 w-4 text-brand-500" />}
         data={revenue.checkoutValue}
       />
       <RevenueCard
-        label="Revenue Tracked"
+        label={t("revenueTracked")}
         icon={<DollarSign className="h-4 w-4 text-brand-500" />}
         data={revenue.purchaseValue}
       />

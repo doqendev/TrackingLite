@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
@@ -8,7 +9,7 @@ import { RefreshCw } from "lucide-react";
 interface ReplayButtonProps {
   workspaceId: string;
   failedCount: number;
-  eventId?: string; // If provided, replay a single event
+  eventId?: string;
 }
 
 export function ReplayButton({
@@ -17,6 +18,8 @@ export function ReplayButton({
   eventId,
 }: ReplayButtonProps) {
   const [replaying, setReplaying] = useState(false);
+  const t = useTranslations("dashboard");
+  const tc = useTranslations("common");
 
   async function handleReplay() {
     setReplaying(true);
@@ -30,18 +33,16 @@ export function ReplayButton({
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 429) {
-          toast.error(
-            `Please wait ${data.retryAfter || 300} seconds before replaying again`
-          );
+          toast.error(t("pleaseWait", { seconds: data.retryAfter || 300 }));
         } else {
-          toast.error(data.error || "Failed to replay events");
+          toast.error(data.error || t("failedToReplay"));
         }
         return;
       }
-      toast.success(`${data.replayed} event(s) queued for replay`);
+      toast.success(t("eventsQueuedForReplay", { count: data.replayed }));
       window.location.reload();
     } catch {
-      toast.error("Failed to replay events");
+      toast.error(t("failedToReplay"));
     } finally {
       setReplaying(false);
     }
@@ -59,10 +60,10 @@ export function ReplayButton({
     >
       <RefreshCw className={`h-3.5 w-3.5 ${replaying ? "animate-spin" : ""}`} />
       {replaying
-        ? "Replaying..."
+        ? t("replaying")
         : eventId
-        ? "Retry"
-        : `Retry ${failedCount} failed`}
+        ? tc("retry")
+        : t("retryFailed", { count: failedCount })}
     </Button>
   );
 }

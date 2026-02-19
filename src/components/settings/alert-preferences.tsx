@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -13,37 +14,22 @@ interface AlertPreference {
   orderLimitReached: boolean;
 }
 
-const ALERT_ITEMS: {
-  key: keyof AlertPreference;
-  label: string;
-  description: string;
-}[] = [
-  {
-    key: "trackingDown",
-    label: "Tracking Down",
-    description: "Notify when success rate drops below 80% in the last hour.",
-  },
-  {
-    key: "highErrorRate",
-    label: "High Error Rate",
-    description: "Notify when more than 10% of events fail in the last hour.",
-  },
-  {
-    key: "orderLimitWarning",
-    label: "Order Limit Warning",
-    description: "Notify when monthly order usage reaches 80% or 95% of your plan limit.",
-  },
-  {
-    key: "orderLimitReached",
-    label: "Order Limit Reached",
-    description: "Notify when the monthly order limit is fully reached and Purchase events are blocked.",
-  },
-];
-
 export function AlertPreferences() {
+  const t = useTranslations("settings");
   const [prefs, setPrefs] = useState<AlertPreference | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const alertItems: {
+    key: keyof AlertPreference;
+    labelKey: string;
+    descKey: string;
+  }[] = [
+    { key: "trackingDown", labelKey: "trackingDown", descKey: "trackingDownDesc" },
+    { key: "highErrorRate", labelKey: "highErrorRate", descKey: "highErrorRateDesc" },
+    { key: "orderLimitWarning", labelKey: "orderLimitWarning", descKey: "orderLimitWarningDesc" },
+    { key: "orderLimitReached", labelKey: "orderLimitReached", descKey: "orderLimitReachedDesc" },
+  ];
 
   useEffect(() => {
     fetch("/api/alerts/preferences")
@@ -52,10 +38,10 @@ export function AlertPreferences() {
         setPrefs(data);
       })
       .catch(() => {
-        toast.error("Failed to load alert preferences.");
+        toast.error(t("alertLoadFailed"));
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   async function handleToggle(key: keyof AlertPreference, value: boolean) {
     if (!prefs) return;
@@ -75,11 +61,11 @@ export function AlertPreferences() {
         throw new Error("Failed to save");
       }
 
-      toast.success("Alert preference saved.");
+      toast.success(t("alertSaved"));
     } catch {
       // Revert on failure
       setPrefs(prefs);
-      toast.error("Failed to save alert preference.");
+      toast.error(t("alertSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -88,22 +74,21 @@ export function AlertPreferences() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Email Alerts</CardTitle>
+        <CardTitle>{t("emailAlerts")}</CardTitle>
         <CardDescription>
-          Get notified when tracking health degrades or limits approach. Alerts
-          are sent to your account email with a 24-hour cooldown per alert type.
+          {t("emailAlertsDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading preferences...</p>
+          <p className="text-sm text-muted-foreground">{t("loadingPreferences")}</p>
         ) : prefs === null ? (
           <p className="text-sm text-muted-foreground">
-            Could not load alert preferences.
+            {t("couldNotLoad")}
           </p>
         ) : (
           <div className="space-y-5">
-            {ALERT_ITEMS.map((item) => (
+            {alertItems.map((item) => (
               <div
                 key={item.key}
                 className="flex items-start justify-between gap-4"
@@ -113,10 +98,10 @@ export function AlertPreferences() {
                     htmlFor={`alert-${item.key}`}
                     className="text-sm font-medium leading-none"
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    {item.description}
+                    {t(item.descKey)}
                   </p>
                 </div>
                 <Switch

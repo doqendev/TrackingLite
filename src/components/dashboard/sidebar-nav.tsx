@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { LayoutDashboard, ClipboardList, Plug, Settings, CreditCard, Menu, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,11 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/events", label: "Events", icon: ClipboardList },
-  { href: "/integrations", label: "Integrations", icon: Plug },
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/billing", label: "Billing", icon: CreditCard },
+  { href: "/dashboard", labelKey: "dashboard" as const, icon: LayoutDashboard },
+  { href: "/events", labelKey: "events" as const, icon: ClipboardList },
+  { href: "/integrations", labelKey: "integrations" as const, icon: Plug },
+  { href: "/settings", labelKey: "settings" as const, icon: Settings },
+  { href: "/billing", labelKey: "billing" as const, icon: CreditCard },
 ];
 
 interface SidebarNavProps {
@@ -23,10 +24,11 @@ interface SidebarNavProps {
 
 export function SidebarNav({ userEmail, workspaceName }: SidebarNavProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
 
   return (
     <nav className="flex-1 p-3 space-y-0.5">
-      {navItems.map(({ href, label, icon: Icon }) => {
+      {navItems.map(({ href, labelKey, icon: Icon }) => {
         const isActive = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
@@ -39,7 +41,7 @@ export function SidebarNav({ userEmail, workspaceName }: SidebarNavProps) {
             }`}
           >
             <Icon className={`h-4 w-4 ${isActive ? "text-brand-500" : ""}`} />
-            {label}
+            {t(labelKey)}
           </Link>
         );
       })}
@@ -48,6 +50,8 @@ export function SidebarNav({ userEmail, workspaceName }: SidebarNavProps) {
 }
 
 export function SidebarFooter({ userEmail, workspaceName }: SidebarNavProps) {
+  const t = useTranslations("nav");
+
   return (
     <div className="p-4 border-t border-white/[0.08] space-y-3">
       <div>
@@ -63,7 +67,7 @@ export function SidebarFooter({ userEmail, workspaceName }: SidebarNavProps) {
         onClick={() => signOut({ callbackUrl: "/login" })}
       >
         <LogOut className="h-4 w-4 mr-2" />
-        Log out
+        {t("logOut")}
       </Button>
     </div>
   );
@@ -71,6 +75,7 @@ export function SidebarFooter({ userEmail, workspaceName }: SidebarNavProps) {
 
 export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
 
   return (
@@ -87,7 +92,7 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
             <span className="text-xl font-bold text-foreground tracking-tight"><span className="text-brand-500">Track</span>&thinsp;Clear</span>
           </div>
           <nav className="flex-1 p-4 space-y-1">
-            {navItems.map(({ href, label, icon: Icon }) => {
+            {navItems.map(({ href, labelKey, icon: Icon }) => {
               const isActive = pathname === href || pathname.startsWith(href + "/");
               return (
                 <Link
@@ -101,7 +106,7 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
                   }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? "text-brand-500" : ""}`} />
-                  {label}
+                  {t(labelKey)}
                 </Link>
               );
             })}
@@ -120,7 +125,7 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
               onClick={() => { signOut({ callbackUrl: "/login" }); setOpen(false); }}
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Log out
+              {t("logOut")}
             </Button>
           </div>
         </SheetContent>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,31 +21,9 @@ const SOURCE_COLORS: Record<string, string> = {
   x: "bg-sky-500",
 };
 
-const SOURCE_DOT_COLORS: Record<string, string> = {
-  facebook: "bg-blue-500",
-  fb: "bg-blue-500",
-  meta: "bg-blue-500",
-  google: "bg-amber-500",
-  tiktok: "bg-pink-500",
-  klaviyo: "bg-green-500",
-  instagram: "bg-purple-500",
-  email: "bg-teal-500",
-  bing: "bg-cyan-500",
-  twitter: "bg-sky-500",
-  x: "bg-sky-500",
-};
-
 function getSourceColor(source: string): string {
   const key = source.toLowerCase();
   for (const [prefix, color] of Object.entries(SOURCE_COLORS)) {
-    if (key.includes(prefix)) return color;
-  }
-  return "bg-muted-foreground";
-}
-
-function getSourceDotColor(source: string): string {
-  const key = source.toLowerCase();
-  for (const [prefix, color] of Object.entries(SOURCE_DOT_COLORS)) {
     if (key.includes(prefix)) return color;
   }
   return "bg-muted-foreground";
@@ -74,6 +53,7 @@ interface CampaignPerformanceProps {
 
 export function CampaignPerformance({ campaigns, currency }: CampaignPerformanceProps) {
   const [activeTab, setActiveTab] = useState<string>("all");
+  const t = useTranslations("dashboard");
   const sources = getUniqueSources(campaigns);
 
   const filtered = activeTab === "all"
@@ -87,15 +67,15 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Campaign Performance</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Last 30 days</p>
+            <h3 className="text-sm font-semibold text-foreground">{t("campaignPerformance")}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("last30Days")}</p>
           </div>
         </div>
 
         {campaigns.length === 0 ? (
           <div className="py-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No campaign data yet. Make sure your ad URLs include UTM parameters.
+              {t("noCampaignData")}
             </p>
           </div>
         ) : (
@@ -108,7 +88,7 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
                 className="rounded-full"
                 onClick={() => setActiveTab("all")}
               >
-                All Platforms
+                {t("allPlatforms")}
               </Button>
               {sources.map((source) => (
                 <Button
@@ -118,7 +98,7 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
                   className="rounded-full"
                   onClick={() => setActiveTab(source)}
                 >
-                  <span className={`w-2 h-2 rounded-full mr-1.5 ${getSourceDotColor(source)}`} />
+                  <span className={`w-2 h-2 rounded-full mr-1.5 ${getSourceColor(source)}`} />
                   {source}
                 </Button>
               ))}
@@ -127,7 +107,7 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
             {filtered.length === 0 ? (
               <div className="py-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  No campaigns from this source yet.
+                  {t("noCampaignsSource")}
                 </p>
               </div>
             ) : (
@@ -136,11 +116,11 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
                   <TableHeader>
                     <TableRow>
                       {activeTab === "all" && (
-                        <TableHead className="whitespace-nowrap">Source</TableHead>
+                        <TableHead className="whitespace-nowrap">{t("source")}</TableHead>
                       )}
-                      <TableHead className="whitespace-nowrap">Campaign</TableHead>
-                      <TableHead className="whitespace-nowrap text-right">Events</TableHead>
-                      <TableHead className="whitespace-nowrap text-right">Revenue</TableHead>
+                      <TableHead className="whitespace-nowrap">{t("campaign")}</TableHead>
+                      <TableHead className="whitespace-nowrap text-right">{t("events")}</TableHead>
+                      <TableHead className="whitespace-nowrap text-right">{t("revenue")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

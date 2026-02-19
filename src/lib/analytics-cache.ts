@@ -16,9 +16,13 @@ const ANALYTICS_CACHE_TTL = 60; // 60 seconds
 
 export async function getCachedAnalytics(
   workspaceId: string,
-  computeFn: () => Promise<DashboardAnalytics>
+  computeFn: () => Promise<DashboardAnalytics>,
+  destination?: string | null,
+  displayCurrency?: string
 ): Promise<DashboardAnalytics> {
-  const cacheKey = `analytics:${workspaceId}`;
+  const destPart = destination || "all";
+  const currPart = displayCurrency || "default";
+  const cacheKey = `analytics:${workspaceId}:${destPart}:${currPart}`;
 
   try {
     const cached = await getRedis().get(cacheKey);

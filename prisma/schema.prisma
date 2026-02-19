@@ -26,6 +26,8 @@ model User {
   subscription        Subscription?
   passwordResetTokens PasswordResetToken[]
   alertPreference     AlertPreference?
+  displayCurrency     String               @default("USD")
+  language            String               @default("en")
 }
 
 model Account {

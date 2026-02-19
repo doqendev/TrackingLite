@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginPage() {
+  const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -26,7 +28,7 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password. Please try again.");
+      setError(t("invalidCredentials"));
       setLoading(false);
     } else {
       window.location.href = "/dashboard";
@@ -43,7 +45,7 @@ export default function LoginPage() {
       {/* Branding */}
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-bold tracking-tight text-foreground"><span className="text-brand-500">Track</span>&thinsp;Clear</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t("signInToAccount")}</p>
       </div>
 
       {/* Google */}
@@ -60,12 +62,12 @@ export default function LoginPage() {
           <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
           <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
         </svg>
-        Sign in with Google
+        {t("signInWithGoogle")}
       </Button>
 
       <div className="my-6 flex items-center gap-3">
         <div className="h-px flex-1 bg-border/50" />
-        <span className="text-xs text-muted-foreground">or continue with email</span>
+        <span className="text-xs text-muted-foreground">{t("orContinueWithEmail")}</span>
         <div className="h-px flex-1 bg-border/50" />
       </div>
 
@@ -80,7 +82,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="email" className="mb-1.5 block">
-            Email
+            {t("email")}
           </Label>
           <Input
             id="email"
@@ -96,13 +98,13 @@ export default function LoginPage() {
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <Label htmlFor="password" className="block">
-              Password
+              {t("password")}
             </Label>
             <Link
               href="/forgot-password"
               className="text-xs text-brand-500 hover:text-brand-400"
             >
-              Forgot password?
+              {t("forgotPassword")}
             </Link>
           </div>
           <Input
@@ -117,14 +119,14 @@ export default function LoginPage() {
         </div>
 
         <Button variant="brand" className="mt-2 w-full" type="submit" disabled={loading}>
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? t("signingIn") : t("signIn")}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        Don&apos;t have an account?{" "}
+        {t("dontHaveAccount")}{" "}
         <Link href="/signup" className="font-medium text-brand-500 hover:text-brand-400">
-          Sign up
+          {t("signUp")}
         </Link>
       </p>
     </div>

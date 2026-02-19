@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Destination } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { computeDashboardAnalytics } from "@/lib/analytics";
 import { getCachedAnalytics } from "@/lib/analytics-cache";
+import { convertCurrency } from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
+
+const VALID_DESTINATIONS = new Set<string>(Object.values(Destination));
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: RouteContext
 ) {
   const session = await auth();
@@ -28,8 +32,61 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const analytics = await getCachedAnalytics(workspace.id, () =>
-    computeDashboardAnalytics(workspace.id, session.user!.id!)
+  // Parse destination filter
+  const destParam = request.nextUrl.searchParams.get("destination");
+  let destination: Destination | undefined;
+  if (destParam && VALID_DESTINATIONS.has(destParam)) {
+    destination = destParam as Destination;
+  }
+
+  // Get user's display currency preference
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { displayCurrency: true },
+  });
+  const displayCurrency = user?.displayCurrency ?? "USD";
+
+  const analytics = await getCachedAnalytics(
+    workspace.id,
+    async () => {
+      const data = await computeDashboardAnalytics(
+        workspace.id,
+        session.user!.id!,
+        destination,
+        displayCurrency
+      );
+
+      // Convert revenue values if display currency differs from event currency
+      const eventCurrency = data.revenue.purchaseValue.currency;
+      if (displayCurrency && displayCurrency !== eventCurrency) {
+        const rate = await convertCurrency(1, eventCurrency, displayCurrency);
+        data.revenue.addToCartValue = {
+          today: data.revenue.addToCartValue.today * rate,
+          yesterday: data.revenue.addToCartValue.yesterday * rate,
+          currency: displayCurrency,
+        };
+        data.revenue.checkoutValue = {
+          today: data.revenue.checkoutValue.today * rate,
+          yesterday: data.revenue.checkoutValue.yesterday * rate,
+          currency: displayCurrency,
+        };
+        data.revenue.purchaseValue = {
+          today: data.revenue.purchaseValue.today * rate,
+          yesterday: data.revenue.purchaseValue.yesterday * rate,
+          currency: displayCurrency,
+        };
+        // Convert campaign revenue
+        data.campaigns = data.campaigns.map((c) => ({
+          ...c,
+          revenue: c.revenue * rate,
+        }));
+        data.currency = displayCurrency;
+      }
+
+      return data;
+    },
+    destParam,
+    displayCurrency
   );
 
   return NextResponse.json(analytics);

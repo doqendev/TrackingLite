@@ -91,4 +91,6 @@ export interface DashboardAnalytics {
   conversionAccuracy: ConversionAccuracy;
   campaigns: CampaignRow[];
   currency: string;
+  enabledDestinations: string[];
+  activeDestination: string | null;
 }

@@ -10,16 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertTriangle, ShoppingCart } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_LABELS: Record<SubscriptionStatus, { label: string; className: string }> = {
-  TRIALING: { label: "Free", className: "bg-brand-500/10 text-brand-400" },
-  ACTIVE: { label: "Active", className: "bg-green-500/10 text-green-400" },
-  PAST_DUE: { label: "Past Due", className: "bg-red-500/10 text-red-400" },
-  CANCELED: { label: "Canceled", className: "bg-muted text-muted-foreground" },
-  UNPAID: { label: "Unpaid", className: "bg-red-500/10 text-red-400" },
-};
 
 const PLAN_LABELS: Record<BillingPlan, string> = {
   FREE: BILLING_PLANS.FREE.name,
@@ -36,28 +29,26 @@ function formatDate(date: Date): string {
   });
 }
 
-const faqs = [
-  {
-    q: "What counts as an order?",
-    a: "Only Purchase events count toward your order limit. All other events (PageView, ViewContent, AddToCart, InitiateCheckout) are free and unlimited on every plan.",
-  },
-  {
-    q: "What happens when I exceed my order limit?",
-    a: "On paid plans, we automatically upgrade you to the next tier so your tracking stays uninterrupted. On the free plan, Purchase event forwarding is paused until you upgrade.",
-  },
-  {
-    q: "Can I change plans later?",
-    a: "Yes. You can upgrade or downgrade at any time from the billing portal. Changes take effect immediately.",
-  },
-  {
-    q: "Do you offer refunds?",
-    a: "We do not offer refunds for partial months. You can cancel at any time and keep access until the end of your billing period.",
-  },
-];
-
 export default async function BillingPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  const t = await getTranslations("billing");
+
+  const STATUS_LABELS: Record<SubscriptionStatus, { label: string; className: string }> = {
+    TRIALING: { label: t("free"), className: "bg-brand-500/10 text-brand-400" },
+    ACTIVE: { label: t("active"), className: "bg-green-500/10 text-green-400" },
+    PAST_DUE: { label: t("pastDue"), className: "bg-red-500/10 text-red-400" },
+    CANCELED: { label: t("canceled"), className: "bg-muted text-muted-foreground" },
+    UNPAID: { label: t("unpaid"), className: "bg-red-500/10 text-red-400" },
+  };
+
+  const faqs = [
+    { q: t("faqWhatCounts"), a: t("faqWhatCountsAnswer") },
+    { q: t("faqExceedLimit"), a: t("faqExceedLimitAnswer") },
+    { q: t("faqChangePlans"), a: t("faqChangePlansAnswer") },
+    { q: t("faqRefunds"), a: t("faqRefundsAnswer") },
+  ];
 
   const subscription = await db.subscription.findUnique({
     where: { userId: session.user.id },
@@ -83,8 +74,8 @@ export default async function BillingPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Billing</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your subscription and plan.</p>
+        <h1 className="text-2xl font-bold text-foreground">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t("subtitle")}</p>
       </div>
 
       {/* Current plan summary card */}
@@ -99,12 +90,12 @@ export default async function BillingPage() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Up to {planConfig.ordersPerMonth.toLocaleString()} orders/month &middot;{" "}
-                {planConfig.eventLogRetentionDays}-day log retention
+                {t("ordersPerMonth", { count: planConfig.ordersPerMonth.toLocaleString() })} &middot;{" "}
+                {t("dayRetention", { days: planConfig.eventLogRetentionDays })}
               </p>
               {plan !== "FREE" && planConfig.priceMonthly > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  ${planConfig.priceMonthly}/month
+                  {t("perMonth", { price: planConfig.priceMonthly })}
                 </p>
               )}
             </div>
@@ -113,7 +104,7 @@ export default async function BillingPage() {
               {subscription?.currentPeriodEnd && status === "ACTIVE" && plan !== "FREE" && (
                 <>
                   <p className="text-xs text-muted-foreground">
-                    {subscription.cancelAtPeriodEnd ? "Cancels on" : "Renews on"}
+                    {subscription.cancelAtPeriodEnd ? t("cancelsOn") : t("renewsOn")}
                   </p>
                   <p className="text-sm font-medium text-foreground">
                     {formatDate(subscription.currentPeriodEnd)}
@@ -122,9 +113,9 @@ export default async function BillingPage() {
               )}
               {subscription?.currentPeriodEnd && status === "PAST_DUE" && (
                 <>
-                  <p className="text-xs text-red-400 font-medium">Payment failed</p>
+                  <p className="text-xs text-red-400 font-medium">{t("paymentFailed")}</p>
                   <p className="text-sm text-muted-foreground">
-                    Due {formatDate(subscription.currentPeriodEnd)}
+                    {t("due", { date: formatDate(subscription.currentPeriodEnd) })}
                   </p>
                 </>
               )}
@@ -138,12 +129,12 @@ export default async function BillingPage() {
         <CardContent className="p-6">
           <div className="flex items-center gap-3 mb-3">
             <ShoppingCart className="h-5 w-5 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-foreground">Monthly Order Usage</h3>
+            <h3 className="text-sm font-semibold text-foreground">{t("monthlyOrderUsage")}</h3>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                {orderCount.toLocaleString()} of {orderLimit.toLocaleString()} orders used
+                {t("ordersUsed", { used: orderCount.toLocaleString(), limit: orderLimit.toLocaleString() })}
               </span>
               <span className="text-muted-foreground">{usagePercent}%</span>
             </div>
@@ -156,7 +147,7 @@ export default async function BillingPage() {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Only Purchase events count toward your limit. All other events are free and unlimited.
+              {t("purchaseEventsNote")}
             </p>
           </div>
         </CardContent>
@@ -171,13 +162,13 @@ export default async function BillingPage() {
               <div>
                 <p className="text-sm font-semibold text-amber-400">
                   {orderCount >= orderLimit
-                    ? "Order limit reached"
-                    : "Approaching order limit"}
+                    ? t("orderLimitReached")
+                    : t("approachingLimit")}
                 </p>
                 <p className="text-sm text-amber-400/80 mt-0.5">
                   {orderCount >= orderLimit
-                    ? "Purchase events are no longer being forwarded to Meta. Upgrade to continue tracking orders."
-                    : `You've used ${orderCount} of ${orderLimit} orders. Upgrade to Starter ($29/mo) for 500 orders/month.`}
+                    ? t("purchasesPaused")
+                    : t("usedOfLimit", { used: orderCount, limit: orderLimit })}
                 </p>
               </div>
             </div>
@@ -192,10 +183,9 @@ export default async function BillingPage() {
             <div className="flex items-start gap-4">
               <ShoppingCart className="h-5 w-5 text-brand-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-brand-400">Approaching order limit</p>
+                <p className="text-sm font-semibold text-brand-400">{t("approachingLimit")}</p>
                 <p className="text-sm text-brand-400/80 mt-0.5">
-                  When you exceed {orderLimit.toLocaleString()} orders, we&apos;ll automatically upgrade you
-                  to the next plan tier so your tracking stays uninterrupted.
+                  {t("autoUpgradeNotice", { limit: orderLimit.toLocaleString() })}
                 </p>
               </div>
             </div>
@@ -210,10 +200,9 @@ export default async function BillingPage() {
             <div className="flex items-start gap-4">
               <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-amber-400">Subscription set to cancel</p>
+                <p className="text-sm font-semibold text-amber-400">{t("subscriptionSetToCancel")}</p>
                 <p className="text-sm text-amber-400/80 mt-0.5">
-                  Your subscription will cancel on {formatDate(subscription.currentPeriodEnd)}. You can
-                  reactivate it from the billing portal.
+                  {t("cancelNotice", { date: formatDate(subscription.currentPeriodEnd) })}
                 </p>
               </div>
             </div>
@@ -223,7 +212,7 @@ export default async function BillingPage() {
 
       {/* Plan comparison */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Choose a Plan</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">{t("choosePlan")}</h2>
         <PlanCards
           currentPlan={plan}
           subscriptionStatus={status}
@@ -234,7 +223,7 @@ export default async function BillingPage() {
       {/* FAQ */}
       <Card>
         <CardHeader>
-          <CardTitle>Frequently Asked Questions</CardTitle>
+          <CardTitle>{t("faq")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Accordion type="single" collapsible className="w-full">

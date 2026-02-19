@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import type { EventBreakdown } from "@/types/app";
 
@@ -14,7 +17,7 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 function getPercentChangeText(today: number, yesterday: number): string {
-  if (yesterday === 0 && today === 0) return "—";
+  if (yesterday === 0 && today === 0) return "\u2014";
   if (yesterday === 0) return "+new";
   const change = ((today - yesterday) / yesterday) * 100;
   const rounded = Math.round(change);
@@ -33,6 +36,8 @@ function getPercentChangeColor(today: number, yesterday: number): string {
 }
 
 export function EventFunnel({ eventBreakdown }: EventFunnelProps) {
+  const t = useTranslations("dashboard");
+
   const entries = (
     Object.keys(EVENT_LABELS) as Array<keyof EventBreakdown>
   ).map((key) => ({
@@ -50,7 +55,7 @@ export function EventFunnel({ eventBreakdown }: EventFunnelProps) {
     <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
       <CardContent className="p-5">
         <h3 className="text-sm font-semibold text-foreground mb-4">
-          Event Funnel (Today)
+          {t("eventFunnel")}
         </h3>
 
         <div className="space-y-3">
@@ -94,15 +99,15 @@ export function EventFunnel({ eventBreakdown }: EventFunnelProps) {
         <div className="mt-4 pt-3 border-t border-border">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">
-              vs yesterday:{" "}
+              {t("vsYesterday")}{" "}
               <span
                 className={getPercentChangeColor(totalToday, totalYesterday)}
               >
-                {getPercentChangeText(totalToday, totalYesterday)} overall
+                {getPercentChangeText(totalToday, totalYesterday)} {t("overall")}
               </span>
             </span>
             <span className="text-muted-foreground tabular-nums">
-              {totalToday.toLocaleString()} total
+              {totalToday.toLocaleString()} {t("total")}
             </span>
           </div>
         </div>

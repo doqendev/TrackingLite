@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, ArrowRight } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 interface RecentEventsProps {
   workspaceId: string;
@@ -32,14 +33,17 @@ const destinationLabels: Record<Destination, { label: string; className: string 
   KLAVIYO: { label: "Klaviyo", className: "text-emerald-400" },
 };
 
-const statusConfig: Record<EventStatus, { label: string; className: string }> = {
-  PENDING: { label: "Pending", className: "bg-yellow-500/10 text-yellow-400" },
-  SENT: { label: "Sent", className: "bg-green-500/10 text-green-400" },
-  FAILED: { label: "Failed", className: "bg-red-500/10 text-red-400" },
-  RETRYING: { label: "Retrying", className: "bg-orange-500/10 text-orange-400" },
-};
-
 export async function RecentEvents({ workspaceId }: RecentEventsProps) {
+  const t = await getTranslations("dashboard");
+  const tc = await getTranslations("common");
+
+  const statusConfig: Record<EventStatus, { label: string; className: string }> = {
+    PENDING: { label: t("pending"), className: "bg-yellow-500/10 text-yellow-400" },
+    SENT: { label: t("sent"), className: "bg-green-500/10 text-green-400" },
+    FAILED: { label: t("failed"), className: "bg-red-500/10 text-red-400" },
+    RETRYING: { label: t("retrying"), className: "bg-orange-500/10 text-orange-400" },
+  };
+
   const events = await db.eventLog.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
@@ -62,8 +66,8 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
     return (
       <Card className="p-8 text-center">
         <ClipboardList className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-        <p className="text-sm font-medium text-muted-foreground">No events yet</p>
-        <p className="text-xs text-muted-foreground mt-1">Events will appear here once your JS snippet is installed</p>
+        <p className="text-sm font-medium text-muted-foreground">{t("noEventsYet")}</p>
+        <p className="text-xs text-muted-foreground mt-1">{t("eventsAppearHere")}</p>
       </Card>
     );
   }
@@ -71,22 +75,22 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between px-5 py-4">
-        <h3 className="text-sm font-semibold text-foreground">Recent Events</h3>
+        <h3 className="text-sm font-semibold text-foreground">{t("recentEvents")}</h3>
         <Link href="/events" className="text-xs text-brand-500 hover:text-brand-400 font-medium inline-flex items-center gap-1 group">
-          View all <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+          {tc("viewAll")} <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </CardHeader>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Time</TableHead>
-              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event</TableHead>
-              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Event ID</TableHead>
-              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Dest</TableHead>
-              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Status</TableHead>
-              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Value</TableHead>
-              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">Page</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">{t("time")}</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">{t("event")}</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">{t("eventId")}</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">{t("dest")}</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">{t("status")}</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">{t("value")}</TableHead>
+              <TableHead className="text-xs font-normal text-muted-foreground/60 uppercase tracking-wider px-5 py-3">{t("page")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

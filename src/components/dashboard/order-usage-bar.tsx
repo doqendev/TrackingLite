@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart } from "lucide-react";
@@ -10,33 +11,6 @@ interface OrderUsageBarProps {
   ordersLimit: number;
   usagePercent: number;
   hasEvents: boolean;
-}
-
-function getSubtitleMessage(
-  ordersUsed: number,
-  usagePercent: number,
-  plan: string,
-  hasEvents: boolean
-): string {
-  if (ordersUsed === 0) {
-    if (!hasEvents) {
-      return "Install your snippet to start tracking purchases.";
-    }
-    return "No purchases tracked yet this month. Other events are flowing.";
-  }
-  if (usagePercent >= 90) {
-    if (plan === "FREE") {
-      return "You\u2019re near the free plan limit. Upgrade to keep tracking.";
-    }
-    if (plan === "SCALE") {
-      return "Approaching the Scale limit. Contact us for enterprise.";
-    }
-    return "Nearing your limit. We\u2019ll auto-upgrade to keep tracking.";
-  }
-  if (usagePercent >= 70) {
-    return "Tracking strong! Consider upgrading for more capacity.";
-  }
-  return `Your tracking is working! ${ordersUsed} purchase${ordersUsed === 1 ? "" : "s"} forwarded to Meta.`;
 }
 
 function getBarColor(usagePercent: number): string {
@@ -61,9 +35,25 @@ export function OrderUsageBar({
   usagePercent,
   hasEvents,
 }: OrderUsageBarProps) {
-  const subtitle = getSubtitleMessage(ordersUsed, usagePercent, plan, hasEvents);
+  const t = useTranslations("dashboard");
   const barColor = getBarColor(usagePercent);
   const planLabel = PLAN_LABELS[plan] ?? plan;
+
+  function getSubtitleMessage(): string {
+    if (ordersUsed === 0) {
+      if (!hasEvents) return t("installSnippet");
+      return t("noPurchasesYet");
+    }
+    if (usagePercent >= 90) {
+      if (plan === "FREE") return t("nearFreeLimit");
+      if (plan === "SCALE") return t("nearScaleLimit");
+      return t("nearLimit");
+    }
+    if (usagePercent >= 70) return t("trackingStrong");
+    return t("trackingWorking", { count: ordersUsed });
+  }
+
+  const subtitle = getSubtitleMessage();
 
   return (
     <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
@@ -74,7 +64,7 @@ export function OrderUsageBar({
               <ShoppingCart className="h-4 w-4 text-brand-500" />
             </span>
             <p className="text-sm font-medium text-muted-foreground">
-              Orders This Month
+              {t("ordersThisMonth")}
             </p>
           </div>
           <Badge className="bg-brand-500/10 text-brand-400">
@@ -89,7 +79,7 @@ export function OrderUsageBar({
                 {ordersUsed.toLocaleString()}
               </span>{" "}
               <span className="text-muted-foreground">
-                of {ordersLimit.toLocaleString()} orders tracked
+                {t("ofOrdersTracked", { limit: ordersLimit.toLocaleString() })}
               </span>
             </span>
             <span className="text-muted-foreground tabular-nums">

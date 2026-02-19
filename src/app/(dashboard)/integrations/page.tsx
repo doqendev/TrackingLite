@@ -2,10 +2,12 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { IntegrationsGrid } from "@/components/integrations/integrations-grid";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function IntegrationsPage() {
+  const t = await getTranslations("integrations");
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -69,9 +71,9 @@ export default async function IntegrationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Integrations</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t("title")}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Connect your ad platforms and analytics destinations.
+          {t("subtitle")}
         </p>
       </div>
 

@@ -10,17 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ClipboardList } from "lucide-react";
 import { ReplayButton } from "@/components/dashboard/replay-button";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
-
-const statusConfig: Record<EventStatus, { label: string; className: string }> = {
-  PENDING: { label: "Pending", className: "bg-yellow-500/10 text-yellow-400" },
-  SENT: { label: "Sent", className: "bg-green-500/10 text-green-400" },
-  FAILED: { label: "Failed", className: "bg-red-500/10 text-red-400" },
-  RETRYING: { label: "Retrying", className: "bg-orange-500/10 text-orange-400" },
-};
 
 const destinationLabels: Record<Destination, { label: string; className: string }> = {
   META: { label: "Meta", className: "text-blue-400" },
@@ -59,6 +53,17 @@ export default async function EventsPage({
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  const t = await getTranslations("events");
+  const tc = await getTranslations("common");
+  const td = await getTranslations("dashboard");
+
+  const statusConfig: Record<EventStatus, { label: string; className: string }> = {
+    PENDING: { label: t("pending"), className: "bg-yellow-500/10 text-yellow-400" },
+    SENT: { label: t("sent"), className: "bg-green-500/10 text-green-400" },
+    FAILED: { label: t("failed"), className: "bg-red-500/10 text-red-400" },
+    RETRYING: { label: t("retrying"), className: "bg-orange-500/10 text-orange-400" },
+  };
 
   const params = searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10));
@@ -129,9 +134,9 @@ export default async function EventsPage({
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Event Log</h1>
+          <h1 className="text-2xl font-bold text-foreground">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {total.toLocaleString()} total events
+            {t("totalEvents", { count: total.toLocaleString() })}
           </p>
         </div>
         <ReplayButton workspaceId={workspace.id} failedCount={failedCount} />
@@ -140,7 +145,7 @@ export default async function EventsPage({
       {/* Filter bar */}
       <Card>
         <CardContent className="p-4 flex flex-wrap gap-3 items-center">
-          <span className="text-sm font-medium text-foreground">Filter:</span>
+          <span className="text-sm font-medium text-foreground">{tc("filter")}</span>
 
           {/* Event type filter */}
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -151,7 +156,7 @@ export default async function EventsPage({
               asChild
             >
               <Link href={buildHref({ eventName: undefined, page: "1" })}>
-                All Events
+                {t("allEvents")}
               </Link>
             </Button>
             {EVENT_NAMES.map((name) => (
@@ -180,7 +185,7 @@ export default async function EventsPage({
               asChild
             >
               <Link href={buildHref({ status: undefined, page: "1" })}>
-                All
+                {tc("all")}
               </Link>
             </Button>
             {(["SENT", "PENDING", "FAILED", "RETRYING"] as EventStatus[]).map((s) => {
@@ -207,18 +212,18 @@ export default async function EventsPage({
       {events.length === 0 ? (
         <Card className="p-12 text-center">
           <ClipboardList className="h-14 w-14 text-brand-500/30 mx-auto mb-4" />
-          <p className="text-base font-semibold text-foreground">No events found</p>
+          <p className="text-base font-semibold text-foreground">{t("noEventsFound")}</p>
           <p className="text-sm text-muted-foreground mt-1">
             {filterEventName || filterStatus
-              ? "Try adjusting your filters"
-              : "Events will appear here once your JS snippet receives traffic"}
+              ? t("adjustFilters")
+              : t("eventsWillAppear")}
           </p>
           {(filterEventName || filterStatus) && (
             <Link
               href="/events"
               className="mt-4 inline-flex items-center gap-1 text-sm text-brand-500 hover:text-brand-400 font-medium underline underline-offset-4"
             >
-              Clear filters
+              {tc("clearFilters")}
             </Link>
           )}
         </Card>
@@ -228,17 +233,17 @@ export default async function EventsPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">Time</TableHead>
-                  <TableHead className="whitespace-nowrap">Event Type</TableHead>
-                  <TableHead className="whitespace-nowrap">Event ID</TableHead>
-                  <TableHead className="whitespace-nowrap">Dest</TableHead>
-                  <TableHead className="whitespace-nowrap">Status</TableHead>
-                  <TableHead className="whitespace-nowrap">Value</TableHead>
-                  <TableHead className="whitespace-nowrap">Page URL</TableHead>
-                  <TableHead className="whitespace-nowrap">Source</TableHead>
-                  <TableHead className="whitespace-nowrap">Campaign</TableHead>
-                  <TableHead className="whitespace-nowrap">Error</TableHead>
-                  <TableHead className="whitespace-nowrap">Actions</TableHead>
+                  <TableHead className="whitespace-nowrap">{td("time")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{t("eventType")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{td("eventId")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{td("dest")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{td("status")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{td("value")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{t("pageUrl")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{t("source")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{t("campaign")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{t("error")}</TableHead>
+                  <TableHead className="whitespace-nowrap">{t("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -354,29 +359,29 @@ export default async function EventsPage({
           {/* Pagination */}
           <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06] bg-card/50">
             <p className="text-xs text-muted-foreground">
-              Page {page} of {totalPages} &middot; {total.toLocaleString()} events
+              {t("pageOf", { page, totalPages })} &middot; {t("totalEvents", { count: total.toLocaleString() })}
             </p>
             <div className="flex items-center gap-2">
               {page > 1 ? (
                 <Button variant="outline" size="sm" asChild>
                   <Link href={buildHref({ page: String(page - 1) })}>
-                    Previous
+                    {tc("previous")}
                   </Link>
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" disabled>
-                  Previous
+                  {tc("previous")}
                 </Button>
               )}
               {page < totalPages ? (
                 <Button variant="outline" size="sm" asChild>
                   <Link href={buildHref({ page: String(page + 1) })}>
-                    Next
+                    {tc("next")}
                   </Link>
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" disabled>
-                  Next
+                  {tc("next")}
                 </Button>
               )}
             </div>

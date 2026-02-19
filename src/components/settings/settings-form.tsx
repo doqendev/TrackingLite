@@ -24,11 +24,32 @@ interface Workspace {
   apiKey: string;
 }
 
-interface SettingsFormProps {
-  workspace: Workspace;
+interface UserPreferences {
+  displayCurrency: string;
+  language: string;
 }
 
-export function SettingsForm({ workspace }: SettingsFormProps) {
+interface SettingsFormProps {
+  workspace: Workspace;
+  userPreferences: UserPreferences;
+}
+
+const CURRENCIES = [
+  "USD", "EUR", "GBP", "CHF", "BRL", "AUD", "CAD", "JPY", "INR", "MXN",
+  "PLN", "SEK", "NOK", "DKK", "CZK", "HUF", "RON", "BGN", "TRY", "ZAR",
+  "NZD", "SGD", "HKD", "KRW",
+];
+
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "pt", label: "Portuguese" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "it", label: "Italian" },
+];
+
+export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) {
   // Event toggles state
   const [toggles, setToggles] = useState({
     enablePageView: workspace.enablePageView,
@@ -42,6 +63,11 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
   // Consent mode state
   const [consentMode, setConsentMode] = useState<ConsentMode>(workspace.consentMode);
   const [savingConsent, setSavingConsent] = useState(false);
+
+  // User preferences state
+  const [displayCurrency, setDisplayCurrency] = useState(userPreferences.displayCurrency);
+  const [language, setLanguage] = useState(userPreferences.language);
+  const [savingPreferences, setSavingPreferences] = useState(false);
 
   // Snippet state
   const [snippet, setSnippet] = useState<string>("");
@@ -97,6 +123,36 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
     }
   }
 
+  async function handleSavePreferences(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingPreferences(true);
+    try {
+      const res = await fetch("/api/user/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayCurrency, language }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to save");
+      }
+
+      // Set locale cookie for next-intl
+      document.cookie = `locale=${language};path=/;max-age=31536000;samesite=lax`;
+
+      toast.success("Preferences saved");
+
+      // Reload if language changed to apply translations
+      if (language !== userPreferences.language) {
+        window.location.reload();
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingPreferences(false);
+    }
+  }
+
   async function handleCopySnippet() {
     await navigator.clipboard.writeText(snippet).catch(() => {});
     setCopied(true);
@@ -145,7 +201,54 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
 
   return (
     <div className="space-y-8">
-      {/* 6. Event Toggles */}
+      {/* Display Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Display Preferences</CardTitle>
+          <CardDescription>Set your preferred currency and language for the dashboard.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSavePreferences}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="displayCurrency">Display Currency</Label>
+                <select
+                  id="displayCurrency"
+                  value={displayCurrency}
+                  onChange={(e) => setDisplayCurrency(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">Revenue values will be converted to this currency.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="language">Language</Label>
+                <select
+                  id="language"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>{l.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">Dashboard and UI text will display in this language.</p>
+              </div>
+            </div>
+            <div className="flex justify-end pt-4">
+              <Button type="submit" variant="brand" disabled={savingPreferences}>
+                {savingPreferences ? "Saving\u2026" : "Save preferences"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Event Toggles */}
       <Card>
         <CardHeader>
           <CardTitle>Event Toggles</CardTitle>
@@ -180,7 +283,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* 5. Consent Mode */}
+      {/* Consent Mode */}
       <Card>
         <CardHeader>
           <CardTitle>Consent Mode</CardTitle>
@@ -213,7 +316,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* 6. JS Snippet */}
+      {/* JS Snippet */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -244,7 +347,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* 7. Danger Zone */}
+      {/* Danger Zone */}
       <Card className="border-red-500/10 border-l-2 border-l-red-500/30">
         <CardHeader className="border-b border-red-500/10">
           <CardTitle className="text-red-400">Danger Zone</CardTitle>

@@ -1,11 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ConversionAccuracy } from "@/types/app";
 
+const DESTINATION_LABELS: Record<string, string> = {
+  META: "Meta",
+  GOOGLE_ADS: "Google Ads",
+  TIKTOK: "TikTok",
+  GA4: "GA4",
+  KLAVIYO: "Klaviyo",
+};
+
 interface ConversionAccuracyProps {
   conversionAccuracy: ConversionAccuracy;
+  activeDestination?: string | null;
 }
 
 type TimeRange = "7d" | "30d";
@@ -24,8 +34,9 @@ function getAccuracyBarColor(accuracy: number, total: number): string {
   return "bg-red-500";
 }
 
-export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyProps) {
+export function ConversionAccuracy({ conversionAccuracy, activeDestination }: ConversionAccuracyProps) {
   const [range, setRange] = useState<TimeRange>("7d");
+  const t = useTranslations("dashboard");
 
   const data = range === "7d" ? conversionAccuracy.last7d : conversionAccuracy.last30d;
   const accuracyColor = getAccuracyColor(data.accuracy, data.total);
@@ -36,7 +47,7 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
     <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-medium text-muted-foreground">Conversion Accuracy</p>
+          <p className="text-sm font-medium text-muted-foreground">{t("conversionAccuracy")}</p>
           <div className="flex items-center gap-1 bg-secondary rounded-md p-0.5">
             <button
               onClick={() => setRange("7d")}
@@ -46,7 +57,7 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              7 days
+              {t("days7")}
             </button>
             <button
               onClick={() => setRange("30d")}
@@ -56,7 +67,7 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              30 days
+              {t("days30")}
             </button>
           </div>
         </div>
@@ -64,9 +75,9 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
         {!hasData ? (
           <div className="py-4">
             <p className="text-2xl font-bold text-muted-foreground tabular-nums">--</p>
-            <p className="text-sm text-muted-foreground mt-1">No purchase events yet</p>
+            <p className="text-sm text-muted-foreground mt-1">{t("noPurchaseEvents")}</p>
             <p className="text-xs text-muted-foreground/60 mt-3 border-t border-border pt-3">
-              Browser-only pixels miss 20-40% of conversions
+              {t("browserPixelsMiss")}
             </p>
           </div>
         ) : (
@@ -76,7 +87,9 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
                 {data.accuracy.toFixed(1)}%
               </p>
               <p className="text-sm text-muted-foreground mb-1">
-                of purchases delivered to Meta
+                {activeDestination
+                  ? t("purchasesDeliveredTo", { destination: DESTINATION_LABELS[activeDestination] ?? activeDestination })
+                  : t("purchasesDelivered")}
               </p>
             </div>
 
@@ -91,16 +104,13 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
             {/* Raw numbers */}
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>
-                <span className="text-foreground font-medium tabular-nums">{data.sent}</span>
-                {" of "}
-                <span className="tabular-nums">{data.total}</span>
-                {" purchases delivered"}
+                {t("purchasesDeliveredCount", { sent: data.sent, total: data.total })}
               </span>
               {data.failed > 0 && (
                 <>
                   <span className="text-border">|</span>
                   <span className="text-red-400 tabular-nums">
-                    {data.failed} failed
+                    {t("failed", { count: data.failed })}
                   </span>
                 </>
               )}
@@ -108,7 +118,7 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
 
             {/* Comparison line */}
             <p className="text-xs text-muted-foreground/60 mt-3 border-t border-border pt-3">
-              Browser-only pixels miss 20-40% of conversions
+              {t("browserPixelsMiss")}
             </p>
           </div>
         )}

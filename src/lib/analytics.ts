@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { EventName, EventStatus } from "@prisma/client";
+import { Destination, EventName, EventStatus } from "@prisma/client";
 import { BILLING_PLANS } from "@/lib/constants";
 import { getOrderCount } from "@/lib/billing";
 import type {
@@ -40,20 +40,43 @@ function getTimeWindows() {
   return { now, todayStart, yesterdayStart, since24h };
 }
 
+/**
+ * Find the first destination used by a workspace.
+ * Used to deduplicate the "All" view: since every event fans out to ALL
+ * enabled destinations, filtering by any single one gives correct unique counts.
+ */
+async function getCanonicalDestination(
+  workspaceId: string
+): Promise<Destination | null> {
+  const first = await db.eventLog.findFirst({
+    where: { workspaceId },
+    select: { destination: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return first?.destination ?? null;
+}
+
+function destFilter(destination?: Destination | null) {
+  return destination ? { destination } : {};
+}
+
 async function queryHealthMetrics(
   workspaceId: string,
-  since24h: Date
+  since24h: Date,
+  destination?: Destination | null
 ): Promise<HealthMetrics> {
+  const df = destFilter(destination);
   const [totalEvents24h, sentEvents24h, failedEvents24h, lastEvent] =
     await Promise.all([
       db.eventLog.count({
-        where: { workspaceId, createdAt: { gte: since24h } },
+        where: { workspaceId, createdAt: { gte: since24h }, ...df },
       }),
       db.eventLog.count({
         where: {
           workspaceId,
           createdAt: { gte: since24h },
           status: EventStatus.SENT,
+          ...df,
         },
       }),
       db.eventLog.count({
@@ -61,10 +84,11 @@ async function queryHealthMetrics(
           workspaceId,
           createdAt: { gte: since24h },
           status: EventStatus.FAILED,
+          ...df,
         },
       }),
       db.eventLog.findFirst({
-        where: { workspaceId },
+        where: { workspaceId, ...df },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),
@@ -89,8 +113,10 @@ async function queryRevenueMetrics(
   workspaceId: string,
   todayStart: Date,
   yesterdayStart: Date,
-  now: Date
+  now: Date,
+  destination?: Destination | null
 ): Promise<RevenueMetrics> {
+  const df = destFilter(destination);
   const revenueEventTypes: EventName[] = [
     "AddToCart",
     "InitiateCheckout",
@@ -105,6 +131,7 @@ async function queryRevenueMetrics(
         eventName,
         status: EventStatus.SENT,
         createdAt: { gte: todayStart, lte: now },
+        ...df,
       },
       _sum: { value: true },
     }),
@@ -115,6 +142,7 @@ async function queryRevenueMetrics(
         eventName,
         status: EventStatus.SENT,
         createdAt: { gte: yesterdayStart, lt: todayStart },
+        ...df,
       },
       _sum: { value: true },
     }),
@@ -128,6 +156,7 @@ async function queryRevenueMetrics(
         eventName: "Purchase",
         status: EventStatus.SENT,
         createdAt: { gte: todayStart, lte: now },
+        ...df,
       },
     }),
     db.eventLog.count({
@@ -136,13 +165,14 @@ async function queryRevenueMetrics(
         eventName: "Purchase",
         status: EventStatus.SENT,
         createdAt: { gte: yesterdayStart, lt: todayStart },
+        ...df,
       },
     }),
   ];
 
   // Dominant currency query
   const currencyQuery = db.eventLog.findFirst({
-    where: { workspaceId, currency: { not: null } },
+    where: { workspaceId, currency: { not: null }, ...df },
     orderBy: { createdAt: "desc" },
     select: { currency: true },
   });
@@ -182,14 +212,17 @@ async function queryEventBreakdown(
   workspaceId: string,
   todayStart: Date,
   yesterdayStart: Date,
-  now: Date
+  now: Date,
+  destination?: Destination | null
 ): Promise<EventBreakdown> {
+  const df = destFilter(destination);
   const [todayGroups, yesterdayGroups] = await Promise.all([
     db.eventLog.groupBy({
       by: ["eventName"],
       where: {
         workspaceId,
         createdAt: { gte: todayStart, lte: now },
+        ...df,
       },
       _count: true,
     }),
@@ -198,6 +231,7 @@ async function queryEventBreakdown(
       where: {
         workspaceId,
         createdAt: { gte: yesterdayStart, lt: todayStart },
+        ...df,
       },
       _count: true,
     }),
@@ -222,8 +256,10 @@ async function queryEventBreakdown(
 }
 
 async function queryConversionAccuracy(
-  workspaceId: string
+  workspaceId: string,
+  destination?: Destination | null
 ): Promise<ConversionAccuracy> {
+  const df = destFilter(destination);
   const now = new Date();
   const since7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -231,7 +267,7 @@ async function queryConversionAccuracy(
   const [total7d, sent7d, failed7d, total30d, sent30d, failed30d] =
     await Promise.all([
       db.eventLog.count({
-        where: { workspaceId, eventName: "Purchase", createdAt: { gte: since7d } },
+        where: { workspaceId, eventName: "Purchase", createdAt: { gte: since7d }, ...df },
       }),
       db.eventLog.count({
         where: {
@@ -239,6 +275,7 @@ async function queryConversionAccuracy(
           eventName: "Purchase",
           status: EventStatus.SENT,
           createdAt: { gte: since7d },
+          ...df,
         },
       }),
       db.eventLog.count({
@@ -247,10 +284,11 @@ async function queryConversionAccuracy(
           eventName: "Purchase",
           status: EventStatus.FAILED,
           createdAt: { gte: since7d },
+          ...df,
         },
       }),
       db.eventLog.count({
-        where: { workspaceId, eventName: "Purchase", createdAt: { gte: since30d } },
+        where: { workspaceId, eventName: "Purchase", createdAt: { gte: since30d }, ...df },
       }),
       db.eventLog.count({
         where: {
@@ -258,6 +296,7 @@ async function queryConversionAccuracy(
           eventName: "Purchase",
           status: EventStatus.SENT,
           createdAt: { gte: since30d },
+          ...df,
         },
       }),
       db.eventLog.count({
@@ -266,6 +305,7 @@ async function queryConversionAccuracy(
           eventName: "Purchase",
           status: EventStatus.FAILED,
           createdAt: { gte: since30d },
+          ...df,
         },
       }),
     ]);
@@ -288,17 +328,14 @@ async function queryConversionAccuracy(
 }
 
 async function queryCampaignPerformance(
-  workspaceId: string
+  workspaceId: string,
+  destination?: Destination | null
 ): Promise<CampaignRow[]> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  // Find the first destination used by this workspace to avoid counting
-  // duplicates across destinations (each event fans out to multiple queues)
-  const firstDest = await db.eventLog.findFirst({
-    where: { workspaceId },
-    select: { destination: true },
-    orderBy: { createdAt: "desc" },
-  });
+  // Use provided destination or find canonical to avoid duplicate counting
+  const filterDest =
+    destination ?? (await getCanonicalDestination(workspaceId));
 
   const campaigns = await db.eventLog.groupBy({
     by: ["utmSource", "utmCampaign"],
@@ -306,7 +343,7 @@ async function queryCampaignPerformance(
       workspaceId,
       createdAt: { gte: thirtyDaysAgo },
       utmSource: { not: null },
-      ...(firstDest ? { destination: firstDest.destination } : {}),
+      ...(filterDest ? { destination: filterDest } : {}),
     },
     _count: true,
     _sum: { value: true },
@@ -349,23 +386,40 @@ async function queryBillingUsage(userId: string): Promise<BillingUsage> {
 
 export async function computeDashboardAnalytics(
   workspaceId: string,
-  userId: string
+  userId: string,
+  destination?: Destination | null,
+  displayCurrency?: string
 ): Promise<DashboardAnalytics> {
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
-  const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns] =
+  // For "All" view, find canonical destination to deduplicate
+  const filterDest = destination ?? (await getCanonicalDestination(workspaceId));
+
+  // Query enabled destinations for the tab bar
+  const enabledDestsQuery = db.eventLog.groupBy({
+    by: ["destination"],
+    where: { workspaceId },
+    _count: true,
+  });
+
+  const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns, enabledDests] =
     await Promise.all([
-      queryHealthMetrics(workspaceId, since24h),
-      queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now),
-      queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now),
+      queryHealthMetrics(workspaceId, since24h, filterDest),
+      queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, filterDest),
+      queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, filterDest),
       queryBillingUsage(userId),
-      queryConversionAccuracy(workspaceId),
-      queryCampaignPerformance(workspaceId),
+      queryConversionAccuracy(workspaceId, filterDest),
+      queryCampaignPerformance(workspaceId, filterDest),
+      enabledDestsQuery,
     ]);
 
   const planConfig =
     BILLING_PLANS[billing.plan as keyof typeof BILLING_PLANS];
   const retentionDays = planConfig?.eventLogRetentionDays ?? 7;
+
+  // If user has a display currency preference and it differs from event currency,
+  // the conversion is applied in the API route after calling this function.
+  const currency = displayCurrency || revenue.purchaseValue.currency;
 
   return {
     health,
@@ -375,9 +429,11 @@ export async function computeDashboardAnalytics(
     retentionDays,
     conversionAccuracy,
     campaigns,
-    currency: revenue.purchaseValue.currency,
+    currency,
+    enabledDestinations: enabledDests.map((d) => d.destination),
+    activeDestination: destination ?? null,
   };
 }
 
 // Export for testing
-export { getHealthStatus, getTimeWindows };
+export { getHealthStatus, getTimeWindows, getCanonicalDestination };

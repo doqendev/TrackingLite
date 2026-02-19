@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-02-19 (post feature expansion: Phases 1-4)
+Last updated: 2026-02-19 (post feature expansion: Phases 1-5)
 
 ## Build Health
 
@@ -22,13 +22,13 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-4)
 | `/signup` | Public | Working | Registration with auto-login, redirects to onboarding |
 | `/forgot-password` | Public | Working | Sends password reset email via Resend |
 | `/reset-password` | Public | Working | Token-based password reset with confirmation |
-| `/dashboard` | Protected | Working | Rich analytics: revenue cards, event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events |
+| `/dashboard` | Protected | Working | Rich analytics with per-destination tabs, revenue cards (currency conversion), event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events. Full i18n (6 languages) |
 | `/events` | Protected | Working | Paginated event log with type/status filters, Source/Campaign columns, retry failed events |
-| `/settings` | Protected | Working | 6 destination credential cards (Meta, Google Ads, TikTok, GA4, Klaviyo), event toggles, consent mode, snippet, alert preferences, danger zone |
+| `/settings` | Protected | Working | 6 destination credential cards, event toggles, consent mode, snippet, alert preferences, language selector, currency selector, danger zone |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
 | `/onboarding` | Protected | Working | 3-step wizard: create workspace, copy snippet, test event |
 
-### API Routes (14 endpoints)
+### API Routes (15 endpoints)
 
 | Endpoint | Methods | Auth | Status | Notes |
 |----------|---------|------|--------|-------|
@@ -41,7 +41,8 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-4)
 | `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, all destinations |
 | `/api/workspaces/[id]/rotate-key` | POST | Session | Working | Generates new API key |
 | `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown) |
-| `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics (60s Redis cache) |
+| `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics (60s Redis cache, destination filter, currency conversion) |
+| `/api/user/preferences` | PATCH | Session | Working | Update user display currency and language |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
 | `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, UTMs, gclid) |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
@@ -87,8 +88,9 @@ Each destination has:
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case |
 | `queue.ts` | Working | Lazy BullMQ queues (5 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
-| `analytics.ts` | Working | Dashboard analytics: health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
-| `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection) |
+| `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
+| `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection, keyed by destination+currency) |
+| `currency.ts` | Working | Exchange rate fetcher (frankfurter.app), Redis-cached 24h, convertCurrency helper |
 | `email.ts` | Working | Resend client for password reset + alert emails |
 | `alerts.ts` | Working | Alert evaluation: tracking down, high error rate, order limit warnings |
 | `replay-rate-limit.ts` | Working | Redis cooldown for event replay (5min per workspace) |
@@ -221,6 +223,13 @@ None currently tracked.
 2. **gclid Capture** - Google Click ID captured from URL params alongside UTMs
 3. **Campaign Performance Dashboard** - Top campaigns by revenue with per-platform tabs, Source/Campaign columns on events page
 4. **Stale Pending Auto-Requeue** - BullMQ job every 5min re-queues PENDING events older than 5min to destination queues
+
+### Phase 5: Analytics Fix, Currency & i18n (2026-02-19)
+1. **Analytics Deduplication** - Fixed double-counting bug where multi-destination fan-out inflated all metrics 2-5x. Uses canonical destination filtering to deduplicate "All" view
+2. **Per-Destination Tabs** - Dashboard tabs for All + each enabled destination. Filters analytics to show per-platform stats
+3. **Currency Display & Conversion** - User-selectable display currency in settings. Exchange rates from frankfurter.app API cached 24h in Redis. Revenue cards and campaign performance show converted values
+4. **Internationalization (6 Languages)** - Full i18n with next-intl v4. Languages: English, Portuguese, Spanish, French, German, Italian. Cookie-based locale, language selector in settings, ~250 translation keys per language
+5. **User Preferences API** - New PATCH `/api/user/preferences` endpoint for display currency and language. `displayCurrency` and `language` fields added to User model
 
 ---
 

@@ -20,14 +20,15 @@ Small-to-mid Shopify stores running ads on Meta, Google, TikTok, and more. Free 
 
 ## Current State
 
-**Feature-complete with multi-destination support.** All core features + 4 phases of feature expansion implemented:
+**Feature-complete with multi-destination support, i18n, and currency conversion.** All core features + 5 phases of feature expansion implemented:
 - Build: compiles clean
 - Unit tests: 239/239 passing (13 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors
 - Lint: 0 warnings/errors
 - 5 destinations: Meta CAPI, Google Ads, TikTok, GA4, Klaviyo
-- Dashboard: conversion accuracy, revenue cards, event funnel, delivery stats, campaign performance
+- Dashboard: per-destination tabs, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
+- i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue
 
 See `STATUS.md` for the full audit and remaining work.
@@ -42,6 +43,7 @@ See `STATUS.md` for the full audit and remaining work.
 | Queue | BullMQ + ioredis | BullMQ 5.4.0, ioredis 5.3.2 |
 | Billing | Stripe Subscriptions (Free $0, Starter $29, Growth $49, Scale $99 — order-based) | stripe 14.18.0 |
 | UI | Tailwind CSS 3.4 + shadcn/ui (new-york style, 14 components) | |
+| i18n | next-intl (cookie-based locale, 6 languages) | 4.8.3 |
 | Validation | Zod | 3.22.0 |
 | Testing | Vitest + MSW | Vitest 4.0.18, MSW 2.2.0 |
 | Runtime | Node.js >= 20 | |
@@ -108,7 +110,7 @@ Stale Pending Requeue (every 5 minutes)
 src/
   app/
     page.tsx                          # Landing page (public marketing)
-    layout.tsx                        # Root layout (Inter font, Sonner Toaster, dark mode)
+    layout.tsx                        # Root layout (Inter font, Sonner Toaster, dark mode, NextIntlClientProvider)
     globals.css                       # Tailwind + CSS variable tokens (dark/light)
     (auth)/
       layout.tsx                      # Centered card layout
@@ -118,9 +120,9 @@ src/
       reset-password/page.tsx         # Token-based password reset with confirmation
     (dashboard)/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
-      dashboard/page.tsx              # Rich analytics: revenue, conversion accuracy, event funnel, delivery, campaign performance, recent events
+      dashboard/page.tsx              # Rich analytics with per-destination tabs: revenue (currency conversion), conversion accuracy, event funnel, delivery, campaign performance, recent events
       events/page.tsx                 # Event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
-      settings/page.tsx               # 6 destination cards, event toggles, consent, snippet, alerts, danger zone
+      settings/page.tsx               # 6 destination cards, event toggles, consent, snippet, alerts, language/currency selectors, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
         page.tsx                      # 3-step wizard: create workspace, copy snippet, test event
@@ -137,6 +139,7 @@ src/
       workspaces/[id]/analytics/route.ts   # GET: dashboard analytics (cached 60s)
       workspaces/[id]/replay/route.ts # POST: re-queue failed events (500 max, 5min cooldown)
       alerts/preferences/route.ts     # GET/PUT: alert notification preferences
+      user/preferences/route.ts      # PATCH: update display currency and language
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet (captures ttclid, UTMs, gclid)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
@@ -155,7 +158,7 @@ src/
       replay-button.tsx               # Retry failed events button (bulk + per-event)
       campaign-performance.tsx        # Top campaigns by revenue with per-platform tabs (30d)
     settings/
-      settings-form.tsx               # All settings: 6 destination cards + toggles + consent + snippet + danger zone
+      settings-form.tsx               # All settings: 6 destination cards + toggles + consent + snippet + language/currency selectors + danger zone
       alert-preferences.tsx           # Email alert notification toggles
     billing/
       plan-cards.tsx                  # Starter/Growth plan comparison + subscribe buttons
@@ -173,8 +176,9 @@ src/
     constants.ts                      # BILLING_PLANS (order-based), AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG, META_API_*
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case)
-    analytics.ts                      # Dashboard analytics computation (parallel Prisma queries, campaign performance)
-    analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL)
+    analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
+    analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
+    currency.ts                       # Exchange rate fetcher (frankfurter.app API), Redis-cached 24h
     queue.ts                          # Lazy BullMQ queues (5 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
     replay-rate-limit.ts              # Redis cooldown for event replay (5min per workspace)
@@ -202,7 +206,16 @@ src/
     klaviyo-event-processor.ts        # BullMQ worker: Klaviyo Events API
     alert-checker.ts                  # Hourly repeatable job: evaluate alerts, send emails
     stale-pending-requeue.ts          # Every 5min: re-queue stale PENDING events to destination queues
+  i18n/
+    request.ts                        # next-intl config (cookie-based locale resolution)
   middleware.ts                       # Auth redirect for protected routes
+messages/
+  en.json                             # English translations (~250 keys)
+  pt.json                             # Portuguese translations
+  es.json                             # Spanish translations
+  fr.json                             # French translations
+  de.json                             # German translations
+  it.json                             # Italian translations
 tests/
   unit/
     hash-pii.test.ts                  # 25 tests
@@ -227,7 +240,7 @@ prisma/
 **Models:** User, Account, Session, VerificationToken (NextAuth), PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog
 
 **Key relationships:**
-- User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens
+- User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
 - Workspace has many EventLogs, stores encrypted credentials for all 5 destinations
 - EventLog has a `destination` field (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
@@ -309,7 +322,8 @@ All documented in `.env.example`. Critical ones:
 | `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
 | `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown) |
-| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing, accuracy, campaigns) |
+| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics with destination filter + currency conversion |
+| `PATCH /api/user/preferences` | PATCH | Update user display currency and language |
 | `GET/PUT /api/alerts/preferences` | GET, PUT | Alert notification preferences |
 | `GET /api/snippet/:workspaceId` | GET | Generate JS snippet (captures ttclid, UTMs, gclid) |
 | `POST /api/stripe/checkout` | POST | Create Stripe checkout session |
@@ -354,7 +368,10 @@ Header: Content-Type: application/json
 - **Multi-destination fan-out:** Ingest route creates one EventLog + one BullMQ job per enabled destination. Each destination has its own queue, worker, normalizer, and API client.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
-- **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.
+- **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard "All" view deduplicates by filtering to a canonical destination (first enabled). Per-destination tabs show filtered stats. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.
+- **Currency conversion:** Users set `displayCurrency` on their profile. Revenue values converted via frankfurter.app API (free, no key). Exchange rates cached in Redis for 24h. Fallback: show unconverted if API fails.
+- **Internationalization:** next-intl v4 with cookie-based locale (no URL prefixes). 6 languages: EN, PT, ES, FR, DE, IT. ~250 translation keys per language in `messages/*.json`. Server components use `getTranslations`, client components use `useTranslations`. Language preference stored on User model, synced to `locale` cookie on login/change.
+- **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}:{dest}:{currency}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.
 - **Klaviyo raw email:** Klaviyo requires unhashed email for profile matching, unlike Meta/Google/TikTok which all use SHA-256.
 - **Email alerts:** Hourly BullMQ repeatable job evaluates tracking health, error rates, and order limits. 24h cooldown per alert type per user.
 - **UTM attribution:** Snippet captures UTM params + gclid once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
@@ -403,3 +420,4 @@ All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII
 - MVP fixes plan: `.omc/plans/trackclear-mvp-next-steps.md` (6 phases, all executed)
 - UI migration plan: `.omc/plans/shadcn-ui-implementation.md` (9 phases, all executed)
 - Billing model plan: `.omc/plans/purchase-based-billing.md` (10 phases, all executed)
+- Analytics/Currency/i18n plan: `C:\Users\Marcos\.claude\plans\jaunty-weaving-lobster.md` (3 workstreams, all executed)

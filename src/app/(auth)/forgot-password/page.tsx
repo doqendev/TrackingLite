@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ForgotPasswordPage() {
+  const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -25,11 +27,11 @@ export default function ForgotPasswordPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error || t("somethingWentWrong"));
       }
       setSubmitted(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : t("somethingWentWrong"));
     } finally {
       setSubmitting(false);
     }
@@ -41,21 +43,21 @@ export default function ForgotPasswordPage() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           <span className="text-brand-500">Track</span>&thinsp;Clear
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Reset your password</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t("forgotPasswordTitle")}</p>
       </div>
 
       {submitted ? (
         <div className="space-y-6">
           <Alert className="border-green-500/30 bg-green-500/10">
             <AlertDescription className="text-center text-green-200">
-              If an account exists with that email, we sent a reset link. Check your inbox.
+              {t("resetLinkSent")}
             </AlertDescription>
           </Alert>
           <Link
             href="/login"
             className="block text-center text-sm font-medium text-brand-500 hover:text-brand-400"
           >
-            Back to Login
+            {t("backToLogin")}
           </Link>
         </div>
       ) : (
@@ -66,7 +68,7 @@ export default function ForgotPasswordPage() {
             </Alert>
           )}
           <div>
-            <Label htmlFor="email" className="mb-1">Email address</Label>
+            <Label htmlFor="email" className="mb-1">{t("email")}</Label>
             <Input
               id="email"
               type="email"
@@ -76,22 +78,23 @@ export default function ForgotPasswordPage() {
               required
               autoFocus
             />
+            <p className="text-xs text-muted-foreground mt-1.5">{t("forgotPasswordDesc")}</p>
           </div>
           <Button type="submit" variant="brand" className="w-full" disabled={submitting}>
-            {submitting ? "Sending..." : "Send reset link"}
+            {submitting ? t("sending") : t("sendResetLink")}
           </Button>
           <div className="space-y-2 pt-2">
             <Link
               href="/login"
               className="block text-center text-sm font-medium text-brand-500 hover:text-brand-400"
             >
-              Back to Login
+              {t("backToLogin")}
             </Link>
             <Link
               href="/signup"
               className="block text-center text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              Create a new account
+              {t("createAccountBtn")}
             </Link>
           </div>
         </form>

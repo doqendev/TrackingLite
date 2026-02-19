@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 export interface IntegrationWorkspace {
   id: string;
@@ -78,15 +79,15 @@ function KlaviyoIcon() {
   );
 }
 
-function EncryptedBadge() {
+function EncryptedBadge({ label }: { label: string }) {
   return (
     <span className="text-[10px] font-medium text-brand-500/70 bg-brand-500/10 px-1.5 py-0.5 rounded">
-      encrypted at rest
+      {label}
     </span>
   );
 }
 
-function StatusBadge({ connected }: { connected: boolean }) {
+function StatusBadge({ connected, connectedLabel, notConnectedLabel }: { connected: boolean; connectedLabel: string; notConnectedLabel: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -100,12 +101,14 @@ function StatusBadge({ connected }: { connected: boolean }) {
           connected ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"
         }`}
       />
-      {connected ? "Connected" : "Not connected"}
+      {connected ? connectedLabel : notConnectedLabel}
     </span>
   );
 }
 
 export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
+  const t = useTranslations("integrations");
+  const tc = useTranslations("common");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   // Meta state
@@ -173,9 +176,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         body: JSON.stringify({ [field]: enabled }),
       });
       if (!res.ok) throw new Error("Failed to save");
-      toast.success(`${platformName} ${enabled ? "enabled" : "disabled"}`);
+      toast.success(t(enabled ? "platformEnabled" : "platformDisabled", { platform: platformName }));
     } catch {
-      toast.error("Failed to update");
+      toast.error(t("failedToUpdate"));
     }
   }
 
@@ -194,10 +197,10 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to save");
-      toast.success("Meta credentials saved");
+      toast.success(t("credentialsSaved", { platform: "Meta" }));
       setMetaAccessToken("");
     } catch {
-      toast.error("Failed to save Meta credentials");
+      toast.error(t("failedToSave", { platform: "Meta" }));
     } finally {
       setSavingMeta(false);
     }
@@ -221,11 +224,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to save");
-      toast.success("Google Ads credentials saved");
+      toast.success(t("credentialsSaved", { platform: "Google Ads" }));
       setGoogleAccessToken("");
       setGoogleRefreshToken("");
     } catch {
-      toast.error("Failed to save Google Ads credentials");
+      toast.error(t("failedToSave", { platform: "Google Ads" }));
     } finally {
       setSavingGoogle(false);
     }
@@ -246,10 +249,10 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to save");
-      toast.success("TikTok credentials saved");
+      toast.success(t("credentialsSaved", { platform: "TikTok" }));
       setTiktokAccessToken("");
     } catch {
-      toast.error("Failed to save TikTok credentials");
+      toast.error(t("failedToSave", { platform: "TikTok" }));
     } finally {
       setSavingTiktok(false);
     }
@@ -270,10 +273,10 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to save");
-      toast.success("GA4 credentials saved");
+      toast.success(t("credentialsSaved", { platform: "GA4" }));
       setGa4ApiSecret("");
     } catch {
-      toast.error("Failed to save GA4 credentials");
+      toast.error(t("failedToSave", { platform: "GA4" }));
     } finally {
       setSavingGA4(false);
     }
@@ -293,10 +296,10 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to save");
-      toast.success("Klaviyo credentials saved");
+      toast.success(t("credentialsSaved", { platform: "Klaviyo" }));
       setKlaviyoApiKey("");
     } catch {
-      toast.error("Failed to save Klaviyo credentials");
+      toast.error(t("failedToSave", { platform: "Klaviyo" }));
     } finally {
       setSavingKlaviyo(false);
     }
@@ -318,7 +321,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     <div className="space-y-8">
       {/* Advertising Platforms */}
       <div>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Advertising Platforms</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("advertisingPlatforms")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
       {/* Meta CAPI */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-blue-500 overflow-hidden">
@@ -332,11 +335,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">Meta CAPI</p>
             <p className="text-xs text-muted-foreground truncate">
-              Connect your Meta Pixel for server-side conversion tracking
+              {t("metaDesc")}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge connected={metaConnected} />
+            <StatusBadge connected={metaConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
                 expandedCard === "meta" ? "rotate-180" : ""
@@ -353,7 +356,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
             <div className="pt-4 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="meta-pixel-id" className="text-xs">
-                  Pixel ID
+                  {t("pixelId")}
                 </Label>
                 <Input
                   id="meta-pixel-id"
@@ -365,9 +368,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="meta-access-token" className="text-xs">
-                    Access Token
+                    {t("accessToken")}
                   </Label>
-                  {workspace.hasAccessToken && <EncryptedBadge />}
+                  {workspace.hasAccessToken && <EncryptedBadge label={t("encryptedAtRest")} />}
                 </div>
                 <Input
                   id="meta-access-token"
@@ -376,15 +379,15 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setMetaAccessToken(e.target.value)}
                   placeholder={
                     workspace.hasAccessToken
-                      ? "leave blank to keep current"
+                      ? t("leaveBlankToKeep")
                       : "EAAxxxxx..."
                   }
                 />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="meta-test-code" className="text-xs">
-                  Test Event Code{" "}
-                  <span className="text-muted-foreground">(optional)</span>
+                  {t("testEventCode")}{" "}
+                  <span className="text-muted-foreground">({t("optional")})</span>
                 </Label>
                 <Input
                   id="meta-test-code"
@@ -400,7 +403,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onClick={saveMeta}
                   disabled={savingMeta}
                 >
-                  {savingMeta ? "Saving..." : "Save credentials"}
+                  {savingMeta ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
             </div>
@@ -420,11 +423,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">Google Ads</p>
             <p className="text-xs text-muted-foreground truncate">
-              Forward conversion events to Google Ads
+              {t("googleDesc")}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge connected={googleConnected} />
+            <StatusBadge connected={googleConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
             <Switch
               checked={googleEnabled}
               onCheckedChange={(val) => {
@@ -450,7 +453,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
             <div className="pt-4 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="google-customer-id" className="text-xs">
-                  Customer ID
+                  {t("customerId")}
                 </Label>
                 <Input
                   id="google-customer-id"
@@ -461,7 +464,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="google-conversion-action" className="text-xs">
-                  Conversion Action Resource Name
+                  {t("conversionAction")}
                 </Label>
                 <Input
                   id="google-conversion-action"
@@ -470,15 +473,15 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   placeholder="e.g. customers/1234567890/conversionActions/123456"
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  Find this in Google Ads &gt; Goals &gt; Conversions &gt; Details
+                  {t("conversionActionHelp")}
                 </p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="google-access-token" className="text-xs">
-                    Access Token
+                    {t("accessToken")}
                   </Label>
-                  {workspace.hasGoogleAdsAccessToken && <EncryptedBadge />}
+                  {workspace.hasGoogleAdsAccessToken && <EncryptedBadge label={t("encryptedAtRest")} />}
                 </div>
                 <Input
                   id="google-access-token"
@@ -487,7 +490,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setGoogleAccessToken(e.target.value)}
                   placeholder={
                     workspace.hasGoogleAdsAccessToken
-                      ? "leave blank to keep current"
+                      ? t("leaveBlankToKeep")
                       : "ya29.xxx..."
                   }
                 />
@@ -495,9 +498,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="google-refresh-token" className="text-xs">
-                    Refresh Token
+                    {t("refreshToken")}
                   </Label>
-                  {workspace.hasGoogleAdsRefreshToken && <EncryptedBadge />}
+                  {workspace.hasGoogleAdsRefreshToken && <EncryptedBadge label={t("encryptedAtRest")} />}
                 </div>
                 <Input
                   id="google-refresh-token"
@@ -506,20 +509,20 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setGoogleRefreshToken(e.target.value)}
                   placeholder={
                     workspace.hasGoogleAdsRefreshToken
-                      ? "leave blank to keep current"
+                      ? t("leaveBlankToKeep")
                       : "1//0xxxxxx..."
                   }
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  Required for automatic token refresh when access token expires
+                  {t("refreshTokenHelp")}
                 </p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="google-developer-token" className="text-xs">
-                    Developer Token
+                    {t("developerToken")}
                   </Label>
-                  {workspace.googleAdsDeveloperToken && <EncryptedBadge />}
+                  {workspace.googleAdsDeveloperToken && <EncryptedBadge label={t("encryptedAtRest")} />}
                 </div>
                 <Input
                   id="google-developer-token"
@@ -528,7 +531,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setGoogleDeveloperToken(e.target.value)}
                   placeholder={
                     workspace.googleAdsDeveloperToken
-                      ? "leave blank to keep current"
+                      ? t("leaveBlankToKeep")
                       : "xxxxxxxxxxxxxxxx"
                   }
                 />
@@ -540,7 +543,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onClick={saveGoogle}
                   disabled={savingGoogle}
                 >
-                  {savingGoogle ? "Saving..." : "Save credentials"}
+                  {savingGoogle ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
             </div>
@@ -560,11 +563,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">TikTok</p>
             <p className="text-xs text-muted-foreground truncate">
-              Send events server-side via TikTok Events API
+              {t("tiktokDesc")}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge connected={tiktokConnected} />
+            <StatusBadge connected={tiktokConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
             <Switch
               checked={tiktokEnabled}
               onCheckedChange={(val) => {
@@ -590,7 +593,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
             <div className="pt-4 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="tiktok-pixel-id" className="text-xs">
-                  Pixel ID
+                  {t("pixelId")}
                 </Label>
                 <Input
                   id="tiktok-pixel-id"
@@ -602,9 +605,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="tiktok-access-token" className="text-xs">
-                    Access Token
+                    {t("accessToken")}
                   </Label>
-                  {workspace.hasTiktokAccessToken && <EncryptedBadge />}
+                  {workspace.hasTiktokAccessToken && <EncryptedBadge label={t("encryptedAtRest")} />}
                 </div>
                 <Input
                   id="tiktok-access-token"
@@ -613,7 +616,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setTiktokAccessToken(e.target.value)}
                   placeholder={
                     workspace.hasTiktokAccessToken
-                      ? "leave blank to keep current"
+                      ? t("leaveBlankToKeep")
                       : "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                   }
                 />
@@ -625,7 +628,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onClick={saveTiktok}
                   disabled={savingTiktok}
                 >
-                  {savingTiktok ? "Saving..." : "Save credentials"}
+                  {savingTiktok ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
             </div>
@@ -638,7 +641,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
 
       {/* Analytics & Automation */}
       <div>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Analytics & Automation</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("analyticsAutomation")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
       {/* GA4 */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-orange-500 overflow-hidden">
@@ -652,11 +655,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">GA4</p>
             <p className="text-xs text-muted-foreground truncate">
-              Send events to Google Analytics 4 via Measurement Protocol
+              {t("ga4Desc")}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge connected={ga4Connected} />
+            <StatusBadge connected={ga4Connected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
             <Switch
               checked={ga4Enabled}
               onCheckedChange={(val) => {
@@ -682,7 +685,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
             <div className="pt-4 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="ga4-measurement-id" className="text-xs">
-                  Measurement ID
+                  {t("measurementId")}
                 </Label>
                 <Input
                   id="ga4-measurement-id"
@@ -694,9 +697,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="ga4-api-secret" className="text-xs">
-                    API Secret
+                    {t("apiSecret")}
                   </Label>
-                  {workspace.hasGA4ApiSecret && <EncryptedBadge />}
+                  {workspace.hasGA4ApiSecret && <EncryptedBadge label={t("encryptedAtRest")} />}
                 </div>
                 <Input
                   id="ga4-api-secret"
@@ -705,7 +708,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setGa4ApiSecret(e.target.value)}
                   placeholder={
                     workspace.hasGA4ApiSecret
-                      ? "leave blank to keep current"
+                      ? t("leaveBlankToKeep")
                       : "xxxxxxxxxxxxxxxxxxxxxx"
                   }
                 />
@@ -717,7 +720,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onClick={saveGA4}
                   disabled={savingGA4}
                 >
-                  {savingGA4 ? "Saving..." : "Save credentials"}
+                  {savingGA4 ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
             </div>
@@ -737,11 +740,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">Klaviyo</p>
             <p className="text-xs text-muted-foreground truncate">
-              Forward browsing and purchase events to Klaviyo
+              {t("klaviyoDesc")}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge connected={klaviyoConnected} />
+            <StatusBadge connected={klaviyoConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
             <Switch
               checked={klaviyoEnabled}
               onCheckedChange={(val) => {
@@ -768,9 +771,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="klaviyo-api-key" className="text-xs">
-                    API Key
+                    {t("apiKey")}
                   </Label>
-                  {workspace.hasKlaviyoApiKey && <EncryptedBadge />}
+                  {workspace.hasKlaviyoApiKey && <EncryptedBadge label={t("encryptedAtRest")} />}
                 </div>
                 <Input
                   id="klaviyo-api-key"
@@ -779,7 +782,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setKlaviyoApiKey(e.target.value)}
                   placeholder={
                     workspace.hasKlaviyoApiKey
-                      ? "leave blank to keep current"
+                      ? t("leaveBlankToKeep")
                       : "pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                   }
                 />
@@ -791,7 +794,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onClick={saveKlaviyo}
                   disabled={savingKlaviyo}
                 >
-                  {savingKlaviyo ? "Saving..." : "Save credentials"}
+                  {savingKlaviyo ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
             </div>

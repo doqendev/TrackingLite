@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 type PaidPlanKey = "STARTER" | "GROWTH" | "SCALE";
 
@@ -18,6 +19,7 @@ interface PlanCardsProps {
 }
 
 export function PlanCards({ currentPlan, subscriptionStatus, stripeCustomerId }: PlanCardsProps) {
+  const t = useTranslations("billing");
   const [loadingPlan, setLoadingPlan] = useState<PaidPlanKey | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
 
@@ -29,11 +31,11 @@ export function PlanCards({ currentPlan, subscriptionStatus, stripeCustomerId }:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      if (!res.ok) throw new Error("Failed to create checkout");
+      if (!res.ok) throw new Error(t("failedCheckout"));
       const { url } = await res.json();
       window.location.href = url;
     } catch {
-      toast.error("Failed to open checkout. Please try again.");
+      toast.error(t("failedCheckout"));
     } finally {
       setLoadingPlan(null);
     }
@@ -43,11 +45,11 @@ export function PlanCards({ currentPlan, subscriptionStatus, stripeCustomerId }:
     setLoadingPortal(true);
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" });
-      if (!res.ok) throw new Error("Failed to open portal");
+      if (!res.ok) throw new Error(t("failedPortal"));
       const { url } = await res.json();
       window.location.href = url;
     } catch {
-      toast.error("Failed to open billing portal. Please try again.");
+      toast.error(t("failedPortal"));
     } finally {
       setLoadingPortal(false);
     }
@@ -64,12 +66,12 @@ export function PlanCards({ currentPlan, subscriptionStatus, stripeCustomerId }:
             {loadingPortal ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Opening&hellip;
+                {t("opening")}
               </>
             ) : (
               <>
                 <CreditCard className="h-4 w-4" />
-                Manage Billing
+                {t("manageBilling")}
               </>
             )}
           </Button>
@@ -100,7 +102,7 @@ export function PlanCards({ currentPlan, subscriptionStatus, stripeCustomerId }:
           isLoading={loadingPlan === "STARTER"}
           onSubscribe={() => handleSubscribe("STARTER")}
           highlighted={false}
-          autoUpgradeNote={`Auto-upgrades to ${BILLING_PLANS[AUTO_UPGRADE_MAP.STARTER!].name} if you exceed ${BILLING_PLANS.STARTER.ordersPerMonth.toLocaleString()} orders`}
+          autoUpgradeNote={t("autoUpgradeTo", { plan: BILLING_PLANS[AUTO_UPGRADE_MAP.STARTER!].name, limit: BILLING_PLANS.STARTER.ordersPerMonth.toLocaleString() })}
         />
 
         {/* Growth Plan */}
@@ -112,7 +114,7 @@ export function PlanCards({ currentPlan, subscriptionStatus, stripeCustomerId }:
           isLoading={loadingPlan === "GROWTH"}
           onSubscribe={() => handleSubscribe("GROWTH")}
           highlighted={true}
-          autoUpgradeNote={`Auto-upgrades to ${BILLING_PLANS[AUTO_UPGRADE_MAP.GROWTH!].name} if you exceed ${BILLING_PLANS.GROWTH.ordersPerMonth.toLocaleString()} orders`}
+          autoUpgradeNote={t("autoUpgradeTo", { plan: BILLING_PLANS[AUTO_UPGRADE_MAP.GROWTH!].name, limit: BILLING_PLANS.GROWTH.ordersPerMonth.toLocaleString() })}
         />
 
         {/* Scale Plan */}
@@ -153,6 +155,7 @@ function PlanCard({
   autoUpgradeNote,
   isFree,
 }: PlanCardProps) {
+  const t = useTranslations("billing");
   const isActive = isCurrentPlan && (subscriptionStatus === "ACTIVE" || (!subscriptionStatus && isFree));
   const isPastDue = isCurrentPlan && subscriptionStatus === "PAST_DUE";
 
@@ -168,7 +171,7 @@ function PlanCard({
     >
       {highlighted && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <Badge className="bg-brand-500 text-white glow-brand">Most Popular</Badge>
+          <Badge className="bg-brand-500 text-white glow-brand">{t("mostPopular")}</Badge>
         </div>
       )}
 
@@ -183,7 +186,7 @@ function PlanCard({
                 : "bg-secondary text-muted-foreground"
             }
           >
-            {isActive ? "Current Plan" : isPastDue ? "Past Due" : "Current Plan"}
+            {isActive ? t("currentPlan") : isPastDue ? t("pastDue") : t("currentPlan")}
           </Badge>
         </div>
       )}
@@ -192,7 +195,7 @@ function PlanCard({
         <h3 className="text-lg font-bold text-foreground">{plan.name}</h3>
         <div className="flex items-baseline gap-1 mt-2">
           {plan.priceMonthly === 0 ? (
-            <span className="text-4xl font-extrabold text-foreground">Free</span>
+            <span className="text-4xl font-extrabold text-foreground">{t("free")}</span>
           ) : (
             <>
               <span className="text-4xl font-extrabold text-foreground tabular-nums">${plan.priceMonthly}</span>
@@ -217,7 +220,7 @@ function PlanCard({
 
       {isFree ? (
         <Button className="w-full" variant="secondary" disabled>
-          {isActive ? "Your Current Plan" : "Free Forever"}
+          {isActive ? t("yourCurrentPlan") : t("freeForever")}
         </Button>
       ) : (
         <Button
@@ -229,12 +232,12 @@ function PlanCard({
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Redirecting&hellip;
+              {t("redirecting")}
             </span>
           ) : isCurrentPlan && isActive ? (
-            "Your Current Plan"
+            t("yourCurrentPlan")
           ) : (
-            `Subscribe to ${plan.name}`
+            t("subscribeTo", { plan: plan.name })
           )}
         </Button>
       )}

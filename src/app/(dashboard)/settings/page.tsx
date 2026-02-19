@@ -10,22 +10,28 @@ export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const workspace = await db.workspace.findFirst({
-    where: { userId: session.user.id, isActive: true },
-    select: {
-      id: true,
-      name: true,
-      domain: true,
-      consentMode: true,
-      enablePageView: true,
-      enableViewContent: true,
-      enableAddToCart: true,
-      enableInitiateCheckout: true,
-      enablePurchase: true,
-      apiKey: true,
-      isActive: true,
-    },
-  });
+  const [workspace, user] = await Promise.all([
+    db.workspace.findFirst({
+      where: { userId: session.user.id, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        consentMode: true,
+        enablePageView: true,
+        enableViewContent: true,
+        enableAddToCart: true,
+        enableInitiateCheckout: true,
+        enablePurchase: true,
+        apiKey: true,
+        isActive: true,
+      },
+    }),
+    db.user.findUnique({
+      where: { id: session.user.id },
+      select: { displayCurrency: true, language: true },
+    }),
+  ]);
 
   if (!workspace) redirect("/onboarding");
 
@@ -38,6 +44,11 @@ export default async function SettingsPage() {
     enableInitiateCheckout: workspace.enableInitiateCheckout,
     enablePurchase: workspace.enablePurchase,
     apiKey: workspace.apiKey,
+  };
+
+  const userPreferences = {
+    displayCurrency: user?.displayCurrency ?? "USD",
+    language: user?.language ?? "en",
   };
 
   return (
@@ -54,7 +65,7 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <SettingsForm workspace={workspaceForClient} />
+      <SettingsForm workspace={workspaceForClient} userPreferences={userPreferences} />
       <AlertPreferences />
     </div>
   );
