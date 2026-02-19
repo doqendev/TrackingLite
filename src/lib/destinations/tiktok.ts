@@ -132,8 +132,9 @@ export async function sendToTikTok(
   events: TikTokEvent[]
 ): Promise<unknown> {
   const body = {
-    pixel_code: pixelId,
-    event: events,
+    event_source: "web",
+    event_source_id: pixelId,
+    data: events,
   };
 
   const response = await fetch(TIKTOK_API_URL, {
