@@ -8,7 +8,6 @@ import type {
   RevenueMetrics,
   EventBreakdown,
   BillingUsage,
-  EmqMetrics,
   ConversionAccuracy,
 } from "@/types/app";
 
@@ -221,130 +220,6 @@ async function queryEventBreakdown(
   return breakdown;
 }
 
-async function queryEmqScore(
-  workspaceId: string,
-  since24h: Date
-): Promise<EmqMetrics> {
-  const events = await db.eventLog.findMany({
-    where: {
-      workspaceId,
-      status: EventStatus.SENT,
-      createdAt: { gte: since24h },
-    },
-    select: {
-      fbp: true,
-      fbc: true,
-      customerIp: true,
-      userAgent: true,
-      pageUrl: true,
-      payload: true,
-    },
-    take: 200,
-  });
-
-  const totalSampled = events.length;
-
-  if (totalSampled === 0) {
-    return {
-      score: 0,
-      totalSampled: 0,
-      breakdown: {
-        email: 0,
-        phone: 0,
-        fbp: 0,
-        fbc: 0,
-        ip: 0,
-        userAgent: 0,
-      },
-    };
-  }
-
-  let totalScore = 0;
-  let withEmail = 0;
-  let withPhone = 0;
-  let withFbp = 0;
-  let withFbc = 0;
-  let withIp = 0;
-  let withUserAgent = 0;
-
-  for (const event of events) {
-    let eventScore = 0;
-
-    // Check payload for hasUserData flag and user data fields
-    const payload =
-      event.payload !== null && typeof event.payload === "object"
-        ? (event.payload as Record<string, unknown>)
-        : null;
-
-    const hasEmail =
-      payload !== null &&
-      (payload.hasEmail === true ||
-        (typeof payload.userData === "object" &&
-          payload.userData !== null &&
-          "email" in (payload.userData as Record<string, unknown>)));
-
-    const hasPhone =
-      payload !== null &&
-      (payload.hasPhone === true ||
-        (typeof payload.userData === "object" &&
-          payload.userData !== null &&
-          "phone" in (payload.userData as Record<string, unknown>)));
-
-    const hasFbp = event.fbp !== null && event.fbp !== "";
-    const hasFbc = event.fbc !== null && event.fbc !== "";
-    const hasIp = event.customerIp !== null && event.customerIp !== "";
-    const hasUa = event.userAgent !== null && event.userAgent !== "";
-    const hasUrl = event.pageUrl !== null && event.pageUrl !== "";
-
-    if (hasEmail) {
-      eventScore += 2;
-      withEmail++;
-    }
-    if (hasPhone) {
-      eventScore += 1.5;
-      withPhone++;
-    }
-    if (hasFbp) {
-      eventScore += 1.5;
-      withFbp++;
-    }
-    if (hasFbc) {
-      eventScore += 1;
-      withFbc++;
-    }
-    if (hasIp) {
-      eventScore += 1;
-      withIp++;
-    }
-    if (hasUa) {
-      eventScore += 1;
-      withUserAgent++;
-    }
-    if (hasUrl) {
-      eventScore += 0.5;
-    }
-
-    totalScore += Math.min(10, eventScore);
-  }
-
-  const avg = Math.round((totalScore / totalSampled) * 10) / 10;
-
-  const pct = (n: number) => Math.round((n / totalSampled) * 100);
-
-  return {
-    score: avg,
-    totalSampled,
-    breakdown: {
-      email: pct(withEmail),
-      phone: pct(withPhone),
-      fbp: pct(withFbp),
-      fbc: pct(withFbc),
-      ip: pct(withIp),
-      userAgent: pct(withUserAgent),
-    },
-  };
-}
-
 async function queryConversionAccuracy(
   workspaceId: string
 ): Promise<ConversionAccuracy> {
@@ -442,13 +317,12 @@ export async function computeDashboardAnalytics(
 ): Promise<DashboardAnalytics> {
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
-  const [health, revenue, eventBreakdown, billing, emq, conversionAccuracy] =
+  const [health, revenue, eventBreakdown, billing, conversionAccuracy] =
     await Promise.all([
       queryHealthMetrics(workspaceId, since24h),
       queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now),
       queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now),
       queryBillingUsage(userId),
-      queryEmqScore(workspaceId, since24h),
       queryConversionAccuracy(workspaceId),
     ]);
 
@@ -462,7 +336,6 @@ export async function computeDashboardAnalytics(
     eventBreakdown,
     billing,
     retentionDays,
-    emq,
     conversionAccuracy,
   };
 }

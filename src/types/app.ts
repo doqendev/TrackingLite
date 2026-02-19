@@ -63,19 +63,6 @@ export interface BillingUsage {
   usagePercent: number;
 }
 
-export interface EmqMetrics {
-  score: number;         // 0-10 average
-  totalSampled: number;  // how many events were sampled
-  breakdown: {
-    email: number;       // percentage of events with email
-    phone: number;       // percentage with phone
-    fbp: number;         // percentage with fbp
-    fbc: number;         // percentage with fbc
-    ip: number;          // percentage with IP
-    userAgent: number;   // percentage with user agent
-  };
-}
-
 export interface ConversionAccuracyPeriod {
   total: number;
   sent: number;
@@ -94,6 +81,5 @@ export interface DashboardAnalytics {
   eventBreakdown: EventBreakdown;
   billing: BillingUsage;
   retentionDays: number;
-  emq: EmqMetrics;
   conversionAccuracy: ConversionAccuracy;
 }

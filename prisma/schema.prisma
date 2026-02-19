@@ -196,7 +196,6 @@ model AlertPreference {
   highErrorRate     Boolean @default(true)   // >10% errors in last hour
   orderLimitWarning Boolean @default(true)   // 80% and 95% of monthly limit
   orderLimitReached Boolean @default(true)   // 100% of limit
-  emqDrop           Boolean @default(true)   // EMQ score drops below 6
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -207,7 +206,7 @@ model AlertPreference {
 model AlertLog {
   id        String   @id @default(cuid())
   userId    String
-  alertType String   // "tracking_down", "high_error_rate", "order_limit_warning", "order_limit_reached", "emq_drop"
+  alertType String   // "tracking_down", "high_error_rate", "order_limit_warning", "order_limit_reached"
   message   String
   sentAt    DateTime @default(now())
 

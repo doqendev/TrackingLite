@@ -22,7 +22,7 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-3)
 | `/signup` | Public | Working | Registration with auto-login, redirects to onboarding |
 | `/forgot-password` | Public | Working | Sends password reset email via Resend |
 | `/reset-password` | Public | Working | Token-based password reset with confirmation |
-| `/dashboard` | Protected | Working | Rich analytics: revenue cards, event funnel, delivery stats, order usage, health badge, EMQ score, conversion accuracy, recent events |
+| `/dashboard` | Protected | Working | Rich analytics: revenue cards, event funnel, delivery stats, order usage, health badge, conversion accuracy, recent events |
 | `/events` | Protected | Working | Paginated event log with type/status filters, retry failed events |
 | `/settings` | Protected | Working | 6 destination credential cards (Meta, Google Ads, TikTok, GA4, Klaviyo), event toggles, consent mode, snippet, alert preferences, danger zone |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
@@ -87,10 +87,10 @@ Each destination has:
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case |
 | `queue.ts` | Working | Lazy BullMQ queues (5 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
-| `analytics.ts` | Working | Dashboard analytics: health, revenue, event breakdown, billing, EMQ, conversion accuracy |
+| `analytics.ts` | Working | Dashboard analytics: health, revenue, event breakdown, billing, conversion accuracy |
 | `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection) |
 | `email.ts` | Working | Resend client for password reset + alert emails |
-| `alerts.ts` | Working | Alert evaluation: tracking down, high error rate, order limit warnings, EMQ drop |
+| `alerts.ts` | Working | Alert evaluation: tracking down, high error rate, order limit warnings |
 | `replay-rate-limit.ts` | Working | Redis cooldown for event replay (5min per workspace) |
 | `extract-custom-data.ts` | Working | Extract value/currency/numItems/orderId from customData |
 | `destinations/index.ts` | Working | DESTINATION_EVENT_MAP for all 5 platforms |
@@ -116,7 +116,6 @@ Each destination has:
 
 | Component | What it shows |
 |-----------|-------------|
-| `emq-score.tsx` | Event Match Quality score (0-10), data field coverage breakdown, tips |
 | `conversion-accuracy.tsx` | Purchase delivery accuracy (7d/30d), sent/failed counts |
 | `revenue-cards.tsx` | 3 revenue cards (AddToCart, Checkout, Purchase) with yesterday delta |
 | `event-funnel.tsx` | 5-row event funnel with horizontal bars |
@@ -140,7 +139,7 @@ Each destination has:
 | `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
 | `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
 | `consent.test.ts` | 10 | STRICT/LAX mode combinations |
-| `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, EMQ, conversion accuracy |
+| `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
 
@@ -201,8 +200,7 @@ None currently tracked.
 ## Feature Expansion History
 
 ### Phase 1: Quick Wins (2026-02-19)
-1. **EMQ Score Display** - Event Match Quality gauge on dashboard with field coverage breakdown
-2. **Event Replay** - Retry failed events from events page (bulk or per-event, 5min cooldown)
+1. **Event Replay** - Retry failed events from events page (bulk or per-event, 5min cooldown)
 3. **Conversion Accuracy** - Purchase delivery accuracy dashboard (7d/30d)
 4. **Password Reset** - Working password reset via Resend email service
 
@@ -214,7 +212,7 @@ None currently tracked.
 ### Phase 3: Ecosystem (2026-02-19)
 1. **GA4** - Measurement Protocol integration for server-side Google Analytics
 2. **Klaviyo** - Server-side events for email/SMS automation (raw email, not hashed)
-3. **Email Alerts** - Proactive notifications for tracking health, error rates, order limits, EMQ drops
+3. **Email Alerts** - Proactive notifications for tracking health, error rates, order limits
 
 ---
 

@@ -8,7 +8,6 @@ const updateSchema = z.object({
   highErrorRate: z.boolean(),
   orderLimitWarning: z.boolean(),
   orderLimitReached: z.boolean(),
-  emqDrop: z.boolean(),
 });
 
 export async function GET(): Promise<NextResponse> {

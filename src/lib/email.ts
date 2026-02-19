@@ -17,8 +17,7 @@ export type AlertType =
   | "tracking_down"
   | "high_error_rate"
   | "order_limit_warning"
-  | "order_limit_reached"
-  | "emq_drop";
+  | "order_limit_reached";
 
 export interface AlertDetails {
   workspaceName: string;
@@ -27,7 +26,6 @@ export interface AlertDetails {
   ordersUsed?: number;
   ordersLimit?: number;
   usagePercent?: number;
-  emqScore?: number;
 }
 
 const ALERT_SUBJECT: Record<AlertType, (details: AlertDetails) => string> = {
@@ -39,8 +37,6 @@ const ALERT_SUBJECT: Record<AlertType, (details: AlertDetails) => string> = {
     `Track Clear: Order limit at ${d.usagePercent ?? 0}% for ${d.workspaceName}`,
   order_limit_reached: (d) =>
     `Track Clear: Order limit reached for ${d.workspaceName}`,
-  emq_drop: (d) =>
-    `Track Clear: Event match quality dropped for ${d.workspaceName}`,
 };
 
 function buildAlertBody(alertType: AlertType, details: AlertDetails): string {
@@ -129,22 +125,6 @@ function buildAlertBody(alertType: AlertType, details: AlertDetails): string {
       `;
       break;
 
-    case "emq_drop":
-      body = `
-        <h2 style="font-size: 18px; font-weight: 600; color: #d97706; margin-bottom: 16px;">
-          Event match quality dropped
-        </h2>
-        <p style="font-size: 15px; color: #333; line-height: 1.6;">
-          The workspace <strong>${details.workspaceName}</strong> has an EMQ score of
-          <strong>${details.emqScore ?? 0}</strong>, which is below the recommended threshold
-          of 6.0.
-        </p>
-        <p style="font-size: 15px; color: #333; line-height: 1.6; margin-top: 12px;">
-          A lower EMQ score means Meta has less data to match events to users, reducing ad
-          optimization. Ensure your snippet is capturing email and phone data where possible.
-        </p>
-      `;
-      break;
   }
 
   return `

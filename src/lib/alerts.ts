@@ -90,78 +90,6 @@ async function checkHighErrorRate(
   };
 }
 
-async function checkEmqDrop(
-  workspaceId: string,
-  workspaceName: string,
-  userId: string
-): Promise<Alert | null> {
-  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-  const events = await db.eventLog.findMany({
-    where: {
-      workspaceId,
-      status: EventStatus.SENT,
-      createdAt: { gte: since24h },
-    },
-    select: {
-      fbp: true,
-      fbc: true,
-      customerIp: true,
-      userAgent: true,
-      pageUrl: true,
-      payload: true,
-    },
-    take: 200,
-  });
-
-  if (events.length === 0) return null;
-
-  let totalScore = 0;
-  for (const event of events) {
-    let eventScore = 0;
-    const payload =
-      event.payload !== null && typeof event.payload === "object"
-        ? (event.payload as Record<string, unknown>)
-        : null;
-
-    const hasEmail =
-      payload !== null &&
-      (payload.hasEmail === true ||
-        (typeof payload.userData === "object" &&
-          payload.userData !== null &&
-          "email" in (payload.userData as Record<string, unknown>)));
-
-    const hasPhone =
-      payload !== null &&
-      (payload.hasPhone === true ||
-        (typeof payload.userData === "object" &&
-          payload.userData !== null &&
-          "phone" in (payload.userData as Record<string, unknown>)));
-
-    if (hasEmail) eventScore += 2;
-    if (hasPhone) eventScore += 1.5;
-    if (event.fbp) eventScore += 1.5;
-    if (event.fbc) eventScore += 1;
-    if (event.customerIp) eventScore += 1;
-    if (event.userAgent) eventScore += 1;
-    if (event.pageUrl) eventScore += 0.5;
-
-    totalScore += Math.min(10, eventScore);
-  }
-
-  const emqScore = Math.round((totalScore / events.length) * 10) / 10;
-  if (emqScore >= 6) return null;
-
-  return {
-    userId,
-    workspaceId,
-    workspaceName,
-    alertType: "emq_drop",
-    details: { workspaceName, emqScore },
-    message: `EMQ score dropped to ${emqScore} (below 6.0 threshold) for workspace: ${workspaceName}`,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Per-user checks (billing)
 // ---------------------------------------------------------------------------
@@ -239,7 +167,6 @@ export async function shouldSendAlert(
       high_error_rate: pref.highErrorRate,
       order_limit_warning: pref.orderLimitWarning,
       order_limit_reached: pref.orderLimitReached,
-      emq_drop: pref.emqDrop,
     };
     if (!enabledMap[alertType]) return false;
   }
@@ -274,12 +201,11 @@ export async function evaluateAlerts(userId: string): Promise<Alert[]> {
   // Per-workspace checks (run all workspaces in parallel)
   const workspaceAlertArrays = await Promise.all(
     workspaces.map(async (ws) => {
-      const [trackingDown, highErrorRate, emqDrop] = await Promise.all([
+      const [trackingDown, highErrorRate] = await Promise.all([
         checkTrackingDown(ws.id, ws.name, userId),
         checkHighErrorRate(ws.id, ws.name, userId),
-        checkEmqDrop(ws.id, ws.name, userId),
       ]);
-      return [trackingDown, highErrorRate, emqDrop].filter(
+      return [trackingDown, highErrorRate].filter(
         (a): a is Alert => a !== null
       );
     })

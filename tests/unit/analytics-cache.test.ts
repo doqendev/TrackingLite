@@ -46,18 +46,6 @@ const mockAnalytics: DashboardAnalytics = {
     usagePercent: 5,
   },
   retentionDays: 7,
-  emq: {
-    score: 7.5,
-    totalSampled: 100,
-    breakdown: {
-      email: 80,
-      phone: 60,
-      fbp: 70,
-      fbc: 30,
-      ip: 95,
-      userAgent: 98,
-    },
-  },
   conversionAccuracy: {
     last7d: { total: 30, sent: 29, failed: 1, accuracy: 96.7 },
     last30d: { total: 120, sent: 115, failed: 5, accuracy: 95.8 },

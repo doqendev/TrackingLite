@@ -4,7 +4,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockCount = vi.fn();
 const mockFindFirst = vi.fn();
-const mockFindMany = vi.fn();
 const mockAggregate = vi.fn();
 const mockGroupBy = vi.fn();
 const mockFindUnique = vi.fn();
@@ -14,7 +13,6 @@ vi.mock("@/lib/db", () => ({
     eventLog: {
       count: (...args: unknown[]) => mockCount(...args),
       findFirst: (...args: unknown[]) => mockFindFirst(...args),
-      findMany: (...args: unknown[]) => mockFindMany(...args),
       aggregate: (...args: unknown[]) => mockAggregate(...args),
       groupBy: (...args: unknown[]) => mockGroupBy(...args),
     },
@@ -91,9 +89,6 @@ function setupDefaultMocks() {
       { eventName: "InitiateCheckout", _count: 140 },
       { eventName: "Purchase", _count: 75 },
     ]);
-
-  // EMQ: return empty array (no sent events sampled)
-  mockFindMany.mockResolvedValue([]);
 
   // Subscription
   mockFindUnique.mockResolvedValue({ plan: "STARTER" });
@@ -195,7 +190,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -226,7 +221,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -256,7 +251,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -310,7 +305,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -379,7 +374,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([{ eventName: "PageView", _count: 5 }])
         .mockResolvedValueOnce([]);
 
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -423,7 +418,7 @@ describe("computeDashboardAnalytics", () => {
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null); // no subscription
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -451,7 +446,7 @@ describe("computeDashboardAnalytics", () => {
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -477,7 +472,7 @@ describe("computeDashboardAnalytics", () => {
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(50);
 
@@ -503,7 +498,7 @@ describe("computeDashboardAnalytics", () => {
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(75); // over 50 limit
 
@@ -529,7 +524,7 @@ describe("computeDashboardAnalytics", () => {
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockRejectedValue(new Error("Redis connection failed"));
 
@@ -557,7 +552,7 @@ describe("computeDashboardAnalytics", () => {
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -583,7 +578,7 @@ describe("computeDashboardAnalytics", () => {
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      mockFindMany.mockResolvedValue([]);
+
       mockFindUnique.mockResolvedValue({ plan: "GROWTH" });
       mockGetOrderCount.mockResolvedValue(0);
 

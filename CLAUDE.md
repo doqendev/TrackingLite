@@ -27,8 +27,8 @@ Small-to-mid Shopify stores running ads on Meta, Google, TikTok, and more. Free 
 - TypeScript: 0 source errors
 - Lint: 0 warnings/errors
 - 5 destinations: Meta CAPI, Google Ads, TikTok, GA4, Klaviyo
-- Dashboard: EMQ score, conversion accuracy, revenue cards, event funnel, delivery stats
-- Extras: event replay, password reset, email alerts
+- Dashboard: conversion accuracy, revenue cards, event funnel, delivery stats
+- Extras: event replay, password reset, email alerts (4 alert types)
 
 See `STATUS.md` for the full audit and remaining work.
 
@@ -85,7 +85,7 @@ Workers (separate process) --> Dequeue from per-destination queues
   |-- Retry: 3 attempts, exponential backoff (2s, 4s, 8s)
 
 Alert Checker (hourly repeatable job)
-  |-- Evaluate tracking health, error rates, order limits, EMQ scores
+  |-- Evaluate tracking health, error rates, order limits
   |-- Send email alerts via Resend (24h cooldown per alert type)
 ```
 
@@ -112,7 +112,7 @@ src/
       reset-password/page.tsx         # Token-based password reset with confirmation
     (dashboard)/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
-      dashboard/page.tsx              # Rich analytics: revenue, EMQ, conversion accuracy, event funnel, delivery, recent events
+      dashboard/page.tsx              # Rich analytics: revenue, conversion accuracy, event funnel, delivery, recent events
       events/page.tsx                 # Event log table with filters + pagination (50/page) + event replay
       settings/page.tsx               # 6 destination cards, event toggles, consent, snippet, alerts, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
@@ -144,7 +144,6 @@ src/
       revenue-cards.tsx               # 3 revenue cards with yesterday delta
       event-funnel.tsx                # 5-row event funnel with horizontal bars
       delivery-stats.tsx              # 24h delivery metrics: success rate, delivered/failed
-      emq-score.tsx                   # Event Match Quality score gauge (0-10) with breakdown
       conversion-accuracy.tsx         # Purchase delivery accuracy (7d/30d toggle)
       recent-events.tsx               # Last 10 events mini-table with value column
       replay-button.tsx               # Retry failed events button (bulk + per-event)
@@ -173,7 +172,7 @@ src/
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
     replay-rate-limit.ts              # Redis cooldown for event replay (5min per workspace)
     email.ts                          # Resend client for password reset + alert emails
-    alerts.ts                         # Alert evaluation: health, errors, limits, EMQ
+    alerts.ts                         # Alert evaluation: health, errors, limits
     api-key-cache.ts                  # Redis-cached workspace lookup (UNUSED - see known issues)
     extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
     destinations/
@@ -301,7 +300,7 @@ All documented in `.env.example`. Critical ones:
 | `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
 | `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown) |
-| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing, EMQ, accuracy) |
+| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing, accuracy) |
 | `GET/PUT /api/alerts/preferences` | GET, PUT | Alert notification preferences |
 | `GET /api/snippet/:workspaceId` | GET | Generate JS snippet (includes ttclid capture) |
 | `POST /api/stripe/checkout` | POST | Create Stripe checkout session |
@@ -341,7 +340,7 @@ Header: Content-Type: application/json
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.
 - **Klaviyo raw email:** Klaviyo requires unhashed email for profile matching, unlike Meta/Google/TikTok which all use SHA-256.
-- **Email alerts:** Hourly BullMQ repeatable job evaluates tracking health, error rates, order limits, and EMQ scores. 24h cooldown per alert type per user.
+- **Email alerts:** Hourly BullMQ repeatable job evaluates tracking health, error rates, and order limits. 24h cooldown per alert type per user.
 
 ## Style Rules
 

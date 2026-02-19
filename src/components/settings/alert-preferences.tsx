@@ -11,7 +11,6 @@ interface AlertPreference {
   highErrorRate: boolean;
   orderLimitWarning: boolean;
   orderLimitReached: boolean;
-  emqDrop: boolean;
 }
 
 const ALERT_ITEMS: {
@@ -38,11 +37,6 @@ const ALERT_ITEMS: {
     key: "orderLimitReached",
     label: "Order Limit Reached",
     description: "Notify when the monthly order limit is fully reached and Purchase events are blocked.",
-  },
-  {
-    key: "emqDrop",
-    label: "EMQ Score Drop",
-    description: "Notify when the Event Match Quality score drops below 6.0.",
   },
 ];
 
