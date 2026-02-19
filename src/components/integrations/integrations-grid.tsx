@@ -311,7 +311,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const klaviyoConnected = workspace.hasKlaviyoApiKey;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+    <div className="space-y-8">
+      {/* Advertising Platforms */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Advertising Platforms</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
       {/* Meta CAPI */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-blue-500 overflow-hidden">
         <div
@@ -600,6 +604,13 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
       </div>
 
+        </div>
+      </div>
+
+      {/* Analytics & Automation */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Analytics & Automation</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
       {/* GA4 */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-orange-500 overflow-hidden">
         <div
@@ -756,6 +767,8 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     </div>
