@@ -27,5 +27,6 @@ export interface SnippetEventPayload {
   utmCampaign?: string | null;
   utmContent?: string | null;
   utmTerm?: string | null;
+  gclid?: string | null;
 }
 

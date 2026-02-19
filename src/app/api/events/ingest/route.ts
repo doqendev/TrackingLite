@@ -29,6 +29,7 @@ const IngestPayloadSchema = z.object({
   utmCampaign: z.string().nullable().optional(),
   utmContent: z.string().nullable().optional(),
   utmTerm: z.string().nullable().optional(),
+  gclid: z.string().nullable().optional(),
   consent: z.object({
     analyticsAllowed: z.boolean().optional(),
     marketingAllowed: z.boolean().optional(),
@@ -297,6 +298,7 @@ export async function POST(request: NextRequest) {
       utmCampaign: payload.utmCampaign || null,
       utmContent: payload.utmContent || null,
       utmTerm: payload.utmTerm || null,
+      gclid: payload.gclid || null,
     };
 
     // Create all EventLog entries (one per destination)

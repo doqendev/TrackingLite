@@ -166,6 +166,7 @@ model EventLog {
   utmCampaign    String?
   utmContent     String?
   utmTerm        String?
+  gclid          String?
   destination    Destination  @default(META)
   createdAt      DateTime    @default(now())
 

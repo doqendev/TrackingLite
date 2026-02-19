@@ -311,7 +311,7 @@ async function queryCampaignPerformance(
     _count: true,
     _sum: { value: true },
     orderBy: { _sum: { value: "desc" } },
-    take: 10,
+    take: 30,
   });
 
   return campaigns.map((c) => ({
