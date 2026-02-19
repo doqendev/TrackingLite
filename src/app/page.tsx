@@ -62,7 +62,7 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* ───────────────────────── Hero ───────────────────────── */}
-        <div className="px-3 pt-2 sm:px-5 sm:pt-3">
+        <div className="px-6 pt-2 sm:px-12 sm:pt-3">
           <section
             className="relative overflow-hidden rounded-t-2xl sm:rounded-t-3xl"
             style={{ background: "linear-gradient(180deg, hsl(180,30%,6%) 0%, hsl(200,40%,5%) 100%)" }}
