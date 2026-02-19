@@ -169,8 +169,8 @@ export default function HomePage() {
                   Server-side tracking for Shopify &mdash; setup takes 10 minutes
                 </p>
 
-                <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                  <Button variant="brand" size="lg" asChild className="gap-2 rounded-full px-8">
+                <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                  <Button variant="brand" size="lg" asChild className="gap-2 rounded-lg border border-white/[0.15] px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:brightness-110">
                     <Link href="/signup">
                       Get Started Free
                       <ArrowRight className="h-4 w-4" />
@@ -180,7 +180,7 @@ export default function HomePage() {
                     variant="outline"
                     size="lg"
                     asChild
-                    className="rounded-full border-white/[0.10] bg-transparent px-8 hover:bg-white/[0.04]"
+                    className="rounded-lg border-white/[0.15] bg-transparent px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:bg-white/[0.04] hover:brightness-110"
                   >
                     <Link href="#how-it-works">See how it works</Link>
                   </Button>
