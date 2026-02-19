@@ -10,6 +10,7 @@ import { EventFunnel } from "@/components/dashboard/event-funnel";
 import { DeliveryStats } from "@/components/dashboard/delivery-stats";
 import { RecentEvents } from "@/components/dashboard/recent-events";
 import { ConversionAccuracy } from "@/components/dashboard/conversion-accuracy";
+import { CampaignPerformance } from "@/components/dashboard/campaign-performance";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Settings, AlertTriangle } from "lucide-react";
@@ -110,6 +111,9 @@ export default async function DashboardPage() {
 
       {/* Conversion accuracy */}
       <ConversionAccuracy conversionAccuracy={analytics.conversionAccuracy} />
+
+      {/* Campaign performance */}
+      <CampaignPerformance campaigns={analytics.campaigns} currency={analytics.currency} />
 
       {/* Event funnel + Delivery stats */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

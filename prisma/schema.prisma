@@ -161,12 +161,18 @@ model EventLog {
   currency       String?     // ISO 4217 currency code (e.g., "USD", "BRL")
   numItems       Int?        // number of items in cart/order
   orderId        String?     // Shopify order ID (for dedup)
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+  utmContent     String?
+  utmTerm        String?
   destination    Destination  @default(META)
   createdAt      DateTime    @default(now())
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, eventName])
   @@index([workspaceId, destination])
+  @@index([workspaceId, utmSource, utmCampaign])
   @@index([eventId])
 }
 

@@ -24,6 +24,11 @@ const IngestPayloadSchema = z.object({
   fbp: z.string().nullable().optional(),
   fbc: z.string().nullable().optional(),
   ttclid: z.string().nullable().optional(),
+  utmSource: z.string().nullable().optional(),
+  utmMedium: z.string().nullable().optional(),
+  utmCampaign: z.string().nullable().optional(),
+  utmContent: z.string().nullable().optional(),
+  utmTerm: z.string().nullable().optional(),
   consent: z.object({
     analyticsAllowed: z.boolean().optional(),
     marketingAllowed: z.boolean().optional(),
@@ -287,6 +292,11 @@ export async function POST(request: NextRequest) {
       currency: extracted.currency,
       numItems: extracted.numItems,
       orderId: extracted.orderId,
+      utmSource: payload.utmSource || null,
+      utmMedium: payload.utmMedium || null,
+      utmCampaign: payload.utmCampaign || null,
+      utmContent: payload.utmContent || null,
+      utmTerm: payload.utmTerm || null,
     };
 
     // Create all EventLog entries (one per destination)

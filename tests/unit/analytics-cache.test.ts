@@ -50,6 +50,8 @@ const mockAnalytics: DashboardAnalytics = {
     last7d: { total: 30, sent: 29, failed: 1, accuracy: 96.7 },
     last30d: { total: 120, sent: 115, failed: 5, accuracy: 95.8 },
   },
+  campaigns: [],
+  currency: "USD",
 };
 
 describe("getCachedAnalytics", () => {

@@ -86,6 +86,8 @@ export default async function EventsPage({
         eventId: true,
         status: true,
         pageUrl: true,
+        utmSource: true,
+        utmCampaign: true,
         errorMessage: true,
         retryCount: true,
         value: true,
@@ -223,6 +225,8 @@ export default async function EventsPage({
                   <TableHead className="whitespace-nowrap">Status</TableHead>
                   <TableHead className="whitespace-nowrap">Value</TableHead>
                   <TableHead className="whitespace-nowrap">Page URL</TableHead>
+                  <TableHead className="whitespace-nowrap">Source</TableHead>
+                  <TableHead className="whitespace-nowrap">Campaign</TableHead>
                   <TableHead className="whitespace-nowrap">Error</TableHead>
                   <TableHead className="whitespace-nowrap">Actions</TableHead>
                 </TableRow>
@@ -276,6 +280,30 @@ export default async function EventsPage({
                           title={event.pageUrl ?? ""}
                         >
                           {pagePath.length > 35 ? pagePath.slice(0, 35) + "…" : pagePath}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <span
+                          className="text-xs text-muted-foreground"
+                          title={event.utmSource ?? ""}
+                        >
+                          {event.utmSource
+                            ? event.utmSource.length > 15
+                              ? event.utmSource.slice(0, 15) + "..."
+                              : event.utmSource
+                            : "--"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-[160px]">
+                        <span
+                          className="text-xs text-muted-foreground truncate block"
+                          title={event.utmCampaign ?? ""}
+                        >
+                          {event.utmCampaign
+                            ? event.utmCampaign.length > 20
+                              ? event.utmCampaign.slice(0, 20) + "..."
+                              : event.utmCampaign
+                            : "--"}
                         </span>
                       </TableCell>
                       <TableCell className="max-w-[200px]">

@@ -75,6 +75,13 @@ export interface ConversionAccuracy {
   last30d: ConversionAccuracyPeriod;
 }
 
+export interface CampaignRow {
+  utmSource: string;
+  utmCampaign: string;
+  events: number;
+  revenue: number;
+}
+
 export interface DashboardAnalytics {
   health: HealthMetrics;
   revenue: RevenueMetrics;
@@ -82,4 +89,6 @@ export interface DashboardAnalytics {
   billing: BillingUsage;
   retentionDays: number;
   conversionAccuracy: ConversionAccuracy;
+  campaigns: CampaignRow[];
+  currency: string;
 }

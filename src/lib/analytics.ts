@@ -9,6 +9,7 @@ import type {
   EventBreakdown,
   BillingUsage,
   ConversionAccuracy,
+  CampaignRow,
 } from "@/types/app";
 
 const EVENT_NAMES: EventName[] = [
@@ -286,6 +287,33 @@ async function queryConversionAccuracy(
   };
 }
 
+async function queryCampaignPerformance(
+  workspaceId: string
+): Promise<CampaignRow[]> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const campaigns = await db.eventLog.groupBy({
+    by: ["utmSource", "utmCampaign"],
+    where: {
+      workspaceId,
+      createdAt: { gte: thirtyDaysAgo },
+      utmSource: { not: null },
+      destination: "META",
+    },
+    _count: true,
+    _sum: { value: true },
+    orderBy: { _sum: { value: "desc" } },
+    take: 10,
+  });
+
+  return campaigns.map((c) => ({
+    utmSource: c.utmSource ?? "",
+    utmCampaign: c.utmCampaign ?? "",
+    events: c._count,
+    revenue: c._sum?.value ?? 0,
+  }));
+}
+
 async function queryBillingUsage(userId: string): Promise<BillingUsage> {
   const subscription = await db.subscription.findUnique({
     where: { userId },
@@ -317,13 +345,14 @@ export async function computeDashboardAnalytics(
 ): Promise<DashboardAnalytics> {
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
-  const [health, revenue, eventBreakdown, billing, conversionAccuracy] =
+  const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns] =
     await Promise.all([
       queryHealthMetrics(workspaceId, since24h),
       queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now),
       queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now),
       queryBillingUsage(userId),
       queryConversionAccuracy(workspaceId),
+      queryCampaignPerformance(workspaceId),
     ]);
 
   const planConfig =
@@ -337,6 +366,8 @@ export async function computeDashboardAnalytics(
     billing,
     retentionDays,
     conversionAccuracy,
+    campaigns,
+    currency: revenue.purchaseValue.currency,
   };
 }
 

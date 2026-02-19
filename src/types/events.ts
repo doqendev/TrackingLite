@@ -22,5 +22,10 @@ export interface SnippetEventPayload {
     analytics?: boolean;
     marketing?: boolean;
   };
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmContent?: string | null;
+  utmTerm?: string | null;
 }
 
