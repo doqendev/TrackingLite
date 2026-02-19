@@ -6,28 +6,31 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**Track Clear** is a standalone SaaS that enables Shopify merchants to send ecommerce events server-side to Meta (Conversions API). Primary value: "Fix your Meta tracking in 10 minutes."
+**Track Clear** is a standalone SaaS that enables Shopify merchants to send ecommerce events server-side to multiple ad platforms (Meta CAPI, Google Ads, TikTok, GA4, Klaviyo). Primary value: "Fix your tracking in 10 minutes."
 
 **This is NOT a Shopify embedded app.** It is a standalone web application with its own auth, dashboard, and billing. Shopify integration is via a JS snippet pasted into Shopify's Custom Pixel feature.
 
 ### Why It Exists
 
-Browser-only Meta Pixels lose 20-40% of conversion data to ad blockers (which block `connect.facebook.net`). Track Clear captures events via a custom JS snippet, sends them to our server (`api.trackclear.io` --- not on any block list), and forwards server-to-server to Meta CAPI, bypassing ad blockers entirely.
+Browser-only pixels lose 20-40% of conversion data to ad blockers. Track Clear captures events via a custom JS snippet, sends them to our server (`api.trackclear.io` --- not on any block list), and forwards server-to-server to up to 5 ad/analytics platforms, bypassing ad blockers entirely.
 
 ### Target Users
 
-Small-to-mid Shopify stores running Meta ads. Free plan (50 orders/mo), paid plans $29-$99/mo via Stripe.
+Small-to-mid Shopify stores running ads on Meta, Google, TikTok, and more. Free plan (50 orders/mo), paid plans $29-$99/mo via Stripe.
 
 ## Current State
 
-**MVP is functionally complete.** All core features are implemented and working:
-- Build: 20 routes, compiles clean
+**Feature-complete with multi-destination support.** All core features + 3 phases of feature expansion implemented:
+- Build: compiles clean
 - Unit tests: 239/239 passing (13 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
-- TypeScript: 0 errors
+- TypeScript: 0 source errors
 - Lint: 0 warnings/errors
+- 5 destinations: Meta CAPI, Google Ads, TikTok, GA4, Klaviyo
+- Dashboard: EMQ score, conversion accuracy, revenue cards, event funnel, delivery stats
+- Extras: event replay, password reset, email alerts
 
-See `STATUS.md` for the full audit, known bugs, and remaining work.
+See `STATUS.md` for the full audit and remaining work.
 
 ## Tech Stack (Actual Versions)
 
@@ -63,23 +66,27 @@ See `STATUS.md` for the full audit, known bugs, and remaining work.
 
 ```
 JS Snippet (browser) --> POST /api/events/ingest (X-TL-API-Key header)
-  |-- Validate API key (workspace lookup)
+  |-- Validate API key (workspace lookup with all destination fields)
+  |-- Check which destinations are enabled + have credentials
   |-- Check order limits (only for Purchase events, Redis monthly counter)
   |-- Check rate limit (100 req/sec/workspace)
-  |-- Zod validate payload
+  |-- Zod validate payload (includes ttclid for TikTok)
   |-- Check per-event toggle (enablePageView, etc.)
   |-- Check consent (STRICT/LAX mode)
-  |-- Create EventLog (status: PENDING)
-  |-- Queue BullMQ job (meta-events queue)
-  |-- Return { success: true, eventId }
+  |-- Fan-out: Create one EventLog per enabled destination (status: PENDING)
+  |-- Queue BullMQ jobs per destination (meta-events, google-events, tiktok-events, ga4-events, klaviyo-events)
+  |-- Return { success: true, eventId, destinations: [...] }
 
-Worker (separate process) --> Dequeue from meta-events
-  |-- Decrypt Meta access token (AES-256-GCM)
-  |-- Build SnippetEventPayload
-  |-- normalizeToMetaCapiEvent (hash PII, E.164 phone, ms->sec timestamp)
-  |-- POST to graph.facebook.com/v21.0/{pixelId}/events
+Workers (separate process) --> Dequeue from per-destination queues
+  |-- Decrypt destination credentials (AES-256-GCM)
+  |-- Normalize event to destination format (hash PII where required)
+  |-- POST to destination API
   |-- Update EventLog to SENT (or FAILED on error)
   |-- Retry: 3 attempts, exponential backoff (2s, 4s, 8s)
+
+Alert Checker (hourly repeatable job)
+  |-- Evaluate tracking health, error rates, order limits, EMQ scores
+  |-- Send email alerts via Resend (24h cooldown per alert type)
 ```
 
 ### Deduplication Strategy
@@ -101,12 +108,13 @@ src/
       layout.tsx                      # Centered card layout
       login/page.tsx                  # Email/password + Google OAuth login
       signup/page.tsx                 # Name + email + password signup, auto-login
-      forgot-password/page.tsx        # STUB - shows success but sends no email
+      forgot-password/page.tsx        # Sends password reset email via Resend
+      reset-password/page.tsx         # Token-based password reset with confirmation
     (dashboard)/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
-      dashboard/page.tsx              # Workspace overview, stats cards, recent events
-      events/page.tsx                 # Event log table with filters + pagination (50/page)
-      settings/page.tsx               # Meta credentials, toggles, consent, snippet, danger zone
+      dashboard/page.tsx              # Rich analytics: revenue, EMQ, conversion accuracy, event funnel, delivery, recent events
+      events/page.tsx                 # Event log table with filters + pagination (50/page) + event replay
+      settings/page.tsx               # 6 destination cards, event toggles, consent, snippet, alerts, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
         page.tsx                      # 3-step wizard: create workspace, copy snippet, test event
@@ -114,11 +122,15 @@ src/
     api/
       auth/[...nextauth]/route.ts     # NextAuth handler
       auth/signup/route.ts            # POST: create user (Zod, bcrypt, 409 on dupe)
-      events/ingest/route.ts          # POST: main ingestion (CORS, 12-step pipeline)
+      auth/forgot-password/route.ts   # POST: generate token, send reset email
+      auth/reset-password/route.ts    # POST: validate token, update password
+      events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS)
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
       workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD
       workspaces/[id]/rotate-key/route.ts  # POST: rotate API key
       workspaces/[id]/analytics/route.ts   # GET: dashboard analytics (cached 60s)
+      workspaces/[id]/replay/route.ts # POST: re-queue failed events (500 max, 5min cooldown)
+      alerts/preferences/route.ts     # GET/PUT: alert notification preferences
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet for workspace
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
@@ -128,13 +140,17 @@ src/
     ui/                               # 14 shadcn/ui components (see list below)
     dashboard/
       sidebar-nav.tsx                 # Desktop sidebar + MobileNav (Sheet drawer)
-      order-usage-bar.tsx             # Order usage progress bar with plan badge (client component)
-      revenue-cards.tsx               # 3 revenue cards: AddToCart, Checkout, Purchase with yesterday delta
+      order-usage-bar.tsx             # Order usage progress bar with plan badge
+      revenue-cards.tsx               # 3 revenue cards with yesterday delta
       event-funnel.tsx                # 5-row event funnel with horizontal bars
       delivery-stats.tsx              # 24h delivery metrics: success rate, delivered/failed
+      emq-score.tsx                   # Event Match Quality score gauge (0-10) with breakdown
+      conversion-accuracy.tsx         # Purchase delivery accuracy (7d/30d toggle)
       recent-events.tsx               # Last 10 events mini-table with value column
+      replay-button.tsx               # Retry failed events button (bulk + per-event)
     settings/
-      settings-form.tsx               # All settings in one client component (5 cards)
+      settings-form.tsx               # All settings: 6 destination cards + toggles + consent + snippet + danger zone
+      alert-preferences.tsx           # Email alert notification toggles
     billing/
       plan-cards.tsx                  # Starter/Growth plan comparison + subscribe buttons
   lib/
@@ -153,18 +169,32 @@ src/
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case)
     analytics.ts                      # Dashboard analytics computation (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL)
-    queue.ts                          # Lazy BullMQ queue (meta-events), MetaEventJob interface
+    queue.ts                          # Lazy BullMQ queues (5 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
+    replay-rate-limit.ts              # Redis cooldown for event replay (5min per workspace)
+    email.ts                          # Resend client for password reset + alert emails
+    alerts.ts                         # Alert evaluation: health, errors, limits, EMQ
     api-key-cache.ts                  # Redis-cached workspace lookup (UNUSED - see known issues)
     extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
+    destinations/
+      index.ts                        # DESTINATION_EVENT_MAP for all 5 platforms
+      google-ads.ts                   # Google Ads normalizer + Conversion Upload API client
+      tiktok.ts                       # TikTok normalizer + Events API client
+      ga4.ts                          # GA4 normalizer + Measurement Protocol client
+      klaviyo.ts                      # Klaviyo normalizer + Events API client (raw email)
   types/
     meta-capi.ts                      # MetaCapiEvent, MetaUserData, MetaCustomData, etc.
     events.ts                         # SnippetEventPayload
     app.ts                            # WorkspaceWithStats, DashboardStats
     next-auth.d.ts                    # Module augmentation (adds id to Session.user)
   workers/
-    start-worker.ts                   # Entry point: imports worker, graceful shutdown
+    start-worker.ts                   # Entry point: starts all 6 workers, graceful shutdown
     meta-event-processor.ts           # BullMQ worker: decrypt, normalize, send to Meta CAPI
+    google-event-processor.ts         # BullMQ worker: Google Ads Conversion Upload
+    tiktok-event-processor.ts         # BullMQ worker: TikTok Events API
+    ga4-event-processor.ts            # BullMQ worker: GA4 Measurement Protocol
+    klaviyo-event-processor.ts        # BullMQ worker: Klaviyo Events API
+    alert-checker.ts                  # Hourly repeatable job: evaluate alerts, send emails
   middleware.ts                       # Auth redirect for protected routes
 tests/
   unit/
@@ -187,15 +217,15 @@ prisma/
 
 ### Data Model
 
-**Models:** User, Account, Session, VerificationToken (NextAuth), Workspace, EventLog, Subscription
+**Models:** User, Account, Session, VerificationToken (NextAuth), PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog
 
 **Key relationships:**
-- User has many Workspaces (unlimited), one Subscription
-- Workspace has many EventLogs
-- Workspace stores encrypted Meta credentials (metaAccessTokenEncrypted + Iv + Tag)
+- User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens
+- Workspace has many EventLogs, stores encrypted credentials for all 5 destinations
+- EventLog has a `destination` field (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 
-**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), EventName (5 events), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus (TRIALING/ACTIVE/PAST_DUE/CANCELED/UNPAID)
+**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), EventName (5 events), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO)
 
 ## Development Commands
 
@@ -259,6 +289,8 @@ All documented in `.env.example`. Critical ones:
 | `POST /api/stripe/webhook` | POST | Stripe webhook handler (signature verified) |
 | `GET /api/health` | GET | Health check (DB ping) |
 | `POST /api/auth/signup` | POST | User registration |
+| `POST /api/auth/forgot-password` | POST | Generate reset token, send email |
+| `POST /api/auth/reset-password` | POST | Validate token, update password |
 | `/api/auth/*` | ALL | NextAuth handlers |
 
 ### Protected Endpoints (session required)
@@ -268,8 +300,10 @@ All documented in `.env.example`. Critical ones:
 | `GET/POST /api/workspaces` | GET, POST | List/create workspaces |
 | `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
-| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing) |
-| `GET /api/snippet/:workspaceId` | GET | Generate JS snippet |
+| `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown) |
+| `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics (health, revenue, events, billing, EMQ, accuracy) |
+| `GET/PUT /api/alerts/preferences` | GET, PUT | Alert notification preferences |
+| `GET /api/snippet/:workspaceId` | GET | Generate JS snippet (includes ttclid capture) |
 | `POST /api/stripe/checkout` | POST | Create Stripe checkout session |
 | `POST /api/stripe/portal` | POST | Create Stripe billing portal session |
 
@@ -302,9 +336,12 @@ Header: Content-Type: application/json
 - **E.164 phone normalization:** Country code inferred from billing address (55-country map) before SHA-256 hashing.
 - **Token encryption:** Meta access tokens encrypted at rest using AES-256-GCM.
 - **Workspace model:** Each merchant has a workspace with a unique API key (unlimited per user, shared order pool).
+- **Multi-destination fan-out:** Ingest route creates one EventLog + one BullMQ job per enabled destination. Each destination has its own queue, worker, normalizer, and API client.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.
+- **Klaviyo raw email:** Klaviyo requires unhashed email for profile matching, unlike Meta/Google/TikTok which all use SHA-256.
+- **Email alerts:** Hourly BullMQ repeatable job evaluates tracking health, error rates, order limits, and EMQ scores. 24h cooldown per alert type per user.
 
 ## Style Rules
 
@@ -314,19 +351,17 @@ Header: Content-Type: application/json
 
 - Shopify OAuth, Shopify session tokens, `@shopify/shopify-app-remix`
 - Shopify Polaris components
-- Shopify webhooks (for MVP)
+- Shopify webhooks
 - Shopify Web Pixel Extension (we use Custom Pixel JS snippet instead)
-- Multi-destination support (only Meta CAPI)
 - Custom events beyond the 5 standard ones
 
 ## Known Issues
 
 See `STATUS.md` for the full list. Currently:
 1. **`api-key-cache.ts` is dead code** --- exists but is never imported
-2. **Forgot password is a stub** --- shows honest "not yet available" message
-3. **`pnpm build` hangs on Windows** --- pre-existing environment issue, not code-related
+2. **`pnpm build` hangs on Windows** --- pre-existing environment issue, not code-related
 
-All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII storage) are fixed.
+All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII storage, forgot password) are fixed.
 
 ## Billing Model
 

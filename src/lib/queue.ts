@@ -14,24 +14,79 @@ function getConnection(): IORedis {
   return connection;
 }
 
+const defaultJobOptions = {
+  attempts: QUEUE_CONFIG.MAX_ATTEMPTS,
+  backoff: {
+    type: "exponential" as const,
+    delay: QUEUE_CONFIG.BACKOFF_DELAY_MS,
+  },
+  removeOnComplete: 1000,
+  removeOnFail: 5000,
+};
+
+// Meta queue (existing)
 let _eventQueue: Queue | null = null;
 
 export function getEventQueue(): Queue {
   if (!_eventQueue) {
     _eventQueue = new Queue(QUEUE_CONFIG.QUEUE_NAME, {
       connection: getConnection() as never,
-      defaultJobOptions: {
-        attempts: QUEUE_CONFIG.MAX_ATTEMPTS,
-        backoff: {
-          type: "exponential",
-          delay: QUEUE_CONFIG.BACKOFF_DELAY_MS,
-        },
-        removeOnComplete: 1000,
-        removeOnFail: 5000,
-      },
+      defaultJobOptions,
     });
   }
   return _eventQueue;
+}
+
+// Google Ads queue
+let _googleQueue: Queue | null = null;
+
+export function getGoogleQueue(): Queue {
+  if (!_googleQueue) {
+    _googleQueue = new Queue(QUEUE_CONFIG.GOOGLE_QUEUE_NAME, {
+      connection: getConnection() as never,
+      defaultJobOptions,
+    });
+  }
+  return _googleQueue;
+}
+
+// TikTok queue
+let _tiktokQueue: Queue | null = null;
+
+export function getTiktokQueue(): Queue {
+  if (!_tiktokQueue) {
+    _tiktokQueue = new Queue(QUEUE_CONFIG.TIKTOK_QUEUE_NAME, {
+      connection: getConnection() as never,
+      defaultJobOptions,
+    });
+  }
+  return _tiktokQueue;
+}
+
+// GA4 queue
+let _ga4Queue: Queue | null = null;
+
+export function getGA4Queue(): Queue {
+  if (!_ga4Queue) {
+    _ga4Queue = new Queue(QUEUE_CONFIG.GA4_QUEUE_NAME, {
+      connection: getConnection() as never,
+      defaultJobOptions,
+    });
+  }
+  return _ga4Queue;
+}
+
+// Klaviyo queue
+let _klaviyoQueue: Queue | null = null;
+
+export function getKlaviyoQueue(): Queue {
+  if (!_klaviyoQueue) {
+    _klaviyoQueue = new Queue(QUEUE_CONFIG.KLAVIYO_QUEUE_NAME, {
+      connection: getConnection() as never,
+      defaultJobOptions,
+    });
+  }
+  return _klaviyoQueue;
 }
 
 export interface MetaEventJob {
@@ -55,4 +110,25 @@ export interface MetaEventJob {
     userAgent: string;
   };
   eventLogId: string;
+}
+
+export interface DestinationEventJob {
+  workspaceId: string;
+  destination: string;
+  eventLogId: string;
+  event: {
+    eventName: string;
+    eventId: string;
+    timestamp: number;
+    url: string;
+    referrer: string;
+    fbp?: string | null;
+    fbc?: string | null;
+    ttclid?: string | null;
+    userData: Record<string, unknown>;
+    customData: Record<string, unknown>;
+    clientIp: string;
+    userAgent: string;
+  };
+  credentials: Record<string, string>;
 }

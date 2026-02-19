@@ -25,6 +25,23 @@ interface Workspace {
   enableInitiateCheckout: boolean;
   enablePurchase: boolean;
   apiKey: string;
+  // Google Ads
+  googleAdsCustomerId: string | null;
+  googleAdsConversionAction: string | null;
+  hasGoogleAdsAccessToken: boolean;
+  googleAdsDeveloperToken: string | null;
+  enableGoogleAds: boolean;
+  // TikTok
+  tiktokPixelId: string | null;
+  hasTiktokAccessToken: boolean;
+  enableTikTok: boolean;
+  // GA4
+  ga4MeasurementId: string | null;
+  hasGA4ApiSecret: boolean;
+  enableGA4: boolean;
+  // Klaviyo
+  hasKlaviyoApiKey: boolean;
+  enableKlaviyo: boolean;
 }
 
 interface SettingsFormProps {
@@ -37,6 +54,31 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
   const [accessToken, setAccessToken] = useState("");
   const [testEventCode, setTestEventCode] = useState(workspace.metaTestEventCode ?? "");
   const [savingMeta, setSavingMeta] = useState(false);
+
+  // Google Ads state
+  const [googleCustomerId, setGoogleCustomerId] = useState(workspace.googleAdsCustomerId ?? "");
+  const [googleConversionAction, setGoogleConversionAction] = useState(workspace.googleAdsConversionAction ?? "");
+  const [googleAccessToken, setGoogleAccessToken] = useState("");
+  const [googleDeveloperToken, setGoogleDeveloperToken] = useState(workspace.googleAdsDeveloperToken ?? "");
+  const [googleAdsEnabled, setGoogleAdsEnabled] = useState(workspace.enableGoogleAds);
+  const [savingGoogle, setSavingGoogle] = useState(false);
+
+  // TikTok state
+  const [tiktokPixelId, setTiktokPixelId] = useState(workspace.tiktokPixelId ?? "");
+  const [tiktokAccessToken, setTiktokAccessToken] = useState("");
+  const [tiktokEnabled, setTiktokEnabled] = useState(workspace.enableTikTok);
+  const [savingTiktok, setSavingTiktok] = useState(false);
+
+  // GA4 state
+  const [ga4MeasurementId, setGa4MeasurementId] = useState(workspace.ga4MeasurementId ?? "");
+  const [ga4ApiSecret, setGa4ApiSecret] = useState("");
+  const [ga4Enabled, setGa4Enabled] = useState(workspace.enableGA4);
+  const [savingGA4, setSavingGA4] = useState(false);
+
+  // Klaviyo state
+  const [klaviyoApiKey, setKlaviyoApiKey] = useState("");
+  const [klaviyoEnabled, setKlaviyoEnabled] = useState(workspace.enableKlaviyo);
+  const [savingKlaviyo, setSavingKlaviyo] = useState(false);
 
   // Event toggles state
   const [toggles, setToggles] = useState({
@@ -93,6 +135,83 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingMeta(false);
+    }
+  }
+
+  async function handleSaveGoogle(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingGoogle(true);
+    try {
+      const payload: Record<string, unknown> = {
+        googleAdsCustomerId: googleCustomerId,
+        googleAdsConversionAction: googleConversionAction,
+        googleAdsDeveloperToken: googleDeveloperToken,
+        enableGoogleAds: googleAdsEnabled,
+      };
+      if (googleAccessToken) payload.googleAdsAccessToken = googleAccessToken;
+      await patchWorkspace(payload);
+      toast.success("Google Ads credentials saved");
+      setGoogleAccessToken("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingGoogle(false);
+    }
+  }
+
+  async function handleSaveTiktok(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingTiktok(true);
+    try {
+      const payload: Record<string, unknown> = {
+        tiktokPixelId: tiktokPixelId,
+        enableTikTok: tiktokEnabled,
+      };
+      if (tiktokAccessToken) payload.tiktokAccessToken = tiktokAccessToken;
+      await patchWorkspace(payload);
+      toast.success("TikTok credentials saved");
+      setTiktokAccessToken("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingTiktok(false);
+    }
+  }
+
+  async function handleSaveGA4(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingGA4(true);
+    try {
+      const payload: Record<string, unknown> = {
+        ga4MeasurementId: ga4MeasurementId,
+        enableGA4: ga4Enabled,
+      };
+      if (ga4ApiSecret) payload.ga4ApiSecret = ga4ApiSecret;
+      await patchWorkspace(payload);
+      toast.success("GA4 credentials saved");
+      setGa4ApiSecret("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingGA4(false);
+    }
+  }
+
+  async function handleSaveKlaviyo(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingKlaviyo(true);
+    try {
+      const payload: Record<string, unknown> = {
+        enableKlaviyo: klaviyoEnabled,
+      };
+      if (klaviyoApiKey) payload.klaviyoApiKey = klaviyoApiKey;
+      await patchWorkspace(payload);
+      toast.success("Klaviyo credentials saved");
+      setKlaviyoApiKey("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingKlaviyo(false);
     }
   }
 
@@ -226,7 +345,253 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* 2. Event Toggles */}
+      {/* 2. Google Ads Conversion API */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Google Ads Conversion API</CardTitle>
+          <CardDescription>Forward conversion events to Google Ads offline conversions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveGoogle} className="space-y-4">
+            <div>
+              <Label htmlFor="googleCustomerId" className="mb-1">
+                Customer ID
+              </Label>
+              <Input
+                id="googleCustomerId"
+                type="text"
+                value={googleCustomerId}
+                onChange={(e) => setGoogleCustomerId(e.target.value)}
+                placeholder="123-456-7890"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Your Google Ads account customer ID (with or without dashes).</p>
+            </div>
+            <div>
+              <Label htmlFor="googleConversionAction" className="mb-1">
+                Conversion Action Resource Name
+              </Label>
+              <Input
+                id="googleConversionAction"
+                type="text"
+                value={googleConversionAction}
+                onChange={(e) => setGoogleConversionAction(e.target.value)}
+                placeholder="customers/123456789/conversionActions/987654321"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Full resource name from Google Ads &gt; Goals &gt; Conversions.</p>
+            </div>
+            <div>
+              <Label htmlFor="googleAccessToken" className="mb-1 flex items-center gap-2">
+                Access Token
+                <span className="text-[10px] font-medium text-brand-500/70 bg-brand-500/10 px-1.5 py-0.5 rounded">encrypted at rest</span>
+              </Label>
+              <Input
+                id="googleAccessToken"
+                type="password"
+                value={googleAccessToken}
+                onChange={(e) => setGoogleAccessToken(e.target.value)}
+                placeholder={workspace.hasGoogleAdsAccessToken ? "••••••••• (leave blank to keep current)" : "ya29.a0..."}
+              />
+              <p className="text-xs text-muted-foreground mt-1">OAuth2 access token. Stored encrypted at rest. Leave blank to keep existing.</p>
+            </div>
+            <div>
+              <Label htmlFor="googleDeveloperToken" className="mb-1">
+                Developer Token
+              </Label>
+              <Input
+                id="googleDeveloperToken"
+                type="password"
+                value={googleDeveloperToken}
+                onChange={(e) => setGoogleDeveloperToken(e.target.value)}
+                placeholder="AbCdEf-GhIjKl..."
+              />
+              <p className="text-xs text-muted-foreground mt-1">From Google Ads API Center. Required for all API calls.</p>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <Label htmlFor="enableGoogleAds" className="flex items-center gap-2 cursor-pointer">
+                  <span className={`h-1.5 w-1.5 rounded-full ${googleAdsEnabled ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                  Enable Google Ads
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Forward AddToCart, InitiateCheckout, and Purchase events.</p>
+              </div>
+              <Switch
+                id="enableGoogleAds"
+                checked={googleAdsEnabled}
+                onCheckedChange={setGoogleAdsEnabled}
+              />
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button type="submit" variant="brand" disabled={savingGoogle}>
+                {savingGoogle ? "Saving\u2026" : "Save Google Ads"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* 3. TikTok Events API */}
+      <Card>
+        <CardHeader>
+          <CardTitle>TikTok Events API</CardTitle>
+          <CardDescription>Forward events server-side to TikTok via the Events API.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveTiktok} className="space-y-4">
+            <div>
+              <Label htmlFor="tiktokPixelId" className="mb-1">
+                Pixel ID
+              </Label>
+              <Input
+                id="tiktokPixelId"
+                type="text"
+                value={tiktokPixelId}
+                onChange={(e) => setTiktokPixelId(e.target.value)}
+                placeholder="ABCDE12345"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Found in TikTok Ads Manager &gt; Assets &gt; Events &gt; Web Events.</p>
+            </div>
+            <div>
+              <Label htmlFor="tiktokAccessToken" className="mb-1 flex items-center gap-2">
+                Access Token
+                <span className="text-[10px] font-medium text-brand-500/70 bg-brand-500/10 px-1.5 py-0.5 rounded">encrypted at rest</span>
+              </Label>
+              <Input
+                id="tiktokAccessToken"
+                type="password"
+                value={tiktokAccessToken}
+                onChange={(e) => setTiktokAccessToken(e.target.value)}
+                placeholder={workspace.hasTiktokAccessToken ? "••••••••• (leave blank to keep current)" : "Your Events API access token"}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Stored encrypted at rest. Leave blank to keep existing token.</p>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <Label htmlFor="enableTikTok" className="flex items-center gap-2 cursor-pointer">
+                  <span className={`h-1.5 w-1.5 rounded-full ${tiktokEnabled ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                  Enable TikTok Events API
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Forward all 5 event types including ttclid for click attribution.</p>
+              </div>
+              <Switch
+                id="enableTikTok"
+                checked={tiktokEnabled}
+                onCheckedChange={setTiktokEnabled}
+              />
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button type="submit" variant="brand" disabled={savingTiktok}>
+                {savingTiktok ? "Saving\u2026" : "Save TikTok"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* 4. Google Analytics 4 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Google Analytics 4</CardTitle>
+          <CardDescription>Send events server-side to Google Analytics 4 via Measurement Protocol.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveGA4} className="space-y-4">
+            <div>
+              <Label htmlFor="ga4MeasurementId" className="mb-1">
+                Measurement ID
+              </Label>
+              <Input
+                id="ga4MeasurementId"
+                type="text"
+                value={ga4MeasurementId}
+                onChange={(e) => setGa4MeasurementId(e.target.value)}
+                placeholder="G-XXXXXXXXXX"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Found in GA4 Admin &gt; Data Streams &gt; your stream &gt; Measurement ID.</p>
+            </div>
+            <div>
+              <Label htmlFor="ga4ApiSecret" className="mb-1 flex items-center gap-2">
+                API Secret
+                <span className="text-[10px] font-medium text-brand-500/70 bg-brand-500/10 px-1.5 py-0.5 rounded">encrypted at rest</span>
+              </Label>
+              <Input
+                id="ga4ApiSecret"
+                type="password"
+                value={ga4ApiSecret}
+                onChange={(e) => setGa4ApiSecret(e.target.value)}
+                placeholder={workspace.hasGA4ApiSecret ? "••••••••• (leave blank to keep current)" : "Your Measurement Protocol API secret"}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Created in GA4 Admin &gt; Data Streams &gt; Measurement Protocol API secrets. Stored encrypted at rest.</p>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <Label htmlFor="enableGA4" className="flex items-center gap-2 cursor-pointer">
+                  <span className={`h-1.5 w-1.5 rounded-full ${ga4Enabled ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                  Enable Google Analytics 4
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Forward all 5 event types to GA4 via Measurement Protocol.</p>
+              </div>
+              <Switch
+                id="enableGA4"
+                checked={ga4Enabled}
+                onCheckedChange={setGa4Enabled}
+              />
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button type="submit" variant="brand" disabled={savingGA4}>
+                {savingGA4 ? "Saving\u2026" : "Save GA4"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* 5. Klaviyo */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Klaviyo</CardTitle>
+          <CardDescription>Forward browsing and purchase events to Klaviyo for email/SMS automation.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveKlaviyo} className="space-y-4">
+            <div>
+              <Label htmlFor="klaviyoApiKey" className="mb-1 flex items-center gap-2">
+                API Key
+                <span className="text-[10px] font-medium text-brand-500/70 bg-brand-500/10 px-1.5 py-0.5 rounded">encrypted at rest</span>
+              </Label>
+              <Input
+                id="klaviyoApiKey"
+                type="password"
+                value={klaviyoApiKey}
+                onChange={(e) => setKlaviyoApiKey(e.target.value)}
+                placeholder={workspace.hasKlaviyoApiKey ? "••••••••• (leave blank to keep current)" : "pk_xxxxxxxx..."}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Found in Klaviyo &gt; Settings &gt; API Keys. Stored encrypted at rest. Leave blank to keep existing.</p>
+            </div>
+            <p className="text-xs text-muted-foreground">Note: PageView events are skipped (too noisy for email automation).</p>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <Label htmlFor="enableKlaviyo" className="flex items-center gap-2 cursor-pointer">
+                  <span className={`h-1.5 w-1.5 rounded-full ${klaviyoEnabled ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                  Enable Klaviyo
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Forward ViewContent, AddToCart, InitiateCheckout, and Purchase events.</p>
+              </div>
+              <Switch
+                id="enableKlaviyo"
+                checked={klaviyoEnabled}
+                onCheckedChange={setKlaviyoEnabled}
+              />
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button type="submit" variant="brand" disabled={savingKlaviyo}>
+                {savingKlaviyo ? "Saving\u2026" : "Save Klaviyo"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* 6. Event Toggles */}
       <Card>
         <CardHeader>
           <CardTitle>Event Toggles</CardTitle>
@@ -261,7 +626,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* 3. Consent Mode */}
+      {/* 5. Consent Mode */}
       <Card>
         <CardHeader>
           <CardTitle>Consent Mode</CardTitle>
@@ -294,7 +659,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* 4. JS Snippet */}
+      {/* 6. JS Snippet */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -325,7 +690,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* 5. Danger Zone */}
+      {/* 7. Danger Zone */}
       <Card className="border-red-500/10 border-l-2 border-l-red-500/30">
         <CardHeader className="border-b border-red-500/10">
           <CardTitle className="text-red-400">Danger Zone</CardTitle>
@@ -362,7 +727,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
             <div>
               <p className="text-sm font-medium text-foreground">Deactivate Workspace</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Stop all event tracking for this workspace. Events will no longer be forwarded to Meta.
+                Stop all event tracking for this workspace. Events will no longer be forwarded to any destination.
               </p>
             </div>
             <AlertDialog>
@@ -374,7 +739,7 @@ export function SettingsForm({ workspace }: SettingsFormProps) {
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Deactivate Workspace?</AlertDialogTitle>
-                  <AlertDialogDescription>Tracking will stop and events will no longer be forwarded to Meta. This action is disruptive.</AlertDialogDescription>
+                  <AlertDialogDescription>Tracking will stop and events will no longer be forwarded to any destination. This action is disruptive.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>

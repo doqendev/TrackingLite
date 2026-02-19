@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { SettingsForm } from "@/components/settings/settings-form";
+import { AlertPreferences } from "@/components/settings/alert-preferences";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,29 @@ export default async function SettingsPage() {
       enablePurchase: true,
       apiKey: true,
       isActive: true,
+      // Google Ads
+      googleAdsCustomerId: true,
+      googleAdsConversionAction: true,
+      googleAdsAccessTokenEncrypted: true,
+      googleAdsDeveloperToken: true,
+      enableGoogleAds: true,
+      // TikTok
+      tiktokPixelId: true,
+      tiktokAccessTokenEncrypted: true,
+      enableTikTok: true,
+      // GA4
+      ga4MeasurementId: true,
+      ga4ApiSecretEncrypted: true,
+      enableGA4: true,
+      // Klaviyo
+      klaviyoApiKeyEncrypted: true,
+      enableKlaviyo: true,
     },
   });
 
   if (!workspace) redirect("/onboarding");
 
-  // Only pass the fields the client component expects; never send the raw encrypted token
+  // Only pass the fields the client component expects; never send raw encrypted tokens
   const workspaceForClient = {
     id: workspace.id,
     metaPixelId: workspace.metaPixelId,
@@ -45,6 +63,23 @@ export default async function SettingsPage() {
     enableInitiateCheckout: workspace.enableInitiateCheckout,
     enablePurchase: workspace.enablePurchase,
     apiKey: workspace.apiKey,
+    // Google Ads
+    googleAdsCustomerId: workspace.googleAdsCustomerId,
+    googleAdsConversionAction: workspace.googleAdsConversionAction,
+    hasGoogleAdsAccessToken: !!workspace.googleAdsAccessTokenEncrypted,
+    googleAdsDeveloperToken: workspace.googleAdsDeveloperToken,
+    enableGoogleAds: workspace.enableGoogleAds,
+    // TikTok
+    tiktokPixelId: workspace.tiktokPixelId,
+    hasTiktokAccessToken: !!workspace.tiktokAccessTokenEncrypted,
+    enableTikTok: workspace.enableTikTok,
+    // GA4
+    ga4MeasurementId: workspace.ga4MeasurementId,
+    hasGA4ApiSecret: !!workspace.ga4ApiSecretEncrypted,
+    enableGA4: workspace.enableGA4,
+    // Klaviyo
+    hasKlaviyoApiKey: !!workspace.klaviyoApiKeyEncrypted,
+    enableKlaviyo: workspace.enableKlaviyo,
   };
 
   return (
@@ -62,6 +97,7 @@ export default async function SettingsPage() {
       </div>
 
       <SettingsForm workspace={workspaceForClient} />
+      <AlertPreferences />
     </div>
   );
 }

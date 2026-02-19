@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockCount = vi.fn();
 const mockFindFirst = vi.fn();
+const mockFindMany = vi.fn();
 const mockAggregate = vi.fn();
 const mockGroupBy = vi.fn();
 const mockFindUnique = vi.fn();
@@ -13,6 +14,7 @@ vi.mock("@/lib/db", () => ({
     eventLog: {
       count: (...args: unknown[]) => mockCount(...args),
       findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      findMany: (...args: unknown[]) => mockFindMany(...args),
       aggregate: (...args: unknown[]) => mockAggregate(...args),
       groupBy: (...args: unknown[]) => mockGroupBy(...args),
     },
@@ -48,7 +50,15 @@ function setupDefaultMocks() {
     .mockResolvedValueOnce(95)   // sent 24h
     .mockResolvedValueOnce(5)    // failed 24h
     .mockResolvedValueOnce(10)   // orders today (Purchase SENT today)
-    .mockResolvedValueOnce(8);   // orders yesterday (Purchase SENT yesterday)
+    .mockResolvedValueOnce(8)    // orders yesterday (Purchase SENT yesterday)
+    // conversionAccuracy: last7d
+    .mockResolvedValueOnce(30)   // total7d
+    .mockResolvedValueOnce(29)   // sent7d
+    .mockResolvedValueOnce(1)    // failed7d
+    // conversionAccuracy: last30d
+    .mockResolvedValueOnce(120)  // total30d
+    .mockResolvedValueOnce(115)  // sent30d
+    .mockResolvedValueOnce(5);   // failed30d
 
   // Last event
   mockFindFirst
@@ -81,6 +91,9 @@ function setupDefaultMocks() {
       { eventName: "InitiateCheckout", _count: 140 },
       { eventName: "Purchase", _count: 75 },
     ]);
+
+  // EMQ: return empty array (no sent events sampled)
+  mockFindMany.mockResolvedValue([]);
 
   // Subscription
   mockFindUnique.mockResolvedValue({ plan: "STARTER" });
@@ -163,7 +176,13 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // sent
         .mockResolvedValueOnce(0)  // failed
         .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0); // orders yesterday
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst
         .mockResolvedValueOnce(null)   // no last event
@@ -176,6 +195,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -191,8 +211,14 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(100) // total
         .mockResolvedValueOnce(85)  // sent
         .mockResolvedValueOnce(15)  // failed
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)   // orders today
+        .mockResolvedValueOnce(0)   // orders yesterday
+        .mockResolvedValueOnce(0)   // total7d
+        .mockResolvedValueOnce(0)   // sent7d
+        .mockResolvedValueOnce(0)   // failed7d
+        .mockResolvedValueOnce(0)   // total30d
+        .mockResolvedValueOnce(0)   // sent30d
+        .mockResolvedValueOnce(0);  // failed30d
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
@@ -200,6 +226,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -214,8 +241,14 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(100) // total
         .mockResolvedValueOnce(50)  // sent
         .mockResolvedValueOnce(50)  // failed
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)   // orders today
+        .mockResolvedValueOnce(0)   // orders yesterday
+        .mockResolvedValueOnce(0)   // total7d
+        .mockResolvedValueOnce(0)   // sent7d
+        .mockResolvedValueOnce(0)   // failed7d
+        .mockResolvedValueOnce(0)   // total30d
+        .mockResolvedValueOnce(0)   // sent30d
+        .mockResolvedValueOnce(0);  // failed30d
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
@@ -223,6 +256,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -258,11 +292,17 @@ describe("computeDashboardAnalytics", () => {
 
     it("handles null values (no monetary data)", async () => {
       mockCount
-        .mockResolvedValueOnce(10)
-        .mockResolvedValueOnce(10)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(10)  // total 24h
+        .mockResolvedValueOnce(10)  // sent 24h
+        .mockResolvedValueOnce(0)   // failed 24h
+        .mockResolvedValueOnce(0)   // orders today
+        .mockResolvedValueOnce(0)   // orders yesterday
+        .mockResolvedValueOnce(0)   // total7d
+        .mockResolvedValueOnce(0)   // sent7d
+        .mockResolvedValueOnce(0)   // failed7d
+        .mockResolvedValueOnce(0)   // total30d
+        .mockResolvedValueOnce(0)   // sent30d
+        .mockResolvedValueOnce(0);  // failed30d
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
@@ -270,6 +310,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -315,11 +356,17 @@ describe("computeDashboardAnalytics", () => {
 
     it("returns 0 for event types with no events", async () => {
       mockCount
-        .mockResolvedValueOnce(5)
-        .mockResolvedValueOnce(5)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(5)   // total 24h
+        .mockResolvedValueOnce(5)   // sent 24h
+        .mockResolvedValueOnce(0)   // failed 24h
+        .mockResolvedValueOnce(0)   // orders today
+        .mockResolvedValueOnce(0)   // orders yesterday
+        .mockResolvedValueOnce(0)   // total7d
+        .mockResolvedValueOnce(0)   // sent7d
+        .mockResolvedValueOnce(0)   // failed7d
+        .mockResolvedValueOnce(0)   // total30d
+        .mockResolvedValueOnce(0)   // sent30d
+        .mockResolvedValueOnce(0);  // failed30d
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
@@ -332,6 +379,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([{ eventName: "PageView", _count: 5 }])
         .mockResolvedValueOnce([]);
 
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -360,15 +408,22 @@ describe("computeDashboardAnalytics", () => {
 
     it("defaults to FREE plan when no subscription", async () => {
       mockCount
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)  // total 24h
+        .mockResolvedValueOnce(0)  // sent 24h
+        .mockResolvedValueOnce(0)  // failed 24h
+        .mockResolvedValueOnce(0)  // orders today
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null); // no subscription
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -381,15 +436,22 @@ describe("computeDashboardAnalytics", () => {
 
     it("handles 0/50 as 0%", async () => {
       mockCount
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)  // total 24h
+        .mockResolvedValueOnce(0)  // sent 24h
+        .mockResolvedValueOnce(0)  // failed 24h
+        .mockResolvedValueOnce(0)  // orders today
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -400,15 +462,22 @@ describe("computeDashboardAnalytics", () => {
 
     it("handles 50/50 as 100%", async () => {
       mockCount
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)  // total 24h
+        .mockResolvedValueOnce(0)  // sent 24h
+        .mockResolvedValueOnce(0)  // failed 24h
+        .mockResolvedValueOnce(0)  // orders today
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(50);
 
@@ -419,15 +488,22 @@ describe("computeDashboardAnalytics", () => {
 
     it("caps at 100% for over-limit usage", async () => {
       mockCount
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)  // total 24h
+        .mockResolvedValueOnce(0)  // sent 24h
+        .mockResolvedValueOnce(0)  // failed 24h
+        .mockResolvedValueOnce(0)  // orders today
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(75); // over 50 limit
 
@@ -438,15 +514,22 @@ describe("computeDashboardAnalytics", () => {
 
     it("handles Redis failure gracefully (returns 0 orders)", async () => {
       mockCount
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)  // total 24h
+        .mockResolvedValueOnce(0)  // sent 24h
+        .mockResolvedValueOnce(0)  // failed 24h
+        .mockResolvedValueOnce(0)  // orders today
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockRejectedValue(new Error("Redis connection failed"));
 
@@ -459,15 +542,22 @@ describe("computeDashboardAnalytics", () => {
   describe("retention days", () => {
     it("returns 7 for FREE plan", async () => {
       mockCount
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)  // total 24h
+        .mockResolvedValueOnce(0)  // sent 24h
+        .mockResolvedValueOnce(0)  // failed 24h
+        .mockResolvedValueOnce(0)  // orders today
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(0);
 
@@ -478,15 +568,22 @@ describe("computeDashboardAnalytics", () => {
 
     it("returns 30 for GROWTH plan", async () => {
       mockCount
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0);
+        .mockResolvedValueOnce(0)  // total 24h
+        .mockResolvedValueOnce(0)  // sent 24h
+        .mockResolvedValueOnce(0)  // failed 24h
+        .mockResolvedValueOnce(0)  // orders today
+        .mockResolvedValueOnce(0)  // orders yesterday
+        .mockResolvedValueOnce(0)  // total7d
+        .mockResolvedValueOnce(0)  // sent7d
+        .mockResolvedValueOnce(0)  // failed7d
+        .mockResolvedValueOnce(0)  // total30d
+        .mockResolvedValueOnce(0)  // sent30d
+        .mockResolvedValueOnce(0); // failed30d
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockFindMany.mockResolvedValue([]);
       mockFindUnique.mockResolvedValue({ plan: "GROWTH" });
       mockGetOrderCount.mockResolvedValue(0);
 

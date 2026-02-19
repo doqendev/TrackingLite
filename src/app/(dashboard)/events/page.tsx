@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ClipboardList } from "lucide-react";
+import { ReplayButton } from "@/components/dashboard/replay-button";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +74,7 @@ export default async function EventsPage({
       : {}),
   };
 
-  const [events, total] = await Promise.all([
+  const [events, total, failedCount] = await Promise.all([
     db.eventLog.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -93,6 +94,7 @@ export default async function EventsPage({
       },
     }),
     db.eventLog.count({ where }),
+    db.eventLog.count({ where: { workspaceId: workspace.id, status: "FAILED" } }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -114,11 +116,14 @@ export default async function EventsPage({
   return (
     <div className="space-y-5">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Event Log</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {total.toLocaleString()} total events
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Event Log</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {total.toLocaleString()} total events
+          </p>
+        </div>
+        <ReplayButton workspaceId={workspace.id} failedCount={failedCount} />
       </div>
 
       {/* Filter bar */}
@@ -219,6 +224,7 @@ export default async function EventsPage({
                   <TableHead className="whitespace-nowrap">Value</TableHead>
                   <TableHead className="whitespace-nowrap">Page URL</TableHead>
                   <TableHead className="whitespace-nowrap">Error</TableHead>
+                  <TableHead className="whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -284,6 +290,15 @@ export default async function EventsPage({
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {event.status === "FAILED" && (
+                          <ReplayButton
+                            workspaceId={workspace.id}
+                            failedCount={0}
+                            eventId={event.id}
+                          />
                         )}
                       </TableCell>
                     </TableRow>

@@ -16,7 +16,35 @@ const UpdateWorkspaceSchema = z.object({
   enableAddToCart: z.boolean().optional(),
   enableInitiateCheckout: z.boolean().optional(),
   enablePurchase: z.boolean().optional(),
+  // Google Ads
+  googleAdsCustomerId: z.string().optional().nullable(),
+  googleAdsConversionAction: z.string().optional().nullable(),
+  googleAdsAccessToken: z.string().optional().nullable(),
+  googleAdsRefreshToken: z.string().optional().nullable(),
+  googleAdsDeveloperToken: z.string().optional().nullable(),
+  enableGoogleAds: z.boolean().optional(),
+  // TikTok
+  tiktokPixelId: z.string().optional().nullable(),
+  tiktokAccessToken: z.string().optional().nullable(),
+  enableTikTok: z.boolean().optional(),
+  // GA4
+  ga4MeasurementId: z.string().optional().nullable(),
+  ga4ApiSecret: z.string().optional().nullable(),
+  enableGA4: z.boolean().optional(),
+  // Klaviyo
+  klaviyoApiKey: z.string().optional().nullable(),
+  enableKlaviyo: z.boolean().optional(),
 });
+
+// Sensitive fields that need encryption: [inputFieldName, encryptedField, ivField, tagField]
+const ENCRYPTED_FIELDS: Array<[string, string, string, string]> = [
+  ["metaAccessToken", "metaAccessTokenEncrypted", "metaAccessTokenIv", "metaAccessTokenTag"],
+  ["googleAdsAccessToken", "googleAdsAccessTokenEncrypted", "googleAdsAccessTokenIv", "googleAdsAccessTokenTag"],
+  ["googleAdsRefreshToken", "googleAdsRefreshTokenEncrypted", "googleAdsRefreshTokenIv", "googleAdsRefreshTokenTag"],
+  ["tiktokAccessToken", "tiktokAccessTokenEncrypted", "tiktokAccessTokenIv", "tiktokAccessTokenTag"],
+  ["ga4ApiSecret", "ga4ApiSecretEncrypted", "ga4ApiSecretIv", "ga4ApiSecretTag"],
+  ["klaviyoApiKey", "klaviyoApiKeyEncrypted", "klaviyoApiKeyIv", "klaviyoApiKeyTag"],
+];
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -39,7 +67,6 @@ export async function GET(
       domain: true,
       platform: true,
       metaPixelId: true,
-      // Indicate whether the token is set without exposing it
       metaAccessTokenEncrypted: true,
       metaTestEventCode: true,
       consentMode: true,
@@ -50,6 +77,23 @@ export async function GET(
       enablePurchase: true,
       isActive: true,
       eventsForwardedCount: true,
+      // Google Ads
+      googleAdsCustomerId: true,
+      googleAdsConversionAction: true,
+      googleAdsAccessTokenEncrypted: true,
+      googleAdsDeveloperToken: true,
+      enableGoogleAds: true,
+      // TikTok
+      tiktokPixelId: true,
+      tiktokAccessTokenEncrypted: true,
+      enableTikTok: true,
+      // GA4
+      ga4MeasurementId: true,
+      ga4ApiSecretEncrypted: true,
+      enableGA4: true,
+      // Klaviyo
+      klaviyoApiKeyEncrypted: true,
+      enableKlaviyo: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -59,11 +103,23 @@ export async function GET(
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  // Replace the encrypted token with a boolean flag
-  const { metaAccessTokenEncrypted, ...rest } = workspace;
+  // Replace encrypted tokens with boolean flags
+  const {
+    metaAccessTokenEncrypted,
+    googleAdsAccessTokenEncrypted,
+    tiktokAccessTokenEncrypted,
+    ga4ApiSecretEncrypted,
+    klaviyoApiKeyEncrypted,
+    ...rest
+  } = workspace;
+
   return NextResponse.json({
     ...rest,
     hasMetaAccessToken: metaAccessTokenEncrypted !== null,
+    hasGoogleAdsAccessToken: googleAdsAccessTokenEncrypted !== null,
+    hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
+    hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
+    hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
   });
 }
 
@@ -90,24 +146,38 @@ export async function PATCH(
     const body = await request.json();
     const data = UpdateWorkspaceSchema.parse(body);
 
-    // Separate the metaAccessToken from the rest of the fields
-    const { metaAccessToken, ...scalarFields } = data;
+    // Separate sensitive token fields from scalar fields
+    const sensitiveFieldNames = ENCRYPTED_FIELDS.map(([inputName]) => inputName);
+    const scalarFields: Record<string, unknown> = {};
+    const sensitiveValues: Record<string, string | null | undefined> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      if (sensitiveFieldNames.includes(key)) {
+        sensitiveValues[key] = value as string | null | undefined;
+      } else {
+        scalarFields[key] = value;
+      }
+    }
 
     // Build the update payload
     const updateData: Record<string, unknown> = { ...scalarFields };
 
-    if (metaAccessToken !== undefined) {
-      if (metaAccessToken === null) {
-        // Clear the token
-        updateData.metaAccessTokenEncrypted = null;
-        updateData.metaAccessTokenIv = null;
-        updateData.metaAccessTokenTag = null;
+    // Handle encryption for each sensitive field
+    for (const [inputName, encField, ivField, tagField] of ENCRYPTED_FIELDS) {
+      const value = sensitiveValues[inputName];
+      if (value === undefined) continue;
+
+      if (value === null) {
+        // Clear the encrypted fields
+        updateData[encField] = null;
+        updateData[ivField] = null;
+        updateData[tagField] = null;
       } else {
-        // Re-encrypt new token value
-        const { encrypted, iv, tag } = encrypt(metaAccessToken);
-        updateData.metaAccessTokenEncrypted = encrypted;
-        updateData.metaAccessTokenIv = iv;
-        updateData.metaAccessTokenTag = tag;
+        // Encrypt and store
+        const { encrypted, iv, tag } = encrypt(value);
+        updateData[encField] = encrypted;
+        updateData[ivField] = iv;
+        updateData[tagField] = tag;
       }
     }
 
@@ -130,15 +200,44 @@ export async function PATCH(
         enablePurchase: true,
         isActive: true,
         eventsForwardedCount: true,
+        // Google Ads
+        googleAdsCustomerId: true,
+        googleAdsConversionAction: true,
+        googleAdsAccessTokenEncrypted: true,
+        googleAdsDeveloperToken: true,
+        enableGoogleAds: true,
+        // TikTok
+        tiktokPixelId: true,
+        tiktokAccessTokenEncrypted: true,
+        enableTikTok: true,
+        // GA4
+        ga4MeasurementId: true,
+        ga4ApiSecretEncrypted: true,
+        enableGA4: true,
+        // Klaviyo
+        klaviyoApiKeyEncrypted: true,
+        enableKlaviyo: true,
         createdAt: true,
         updatedAt: true,
       },
     });
 
-    const { metaAccessTokenEncrypted, ...rest } = updated;
+    const {
+      metaAccessTokenEncrypted,
+      googleAdsAccessTokenEncrypted,
+      tiktokAccessTokenEncrypted,
+      ga4ApiSecretEncrypted,
+      klaviyoApiKeyEncrypted,
+      ...rest
+    } = updated;
+
     return NextResponse.json({
       ...rest,
       hasMetaAccessToken: metaAccessTokenEncrypted !== null,
+      hasGoogleAdsAccessToken: googleAdsAccessTokenEncrypted !== null,
+      hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
+      hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
+      hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

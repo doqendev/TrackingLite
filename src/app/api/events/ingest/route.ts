@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getEventQueue } from "@/lib/queue";
+import {
+  getEventQueue,
+  getGoogleQueue,
+  getTiktokQueue,
+  getGA4Queue,
+  getKlaviyoQueue,
+} from "@/lib/queue";
+import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { shouldSendEvent } from "@/lib/consent";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkOrderLimits, incrementOrderCount } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
 import { z } from "zod";
+import type { Queue } from "bullmq";
 
 const IngestPayloadSchema = z.object({
   eventName: z.enum(["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"]),
@@ -15,6 +23,7 @@ const IngestPayloadSchema = z.object({
   referrer: z.string().optional().default(""),
   fbp: z.string().nullable().optional(),
   fbc: z.string().nullable().optional(),
+  ttclid: z.string().nullable().optional(),
   consent: z.object({
     analyticsAllowed: z.boolean().optional(),
     marketingAllowed: z.boolean().optional(),
@@ -51,18 +60,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing API key" }, { status: 401, headers: corsHeaders });
     }
 
-    // 2. Look up workspace by API key
+    // 2. Look up workspace by API key (include all destination fields)
     const workspace = await db.workspace.findUnique({
       where: { apiKey },
       select: {
         id: true,
         userId: true,
         isActive: true,
+        // Meta fields
         metaPixelId: true,
         metaAccessTokenEncrypted: true,
         metaAccessTokenIv: true,
         metaAccessTokenTag: true,
         metaTestEventCode: true,
+        // Google Ads fields
+        enableGoogleAds: true,
+        googleAdsCustomerId: true,
+        googleAdsConversionAction: true,
+        googleAdsAccessTokenEncrypted: true,
+        googleAdsAccessTokenIv: true,
+        googleAdsAccessTokenTag: true,
+        googleAdsRefreshTokenEncrypted: true,
+        googleAdsRefreshTokenIv: true,
+        googleAdsRefreshTokenTag: true,
+        googleAdsDeveloperToken: true,
+        // TikTok fields
+        enableTikTok: true,
+        tiktokPixelId: true,
+        tiktokAccessTokenEncrypted: true,
+        tiktokAccessTokenIv: true,
+        tiktokAccessTokenTag: true,
+        // GA4 fields
+        enableGA4: true,
+        ga4MeasurementId: true,
+        ga4ApiSecretEncrypted: true,
+        ga4ApiSecretIv: true,
+        ga4ApiSecretTag: true,
+        // Klaviyo fields
+        enableKlaviyo: true,
+        klaviyoApiKeyEncrypted: true,
+        klaviyoApiKeyIv: true,
+        klaviyoApiKeyTag: true,
+        // Event toggles and consent
         consentMode: true,
         enablePageView: true,
         enableViewContent: true,
@@ -80,9 +119,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Workspace inactive" }, { status: 403, headers: corsHeaders });
     }
 
-    // 3. Check Meta credentials configured
-    if (!workspace.metaPixelId || !workspace.metaAccessTokenEncrypted) {
-      return NextResponse.json({ error: "Meta credentials not configured" }, { status: 422, headers: corsHeaders });
+    // 3. Check that at least one destination has credentials configured
+    const hasMetaCredentials = !!(workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
+    const hasGoogleAdsCredentials = !!(workspace.enableGoogleAds && workspace.googleAdsAccessTokenEncrypted);
+    const hasTiktokCredentials = !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
+    const hasGA4Credentials = !!(workspace.enableGA4 && workspace.ga4ApiSecretEncrypted);
+    const hasKlaviyoCredentials = !!(workspace.enableKlaviyo && workspace.klaviyoApiKeyEncrypted);
+
+    if (!hasMetaCredentials && !hasGoogleAdsCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials) {
+      return NextResponse.json({ error: "No destination credentials configured" }, { status: 422, headers: corsHeaders });
     }
 
     // 4. Rate limit check
@@ -134,53 +179,182 @@ export async function POST(request: NextRequest) {
     // 10. Extract monetary fields from customData
     const extracted = extractCustomData(payload.customData);
 
-    // 11. Create EventLog record
-    const eventLog = await db.eventLog.create({
-      data: {
-        workspaceId: workspace.id,
-        eventName: payload.eventName as any,
-        eventId: payload.eventId,
-        status: "PENDING",
-        payload: {
-          eventName: payload.eventName,
-          customData: payload.customData,
-          hasUserData: !!(payload.userData?.email || payload.userData?.phone),
-        } as any,
-        customerIp: clientIp,
-        userAgent,
-        fbp: payload.fbp || null,
-        fbc: payload.fbc || null,
-        pageUrl: payload.url || null,
-        value: extracted.value,
-        currency: extracted.currency,
-        numItems: extracted.numItems,
-        orderId: extracted.orderId,
-      },
-    });
+    // 11. Build the list of enabled destinations
+    const destinations: Array<{
+      destination: string;
+      queue: Queue;
+      jobName: string;
+      credentials: Record<string, string>;
+    }> = [];
 
-    // 12. Queue Meta CAPI send
-    await getEventQueue().add("send-meta-event", {
+    // Meta (if credentials are configured - preserves existing behavior)
+    if (hasMetaCredentials) {
+      destinations.push({
+        destination: "META",
+        queue: getEventQueue(),
+        jobName: "send-meta-event",
+        credentials: {
+          pixelId: workspace.metaPixelId!,
+          accessToken: workspace.metaAccessTokenEncrypted!,
+          accessTokenIv: workspace.metaAccessTokenIv!,
+          accessTokenTag: workspace.metaAccessTokenTag!,
+          testEventCode: workspace.metaTestEventCode || "",
+        },
+      });
+    }
+
+    // Google Ads
+    if (hasGoogleAdsCredentials) {
+      destinations.push({
+        destination: "GOOGLE_ADS",
+        queue: getGoogleQueue(),
+        jobName: "send-google-event",
+        credentials: {
+          customerId: workspace.googleAdsCustomerId || "",
+          conversionAction: workspace.googleAdsConversionAction || "",
+          accessToken: workspace.googleAdsAccessTokenEncrypted!,
+          accessTokenIv: workspace.googleAdsAccessTokenIv!,
+          accessTokenTag: workspace.googleAdsAccessTokenTag!,
+          refreshToken: workspace.googleAdsRefreshTokenEncrypted || "",
+          refreshTokenIv: workspace.googleAdsRefreshTokenIv || "",
+          refreshTokenTag: workspace.googleAdsRefreshTokenTag || "",
+          developerToken: workspace.googleAdsDeveloperToken || "",
+        },
+      });
+    }
+
+    // TikTok
+    if (hasTiktokCredentials) {
+      destinations.push({
+        destination: "TIKTOK",
+        queue: getTiktokQueue(),
+        jobName: "send-tiktok-event",
+        credentials: {
+          pixelId: workspace.tiktokPixelId || "",
+          accessToken: workspace.tiktokAccessTokenEncrypted!,
+          accessTokenIv: workspace.tiktokAccessTokenIv!,
+          accessTokenTag: workspace.tiktokAccessTokenTag!,
+        },
+      });
+    }
+
+    // GA4
+    if (hasGA4Credentials) {
+      destinations.push({
+        destination: "GA4",
+        queue: getGA4Queue(),
+        jobName: "send-ga4-event",
+        credentials: {
+          measurementId: workspace.ga4MeasurementId || "",
+          apiSecret: workspace.ga4ApiSecretEncrypted!,
+          apiSecretIv: workspace.ga4ApiSecretIv!,
+          apiSecretTag: workspace.ga4ApiSecretTag!,
+        },
+      });
+    }
+
+    // Klaviyo (skip PageView - too noisy for email platform)
+    if (hasKlaviyoCredentials && payload.eventName !== "PageView") {
+      destinations.push({
+        destination: "KLAVIYO",
+        queue: getKlaviyoQueue(),
+        jobName: "send-klaviyo-event",
+        credentials: {
+          apiKey: workspace.klaviyoApiKeyEncrypted!,
+          apiKeyIv: workspace.klaviyoApiKeyIv!,
+          apiKeyTag: workspace.klaviyoApiKeyTag!,
+        },
+      });
+    }
+
+    // 12. Create EventLog entries and queue jobs for each destination
+    const eventLogBaseData = {
       workspaceId: workspace.id,
-      pixelId: workspace.metaPixelId,
-      accessToken: workspace.metaAccessTokenEncrypted,
-      accessTokenIv: workspace.metaAccessTokenIv,
-      accessTokenTag: workspace.metaAccessTokenTag,
-      testEventCode: workspace.metaTestEventCode,
-      event: {
+      eventName: payload.eventName as any,
+      eventId: payload.eventId,
+      status: "PENDING" as const,
+      payload: {
         eventName: payload.eventName,
-        eventId: payload.eventId,
-        timestamp: payload.timestamp,
-        url: payload.url,
-        referrer: payload.referrer,
-        fbp: payload.fbp,
-        fbc: payload.fbc,
-        userData: payload.userData,
         customData: payload.customData,
-        clientIp,
-        userAgent,
-      },
-      eventLogId: eventLog.id,
-    });
+        hasUserData: !!(payload.userData?.email || payload.userData?.phone),
+      } as any,
+      customerIp: clientIp,
+      userAgent,
+      fbp: payload.fbp || null,
+      fbc: payload.fbc || null,
+      pageUrl: payload.url || null,
+      value: extracted.value,
+      currency: extracted.currency,
+      numItems: extracted.numItems,
+      orderId: extracted.orderId,
+    };
+
+    // Create all EventLog entries (one per destination)
+    const eventLogEntries = await Promise.all(
+      destinations.map((dest) =>
+        db.eventLog.create({
+          data: {
+            ...eventLogBaseData,
+            destination: dest.destination as any,
+          },
+        })
+      )
+    );
+
+    // Queue jobs for all destinations in parallel
+    await Promise.all(
+      destinations.map((dest, idx) => {
+        const eventLogId = eventLogEntries[idx].id;
+
+        if (dest.destination === "META") {
+          // Use existing MetaEventJob format for backward compatibility
+          return dest.queue.add(dest.jobName, {
+            workspaceId: workspace.id,
+            pixelId: dest.credentials.pixelId,
+            accessToken: dest.credentials.accessToken,
+            accessTokenIv: dest.credentials.accessTokenIv,
+            accessTokenTag: dest.credentials.accessTokenTag,
+            testEventCode: dest.credentials.testEventCode || undefined,
+            event: {
+              eventName: payload.eventName,
+              eventId: payload.eventId,
+              timestamp: payload.timestamp,
+              url: payload.url,
+              referrer: payload.referrer,
+              fbp: payload.fbp,
+              fbc: payload.fbc,
+              userData: payload.userData,
+              customData: payload.customData,
+              clientIp,
+              userAgent,
+            },
+            eventLogId,
+          } satisfies MetaEventJob);
+        } else {
+          // Use generic DestinationEventJob format
+          return dest.queue.add(dest.jobName, {
+            workspaceId: workspace.id,
+            destination: dest.destination,
+            eventLogId,
+            event: {
+              eventName: payload.eventName,
+              eventId: payload.eventId,
+              timestamp: payload.timestamp,
+              url: payload.url,
+              referrer: payload.referrer,
+              fbp: payload.fbp,
+              fbc: payload.fbc,
+              ttclid: payload.ttclid,
+              userData: payload.userData,
+              customData: payload.customData,
+              clientIp,
+              userAgent,
+            },
+            credentials: dest.credentials,
+          } satisfies DestinationEventJob);
+        }
+      })
+    );
 
     // 13. Increment order count only for Purchase events
     if (payload.eventName === "Purchase") {
@@ -188,7 +362,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 14. Return success
-    const response: any = { success: true, eventId: payload.eventId };
+    const response: any = {
+      success: true,
+      eventId: payload.eventId,
+      destinations: destinations.map((d) => d.destination),
+    };
     if (billing.upgraded) {
       response.upgraded = true;
       response.newPlan = billing.newPlan;

@@ -12,18 +12,20 @@ datasource db {
 // ============================================================
 
 model User {
-  id              String         @id @default(cuid())
-  name            String?
-  email           String         @unique
-  emailVerified   DateTime?
-  hashedPassword  String?        // null if signed up via Google OAuth
-  image           String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  accounts        Account[]
-  sessions        Session[]
-  workspaces      Workspace[]
-  subscription    Subscription?
+  id                  String               @id @default(cuid())
+  name                String?
+  email               String               @unique
+  emailVerified       DateTime?
+  hashedPassword      String?              // null if signed up via Google OAuth
+  image               String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  accounts            Account[]
+  sessions            Session[]
+  workspaces          Workspace[]
+  subscription        Subscription?
+  passwordResetTokens PasswordResetToken[]
+  alertPreference     AlertPreference?
 }
 
 model Account {
@@ -60,6 +62,19 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
 // ============================================================
 // CORE BUSINESS
 // ============================================================
@@ -77,6 +92,39 @@ model Workspace {
   metaAccessTokenIv         String?         // IV for decryption
   metaAccessTokenTag        String?         // Auth tag for decryption
   metaTestEventCode         String?         // For testing in Meta Events Manager
+
+  // Google Ads fields
+  googleAdsCustomerId         String?
+  googleAdsConversionAction   String?
+  googleAdsAccessTokenEncrypted  String?
+  googleAdsAccessTokenIv      String?
+  googleAdsAccessTokenTag     String?
+  googleAdsRefreshTokenEncrypted String?
+  googleAdsRefreshTokenIv     String?
+  googleAdsRefreshTokenTag    String?
+  googleAdsDeveloperToken     String?
+  enableGoogleAds             Boolean   @default(false)
+
+  // TikTok fields
+  tiktokPixelId               String?
+  tiktokAccessTokenEncrypted  String?
+  tiktokAccessTokenIv         String?
+  tiktokAccessTokenTag        String?
+  enableTikTok                Boolean   @default(false)
+
+  // GA4 fields
+  ga4MeasurementId            String?
+  ga4ApiSecretEncrypted       String?
+  ga4ApiSecretIv              String?
+  ga4ApiSecretTag             String?
+  enableGA4                   Boolean   @default(false)
+
+  // Klaviyo fields
+  klaviyoApiKeyEncrypted      String?
+  klaviyoApiKeyIv             String?
+  klaviyoApiKeyTag            String?
+  enableKlaviyo               Boolean   @default(false)
+
   consentMode               ConsentMode     @default(STRICT)
   isActive                  Boolean         @default(true)
   enablePageView            Boolean         @default(true)
@@ -113,10 +161,12 @@ model EventLog {
   currency       String?     // ISO 4217 currency code (e.g., "USD", "BRL")
   numItems       Int?        // number of items in cart/order
   orderId        String?     // Shopify order ID (for dedup)
+  destination    Destination  @default(META)
   createdAt      DateTime    @default(now())
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, eventName])
+  @@index([workspaceId, destination])
   @@index([eventId])
 }
 
@@ -134,6 +184,34 @@ model Subscription {
   cancelAtPeriodEnd    Boolean            @default(false)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+}
+
+model AlertPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Alert types - which alerts are enabled
+  trackingDown      Boolean @default(true)   // success rate < 80%
+  highErrorRate     Boolean @default(true)   // >10% errors in last hour
+  orderLimitWarning Boolean @default(true)   // 80% and 95% of monthly limit
+  orderLimitReached Boolean @default(true)   // 100% of limit
+  emqDrop           Boolean @default(true)   // EMQ score drops below 6
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId])
+}
+
+model AlertLog {
+  id        String   @id @default(cuid())
+  userId    String
+  alertType String   // "tracking_down", "high_error_rate", "order_limit_warning", "order_limit_reached", "emq_drop"
+  message   String
+  sentAt    DateTime @default(now())
+
+  @@index([userId, alertType, sentAt])
 }
 
 // ============================================================
@@ -180,4 +258,12 @@ enum SubscriptionStatus {
   PAST_DUE
   CANCELED
   UNPAID
+}
+
+enum Destination {
+  META
+  GOOGLE_ADS
+  TIKTOK
+  GA4
+  KLAVIYO
 }

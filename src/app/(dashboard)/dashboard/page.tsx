@@ -8,7 +8,9 @@ import { OrderUsageBar } from "@/components/dashboard/order-usage-bar";
 import { RevenueCards } from "@/components/dashboard/revenue-cards";
 import { EventFunnel } from "@/components/dashboard/event-funnel";
 import { DeliveryStats } from "@/components/dashboard/delivery-stats";
+import { EmqScore } from "@/components/dashboard/emq-score";
 import { RecentEvents } from "@/components/dashboard/recent-events";
+import { ConversionAccuracy } from "@/components/dashboard/conversion-accuracy";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Settings, AlertTriangle } from "lucide-react";
@@ -107,13 +109,17 @@ export default async function DashboardPage() {
       {/* Revenue cards */}
       <RevenueCards revenue={analytics.revenue} />
 
-      {/* Event funnel + Delivery stats side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Conversion accuracy */}
+      <ConversionAccuracy conversionAccuracy={analytics.conversionAccuracy} />
+
+      {/* Event funnel + Delivery stats + EMQ score */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         <EventFunnel eventBreakdown={analytics.eventBreakdown} />
         <DeliveryStats
           health={analytics.health}
           eventBreakdown={analytics.eventBreakdown}
         />
+        <EmqScore emq={analytics.emq} />
       </div>
 
       {/* Recent events */}
