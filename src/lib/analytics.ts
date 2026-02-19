@@ -292,13 +292,21 @@ async function queryCampaignPerformance(
 ): Promise<CampaignRow[]> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
+  // Find the first destination used by this workspace to avoid counting
+  // duplicates across destinations (each event fans out to multiple queues)
+  const firstDest = await db.eventLog.findFirst({
+    where: { workspaceId },
+    select: { destination: true },
+    orderBy: { createdAt: "desc" },
+  });
+
   const campaigns = await db.eventLog.groupBy({
     by: ["utmSource", "utmCampaign"],
     where: {
       workspaceId,
       createdAt: { gte: thirtyDaysAgo },
       utmSource: { not: null },
-      destination: "META",
+      ...(firstDest ? { destination: firstDest.destination } : {}),
     },
     _count: true,
     _sum: { value: true },

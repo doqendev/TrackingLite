@@ -62,7 +62,9 @@ function setupDefaultMocks() {
   mockFindFirst
     .mockResolvedValueOnce({ createdAt: new Date("2026-02-18T12:00:00Z") })
     // Currency query
-    .mockResolvedValueOnce({ currency: "USD" });
+    .mockResolvedValueOnce({ currency: "USD" })
+    // Campaign first destination
+    .mockResolvedValueOnce({ destination: "META" });
 
   // Revenue aggregates: AddToCart today, AddToCart yesterday, Checkout today, Checkout yesterday, Purchase today, Purchase yesterday
   mockAggregate
@@ -182,7 +184,8 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst
         .mockResolvedValueOnce(null)   // no last event
-        .mockResolvedValueOnce(null);  // no currency
+        .mockResolvedValueOnce(null)   // no currency
+        .mockResolvedValueOnce(null);  // no destination for campaigns
 
       mockAggregate
         .mockResolvedValue({ _sum: { value: null } });
@@ -218,7 +221,8 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
-        .mockResolvedValueOnce(null);
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ destination: "META" });
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
@@ -248,7 +252,8 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
-        .mockResolvedValueOnce(null);
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ destination: "META" });
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
@@ -302,7 +307,8 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
-        .mockResolvedValueOnce(null); // no currency
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ destination: "META" }); // no currency
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
       mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
@@ -366,7 +372,8 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst
         .mockResolvedValueOnce({ createdAt: new Date() })
-        .mockResolvedValueOnce(null);
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ destination: "META" });
 
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
 
