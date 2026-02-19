@@ -20,7 +20,7 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col bg-background">
       {/* ───────────────────────── Navigation ───────────────────────── */}
       <header className="relative z-10 bg-transparent">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link
             href="/"
             className="text-sm font-semibold tracking-tight text-foreground"
@@ -31,29 +31,29 @@ export default function HomePage() {
           <nav className="hidden items-center gap-8 sm:flex">
             <a
               href="#features"
-              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               Features
             </a>
             <a
               href="#how-it-works"
-              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               How it Works
             </a>
             <a
               href="#pricing"
-              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               Pricing
             </a>
           </nav>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="default" asChild>
               <Link href="/login">Log in</Link>
             </Button>
-            <Button variant="brand" size="sm" asChild>
+            <Button variant="brand" size="default" asChild>
               <Link href="/signup">Get Started</Link>
             </Button>
           </div>
