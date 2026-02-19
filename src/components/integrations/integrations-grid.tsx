@@ -311,7 +311,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const klaviyoConnected = workspace.hasKlaviyoApiKey;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
       {/* Meta CAPI */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-blue-500 overflow-hidden">
         <div
