@@ -224,7 +224,7 @@ export default function HomePage() {
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                       {/* Shopify card */}
                       <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
-                        <Image src="/shopify.svg" alt="Shopify" width={20} height={20} className="absolute right-3 top-3 opacity-60" style={{ filter: "brightness(0) saturate(100%) invert(73%) sepia(52%) saturate(452%) hue-rotate(107deg) brightness(96%) contrast(92%)" }} />
+                        <Image src="/shopify.svg" alt="Shopify" width={20} height={20} className="absolute right-3 top-3 opacity-70" style={{ filter: "brightness(0) saturate(100%) invert(73%) sepia(52%) saturate(452%) hue-rotate(107deg) brightness(96%) contrast(92%) drop-shadow(0 0 6px rgba(16,185,129,0.5)) drop-shadow(0 0 12px rgba(16,185,129,0.25))" }} />
                         <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           Connected
@@ -245,7 +245,7 @@ export default function HomePage() {
 
                       {/* Meta CAPI card */}
                       <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
-                        <Image src="/meta.svg" alt="Meta" width={20} height={20} className="absolute right-3 top-3 opacity-60" style={{ filter: "brightness(0) saturate(100%) invert(73%) sepia(52%) saturate(452%) hue-rotate(107deg) brightness(96%) contrast(92%)" }} />
+                        <Image src="/meta.svg" alt="Meta" width={20} height={20} className="absolute right-3 top-3 opacity-70" style={{ filter: "brightness(0) saturate(100%) invert(73%) sepia(52%) saturate(452%) hue-rotate(107deg) brightness(96%) contrast(92%) drop-shadow(0 0 6px rgba(16,185,129,0.5)) drop-shadow(0 0 12px rgba(16,185,129,0.25))" }} />
                         <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           Forwarding
