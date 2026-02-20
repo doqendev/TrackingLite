@@ -2,7 +2,6 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import Link from "next/link";
-import { Destination } from "@prisma/client";
 import { computeDashboardAnalytics } from "@/lib/analytics";
 import { getCachedAnalytics } from "@/lib/analytics-cache";
 import { convertCurrency } from "@/lib/currency";
@@ -15,6 +14,7 @@ import { DeliveryStats } from "@/components/dashboard/delivery-stats";
 import { RecentEvents } from "@/components/dashboard/recent-events";
 import { ConversionAccuracy } from "@/components/dashboard/conversion-accuracy";
 import { CampaignPerformance } from "@/components/dashboard/campaign-performance";
+import { PlatformDelivery } from "@/components/dashboard/platform-delivery";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Settings, AlertTriangle } from "lucide-react";
@@ -28,25 +28,9 @@ const HEALTH_CONFIG = {
   inactive: { dot: "bg-muted-foreground", label: "Inactive", labelColor: "text-muted-foreground" },
 } as const;
 
-const DESTINATION_LABELS: Record<string, string> = {
-  META: "Meta",
-  GOOGLE_ADS: "Google Ads",
-  TIKTOK: "TikTok",
-  GA4: "GA4",
-  KLAVIYO: "Klaviyo",
-};
-
-const VALID_DESTINATIONS = new Set<string>(Object.values(Destination));
-
-interface DashboardPageProps {
-  searchParams: Promise<{ destination?: string }>;
-}
-
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-
-  const resolvedParams = await searchParams;
 
   const workspace = await db.workspace.findFirst({
     where: { userId: session.user.id, isActive: true },
@@ -72,13 +56,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
   const hasAnyDestination = hasMetaCredentials || workspace.enableGoogleAds || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo;
 
-  // Parse destination filter from URL
-  const destParam = resolvedParams.destination;
-  let destination: Destination | undefined;
-  if (destParam && VALID_DESTINATIONS.has(destParam)) {
-    destination = destParam as Destination;
-  }
-
   // Get user's display currency
   const user = await db.user.findUnique({
     where: { id: session.user.id },
@@ -92,7 +69,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       const data = await computeDashboardAnalytics(
         workspace.id,
         session.user!.id!,
-        destination,
         displayCurrency
       );
 
@@ -124,7 +100,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       return data;
     },
-    destParam,
     displayCurrency
   );
 
@@ -150,8 +125,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   };
 
   const healthConfig = HEALTH_CONFIG[analytics.health.status];
-  const enabledDests = analytics.enabledDestinations;
-  const activeTab = destination ?? "all";
 
   return (
     <div className="space-y-6">
@@ -199,35 +172,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </Alert>
       )}
 
-      {/* Destination tabs */}
-      {enabledDests.length > 1 && (
-        <div className="flex items-center gap-1.5 bg-secondary rounded-lg p-1 flex-wrap">
-          <Link
-            href="/dashboard"
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === "all"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All
-          </Link>
-          {enabledDests.map((dest) => (
-            <Link
-              key={dest}
-              href={`/dashboard?destination=${dest}`}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                activeTab === dest
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {DESTINATION_LABELS[dest] ?? dest}
-            </Link>
-          ))}
-        </div>
-      )}
-
       {/* Order usage progress bar */}
       <OrderUsageBar
         plan={analytics.billing.plan}
@@ -240,23 +184,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {/* Revenue cards */}
       <RevenueCards revenue={analytics.revenue} />
 
-      {/* Conversion accuracy */}
-      <ConversionAccuracy
-        conversionAccuracy={analytics.conversionAccuracy}
-        activeDestination={analytics.activeDestination}
+      {/* Platform delivery table */}
+      <PlatformDelivery destinationDelivery={analytics.destinationDelivery} />
+
+      {/* Conversion accuracy + Conversion funnel */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ConversionAccuracy conversionAccuracy={analytics.conversionAccuracy} />
+        <EventFunnel eventBreakdown={analytics.eventBreakdown} />
+      </div>
+
+      {/* Delivery stats */}
+      <DeliveryStats
+        health={analytics.health}
+        eventBreakdown={analytics.eventBreakdown}
       />
 
       {/* Campaign performance */}
       <CampaignPerformance campaigns={analytics.campaigns} currency={analytics.currency} />
-
-      {/* Event funnel + Delivery stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <EventFunnel eventBreakdown={analytics.eventBreakdown} />
-        <DeliveryStats
-          health={analytics.health}
-          eventBreakdown={analytics.eventBreakdown}
-        />
-      </div>
 
       {/* Recent events */}
       <RecentEvents workspaceId={workspace.id} />

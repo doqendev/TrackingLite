@@ -51,9 +51,9 @@ const mockAnalytics: DashboardAnalytics = {
     last30d: { total: 120, sent: 115, failed: 5, accuracy: 95.8 },
   },
   campaigns: [],
+  destinationDelivery: [],
   currency: "USD",
   enabledDestinations: ["META"],
-  activeDestination: null,
 };
 
 describe("getCachedAnalytics", () => {
@@ -71,7 +71,7 @@ describe("getCachedAnalytics", () => {
 
     const result = await getCachedAnalytics(WORKSPACE_ID, computeFn);
 
-    expect(mockGet).toHaveBeenCalledWith(`analytics:${WORKSPACE_ID}:all:default`);
+    expect(mockGet).toHaveBeenCalledWith(`analytics:${WORKSPACE_ID}:default`);
     expect(computeFn).not.toHaveBeenCalled();
     expect(result.health.status).toBe("healthy");
     expect(result.billing.plan).toBe("STARTER");
@@ -106,7 +106,7 @@ describe("getCachedAnalytics", () => {
 
     expect(mockSetex).toHaveBeenCalledTimes(1);
     expect(mockSetex).toHaveBeenCalledWith(
-      `analytics:${WORKSPACE_ID}:all:default`,
+      `analytics:${WORKSPACE_ID}:default`,
       60,
       expect.any(String)
     );

@@ -92,7 +92,8 @@ function setupDefaultMocks() {
       { eventName: "InitiateCheckout", _count: 140 },
       { eventName: "Purchase", _count: 75 },
     ])
-    .mockResolvedValueOnce([]);  // campaigns
+    .mockResolvedValueOnce([])   // campaigns
+    .mockResolvedValueOnce([{ destination: "META", status: "SENT", _count: 95 }, { destination: "META", status: "FAILED", _count: 5 }]);  // destinationDelivery
 
   // Subscription
   mockFindUnique.mockResolvedValue({ plan: "STARTER" });
@@ -195,7 +196,8 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([])   // enabledDestsQuery
         .mockResolvedValueOnce([])   // today event breakdown
         .mockResolvedValueOnce([])   // yesterday event breakdown
-        .mockResolvedValueOnce([]);  // campaigns
+        .mockResolvedValueOnce([])   // campaigns
+        .mockResolvedValueOnce([]);  // destinationDelivery
 
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
@@ -231,7 +233,8 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // enabledDestsQuery
         .mockResolvedValueOnce([])  // today event breakdown
         .mockResolvedValueOnce([])  // yesterday event breakdown
-        .mockResolvedValueOnce([]); // campaigns
+        .mockResolvedValueOnce([])  // campaigns
+        .mockResolvedValueOnce([]); // destinationDelivery
 
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
@@ -266,7 +269,8 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // enabledDestsQuery
         .mockResolvedValueOnce([])  // today event breakdown
         .mockResolvedValueOnce([])  // yesterday event breakdown
-        .mockResolvedValueOnce([]); // campaigns
+        .mockResolvedValueOnce([])  // campaigns
+        .mockResolvedValueOnce([]); // destinationDelivery
 
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
@@ -325,7 +329,8 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // enabledDestsQuery
         .mockResolvedValueOnce([])  // today event breakdown
         .mockResolvedValueOnce([])  // yesterday event breakdown
-        .mockResolvedValueOnce([]); // campaigns
+        .mockResolvedValueOnce([])  // campaigns
+        .mockResolvedValueOnce([]); // destinationDelivery
 
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
@@ -396,7 +401,8 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // enabledDestsQuery
         .mockResolvedValueOnce([{ eventName: "PageView", _count: 5 }]) // today event breakdown
         .mockResolvedValueOnce([])   // yesterday event breakdown
-        .mockResolvedValueOnce([]);  // campaigns
+        .mockResolvedValueOnce([])   // campaigns
+        .mockResolvedValueOnce([]);  // destinationDelivery
 
 
       mockFindUnique.mockResolvedValue(null);
@@ -441,7 +447,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
-      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       mockFindUnique.mockResolvedValue(null); // no subscription
       mockGetOrderCount.mockResolvedValue(0);
@@ -469,7 +475,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
-      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
@@ -495,7 +501,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
-      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(50);
@@ -521,7 +527,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
-      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(75); // over 50 limit
@@ -547,7 +553,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
-      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockRejectedValue(new Error("Redis connection failed"));
@@ -575,7 +581,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
-      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       mockFindUnique.mockResolvedValue({ plan: "FREE" });
       mockGetOrderCount.mockResolvedValue(0);
@@ -601,7 +607,7 @@ describe("computeDashboardAnalytics", () => {
 
       mockFindFirst.mockResolvedValue(null);
       mockAggregate.mockResolvedValue({ _sum: { value: null } });
-      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       mockFindUnique.mockResolvedValue({ plan: "GROWTH" });
       mockGetOrderCount.mockResolvedValue(0);

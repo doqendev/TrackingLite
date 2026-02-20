@@ -10,6 +10,7 @@ import type {
   BillingUsage,
   ConversionAccuracy,
   CampaignRow,
+  DestinationDeliveryRow,
 } from "@/types/app";
 
 const EVENT_NAMES: EventName[] = [
@@ -359,6 +360,41 @@ async function queryCampaignPerformance(
   }));
 }
 
+async function queryDestinationDelivery(
+  workspaceId: string,
+  since24h: Date
+): Promise<DestinationDeliveryRow[]> {
+  const groups = await db.eventLog.groupBy({
+    by: ["destination", "status"],
+    where: { workspaceId, createdAt: { gte: since24h } },
+    _count: true,
+  });
+
+  const destMap = new Map<string, { sent: number; failed: number; total: number }>();
+
+  for (const g of groups) {
+    const existing = destMap.get(g.destination) ?? { sent: 0, failed: 0, total: 0 };
+    existing.total += g._count;
+    if (g.status === EventStatus.SENT) {
+      existing.sent += g._count;
+    } else if (g.status === EventStatus.FAILED) {
+      existing.failed += g._count;
+    }
+    destMap.set(g.destination, existing);
+  }
+
+  return Array.from(destMap.entries()).map(([destination, stats]) => ({
+    destination,
+    sent: stats.sent,
+    failed: stats.failed,
+    total: stats.total,
+    successRate:
+      stats.total > 0
+        ? Math.round((stats.sent / stats.total) * 1000) / 10
+        : 0,
+  }));
+}
+
 async function queryBillingUsage(userId: string): Promise<BillingUsage> {
   const subscription = await db.subscription.findUnique({
     where: { userId },
@@ -387,22 +423,21 @@ async function queryBillingUsage(userId: string): Promise<BillingUsage> {
 export async function computeDashboardAnalytics(
   workspaceId: string,
   userId: string,
-  destination?: Destination | null,
   displayCurrency?: string
 ): Promise<DashboardAnalytics> {
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
-  // For "All" view, find canonical destination to deduplicate
-  const filterDest = destination ?? (await getCanonicalDestination(workspaceId));
+  // Always use canonical destination to deduplicate multi-dest fan-out
+  const filterDest = await getCanonicalDestination(workspaceId);
 
-  // Query enabled destinations for the tab bar
+  // Query enabled destinations for display
   const enabledDestsQuery = db.eventLog.groupBy({
     by: ["destination"],
     where: { workspaceId },
     _count: true,
   });
 
-  const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns, enabledDests] =
+  const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns, destinationDelivery, enabledDests] =
     await Promise.all([
       queryHealthMetrics(workspaceId, since24h, filterDest),
       queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, filterDest),
@@ -410,6 +445,7 @@ export async function computeDashboardAnalytics(
       queryBillingUsage(userId),
       queryConversionAccuracy(workspaceId, filterDest),
       queryCampaignPerformance(workspaceId, filterDest),
+      queryDestinationDelivery(workspaceId, since24h),
       enabledDestsQuery,
     ]);
 
@@ -417,8 +453,6 @@ export async function computeDashboardAnalytics(
     BILLING_PLANS[billing.plan as keyof typeof BILLING_PLANS];
   const retentionDays = planConfig?.eventLogRetentionDays ?? 7;
 
-  // If user has a display currency preference and it differs from event currency,
-  // the conversion is applied in the API route after calling this function.
   const currency = displayCurrency || revenue.purchaseValue.currency;
 
   return {
@@ -429,9 +463,9 @@ export async function computeDashboardAnalytics(
     retentionDays,
     conversionAccuracy,
     campaigns,
+    destinationDelivery,
     currency,
     enabledDestinations: enabledDests.map((d) => d.destination),
-    activeDestination: destination ?? null,
   };
 }
 

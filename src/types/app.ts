@@ -75,6 +75,14 @@ export interface ConversionAccuracy {
   last30d: ConversionAccuracyPeriod;
 }
 
+export interface DestinationDeliveryRow {
+  destination: string;
+  sent: number;
+  failed: number;
+  total: number;
+  successRate: number; // 0-100 with 1 decimal
+}
+
 export interface CampaignRow {
   utmSource: string;
   utmCampaign: string;
@@ -90,7 +98,7 @@ export interface DashboardAnalytics {
   retentionDays: number;
   conversionAccuracy: ConversionAccuracy;
   campaigns: CampaignRow[];
+  destinationDelivery: DestinationDeliveryRow[];
   currency: string;
   enabledDestinations: string[];
-  activeDestination: string | null;
 }

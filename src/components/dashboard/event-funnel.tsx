@@ -9,8 +9,6 @@ interface EventFunnelProps {
 }
 
 const EVENT_LABELS: Record<string, string> = {
-  PageView: "PageView",
-  ViewContent: "ViewContent",
   AddToCart: "AddToCart",
   InitiateCheckout: "Checkout",
   Purchase: "Purchase",
@@ -55,7 +53,7 @@ export function EventFunnel({ eventBreakdown }: EventFunnelProps) {
     <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
       <CardContent className="p-5">
         <h3 className="text-sm font-semibold text-foreground mb-4">
-          {t("eventFunnel")}
+          {t("conversionFunnel")}
         </h3>
 
         <div className="space-y-3">

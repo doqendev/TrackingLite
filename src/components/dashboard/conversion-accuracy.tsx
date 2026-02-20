@@ -5,17 +5,8 @@ import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ConversionAccuracy } from "@/types/app";
 
-const DESTINATION_LABELS: Record<string, string> = {
-  META: "Meta",
-  GOOGLE_ADS: "Google Ads",
-  TIKTOK: "TikTok",
-  GA4: "GA4",
-  KLAVIYO: "Klaviyo",
-};
-
 interface ConversionAccuracyProps {
   conversionAccuracy: ConversionAccuracy;
-  activeDestination?: string | null;
 }
 
 type TimeRange = "7d" | "30d";
@@ -34,7 +25,7 @@ function getAccuracyBarColor(accuracy: number, total: number): string {
   return "bg-red-500";
 }
 
-export function ConversionAccuracy({ conversionAccuracy, activeDestination }: ConversionAccuracyProps) {
+export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyProps) {
   const [range, setRange] = useState<TimeRange>("7d");
   const t = useTranslations("dashboard");
 
@@ -87,9 +78,7 @@ export function ConversionAccuracy({ conversionAccuracy, activeDestination }: Co
                 {data.accuracy.toFixed(1)}%
               </p>
               <p className="text-sm text-muted-foreground mb-1">
-                {activeDestination
-                  ? t("purchasesDeliveredTo", { destination: DESTINATION_LABELS[activeDestination] ?? activeDestination })
-                  : t("purchasesDelivered")}
+                {t("purchasesDelivered")}
               </p>
             </div>
 

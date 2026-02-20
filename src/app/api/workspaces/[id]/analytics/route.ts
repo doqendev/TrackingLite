@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Destination } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { computeDashboardAnalytics } from "@/lib/analytics";
@@ -8,12 +7,10 @@ import { convertCurrency } from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
 
-const VALID_DESTINATIONS = new Set<string>(Object.values(Destination));
-
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: RouteContext
 ) {
   const session = await auth();
@@ -32,13 +29,6 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Parse destination filter
-  const destParam = request.nextUrl.searchParams.get("destination");
-  let destination: Destination | undefined;
-  if (destParam && VALID_DESTINATIONS.has(destParam)) {
-    destination = destParam as Destination;
-  }
-
   // Get user's display currency preference
   const user = await db.user.findUnique({
     where: { id: session.user.id },
@@ -52,7 +42,6 @@ export async function GET(
       const data = await computeDashboardAnalytics(
         workspace.id,
         session.user!.id!,
-        destination,
         displayCurrency
       );
 
@@ -85,7 +74,6 @@ export async function GET(
 
       return data;
     },
-    destParam,
     displayCurrency
   );
 
