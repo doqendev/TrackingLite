@@ -2,7 +2,6 @@ export function validateEnv() {
   const required: Record<string, string | undefined> = {
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   };
 
