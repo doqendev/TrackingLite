@@ -52,14 +52,16 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       testEventCode || undefined
     );
 
-    // 5. Update EventLog to SENT
-    await db.eventLog.update({
-      where: { id: eventLogId },
-      data: {
-        status: "SENT",
-        metaResponse: response as any,
-      },
-    });
+    // 5. Update EventLog to SENT (skip for fire-and-forget events)
+    if (eventLogId) {
+      await db.eventLog.update({
+        where: { id: eventLogId },
+        data: {
+          status: "SENT",
+          metaResponse: response as any,
+        },
+      });
+    }
 
     // 6. Increment workspace forwarded count
     await db.workspace.update({
@@ -79,18 +81,20 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
         ? error.message
         : "Unknown error";
 
-    await db.eventLog
-      .update({
-        where: { id: eventLogId },
-        data: {
-          status: "FAILED",
-          errorMessage,
-          retryCount: { increment: 1 },
-        },
-      })
-      .catch((dbErr) => {
-        console.error(`[Worker] Failed to update EventLog ${eventLogId}:`, dbErr);
-      });
+    if (eventLogId) {
+      await db.eventLog
+        .update({
+          where: { id: eventLogId },
+          data: {
+            status: "FAILED",
+            errorMessage,
+            retryCount: { increment: 1 },
+          },
+        })
+        .catch((dbErr) => {
+          console.error(`[Worker] Failed to update EventLog ${eventLogId}:`, dbErr);
+        });
+    }
 
     // Re-throw so BullMQ can retry with exponential backoff
     throw error;

@@ -31,13 +31,15 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
 
     if (!klaviyoEvent) {
       // Event type not supported — skip (PageView is skipped at ingest level, but guard here too)
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: {
-          status: "SENT",
-          metaResponse: { skipped: true, reason: "Event type not supported by Klaviyo" } as any,
-        },
-      });
+      if (eventLogId) {
+        await db.eventLog.update({
+          where: { id: eventLogId },
+          data: {
+            status: "SENT",
+            metaResponse: { skipped: true, reason: "Event type not supported by Klaviyo" } as any,
+          },
+        });
+      }
       console.log(
         `[KlaviyoWorker] Job ${job.id} skipped: ${event.eventName} not tracked by Klaviyo`
       );
@@ -47,11 +49,13 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
     // Send to Klaviyo Events API
     const response = await sendToKlaviyo(apiKey, klaviyoEvent);
 
-    // Update EventLog to SENT
-    await db.eventLog.update({
-      where: { id: eventLogId },
-      data: { status: "SENT", metaResponse: response as any },
-    });
+    // Update EventLog to SENT (skip for fire-and-forget events)
+    if (eventLogId) {
+      await db.eventLog.update({
+        where: { id: eventLogId },
+        data: { status: "SENT", metaResponse: response as any },
+      });
+    }
 
     console.log(
       `[KlaviyoWorker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`
@@ -64,21 +68,23 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
         ? error.message
         : "Unknown error";
 
-    await db.eventLog
-      .update({
-        where: { id: eventLogId },
-        data: {
-          status: "FAILED",
-          errorMessage,
-          retryCount: { increment: 1 },
-        },
-      })
-      .catch((dbErr) => {
-        console.error(
-          `[KlaviyoWorker] Failed to update EventLog ${eventLogId}:`,
-          dbErr
-        );
-      });
+    if (eventLogId) {
+      await db.eventLog
+        .update({
+          where: { id: eventLogId },
+          data: {
+            status: "FAILED",
+            errorMessage,
+            retryCount: { increment: 1 },
+          },
+        })
+        .catch((dbErr) => {
+          console.error(
+            `[KlaviyoWorker] Failed to update EventLog ${eventLogId}:`,
+            dbErr
+          );
+        });
+    }
 
     // Re-throw so BullMQ can retry with exponential backoff
     throw error;

@@ -317,7 +317,10 @@ export async function POST(request: NextRequest) {
       return !!dest.credentials[labelField]; // only allow if label is configured (non-empty)
     });
 
-    // 12. Create EventLog entries and queue jobs for each destination
+    // 12. Create EventLog entries (only for conversions) and queue jobs for each destination
+    const CONVERSION_EVENTS = new Set(["AddToCart", "InitiateCheckout", "Purchase"]);
+    const isConversion = CONVERSION_EVENTS.has(payload.eventName);
+
     const eventLogBaseData = {
       workspaceId: workspace.id,
       eventName: payload.eventName as any,
@@ -345,41 +348,48 @@ export async function POST(request: NextRequest) {
       gclid: payload.gclid || null,
     };
 
-    // Create all EventLog entries (one per destination), skip duplicates
-    const eventLogEntries = await Promise.all(
-      finalDestinations.map(async (dest) => {
-        try {
-          return await db.eventLog.create({
-            data: {
-              ...eventLogBaseData,
-              destination: dest.destination as any,
-            },
-          });
-        } catch (err: any) {
-          // P2002 = unique constraint violation (duplicate eventId+destination)
-          if (err?.code === "P2002") {
-            return null;
+    // Create EventLog entries ONLY for conversion events (AddToCart, InitiateCheckout, Purchase)
+    // PageView and ViewContent are fire-and-forget: sent to APIs but not stored
+    let validEntries: Array<{ id: string }> = [];
+    let validDestinations = finalDestinations;
+
+    if (isConversion) {
+      // Create all EventLog entries (one per destination), skip duplicates
+      const eventLogEntries = await Promise.all(
+        finalDestinations.map(async (dest) => {
+          try {
+            return await db.eventLog.create({
+              data: {
+                ...eventLogBaseData,
+                destination: dest.destination as any,
+              },
+            });
+          } catch (err: any) {
+            // P2002 = unique constraint violation (duplicate eventId+destination)
+            if (err?.code === "P2002") {
+              return null;
+            }
+            throw err;
           }
-          throw err;
-        }
-      })
-    );
-
-    // Filter out duplicates (null entries)
-    const validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
-    const validDestinations = finalDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
-
-    if (validEntries.length === 0) {
-      return NextResponse.json(
-        { success: true, eventId: payload.eventId, deduplicated: true },
-        { status: 200, headers: corsHeaders }
+        })
       );
+
+      // Filter out duplicates (null entries)
+      validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
+      validDestinations = finalDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
+
+      if (validEntries.length === 0) {
+        return NextResponse.json(
+          { success: true, eventId: payload.eventId, deduplicated: true },
+          { status: 200, headers: corsHeaders }
+        );
+      }
     }
 
-    // Queue jobs for all non-deduplicated destinations in parallel
+    // Queue jobs for all destinations in parallel
     await Promise.all(
       validDestinations.map((dest, idx) => {
-        const eventLogId = validEntries[idx].id;
+        const eventLogId = isConversion ? validEntries[idx].id : null;
 
         if (dest.destination === "META") {
           // Use existing MetaEventJob format for backward compatibility

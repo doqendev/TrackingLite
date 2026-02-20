@@ -61,6 +61,13 @@ export function normalizeToGA4Event(
     engagement_time_msec: "1",
   };
 
+  // Page view params
+  if (ga4EventName === "page_view") {
+    if (eventData.url) params.page_location = eventData.url;
+    if (eventData.referrer) params.page_referrer = eventData.referrer;
+    return { name: ga4EventName, params };
+  }
+
   // Common ecommerce params
   if (cd.value !== undefined && cd.value !== null) {
     params.value = Number(cd.value);

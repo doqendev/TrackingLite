@@ -19,13 +19,15 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
     const conversionIdTag = credentials.conversionIdTag as string | undefined;
 
     if (!conversionIdEnc || !conversionIdIv || !conversionIdTag) {
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: {
-          status: "FAILED",
-          errorMessage: "Google Ads conversion ID not configured",
-        },
-      });
+      if (eventLogId) {
+        await db.eventLog.update({
+          where: { id: eventLogId },
+          data: {
+            status: "FAILED",
+            errorMessage: "Google Ads conversion ID not configured",
+          },
+        });
+      }
       return;
     }
 
@@ -69,16 +71,18 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
 
     if (!conversionLabel) {
       // Event type has no label configured — skip silently
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: {
-          status: "SENT",
-          metaResponse: {
-            skipped: true,
-            reason: `No conversion label configured for ${event.eventName}`,
-          } as never,
-        },
-      });
+      if (eventLogId) {
+        await db.eventLog.update({
+          where: { id: eventLogId },
+          data: {
+            status: "SENT",
+            metaResponse: {
+              skipped: true,
+              reason: `No conversion label configured for ${event.eventName}`,
+            } as never,
+          },
+        });
+      }
       console.log(
         `[GoogleWorker] Job ${job.id} skipped: no label for ${event.eventName} in workspace ${workspaceId}`
       );
@@ -101,10 +105,12 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
       eventName: event.eventName,
     });
 
-    await db.eventLog.update({
-      where: { id: eventLogId },
-      data: { status: "SENT", metaResponse: response as never },
-    });
+    if (eventLogId) {
+      await db.eventLog.update({
+        where: { id: eventLogId },
+        data: { status: "SENT", metaResponse: response as never },
+      });
+    }
 
     console.log(
       `[GoogleWorker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`
@@ -117,21 +123,23 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
         ? error.message
         : "Unknown error";
 
-    await db.eventLog
-      .update({
-        where: { id: eventLogId },
-        data: {
-          status: "FAILED",
-          errorMessage,
-          retryCount: { increment: 1 },
-        },
-      })
-      .catch((dbErr) => {
-        console.error(
-          `[GoogleWorker] Failed to update EventLog ${eventLogId}:`,
-          dbErr
-        );
-      });
+    if (eventLogId) {
+      await db.eventLog
+        .update({
+          where: { id: eventLogId },
+          data: {
+            status: "FAILED",
+            errorMessage,
+            retryCount: { increment: 1 },
+          },
+        })
+        .catch((dbErr) => {
+          console.error(
+            `[GoogleWorker] Failed to update EventLog ${eventLogId}:`,
+            dbErr
+          );
+        });
+    }
 
     // Re-throw so BullMQ can retry with exponential backoff
     throw error;

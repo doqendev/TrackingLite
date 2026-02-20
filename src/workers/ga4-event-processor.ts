@@ -35,13 +35,15 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
 
     if (!ga4Event) {
       // Event type not supported — skip
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: {
-          status: "SENT",
-          metaResponse: { skipped: true, reason: "Event type not supported" } as any,
-        },
-      });
+      if (eventLogId) {
+        await db.eventLog.update({
+          where: { id: eventLogId },
+          data: {
+            status: "SENT",
+            metaResponse: { skipped: true, reason: "Event type not supported" } as any,
+          },
+        });
+      }
       console.log(
         `[GA4Worker] Job ${job.id} skipped: ${event.eventName} not tracked by GA4`
       );
@@ -59,11 +61,13 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       [ga4Event]
     );
 
-    // Update EventLog to SENT
-    await db.eventLog.update({
-      where: { id: eventLogId },
-      data: { status: "SENT", metaResponse: response as any },
-    });
+    // Update EventLog to SENT (skip for fire-and-forget events)
+    if (eventLogId) {
+      await db.eventLog.update({
+        where: { id: eventLogId },
+        data: { status: "SENT", metaResponse: response as any },
+      });
+    }
 
     console.log(
       `[GA4Worker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`
@@ -76,21 +80,23 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
         ? error.message
         : "Unknown error";
 
-    await db.eventLog
-      .update({
-        where: { id: eventLogId },
-        data: {
-          status: "FAILED",
-          errorMessage,
-          retryCount: { increment: 1 },
-        },
-      })
-      .catch((dbErr) => {
-        console.error(
-          `[GA4Worker] Failed to update EventLog ${eventLogId}:`,
-          dbErr
-        );
-      });
+    if (eventLogId) {
+      await db.eventLog
+        .update({
+          where: { id: eventLogId },
+          data: {
+            status: "FAILED",
+            errorMessage,
+            retryCount: { increment: 1 },
+          },
+        })
+        .catch((dbErr) => {
+          console.error(
+            `[GA4Worker] Failed to update EventLog ${eventLogId}:`,
+            dbErr
+          );
+        });
+    }
 
     // Re-throw so BullMQ can retry with exponential backoff
     throw error;

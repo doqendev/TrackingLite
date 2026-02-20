@@ -109,13 +109,13 @@ export interface MetaEventJob {
     clientIp: string;
     userAgent: string;
   };
-  eventLogId: string;
+  eventLogId: string | null;  // null for fire-and-forget events (PageView, ViewContent)
 }
 
 export interface DestinationEventJob {
   workspaceId: string;
   destination: string;
-  eventLogId: string;
+  eventLogId: string | null;  // null for fire-and-forget events (PageView, ViewContent)
   event: {
     eventName: string;
     eventId: string;
