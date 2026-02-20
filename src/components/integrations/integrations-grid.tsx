@@ -15,6 +15,7 @@ export interface IntegrationWorkspace {
   metaPixelId: string | null;
   metaTestEventCode: string | null;
   hasAccessToken: boolean;
+  enableMeta: boolean;
   // Google Ads
   googleAdsConversionId: string | null;
   googleAdsViewContentLabel: string | null;
@@ -117,6 +118,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [metaTestEventCode, setMetaTestEventCode] = useState(
     workspace.metaTestEventCode ?? ""
   );
+  const [metaEnabled, setMetaEnabled] = useState(workspace.enableMeta);
   const [savingMeta, setSavingMeta] = useState(false);
 
   // Google Ads state
@@ -165,6 +167,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
 
   async function handleToggle(platform: string, enabled: boolean, platformName: string) {
     const fieldMap: Record<string, string> = {
+      meta: "enableMeta",
       google: "enableGoogleAds",
       tiktok: "enableTikTok",
       ga4: "enableGA4",
@@ -189,9 +192,10 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   async function saveMeta() {
     setSavingMeta(true);
     try {
-      const body: Record<string, string | null> = {
+      const body: Record<string, string | boolean | null> = {
         metaPixelId: metaPixelId || null,
         metaTestEventCode: metaTestEventCode || null,
+        enableMeta: metaEnabled,
       };
       if (metaAccessToken) body.metaAccessToken = metaAccessToken;
 
@@ -339,6 +343,15 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <StatusBadge connected={metaConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
+            <Switch
+              checked={metaEnabled}
+              onCheckedChange={(val) => {
+                setMetaEnabled(val);
+                handleToggle("meta", val, "Meta");
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="scale-90"
+            />
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
                 expandedCard === "meta" ? "rotate-180" : ""

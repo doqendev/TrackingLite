@@ -56,6 +56,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       domain: true,
       metaPixelId: true,
       metaAccessTokenEncrypted: true,
+      enableMeta: true,
       enableGoogleAds: true,
       enableTikTok: true,
       enableGA4: true,
@@ -68,7 +69,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   // Check which destinations have credentials configured
-  const hasMetaCredentials = !!(workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
+  const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
   const hasAnyDestination = hasMetaCredentials || workspace.enableGoogleAds || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo;
 
   // Parse destination filter from URL

@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
         metaAccessTokenIv: true,
         metaAccessTokenTag: true,
         metaTestEventCode: true,
+        enableMeta: true,
         // Google Ads fields
         enableGoogleAds: true,
         googleAdsConversionId: true,
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Check that at least one destination has credentials configured
-    const hasMetaCredentials = !!(workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
+    const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
     const hasGoogleAdsCredentials = !!(workspace.enableGoogleAds && workspace.googleAdsConversionId);
     const hasTiktokCredentials = !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
     const hasGA4Credentials = !!(workspace.enableGA4 && workspace.ga4ApiSecretEncrypted);

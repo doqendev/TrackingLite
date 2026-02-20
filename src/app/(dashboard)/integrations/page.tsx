@@ -19,6 +19,7 @@ export default async function IntegrationsPage() {
       metaPixelId: true,
       metaTestEventCode: true,
       metaAccessTokenEncrypted: true,
+      enableMeta: true,
       // Google Ads
       googleAdsConversionId: true,
       googleAdsViewContentLabel: true,
@@ -48,6 +49,7 @@ export default async function IntegrationsPage() {
     metaPixelId: workspace.metaPixelId,
     metaTestEventCode: workspace.metaTestEventCode,
     hasAccessToken: !!workspace.metaAccessTokenEncrypted,
+    enableMeta: workspace.enableMeta,
     // Google Ads
     googleAdsConversionId: workspace.googleAdsConversionId,
     googleAdsViewContentLabel: workspace.googleAdsViewContentLabel,

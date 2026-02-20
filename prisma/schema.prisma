@@ -94,6 +94,7 @@ model Workspace {
   metaAccessTokenIv         String?         // IV for decryption
   metaAccessTokenTag        String?         // Auth tag for decryption
   metaTestEventCode         String?         // For testing in Meta Events Manager
+  enableMeta                Boolean   @default(true)
 
   // Google Ads fields (Conversion ID + per-event labels)
   googleAdsConversionId       String?   // e.g. "11366583402"
