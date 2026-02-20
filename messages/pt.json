@@ -40,7 +40,7 @@
     "nearScaleLimit": "Aproximando-se do limite do Scale. Entre em contato para empresas.",
     "nearLimit": "Próximo do seu limite. Faremos upgrade automático para manter o rastreamento.",
     "trackingStrong": "Rastreamento funcionando bem! Considere fazer upgrade para mais capacidade.",
-    "trackingWorking": "Seu rastreamento está funcionando! {count} {count, plural, one {compra} other {compras}} encaminhadas este mês.",
+    "trackingWorking": "Seu rastreamento está funcionando! {count} {count, plural, one {compra encaminhada} other {compras encaminhadas}} este mês.",
     "addedToCart": "Adicionado ao Carrinho",
     "checkoutValue": "Valor do Checkout",
     "revenueTracked": "Receita Rastreada",
