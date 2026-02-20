@@ -210,6 +210,8 @@
     "faqChangePlansAnswer": "Oui. Vous pouvez passer à un plan supérieur ou inférieur à tout moment depuis le portail de facturation. Les modifications prennent effet immédiatement.",
     "faqRefunds": "Proposez-vous des remboursements ?",
     "faqRefundsAnswer": "Nous ne proposons pas de remboursements pour les mois partiels. Vous pouvez annuler à tout moment et conserver l'accès jusqu'à la fin de votre période de facturation.",
+    "subscriptionSuccess": "Merci pour votre abonnement ! Votre plan a ete mis a jour avec succes. Profitez de vos nouvelles fonctionnalites.",
+    "checkoutCanceled": "Le paiement a ete annule. Aucun frais n'a ete preleve. Vous pouvez vous abonner a tout moment.",
     "starter": "Starter",
     "growth": "Growth",
     "scale": "Scale",

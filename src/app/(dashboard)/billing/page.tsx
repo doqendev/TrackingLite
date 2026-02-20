@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { AlertTriangle, ShoppingCart } from "lucide-react";
+import { AlertTriangle, CheckCircle, ShoppingCart } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +29,16 @@ function formatDate(date: Date): string {
   });
 }
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: { success?: string; canceled?: string };
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  const justSubscribed = searchParams.success === "true";
+  const checkoutCanceled = searchParams.canceled === "true";
 
   const t = await getTranslations("billing");
 
@@ -77,6 +84,24 @@ export default async function BillingPage() {
         <h1 className="text-2xl font-bold text-foreground">{t("title")}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">{t("subtitle")}</p>
       </div>
+
+      {/* Subscription success/canceled alerts */}
+      {justSubscribed && (
+        <Alert className="border-green-500/50 bg-green-500/10">
+          <CheckCircle className="h-4 w-4 text-green-400" />
+          <AlertDescription className="text-green-300">
+            {t("subscriptionSuccess")}
+          </AlertDescription>
+        </Alert>
+      )}
+      {checkoutCanceled && (
+        <Alert className="border-yellow-500/50 bg-yellow-500/10">
+          <AlertTriangle className="h-4 w-4 text-yellow-400" />
+          <AlertDescription className="text-yellow-300">
+            {t("checkoutCanceled")}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Current plan summary card */}
       <Card>

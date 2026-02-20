@@ -210,6 +210,8 @@
     "faqChangePlansAnswer": "Ja. Du kannst jederzeit über das Abrechnungsportal upgraden oder downgraden. Änderungen treten sofort in Kraft.",
     "faqRefunds": "Gibt es Rückerstattungen?",
     "faqRefundsAnswer": "Wir bieten keine Rückerstattungen für anteilige Monate an. Du kannst jederzeit kündigen und behältst den Zugang bis zum Ende deines Abrechnungszeitraums.",
+    "subscriptionSuccess": "Vielen Dank fuer dein Abonnement! Dein Plan wurde erfolgreich aktualisiert. Viel Spass mit den neuen Funktionen.",
+    "checkoutCanceled": "Der Bezahlvorgang wurde abgebrochen. Es wurden keine Kosten erhoben. Du kannst jederzeit abonnieren.",
     "starter": "Starter",
     "growth": "Growth",
     "scale": "Scale",

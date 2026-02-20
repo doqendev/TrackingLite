@@ -210,6 +210,8 @@
     "faqChangePlansAnswer": "Si. Puedes actualizar o reducir tu plan en cualquier momento desde el portal de facturacion. Los cambios tienen efecto de inmediato.",
     "faqRefunds": "Ofrecen reembolsos?",
     "faqRefundsAnswer": "No ofrecemos reembolsos por meses parciales. Puedes cancelar en cualquier momento y mantener el acceso hasta el fin de tu periodo de facturacion.",
+    "subscriptionSuccess": "Gracias por suscribirte! Tu plan ha sido actualizado exitosamente. Disfruta de tus nuevas funciones.",
+    "checkoutCanceled": "El proceso de pago fue cancelado. No se realizaron cargos. Puedes suscribirte en cualquier momento.",
     "starter": "Starter",
     "growth": "Growth",
     "scale": "Scale",

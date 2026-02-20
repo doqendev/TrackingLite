@@ -210,6 +210,8 @@
     "faqChangePlansAnswer": "Sim. Voce pode fazer upgrade ou downgrade a qualquer momento pelo portal de faturamento. As alteracoes entram em vigor imediatamente.",
     "faqRefunds": "Voces oferecem reembolsos?",
     "faqRefundsAnswer": "Nao oferecemos reembolsos por meses parciais. Voce pode cancelar a qualquer momento e manter o acesso ate o fim do periodo de faturamento.",
+    "subscriptionSuccess": "Obrigado por assinar! Seu plano foi atualizado com sucesso. Aproveite seus novos recursos.",
+    "checkoutCanceled": "O checkout foi cancelado. Nenhuma cobranca foi feita. Voce pode assinar a qualquer momento.",
     "starter": "Starter",
     "growth": "Growth",
     "scale": "Scale",

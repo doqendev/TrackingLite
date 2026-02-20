@@ -210,6 +210,8 @@
     "faqChangePlansAnswer": "Si. Puoi eseguire l'upgrade o il downgrade in qualsiasi momento dal portale di fatturazione. Le modifiche hanno effetto immediato.",
     "faqRefunds": "Offrite rimborsi?",
     "faqRefundsAnswer": "Non offriamo rimborsi per mesi parziali. Puoi cancellare in qualsiasi momento e mantenere l'accesso fino alla fine del periodo di fatturazione.",
+    "subscriptionSuccess": "Grazie per l'abbonamento! Il tuo piano e stato aggiornato con successo. Goditi le nuove funzionalita.",
+    "checkoutCanceled": "Il pagamento e stato annullato. Non e stato addebitato nulla. Puoi abbonarti in qualsiasi momento.",
     "starter": "Starter",
     "growth": "Growth",
     "scale": "Scale",

@@ -210,6 +210,8 @@
     "faqChangePlansAnswer": "Yes. You can upgrade or downgrade at any time from the billing portal. Changes take effect immediately.",
     "faqRefunds": "Do you offer refunds?",
     "faqRefundsAnswer": "We do not offer refunds for partial months. You can cancel at any time and keep access until the end of your billing period.",
+    "subscriptionSuccess": "Thank you for subscribing! Your plan has been upgraded successfully. Enjoy your new features.",
+    "checkoutCanceled": "Checkout was canceled. No charges were made. You can subscribe anytime.",
     "starter": "Starter",
     "growth": "Growth",
     "scale": "Scale",
