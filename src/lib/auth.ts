@@ -5,7 +5,6 @@ import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { db } from "./db";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const providers: any[] = [
   Credentials({
     name: "credentials",
