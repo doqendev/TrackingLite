@@ -6,6 +6,8 @@ import { Destination } from "@prisma/client";
 import { computeDashboardAnalytics } from "@/lib/analytics";
 import { getCachedAnalytics } from "@/lib/analytics-cache";
 import { convertCurrency } from "@/lib/currency";
+import { getOrderCount } from "@/lib/billing";
+import { BILLING_PLANS } from "@/lib/constants";
 import { OrderUsageBar } from "@/components/dashboard/order-usage-bar";
 import { RevenueCards } from "@/components/dashboard/revenue-cards";
 import { EventFunnel } from "@/components/dashboard/event-funnel";
@@ -124,6 +126,27 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     destParam,
     displayCurrency
   );
+
+  // Query billing data fresh (not from cache) so plan changes reflect immediately
+  const subscription = await db.subscription.findUnique({
+    where: { userId: session.user.id },
+    select: { plan: true },
+  });
+  const freshPlan = subscription?.plan ?? "FREE";
+  const freshPlanConfig = BILLING_PLANS[freshPlan as keyof typeof BILLING_PLANS];
+  const freshOrdersLimit = freshPlanConfig?.ordersPerMonth ?? 50;
+  let freshOrdersUsed: number;
+  try {
+    freshOrdersUsed = await getOrderCount(session.user.id);
+  } catch {
+    freshOrdersUsed = 0;
+  }
+  analytics.billing = {
+    plan: freshPlan,
+    ordersUsed: freshOrdersUsed,
+    ordersLimit: freshOrdersLimit,
+    usagePercent: Math.min(100, Math.round((freshOrdersUsed / freshOrdersLimit) * 100)),
+  };
 
   const healthConfig = HEALTH_CONFIG[analytics.health.status];
   const enabledDests = analytics.enabledDestinations;
