@@ -362,7 +362,7 @@ export default function OnboardingPage() {
                   type="button"
                   variant="brand"
                   className="w-full"
-                  onClick={() => router.push("/settings")}
+                  onClick={() => router.push("/integrations")}
                 >
                   {t("setupIntegrations")}
                 </Button>

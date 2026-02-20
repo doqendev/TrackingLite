@@ -193,7 +193,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </p>
           </AlertDescription>
           <Button variant="outline" size="sm" className="border-amber-500/20 text-amber-400 hover:bg-amber-500/10 flex-shrink-0" asChild>
-            <Link href="/settings">Configure now</Link>
+            <Link href="/integrations">Configure now</Link>
           </Button>
         </Alert>
       )}
