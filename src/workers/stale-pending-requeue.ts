@@ -161,6 +161,10 @@ async function requeueStalePending(): Promise<void> {
             event: eventData,
             eventLogId: event.id,
           } satisfies MetaEventJob);
+          await db.eventLog.update({
+            where: { id: event.id },
+            data: { status: "RETRYING" },
+          });
           requeued++;
         } else if (event.destination === "GOOGLE_ADS" && workspace.googleAdsConversionIdEncrypted) {
           await getGoogleQueue().add("send-google-event", {
@@ -186,6 +190,10 @@ async function requeueStalePending(): Promise<void> {
               purchaseLabelTag: workspace.googleAdsPurchaseLabelTag || "",
             },
           } satisfies DestinationEventJob);
+          await db.eventLog.update({
+            where: { id: event.id },
+            data: { status: "RETRYING" },
+          });
           requeued++;
         } else if (event.destination === "TIKTOK" && workspace.tiktokAccessTokenEncrypted) {
           await getTiktokQueue().add("send-tiktok-event", {
@@ -200,6 +208,10 @@ async function requeueStalePending(): Promise<void> {
               accessTokenTag: workspace.tiktokAccessTokenTag!,
             },
           } satisfies DestinationEventJob);
+          await db.eventLog.update({
+            where: { id: event.id },
+            data: { status: "RETRYING" },
+          });
           requeued++;
         } else if (event.destination === "GA4" && workspace.ga4ApiSecretEncrypted) {
           await getGA4Queue().add("send-ga4-event", {
@@ -214,6 +226,10 @@ async function requeueStalePending(): Promise<void> {
               apiSecretTag: workspace.ga4ApiSecretTag!,
             },
           } satisfies DestinationEventJob);
+          await db.eventLog.update({
+            where: { id: event.id },
+            data: { status: "RETRYING" },
+          });
           requeued++;
         } else if (event.destination === "KLAVIYO" && workspace.klaviyoApiKeyEncrypted) {
           await getKlaviyoQueue().add("send-klaviyo-event", {
@@ -227,6 +243,10 @@ async function requeueStalePending(): Promise<void> {
               apiKeyTag: workspace.klaviyoApiKeyTag!,
             },
           } satisfies DestinationEventJob);
+          await db.eventLog.update({
+            where: { id: event.id },
+            data: { status: "RETRYING" },
+          });
           requeued++;
         } else {
           // No credentials for this destination

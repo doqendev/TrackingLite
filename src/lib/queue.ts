@@ -125,6 +125,7 @@ export interface DestinationEventJob {
     fbp?: string | null;
     fbc?: string | null;
     ttclid?: string | null;
+    gclid?: string | null;
     userData: Record<string, unknown>;
     customData: Record<string, unknown>;
     clientIp: string;

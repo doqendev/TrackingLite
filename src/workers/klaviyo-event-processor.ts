@@ -87,6 +87,7 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
 
 const connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
   maxRetriesPerRequest: null,
+  lazyConnect: true,
 });
 
 export const klaviyoWorker = new Worker<DestinationEventJob>(

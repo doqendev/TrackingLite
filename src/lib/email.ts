@@ -13,6 +13,14 @@ function getResend(): Resend {
 
 const FROM_EMAIL = process.env.EMAIL_FROM || "Track Clear <noreply@trackclear.io>";
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export type AlertType =
   | "tracking_down"
   | "high_error_rate"
@@ -64,7 +72,7 @@ function buildAlertBody(alertType: AlertType, details: AlertDetails): string {
           Tracking health degraded
         </h2>
         <p style="font-size: 15px; color: #333; line-height: 1.6;">
-          The workspace <strong>${details.workspaceName}</strong> has a success rate of
+          The workspace <strong>${escapeHtml(details.workspaceName)}</strong> has a success rate of
           <strong>${details.successRate ?? 0}%</strong> over the last hour, which is below the
           80% threshold.
         </p>
@@ -81,7 +89,7 @@ function buildAlertBody(alertType: AlertType, details: AlertDetails): string {
           High error rate detected
         </h2>
         <p style="font-size: 15px; color: #333; line-height: 1.6;">
-          The workspace <strong>${details.workspaceName}</strong> has an error rate of
+          The workspace <strong>${escapeHtml(details.workspaceName)}</strong> has an error rate of
           <strong>${details.errorRate ?? 0}%</strong> over the last hour, exceeding the 10%
           threshold.
         </p>
@@ -97,7 +105,7 @@ function buildAlertBody(alertType: AlertType, details: AlertDetails): string {
           Approaching order limit
         </h2>
         <p style="font-size: 15px; color: #333; line-height: 1.6;">
-          The workspace <strong>${details.workspaceName}</strong> has used
+          The workspace <strong>${escapeHtml(details.workspaceName)}</strong> has used
           <strong>${details.ordersUsed ?? 0}</strong> of
           <strong>${details.ordersLimit ?? 0}</strong> orders this month
           (<strong>${details.usagePercent ?? 0}%</strong>).
@@ -115,7 +123,7 @@ function buildAlertBody(alertType: AlertType, details: AlertDetails): string {
           Order limit reached
         </h2>
         <p style="font-size: 15px; color: #333; line-height: 1.6;">
-          The workspace <strong>${details.workspaceName}</strong> has reached its monthly order
+          The workspace <strong>${escapeHtml(details.workspaceName)}</strong> has reached its monthly order
           limit of <strong>${details.ordersLimit ?? 0}</strong> orders.
         </p>
         <p style="font-size: 15px; color: #333; line-height: 1.6; margin-top: 12px;">
@@ -173,7 +181,7 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string): P
         </p>
 
         <div style="margin: 32px 0;">
-          <a href="${resetUrl}"
+          <a href="${escapeHtml(resetUrl)}"
              style="display: inline-block; background-color: #14b8a6; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
             Reset Password
           </a>

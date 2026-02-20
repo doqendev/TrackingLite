@@ -39,44 +39,64 @@ function getQueue(): Queue {
 async function runEventLogCleanup(): Promise<void> {
   console.log("[Cleanup] Starting event log retention cleanup...");
 
-  // Get all active workspaces with their user's plan
+  // Single query: fetch all active workspaces with their owner's subscription plan
   const workspaces = await db.workspace.findMany({
     where: { isActive: true },
-    select: { id: true, userId: true },
+    select: {
+      id: true,
+      userId: true,
+      user: {
+        select: {
+          subscription: {
+            select: { plan: true },
+          },
+        },
+      },
+    },
   });
 
   console.log(`[Cleanup] Checking retention for ${workspaces.length} active workspace(s)...`);
 
-  let totalDeleted = 0;
+  // Group workspace IDs by retention period
+  const freeWorkspaceIds: string[] = [];
+  const paidWorkspaceIds: string[] = [];
 
   for (const ws of workspaces) {
-    try {
-      const sub = await db.subscription.findUnique({
-        where: { userId: ws.userId },
-        select: { plan: true },
-      });
-
-      const plan = sub?.plan || "FREE";
-      // FREE=7 days, paid=30 days
-      const retentionDays = plan === "FREE" ? 7 : 30;
-      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-
-      const deleted = await db.eventLog.deleteMany({
-        where: {
-          workspaceId: ws.id,
-          createdAt: { lt: cutoff },
-        },
-      });
-
-      if (deleted.count > 0) {
-        console.log(
-          `[Cleanup] Deleted ${deleted.count} events for workspace ${ws.id} (>${retentionDays}d old)`
-        );
-        totalDeleted += deleted.count;
-      }
-    } catch (err) {
-      console.error(`[Cleanup] Failed to clean up events for workspace ${ws.id}:`, err);
+    const plan = ws.user?.subscription?.plan ?? "FREE";
+    if (plan === "FREE") {
+      freeWorkspaceIds.push(ws.id);
+    } else {
+      paidWorkspaceIds.push(ws.id);
     }
+  }
+
+  const freeCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const paidCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  let totalDeleted = 0;
+
+  if (freeWorkspaceIds.length > 0) {
+    const result = await db.eventLog.deleteMany({
+      where: { workspaceId: { in: freeWorkspaceIds }, createdAt: { lt: freeCutoff } },
+    });
+    if (result.count > 0) {
+      console.log(
+        `[Cleanup] Deleted ${result.count} event(s) from ${freeWorkspaceIds.length} FREE workspace(s) (>7d old)`
+      );
+    }
+    totalDeleted += result.count;
+  }
+
+  if (paidWorkspaceIds.length > 0) {
+    const result = await db.eventLog.deleteMany({
+      where: { workspaceId: { in: paidWorkspaceIds }, createdAt: { lt: paidCutoff } },
+    });
+    if (result.count > 0) {
+      console.log(
+        `[Cleanup] Deleted ${result.count} event(s) from ${paidWorkspaceIds.length} paid workspace(s) (>30d old)`
+      );
+    }
+    totalDeleted += result.count;
   }
 
   console.log(`[Cleanup] Run complete. ${totalDeleted} total event(s) deleted.`);

@@ -100,6 +100,7 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
 // Create worker
 const connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
   maxRetriesPerRequest: null,
+  lazyConnect: true,
 });
 
 export const worker = new Worker<MetaEventJob>(

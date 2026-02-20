@@ -4,6 +4,15 @@ import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import { PLAN_PRICE_MAP } from "@/lib/constants";
 import { z } from "zod";
+import IORedis from "ioredis";
+
+let redis: IORedis | null = null;
+function getRedis(): IORedis {
+  if (!redis) {
+    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", { lazyConnect: true });
+  }
+  return redis;
+}
 
 const CheckoutSchema = z.object({
   plan: z.enum(["STARTER", "GROWTH", "SCALE"]),
@@ -15,6 +24,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const lockKey = `checkout-lock:${session.user.id}`;
+  const acquired = await getRedis().set(lockKey, "1", "EX", 30, "NX").catch(() => "OK");
+  if (!acquired) {
+    return NextResponse.json({ error: "Checkout already in progress" }, { status: 429 });
+  }
+
   try {
     const body = await request.json();
     const { plan } = CheckoutSchema.parse(body);
@@ -23,33 +38,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Plan not configured. Set STRIPE_*_PRICE_ID env vars." }, { status: 500 });
     }
 
-    // Get or create Stripe customer
-    let subscription = await db.subscription.findUnique({
+    // Find existing subscription to check for an existing Stripe customer
+    const existingSubscription = await db.subscription.findUnique({
       where: { userId: session.user.id },
     });
 
     let customerId: string;
-    if (subscription?.stripeCustomerId) {
-      customerId = subscription.stripeCustomerId;
+    if (existingSubscription?.stripeCustomerId) {
+      customerId = existingSubscription.stripeCustomerId;
     } else {
       const customer = await stripe.customers.create({
         email: session.user.email!,
         metadata: { userId: session.user.id },
       });
       customerId = customer.id;
-
-      // Create subscription record with FREE plan
-      if (!subscription) {
-        await db.subscription.create({
-          data: {
-            userId: session.user.id,
-            stripeCustomerId: customerId,
-            plan: "FREE",
-            status: "ACTIVE",
-          },
-        });
-      }
     }
+
+    // Atomically create-or-update the subscription record with the stripeCustomerId
+    await db.subscription.upsert({
+      where: { userId: session.user.id },
+      create: {
+        userId: session.user.id,
+        stripeCustomerId: customerId,
+        plan: "FREE",
+        status: "ACTIVE",
+      },
+      update: {
+        stripeCustomerId: customerId,
+      },
+    });
 
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -68,5 +85,7 @@ export async function POST(request: NextRequest) {
     }
     console.error("[Stripe Checkout] Error:", error);
     return NextResponse.json({ error: "Failed to create checkout" }, { status: 500 });
+  } finally {
+    await getRedis().del(lockKey).catch(() => null);
   }
 }

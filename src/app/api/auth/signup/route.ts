@@ -19,9 +19,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, password } = SignupSchema.parse(body);
+    const { name, email: rawEmail, password } = SignupSchema.parse(body);
+    const normalizedEmail = rawEmail.toLowerCase().trim();
 
-    const existingUser = await db.user.findUnique({ where: { email } });
+    const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
       return NextResponse.json({ error: "Email already registered" }, { status: 409 });
     }
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hash(password, 12);
 
     const user = await db.user.create({
-      data: { name, email, hashedPassword },
+      data: { name, email: normalizedEmail, hashedPassword },
     });
 
     return NextResponse.json(

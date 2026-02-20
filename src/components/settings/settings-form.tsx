@@ -21,7 +21,6 @@ interface Workspace {
   enableAddToCart: boolean;
   enableInitiateCheckout: boolean;
   enablePurchase: boolean;
-  apiKey: string;
 }
 
 interface UserPreferences {

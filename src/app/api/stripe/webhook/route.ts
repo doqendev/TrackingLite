@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import Stripe from "stripe";
+import IORedis from "ioredis";
+
+let redis: IORedis | null = null;
+function getRedis(): IORedis {
+  if (!redis) {
+    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", { lazyConnect: true });
+  }
+  return redis;
+}
 
 function priceIdToPlan(priceId: string | undefined): "STARTER" | "GROWTH" | "SCALE" {
   if (priceId === process.env.STRIPE_SCALE_PRICE_ID) return "SCALE";
@@ -30,6 +39,18 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("[Stripe Webhook] Invalid signature:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  try {
+    const r = getRedis();
+    const dedupeKey = `stripe-webhook:${event.id}`;
+    const alreadyProcessed = await r.set(dedupeKey, "1", "EX", 172800, "NX"); // 48h TTL, NX = only if not exists
+    if (!alreadyProcessed) {
+      // Already processed this event
+      return NextResponse.json({ received: true });
+    }
+  } catch (redisErr) {
+    console.warn("[Stripe Webhook] Redis idempotency check failed, processing anyway:", redisErr);
   }
 
   try {

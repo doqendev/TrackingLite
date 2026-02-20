@@ -151,7 +151,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Parse and validate payload (need eventName before billing check)
-    const body = await request.json();
+    const contentLength = parseInt(request.headers.get("content-length") || "0");
+    if (contentLength > 102400) { // 100KB max
+      return NextResponse.json({ error: "Payload too large" }, { status: 413, headers: corsHeaders });
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400, headers: corsHeaders });
+    }
     const payload = IngestPayloadSchema.parse(body);
 
     // 6. Check order limits (only Purchase events count; others are always free)
@@ -185,9 +195,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. Extract IP and User-Agent from request
-    const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-                     request.headers.get("x-real-ip") ||
-                     "unknown";
+    // Validate IP format and truncate to 45 chars (max IPv6 length)
+    const clientIp = (request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown").slice(0, 45);
     const userAgent = request.headers.get("user-agent") || "";
 
     // 10. Extract monetary fields from customData
@@ -397,6 +406,7 @@ export async function POST(request: NextRequest) {
               fbp: payload.fbp,
               fbc: payload.fbc,
               ttclid: payload.ttclid,
+              gclid: payload.gclid || null,
               userData: payload.userData,
               customData: payload.customData,
               clientIp,

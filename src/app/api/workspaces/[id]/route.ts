@@ -17,6 +17,7 @@ const UpdateWorkspaceSchema = z.object({
   enableAddToCart: z.boolean().optional(),
   enableInitiateCheckout: z.boolean().optional(),
   enablePurchase: z.boolean().optional(),
+  isActive: z.boolean().optional(),
   // Google Ads
   googleAdsConversionId: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid Conversion ID format").optional().nullable(),
   googleAdsViewContentLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),

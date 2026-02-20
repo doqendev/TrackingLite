@@ -23,7 +23,6 @@ export default async function SettingsPage() {
         enableAddToCart: true,
         enableInitiateCheckout: true,
         enablePurchase: true,
-        apiKey: true,
         isActive: true,
       },
     }),
@@ -43,7 +42,6 @@ export default async function SettingsPage() {
     enableAddToCart: workspace.enableAddToCart,
     enableInitiateCheckout: workspace.enableInitiateCheckout,
     enablePurchase: workspace.enablePurchase,
-    apiKey: workspace.apiKey,
   };
 
   const userPreferences = {

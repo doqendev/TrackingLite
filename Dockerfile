@@ -26,4 +26,4 @@ ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
 ENV NODE_OPTIONS="--max-old-space-size=512"
 
-CMD ["sh", "-c", "pnpm prisma db push --accept-data-loss && node .next/standalone/server.js"]
+CMD ["sh", "-c", "pnpm prisma db push && node .next/standalone/server.js"]

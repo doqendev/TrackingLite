@@ -15,8 +15,9 @@ const providers: any[] = [
     },
     async authorize(credentials) {
       if (!credentials?.email || !credentials?.password) return null;
+      const normalizedEmail = (credentials.email as string).toLowerCase().trim();
       const user = await db.user.findUnique({
-        where: { email: credentials.email as string },
+        where: { email: normalizedEmail },
       });
       if (!user || !user.hashedPassword) return null;
       const isValid = await compare(credentials.password as string, user.hashedPassword);

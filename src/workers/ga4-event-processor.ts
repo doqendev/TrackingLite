@@ -99,6 +99,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
 
 const connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
   maxRetriesPerRequest: null,
+  lazyConnect: true,
 });
 
 export const ga4Worker = new Worker<DestinationEventJob>(

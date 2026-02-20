@@ -89,9 +89,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
     const value = cd.value !== undefined && cd.value !== null ? Number(cd.value) : undefined;
     const currency = cd.currency ? String(cd.currency) : undefined;
     const orderId = cd.orderId ? String(cd.orderId) : undefined;
-    // gclid is stored in customData by the ingest route via the EventLog gclid field;
-    // the DestinationEventJob event shape does not carry it directly, so read from customData
-    const gclid = cd.gclid ? String(cd.gclid) : undefined;
+    const gclid = event.gclid ? String(event.gclid) : undefined;
 
     const response = await sendGoogleAdsConversion({
       conversionId,
@@ -142,6 +140,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
 
 const connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
   maxRetriesPerRequest: null,
+  lazyConnect: true,
 });
 
 export const googleWorker = new Worker<DestinationEventJob>(
