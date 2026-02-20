@@ -2,28 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Check, Copy, Zap, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 
-const STEPS = ["Workspace & Meta", "Install Snippet", "Verify"] as const;
 type Step = 0 | 1 | 2;
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;
 
+const PLATFORMS = [
+  { key: "meta", color: "bg-blue-500", label: "Meta", descKey: "metaDescription" as const },
+  { key: "google", color: "bg-amber-500", label: "Google Ads", descKey: "googleDescription" as const },
+  { key: "tiktok", color: "bg-pink-500", label: "TikTok", descKey: "tiktokDescription" as const },
+  { key: "ga4", color: "bg-orange-500", label: "GA4", descKey: "ga4Description" as const },
+  { key: "klaviyo", color: "bg-emerald-500", label: "Klaviyo", descKey: "klaviyoDescription" as const },
+] as const;
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const t = useTranslations("onboarding");
+
+  const STEPS = [t("step1"), t("step2"), t("step3")] as const;
+
   const [step, setStep] = useState<Step>(0);
 
   // Step 0 state
   const [workspaceName, setWorkspaceName] = useState("");
   const [storeUrl, setStoreUrl] = useState("");
-  const [pixelId, setPixelId] = useState("");
-  const [accessToken, setAccessToken] = useState("");
   const [createdWorkspace, setCreatedWorkspace] = useState<{ id: string; apiKey: string } | null>(null);
   const [savingStep0, setSavingStep0] = useState(false);
   const [step0Error, setStep0Error] = useState("");
@@ -32,19 +42,14 @@ export default function OnboardingPage() {
   const [snippet, setSnippet] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Step 2 state
-  const [verifying, setVerifying] = useState(false);
-  const [verifyResult, setVerifyResult] = useState<"success" | "failure" | null>(null);
-  const [verifyMessage, setVerifyMessage] = useState("");
-
   async function handleCreateWorkspace(e: React.FormEvent) {
     e.preventDefault();
     if (!workspaceName.trim()) {
-      setStep0Error("Workspace name is required.");
+      setStep0Error(t("workspaceNameRequired"));
       return;
     }
     if (!storeUrl.trim()) {
-      setStep0Error("Store URL is required.");
+      setStep0Error(t("storeUrlRequired"));
       return;
     }
     setSavingStep0(true);
@@ -56,8 +61,6 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           name: workspaceName.trim(),
           domain: storeUrl.trim() || undefined,
-          metaPixelId: pixelId.trim() || undefined,
-          metaAccessToken: accessToken.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -73,7 +76,7 @@ export default function OnboardingPage() {
         const snippetData = await snippetRes.json();
         setSnippet(snippetData.snippet);
       } else {
-        setSnippet("// Failed to load snippet. Please check Settings after setup.");
+        setSnippet(t("failedSnippet"));
       }
 
       setStep(1);
@@ -89,47 +92,6 @@ export default function OnboardingPage() {
     await navigator.clipboard.writeText(snippet).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function handleSendTestEvent() {
-    if (!createdWorkspace) return;
-    setVerifying(true);
-    setVerifyResult(null);
-    setVerifyMessage("");
-    try {
-      const res = await fetch("/api/events/ingest", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-TL-API-Key": createdWorkspace.apiKey,
-        },
-        body: JSON.stringify({
-          eventName: "PageView",
-          eventId: crypto.randomUUID(),
-          timestamp: Date.now(),
-          url: window.location.href,
-          referrer: "",
-          consent: { analyticsAllowed: true, marketingAllowed: true },
-        }),
-      });
-      if (res.ok) {
-        setVerifyResult("success");
-        setVerifyMessage("Test event received! Your snippet is working correctly.");
-      } else {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        setVerifyResult("failure");
-        setVerifyMessage(body.error ?? "Event not received. Check your snippet installation.");
-      }
-    } catch {
-      setVerifyResult("failure");
-      setVerifyMessage("Could not reach the ingest endpoint. Make sure the app is deployed.");
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  function handleFinish() {
-    router.push("/dashboard");
   }
 
   // Render as a full-screen overlay that covers the dashboard sidebar layout.
@@ -172,7 +134,7 @@ export default function OnboardingPage() {
               </div>
               <span
                 className={`text-xs font-medium ${
-                  i === step ? "text-brand-500" : i < step ? "text-muted-foreground" : "text-muted-foreground"
+                  i === step ? "text-brand-500" : "text-muted-foreground"
                 }`}
               >
                 {label}
@@ -184,70 +146,42 @@ export default function OnboardingPage() {
 
       {/* Step content */}
       <div className="w-full max-w-xl relative z-10">
-        {/* Step 0 — Workspace & Meta credentials */}
+        {/* Step 0 — Create Workspace */}
         {step === 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Create your workspace</CardTitle>
-              <CardDescription>
-                Set up your store and optionally add Meta credentials. You can add them later in Settings.
-              </CardDescription>
+              <CardTitle className="text-xl">{t("createTitle")}</CardTitle>
+              <CardDescription>{t("createDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateWorkspace} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="workspaceName">
-                    Workspace Name <span className="text-red-500">*</span>
+                  <Label htmlFor="onb-workspace-name">
+                    {t("workspaceName")} <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="workspaceName"
+                    id="onb-workspace-name"
                     type="text"
+                    autoComplete="organization"
                     value={workspaceName}
                     onChange={(e) => setWorkspaceName(e.target.value)}
-                    placeholder="My Shopify Store"
+                    placeholder={t("workspaceNamePlaceholder")}
                     required
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="storeUrl">
-                    Store URL
+                  <Label htmlFor="onb-store-url">
+                    {t("storeUrl")} <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="storeUrl"
+                    id="onb-store-url"
                     type="text"
+                    autoComplete="url"
                     value={storeUrl}
                     onChange={(e) => setStoreUrl(e.target.value)}
-                    placeholder="mystore.myshopify.com"
+                    placeholder={t("storeUrlPlaceholder")}
                     required
                   />
-                </div>
-
-                <div className="border-t border-border pt-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    Meta CAPI (optional — add later in Settings)
-                  </p>
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="pixelId">Meta Pixel ID</Label>
-                      <Input
-                        id="pixelId"
-                        type="text"
-                        value={pixelId}
-                        onChange={(e) => setPixelId(e.target.value)}
-                        placeholder="123456789012345"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="accessToken">Access Token</Label>
-                      <Input
-                        id="accessToken"
-                        type="password"
-                        value={accessToken}
-                        onChange={(e) => setAccessToken(e.target.value)}
-                        placeholder="EAAxxxxx..."
-                      />
-                    </div>
-                  </div>
                 </div>
 
                 {step0Error && (
@@ -262,14 +196,14 @@ export default function OnboardingPage() {
                     variant="ghost"
                     onClick={() => router.push("/")}
                   >
-                    Back to home
+                    {t("backToHome")}
                   </Button>
                   <Button
                     type="submit"
                     variant="brand"
                     disabled={savingStep0}
                   >
-                    {savingStep0 ? "Creating..." : "Continue"}
+                    {savingStep0 ? t("creating") : t("continue")}
                   </Button>
                 </div>
               </form>
@@ -281,17 +215,15 @@ export default function OnboardingPage() {
         {step === 1 && createdWorkspace && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Install the tracking snippet</CardTitle>
-              <CardDescription>
-                Go to Shopify Admin &gt; Settings &gt; Customer Events &gt; Add Custom Pixel, then paste the snippet above.
-              </CardDescription>
+              <CardTitle className="text-xl">{t("installTitle")}</CardTitle>
+              <CardDescription>{t("installDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
                 <div className="relative">
                   <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
                     <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
-                      {snippet || "Loading snippet..."}
+                      {snippet || t("loadingSnippet")}
                     </pre>
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pt-12 pb-3 px-4 rounded-b-lg">
                       <Button
@@ -303,12 +235,12 @@ export default function OnboardingPage() {
                         {copied ? (
                           <>
                             <Check className="h-4 w-4 mr-2" />
-                            Copied to clipboard!
+                            {t("copiedSnippet")}
                           </>
                         ) : (
                           <>
                             <Copy className="h-4 w-4 mr-2" />
-                            Copy Snippet Code
+                            {t("copySnippet")}
                           </>
                         )}
                       </Button>
@@ -319,18 +251,18 @@ export default function OnboardingPage() {
 
               <Alert className="border-brand-500/20 bg-brand-500/10">
                 <AlertDescription>
-                  <p className="text-sm font-semibold text-brand-400 mb-2">Shopify Installation Steps</p>
+                  <p className="text-sm font-semibold text-brand-400 mb-2">{t("shopifySteps")}</p>
                   <ol className="list-decimal list-inside space-y-1.5 text-sm text-brand-300">
-                    <li>Go to <strong>Settings &rarr; Customer Events</strong> in your Shopify admin</li>
-                    <li>Click <strong>Add Custom Pixel</strong></li>
-                    <li>Give it a name (e.g. &quot;Track Clear&quot;) and paste the snippet above</li>
-                    <li>Click <strong>Save &amp; Connect</strong></li>
+                    <li>{t("shopifyStep1")}</li>
+                    <li>{t("shopifyStep2")}</li>
+                    <li>{t("shopifyStep3")}</li>
+                    <li>{t("shopifyStep4")}</li>
                   </ol>
                 </AlertDescription>
               </Alert>
 
               <div>
-                <p className="text-sm font-medium text-foreground mb-2">Events that will be tracked:</p>
+                <p className="text-sm font-medium text-foreground mb-2">{t("trackedEvents")}</p>
                 <div className="flex flex-wrap gap-2">
                   {EVENT_NAMES.map((name) => (
                     <Badge key={name} variant="secondary">
@@ -346,91 +278,63 @@ export default function OnboardingPage() {
                   variant="ghost"
                   onClick={() => setStep(2)}
                 >
-                  Skip for now
+                  {t("skipForNow")}
                 </Button>
                 <Button
                   type="button"
                   variant="brand"
                   onClick={() => setStep(2)}
                 >
-                  Continue to verify
+                  {t("continue")}
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 2 — Verify */}
-        {step === 2 && createdWorkspace && (
+        {/* Step 2 — Connect Platforms */}
+        {step === 2 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Verify your setup</CardTitle>
-              <CardDescription>
-                Send a test event to confirm everything is working end-to-end.
-              </CardDescription>
+              <CardTitle className="text-xl">{t("connectTitle")}</CardTitle>
+              <CardDescription>{t("connectDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <Card className="bg-muted shadow-none">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Your API Key</p>
-                  <code className="text-sm font-mono text-foreground break-all">{createdWorkspace.apiKey}</code>
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {PLATFORMS.map((platform) => (
+                  <div
+                    key={platform.key}
+                    className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3"
+                  >
+                    <div className={`h-8 w-8 flex-shrink-0 rounded-md ${platform.color} flex items-center justify-center`}>
+                      <span className="text-xs font-bold text-white">
+                        {platform.label.charAt(0)}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground leading-tight">{platform.label}</p>
+                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">{t(platform.descKey)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-              <Button
-                type="button"
-                variant="brand"
-                className="w-full"
-                onClick={handleSendTestEvent}
-                disabled={verifying}
-              >
-                {verifying ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Sending test event...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4" />
-                    Send Test Event
-                  </>
-                )}
-              </Button>
-
-              {verifyResult === "success" && (
-                <Alert className="border-green-500/20 bg-green-500/10 shadow-sm shadow-green-500/10">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
-                  <AlertDescription className="text-green-400">
-                    <p className="font-semibold">It&apos;s working!</p>
-                    <p className="mt-0.5">{verifyMessage}</p>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {verifyResult === "failure" && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-5 w-5" />
-                  <AlertDescription>
-                    <p className="font-semibold">Something went wrong</p>
-                    <p className="mt-0.5">{verifyMessage}</p>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="flex items-center justify-between pt-2 border-t border-border">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleFinish}
-                >
-                  Skip for now
-                </Button>
+              <div className="flex flex-col gap-3 pt-2 border-t border-border">
                 <Button
                   type="button"
                   variant="brand"
-                  onClick={handleFinish}
+                  className="w-full"
+                  onClick={() => router.push("/settings")}
                 >
-                  Go to Dashboard
+                  {t("setupIntegrations")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => router.push("/dashboard")}
+                >
+                  {t("goToDashboard")}
                 </Button>
               </div>
             </CardContent>
