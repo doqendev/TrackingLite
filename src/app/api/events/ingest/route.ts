@@ -303,6 +303,20 @@ export async function POST(request: NextRequest) {
       return map[payload.eventName as keyof typeof map] !== null;
     });
 
+    // For Google Ads, also check that the per-event label is configured
+    const EVENT_LABEL_FIELD_MAP: Record<string, string> = {
+      AddToCart: "addToCartLabel",
+      InitiateCheckout: "checkoutLabel",
+      Purchase: "purchaseLabel",
+    };
+
+    const finalDestinations = filteredDestinations.filter((dest) => {
+      if (dest.destination !== "GOOGLE_ADS") return true;
+      const labelField = EVENT_LABEL_FIELD_MAP[payload.eventName];
+      if (!labelField) return true; // event type not in map, allow through
+      return !!dest.credentials[labelField]; // only allow if label is configured (non-empty)
+    });
+
     // 12. Create EventLog entries and queue jobs for each destination
     const eventLogBaseData = {
       workspaceId: workspace.id,
@@ -333,7 +347,7 @@ export async function POST(request: NextRequest) {
 
     // Create all EventLog entries (one per destination), skip duplicates
     const eventLogEntries = await Promise.all(
-      filteredDestinations.map(async (dest) => {
+      finalDestinations.map(async (dest) => {
         try {
           return await db.eventLog.create({
             data: {
@@ -353,7 +367,7 @@ export async function POST(request: NextRequest) {
 
     // Filter out duplicates (null entries)
     const validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
-    const validDestinations = filteredDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
+    const validDestinations = finalDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
 
     if (validEntries.length === 0) {
       return NextResponse.json(

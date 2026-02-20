@@ -16,7 +16,7 @@ export const DESTINATION_EVENT_MAP = {
   },
   GOOGLE_ADS: {
     PageView: null, // not tracked
-    ViewContent: "view_item",
+    ViewContent: null, // not tracked
     AddToCart: "add_to_cart",
     InitiateCheckout: "begin_checkout",
     Purchase: "purchase",

@@ -453,7 +453,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="google-view-content-label" className="text-xs text-muted-foreground">
-                      Page View Label <span className="text-muted-foreground/60">(product page views)</span>
+                      View Content Label <span className="text-muted-foreground/60">(product page views)</span>
                     </Label>
                     {workspace.hasGoogleAdsViewContentLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
                   </div>
