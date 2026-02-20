@@ -46,6 +46,7 @@ const IngestPayloadSchema = z.object({
     countryCode: z.string().nullable().optional(),
   }).optional().default({}),
   customData: z.record(z.unknown()).optional().default({}),
+  onlyDestinations: z.array(z.string()).optional(),
 });
 
 // CORS headers for cross-origin snippet requests
@@ -317,6 +318,11 @@ export async function POST(request: NextRequest) {
       return !!dest.credentials[labelField]; // only allow if label is configured (non-empty)
     });
 
+    // Filter to specific destinations if requested (used by checkout_contact_info_submitted for Klaviyo-only)
+    const targetDestinations = payload.onlyDestinations
+      ? finalDestinations.filter((d) => payload.onlyDestinations!.includes(d.destination))
+      : finalDestinations;
+
     // 12. Create EventLog entries (only for conversions) and queue jobs for each destination
     const CONVERSION_EVENTS = new Set(["AddToCart", "InitiateCheckout", "Purchase"]);
     const isConversion = CONVERSION_EVENTS.has(payload.eventName);
@@ -351,12 +357,12 @@ export async function POST(request: NextRequest) {
     // Create EventLog entries ONLY for conversion events (AddToCart, InitiateCheckout, Purchase)
     // PageView and ViewContent are fire-and-forget: sent to APIs but not stored
     let validEntries: Array<{ id: string }> = [];
-    let validDestinations = finalDestinations;
+    let validDestinations = targetDestinations;
 
     if (isConversion) {
       // Create all EventLog entries (one per destination), skip duplicates
       const eventLogEntries = await Promise.all(
-        finalDestinations.map(async (dest) => {
+        targetDestinations.map(async (dest) => {
           try {
             return await db.eventLog.create({
               data: {
@@ -376,7 +382,7 @@ export async function POST(request: NextRequest) {
 
       // Filter out duplicates (null entries)
       validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
-      validDestinations = finalDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
+      validDestinations = targetDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
 
       if (validEntries.length === 0) {
         return NextResponse.json(
