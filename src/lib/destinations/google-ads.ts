@@ -31,38 +31,48 @@ export async function sendGoogleAdsConversion(params: {
   gclid?: string;
   eventName?: string;
 }): Promise<unknown> {
-  const { conversionId, conversionLabel, value, currency, orderId, gclid, eventName } = params;
+  const { conversionLabel, value, currency, orderId, gclid, eventName } = params;
 
-  const url = `https://www.googleadservices.com/pagead/conversion/${conversionId}/`;
+  // Strip AW- prefix if present (users often copy the full tag format)
+  const numericId = params.conversionId.replace(/^AW-/i, "");
 
-  // Build form data
-  const formData = new URLSearchParams();
-  formData.append("label", conversionLabel);
-  formData.append("fmt", "3"); // suppress redirect
-  if (value !== undefined) formData.append("value", String(value));
-  if (currency) formData.append("currency_code", currency);
-  if (orderId) formData.append("oid", orderId);
-  if (gclid) formData.append("gclid", gclid);
+  const url = new URL(`https://www.googleadservices.com/pagead/conversion/${encodeURIComponent(numericId)}/`);
+  url.searchParams.set("label", conversionLabel);
+  url.searchParams.set("fmt", "3"); // suppress redirect, return minimal response
+  url.searchParams.set("random", String(Date.now())); // cache buster
+  url.searchParams.set("script", "0"); // indicates non-browser environment
+  if (value !== undefined) url.searchParams.set("value", String(value));
+  if (currency) url.searchParams.set("currency_code", currency);
+  if (orderId) url.searchParams.set("oid", orderId);
+  if (gclid) url.searchParams.set("gclid", gclid);
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: formData.toString(),
+  const finalUrl = url.toString();
+  console.log(`[GoogleAds] Sending conversion: id=${numericId.slice(0, 4)}**** label=${conversionLabel.slice(0, 6)}**** event=${eventName} url_length=${finalUrl.length}`);
+
+  const response = await fetch(finalUrl, {
+    method: "GET",
+    headers: {
+      "User-Agent": "TrackClear/1.0 (Server-Side Conversion Tracking)",
+    },
     signal: AbortSignal.timeout(30000),
   });
 
+  const responseText = await response.text().catch(() => "");
+
+  console.log(`[GoogleAds] Response: status=${response.status} body_length=${responseText.length} event=${eventName}`);
+
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
+    console.error(`[GoogleAds] FAILED: status=${response.status} body=${responseText.slice(0, 200)}`);
     throw new GoogleAdsError(
-      `Google Ads conversion tracking failed: ${response.status}`,
+      `HTTP ${response.status}: ${responseText.slice(0, 200) || "No response body"}`,
       response.status,
-      text
+      responseText
     );
   }
 
   return {
     status: response.status,
-    conversionId,
+    conversionId: numericId,
     label: conversionLabel,
     eventName,
   };

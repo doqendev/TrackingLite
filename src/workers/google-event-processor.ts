@@ -12,6 +12,7 @@ import type { DestinationEventJob } from "@/lib/queue";
 
 async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> {
   const { workspaceId, eventLogId, event, credentials } = job.data;
+    console.log(`[GoogleWorker] Processing job ${job.id}: event=${event.eventName} workspace=${workspaceId} eventLogId=${eventLogId || "fire-and-forget"}`);
 
   try {
     const conversionIdEnc = credentials.conversionId as string | undefined;
@@ -33,6 +34,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
 
     // Decrypt the conversion ID
     const conversionId = decrypt(conversionIdEnc, conversionIdIv, conversionIdTag);
+    console.log(`[GoogleWorker] Decrypted conversionId: ${conversionId.slice(0, 4)}**** (${conversionId.length} chars)`);
 
     // Decrypt per-event labels (empty string means not configured)
     const decryptLabel = (enc: string, iv: string, tag: string): string => {
@@ -62,12 +64,14 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
         credentials.purchaseLabelTag as string
       ),
     };
+    console.log(`[GoogleWorker] Decrypted labels: viewContent=${decryptedCredentials.viewContentLabel ? "set" : "empty"} addToCart=${decryptedCredentials.addToCartLabel ? "set" : "empty"} checkout=${decryptedCredentials.checkoutLabel ? "set" : "empty"} purchase=${decryptedCredentials.purchaseLabel ? "set" : "empty"}`);
 
     // Look up the per-event label from decrypted credentials
     const conversionLabel = getConversionLabel(
       event.eventName,
       decryptedCredentials
     );
+    console.log(`[GoogleWorker] Resolved label for ${event.eventName}: ${conversionLabel ? conversionLabel.slice(0, 6) + "****" : "null"}`);
 
     if (!conversionLabel) {
       // Event type has no label configured — skip silently
@@ -118,10 +122,12 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
   } catch (error) {
     const errorMessage =
       error instanceof GoogleAdsError
-        ? `Google Ads ${error.statusCode}: ${error.message}`
+        ? `Google Ads HTTP ${error.statusCode}: ${error.message}`
         : error instanceof Error
-        ? error.message
+        ? `${error.name}: ${error.message}`
         : "Unknown error";
+
+    console.error(`[GoogleWorker] Job ${job.id} ERROR: ${errorMessage}`, error instanceof Error ? error.stack : "");
 
     if (eventLogId) {
       await db.eventLog
