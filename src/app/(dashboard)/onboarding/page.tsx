@@ -15,12 +15,52 @@ type Step = 0 | 1 | 2;
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;
 
+function MetaIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a4.892 4.892 0 0 0 1.227 2.31c.58.597 1.31.88 2.084.88 1.077 0 2.026-.382 2.985-1.275.916-.853 1.858-2.13 2.874-3.842l.158-.267.156.267c.803 1.357 1.655 2.453 2.529 3.232.942.84 1.94 1.313 3.074 1.313.743 0 1.443-.257 2.035-.81.563-.525.981-1.278 1.226-2.17.256-.93.357-1.848.357-2.76 0-2.394-.7-4.82-1.955-6.752C15.696 5.248 13.974 4.03 12 4.03c-1.37 0-2.534.546-3.52 1.47l-.48.446-.48-.445C6.525 4.488 5.728 4.03 4.915 4.03h2zm0 1.84c.574 0 1.236.28 1.953.917.466.414.94.963 1.418 1.622l.15.209-.15.21c-1.538 2.167-2.637 3.478-3.384 4.182-.771.726-1.34.97-1.837.97-.376 0-.682-.124-.986-.454-.33-.358-.574-.869-.734-1.49a7.697 7.697 0 0 1-.197-1.587c0-2.275.604-4.548 1.596-6.124.487-.773 1.047-1.455 1.67-1.455h.5zm7.584 0c.658 0 1.312.38 1.937 1.083.635.713 1.2 1.725 1.637 2.91.467 1.267.713 2.636.713 3.586 0 .768-.078 1.498-.264 2.138-.173.594-.42 1.04-.73 1.337-.278.266-.56.372-.857.372-.654 0-1.312-.377-1.978-1.08-.62-.654-1.252-1.582-1.918-2.735l-.138-.238.138-.238c1.516-2.616 2.635-4.19 3.46-5.135z" />
+    </svg>
+  );
+}
+
+function GoogleAdsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h4v-1.9H7A3.1 3.1 0 0 1 3.9 12M8 13h8v-2H8zm9-6h-4v1.9h4a3.1 3.1 0 0 1 3.1 3.1A3.1 3.1 0 0 1 17 15.1h-4V17h4a5 5 0 0 0 5-5 5 5 0 0 0-5-5" />
+    </svg>
+  );
+}
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V9.21a8.16 8.16 0 0 0 4.76 1.52v-3.4a4.85 4.85 0 0 1-1-.64z" />
+    </svg>
+  );
+}
+
+function GA4Icon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M22.84 2.9v18.2a2.9 2.9 0 0 1-5.8 0V2.9a2.9 2.9 0 0 1 5.8 0zM14.1 21.1a2.9 2.9 0 0 1-5.8 0V9.59a2.9 2.9 0 0 1 5.8 0zM5.4 21.1a2.9 2.9 0 1 1-5.8 0 2.9 2.9 0 0 1 5.8 0z" />
+    </svg>
+  );
+}
+
+function KlaviyoIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2L2 19h20L12 2zm0 4.5L17.5 17h-11L12 6.5z" />
+    </svg>
+  );
+}
+
 const PLATFORMS = [
-  { key: "meta", color: "bg-blue-500", label: "Meta", descKey: "metaDescription" as const },
-  { key: "google", color: "bg-amber-500", label: "Google Ads", descKey: "googleDescription" as const },
-  { key: "tiktok", color: "bg-pink-500", label: "TikTok", descKey: "tiktokDescription" as const },
-  { key: "ga4", color: "bg-orange-500", label: "GA4", descKey: "ga4Description" as const },
-  { key: "klaviyo", color: "bg-emerald-500", label: "Klaviyo", descKey: "klaviyoDescription" as const },
+  { key: "meta", color: "bg-blue-500/15", textColor: "text-blue-400", borderColor: "border-blue-500/30", label: "Meta", descKey: "metaDescription" as const, Icon: MetaIcon },
+  { key: "google", color: "bg-amber-500/15", textColor: "text-amber-400", borderColor: "border-amber-500/30", label: "Google Ads", descKey: "googleDescription" as const, Icon: GoogleAdsIcon },
+  { key: "tiktok", color: "bg-pink-500/15", textColor: "text-pink-400", borderColor: "border-pink-500/30", label: "TikTok", descKey: "tiktokDescription" as const, Icon: TikTokIcon },
+  { key: "ga4", color: "bg-orange-500/15", textColor: "text-orange-400", borderColor: "border-orange-500/30", label: "GA4", descKey: "ga4Description" as const, Icon: GA4Icon },
+  { key: "klaviyo", color: "bg-emerald-500/15", textColor: "text-emerald-400", borderColor: "border-emerald-500/30", label: "Klaviyo", descKey: "klaviyoDescription" as const, Icon: KlaviyoIcon },
 ] as const;
 
 export default function OnboardingPage() {
@@ -300,19 +340,17 @@ export default function OnboardingPage() {
               <CardDescription>{t("connectDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {PLATFORMS.map((platform) => (
                   <div
                     key={platform.key}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3"
+                    className={`flex items-center gap-3 rounded-lg border ${platform.borderColor} ${platform.color} px-4 py-3`}
                   >
-                    <div className={`h-8 w-8 flex-shrink-0 rounded-md ${platform.color} flex items-center justify-center`}>
-                      <span className="text-xs font-bold text-white">
-                        {platform.label.charAt(0)}
-                      </span>
+                    <div className="h-9 w-9 flex-shrink-0 flex items-center justify-center">
+                      <platform.Icon className={`h-7 w-7 ${platform.textColor}`} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground leading-tight">{platform.label}</p>
+                      <p className={`text-sm font-semibold ${platform.textColor} leading-tight`}>{platform.label}</p>
                       <p className="text-xs text-muted-foreground leading-tight mt-0.5">{t(platform.descKey)}</p>
                     </div>
                   </div>
