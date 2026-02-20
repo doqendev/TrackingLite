@@ -44,6 +44,7 @@ See `STATUS.md` for the full audit and remaining work.
 | Billing | Stripe Subscriptions (Free $0, Starter $29, Growth $49, Scale $99 — order-based) | stripe 14.18.0 |
 | UI | Tailwind CSS 3.4 + shadcn/ui (new-york style, 14 components) | |
 | i18n | next-intl (cookie-based locale, 6 languages) | 4.8.3 |
+| Icons | react-icons (brand icons) | 5.5.0 |
 | Validation | Zod | 3.22.0 |
 | Testing | Vitest + MSW | Vitest 4.0.18, MSW 2.2.0 |
 | Runtime | Node.js >= 20 | |
@@ -125,7 +126,7 @@ src/
       settings/page.tsx               # 6 destination cards, event toggles, consent, snippet, alerts, language/currency selectors, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
-        page.tsx                      # 3-step wizard: create workspace, copy snippet, test event
+        page.tsx                      # 3-step wizard: create workspace, install snippet, connect platforms
         layout.tsx                    # Pass-through (page renders as fixed overlay)
     api/
       auth/[...nextauth]/route.ts     # NextAuth handler
@@ -241,7 +242,7 @@ prisma/
 
 **Key relationships:**
 - User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
-- Workspace has many EventLogs, stores encrypted credentials for all 5 destinations
+- Workspace has many EventLogs, stores encrypted credentials for all 5 destinations, includes enableMeta toggle
 - EventLog has a `destination` field (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 - EventLog stores UTM attribution data (utmSource, utmMedium, utmCampaign, utmContent, utmTerm, gclid)
@@ -376,6 +377,7 @@ Header: Content-Type: application/json
 - **Email alerts:** Hourly BullMQ repeatable job evaluates tracking health, error rates, and order limits. 24h cooldown per alert type per user.
 - **UTM attribution:** Snippet captures UTM params + gclid once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
 - **Stale pending requeue:** BullMQ repeatable job every 5 minutes finds PENDING events older than 5 minutes and re-queues them to the appropriate destination queue, preventing events from getting stuck after Redis restarts.
+- **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.
 
 ## Style Rules
 
@@ -394,6 +396,7 @@ Header: Content-Type: application/json
 See `STATUS.md` for the full list. Currently:
 1. **`api-key-cache.ts` is dead code** --- exists but is never imported
 2. **`pnpm build` hangs on Windows** --- pre-existing environment issue, not code-related
+3. **Event replay route only supports Meta** --- `/api/workspaces/:id/replay` only handles Meta events, multi-destination replay not yet implemented
 
 All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII storage, forgot password) are fixed.
 

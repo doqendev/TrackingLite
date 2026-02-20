@@ -26,6 +26,7 @@ export async function POST(
       metaAccessTokenIv: true,
       metaAccessTokenTag: true,
       metaTestEventCode: true,
+      enableMeta: true,
     },
   });
 
@@ -33,7 +34,7 @@ export async function POST(
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  if (!workspace.metaPixelId || !workspace.metaAccessTokenEncrypted) {
+  if (!workspace.enableMeta || !workspace.metaPixelId || !workspace.metaAccessTokenEncrypted) {
     return NextResponse.json(
       { error: "Meta credentials not configured" },
       { status: 422 }

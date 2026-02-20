@@ -26,7 +26,7 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-5)
 | `/events` | Protected | Working | Paginated event log with type/status filters, Source/Campaign columns, retry failed events |
 | `/settings` | Protected | Working | 6 destination credential cards, event toggles, consent mode, snippet, alert preferences, language selector, currency selector, danger zone |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
-| `/onboarding` | Protected | Working | 3-step wizard: create workspace, copy snippet, test event |
+| `/onboarding` | Protected | Working | 3-step wizard: create workspace, install snippet, connect platforms |
 
 ### API Routes (15 endpoints)
 
@@ -101,6 +101,12 @@ Each destination has:
 | `destinations/ga4.ts` | Working | GA4 Measurement Protocol normalizer + API client |
 | `destinations/klaviyo.ts` | Working | Klaviyo normalizer + API client (raw email, not hashed) |
 | `api-key-cache.ts` | **Dead code** | Redis-cached workspace lookup, never imported anywhere |
+
+### Known Limitations
+
+| Limitation | Status |
+|------------|--------|
+| Event replay route (`/api/workspaces/:id/replay`) | Only supports Meta events; multi-destination replay not yet implemented |
 
 ### Workers (9 files in src/workers/)
 
@@ -230,6 +236,12 @@ None currently tracked.
 3. **Currency Display & Conversion** - User-selectable display currency in settings. Exchange rates from frankfurter.app API cached 24h in Redis. Revenue cards and campaign performance show converted values
 4. **Internationalization (6 Languages)** - Full i18n with next-intl v4. Languages: English, Portuguese, Spanish, French, German, Italian. Cookie-based locale, language selector in settings, ~250 translation keys per language
 5. **User Preferences API** - New PATCH `/api/user/preferences` endpoint for display currency and language. `displayCurrency` and `language` fields added to User model
+
+### Phase 6: Onboarding Redesign (2026-02-20)
+1. **Onboarding Redesign** - 3-step wizard updated: Create Workspace, Install Snippet, Connect Platforms. Removed Meta credential fields from onboarding flow.
+2. **enableMeta Toggle** - Added `enableMeta Boolean @default(true)` field to Workspace model. Meta now has a toggle like all other destinations for consistency.
+3. **react-icons Dependency** - Added react-icons 5.5.0 for brand icons in settings and onboarding.
+4. **Translation Structure** - Added `onboarding` namespace (~36 keys) to all 6 language files (EN, PT, ES, FR, DE, IT).
 
 ---
 

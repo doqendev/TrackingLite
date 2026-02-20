@@ -89,6 +89,7 @@ async function requeueStalePending(): Promise<void> {
         metaAccessTokenIv: true,
         metaAccessTokenTag: true,
         metaTestEventCode: true,
+        enableMeta: true,
         enableGoogleAds: true,
         googleAdsConversionId: true,
         googleAdsViewContentLabel: true,
@@ -139,7 +140,7 @@ async function requeueStalePending(): Promise<void> {
           userAgent: event.userAgent || "",
         };
 
-        if (event.destination === "META" && workspace.metaAccessTokenEncrypted) {
+        if (event.destination === "META" && workspace.enableMeta && workspace.metaAccessTokenEncrypted) {
           await getEventQueue().add("send-meta-event", {
             workspaceId: workspace.id,
             pixelId: workspace.metaPixelId!,

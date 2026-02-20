@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { SiMeta, SiGoogleads, SiTiktok, SiGoogleanalytics } from "react-icons/si";
 
 export interface IntegrationWorkspace {
   id: string;
@@ -40,42 +41,10 @@ interface IntegrationsGridProps {
   workspace: IntegrationWorkspace;
 }
 
-function MetaIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M12 2.04c-5.5 0-10 4.49-10 10.02 0 5 3.66 9.15 8.44 9.9v-7H7.9v-2.9h2.54V9.85c0-2.52 1.49-3.93 3.78-3.93 1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.45 2.9h-2.33v7a10 10 0 008.44-9.9c0-5.53-4.5-10.02-10-10.02z" />
-    </svg>
-  );
-}
-
-function GoogleAdsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M3.27 12l7.18-12h3.55L6.82 12l7.18 12h-3.55L3.27 12zm10.46 6.54L17.28 12 10.1 0h3.55l7.18 12-7.18 12h-3.55l3.63-5.46z" />
-    </svg>
-  );
-}
-
-function TikTokIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V9.17a8.16 8.16 0 004.76 1.52v-3.4a4.85 4.85 0 01-1-.6z" />
-    </svg>
-  );
-}
-
-function GA4Icon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M22.84 2.02v19.96a2.02 2.02 0 01-4.04 0V2.02a2.02 2.02 0 014.04 0zM14.04 22a2.02 2.02 0 01-2.02-2.02V9.02a2.02 2.02 0 014.04 0v10.96A2.02 2.02 0 0114.04 22zM7.26 22a2.02 2.02 0 01-2.02-2.02v-3.96a2.02 2.02 0 014.04 0v3.96A2.02 2.02 0 017.26 22z" />
-    </svg>
-  );
-}
-
 function KlaviyoIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M2 4l10 8L22 4v16H2V4zm10 9.17L4.43 6.4v11.2h15.14V6.4L12 13.17z" />
+    <svg viewBox="0 0 152 152" className="h-5 w-5" fill="currentColor">
+      <path d="M148.76,124.01H3.24V26.63H148.76l-30.55,48.69,30.55,48.69Z" />
     </svg>
   );
 }
@@ -333,7 +302,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           onClick={() => toggleCard("meta")}
         >
           <div className="text-blue-500 shrink-0">
-            <MetaIcon />
+            <SiMeta className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">Meta CAPI</p>
@@ -430,7 +399,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           onClick={() => toggleCard("google")}
         >
           <div className="text-amber-500 shrink-0">
-            <GoogleAdsIcon />
+            <SiGoogleads className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">Google Ads</p>
@@ -552,7 +521,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           onClick={() => toggleCard("tiktok")}
         >
           <div className="text-pink-500 shrink-0">
-            <TikTokIcon />
+            <SiTiktok className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">TikTok</p>
@@ -644,7 +613,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           onClick={() => toggleCard("ga4")}
         >
           <div className="text-orange-500 shrink-0">
-            <GA4Icon />
+            <SiGoogleanalytics className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm">GA4</p>
