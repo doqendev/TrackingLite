@@ -8,8 +8,8 @@
 
 export const DESTINATION_EVENT_MAP = {
   META: {
-    PageView: "PageView",
-    ViewContent: "ViewContent",
+    PageView: null, // not tracked - high volume, low value
+    ViewContent: null, // not tracked - high volume, low value
     AddToCart: "AddToCart",
     InitiateCheckout: "InitiateCheckout",
     Purchase: "Purchase",
@@ -22,22 +22,22 @@ export const DESTINATION_EVENT_MAP = {
     Purchase: "purchase",
   },
   TIKTOK: {
-    PageView: "Pageview",
-    ViewContent: "ViewContent",
+    PageView: null, // not tracked - high volume, low value
+    ViewContent: null, // not tracked - high volume, low value
     AddToCart: "AddToCart",
     InitiateCheckout: "InitiateCheckout",
     Purchase: "CompletePayment",
   },
   GA4: {
-    PageView: "page_view",
-    ViewContent: "view_item",
+    PageView: null, // not tracked - high volume, low value
+    ViewContent: null, // not tracked - high volume, low value
     AddToCart: "add_to_cart",
     InitiateCheckout: "begin_checkout",
     Purchase: "purchase",
   },
   KLAVIYO: {
-    PageView: null, // skip - too noisy
-    ViewContent: "Viewed Product",
+    PageView: null, // not tracked - high volume, low value
+    ViewContent: null, // not tracked - high volume, low value
     AddToCart: "Added to Cart",
     InitiateCheckout: "Started Checkout",
     Purchase: "Placed Order",
