@@ -322,22 +322,41 @@ export async function POST(request: NextRequest) {
       gclid: payload.gclid || null,
     };
 
-    // Create all EventLog entries (one per destination)
+    // Create all EventLog entries (one per destination), skip duplicates
     const eventLogEntries = await Promise.all(
-      filteredDestinations.map((dest) =>
-        db.eventLog.create({
-          data: {
-            ...eventLogBaseData,
-            destination: dest.destination as any,
-          },
-        })
-      )
+      filteredDestinations.map(async (dest) => {
+        try {
+          return await db.eventLog.create({
+            data: {
+              ...eventLogBaseData,
+              destination: dest.destination as any,
+            },
+          });
+        } catch (err: any) {
+          // P2002 = unique constraint violation (duplicate eventId+destination)
+          if (err?.code === "P2002") {
+            return null;
+          }
+          throw err;
+        }
+      })
     );
 
-    // Queue jobs for all destinations in parallel
+    // Filter out duplicates (null entries)
+    const validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
+    const validDestinations = filteredDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
+
+    if (validEntries.length === 0) {
+      return NextResponse.json(
+        { success: true, eventId: payload.eventId, deduplicated: true },
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
+    // Queue jobs for all non-deduplicated destinations in parallel
     await Promise.all(
-      filteredDestinations.map((dest, idx) => {
-        const eventLogId = eventLogEntries[idx].id;
+      validDestinations.map((dest, idx) => {
+        const eventLogId = validEntries[idx].id;
 
         if (dest.destination === "META") {
           // Use existing MetaEventJob format for backward compatibility
@@ -393,7 +412,7 @@ export async function POST(request: NextRequest) {
     const response: any = {
       success: true,
       eventId: payload.eventId,
-      destinations: filteredDestinations.map((d) => d.destination),
+      destinations: validDestinations.map((d) => d.destination),
     };
     if (billing.upgraded) {
       response.upgraded = true;

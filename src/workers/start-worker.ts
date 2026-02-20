@@ -1,4 +1,8 @@
 import "dotenv/config";
+import { validateEnv } from "@/lib/env-validation";
+
+validateEnv();
+
 import { worker as metaWorker } from "./meta-event-processor";
 import { googleWorker } from "./google-event-processor";
 import { tiktokWorker } from "./tiktok-event-processor";
