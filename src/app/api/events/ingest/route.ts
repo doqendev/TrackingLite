@@ -12,6 +12,7 @@ import { shouldSendEvent } from "@/lib/consent";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkOrderLimits, incrementOrderCount } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
+import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -265,6 +266,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Filter out destinations where this event type is not mapped (null)
+    const filteredDestinations = destinations.filter((dest) => {
+      const map = DESTINATION_EVENT_MAP[dest.destination as keyof typeof DESTINATION_EVENT_MAP];
+      if (!map) return true; // unknown destination, allow
+      return map[payload.eventName as keyof typeof map] !== null;
+    });
+
     // 12. Create EventLog entries and queue jobs for each destination
     const eventLogBaseData = {
       workspaceId: workspace.id,
@@ -295,7 +303,7 @@ export async function POST(request: NextRequest) {
 
     // Create all EventLog entries (one per destination)
     const eventLogEntries = await Promise.all(
-      destinations.map((dest) =>
+      filteredDestinations.map((dest) =>
         db.eventLog.create({
           data: {
             ...eventLogBaseData,
@@ -307,7 +315,7 @@ export async function POST(request: NextRequest) {
 
     // Queue jobs for all destinations in parallel
     await Promise.all(
-      destinations.map((dest, idx) => {
+      filteredDestinations.map((dest, idx) => {
         const eventLogId = eventLogEntries[idx].id;
 
         if (dest.destination === "META") {
@@ -369,7 +377,7 @@ export async function POST(request: NextRequest) {
     const response: any = {
       success: true,
       eventId: payload.eventId,
-      destinations: destinations.map((d) => d.destination),
+      destinations: filteredDestinations.map((d) => d.destination),
     };
     if (billing.upgraded) {
       response.upgraded = true;
