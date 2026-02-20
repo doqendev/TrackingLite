@@ -13,6 +13,13 @@ import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 const QUEUE_NAME = "stale-pending-requeue";
 const JOB_NAME = "requeue-stale-pending";
 const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_RETRY_COUNT = 3;
+const FAILED_RETRY_DELAY_MS = 15 * 60 * 1000; // 15 minutes
+
+const PERMANENT_FAILURE_MESSAGES = [
+  "Workspace inactive or deleted",
+  "Destination credentials missing on requeue",
+];
 
 let _connection: IORedis | null = null;
 
@@ -38,38 +45,37 @@ function getQueue(): Queue {
   return _queue;
 }
 
-async function requeueStalePending(): Promise<void> {
-  const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS);
+// Shared event type used by both requeue functions
+type EventToRequeue = {
+  id: string;
+  workspaceId: string;
+  eventName: string;
+  eventId: string;
+  destination: string;
+  payload: unknown;
+  customerIp: string | null;
+  userAgent: string | null;
+  fbp: string | null;
+  fbc: string | null;
+  pageUrl: string | null;
+  createdAt: Date;
+};
 
-  const staleEvents = await db.eventLog.findMany({
-    where: {
-      status: "PENDING",
-      createdAt: { lt: cutoff },
-    },
-    take: 100,
-    select: {
-      id: true,
-      workspaceId: true,
-      eventName: true,
-      eventId: true,
-      destination: true,
-      payload: true,
-      customerIp: true,
-      userAgent: true,
-      fbp: true,
-      fbc: true,
-      pageUrl: true,
-      createdAt: true,
-    },
-  });
+type RequeueOptions = {
+  incrementRetryCount: boolean;
+  logPrefix: string;
+};
 
-  if (staleEvents.length === 0) return;
-
-  console.log(`[StaleRequeue] Found ${staleEvents.length} stale PENDING event(s)`);
+// Shared routing logic for both PENDING stale requeue and FAILED event retry
+async function requeueEvents(
+  events: EventToRequeue[],
+  options: RequeueOptions
+): Promise<{ requeued: number; failed: number }> {
+  const { incrementRetryCount, logPrefix } = options;
 
   // Group by workspace to batch credential lookups
-  const byWorkspace = new Map<string, typeof staleEvents>();
-  for (const event of staleEvents) {
+  const byWorkspace = new Map<string, EventToRequeue[]>();
+  for (const event of events) {
     const list = byWorkspace.get(event.workspaceId) || [];
     list.push(event);
     byWorkspace.set(event.workspaceId, list);
@@ -78,7 +84,7 @@ async function requeueStalePending(): Promise<void> {
   let requeued = 0;
   let failed = 0;
 
-  for (const [workspaceId, events] of Array.from(byWorkspace)) {
+  for (const [workspaceId, workspaceEvents] of Array.from(byWorkspace)) {
     const workspace = await db.workspace.findUnique({
       where: { id: workspaceId },
       select: {
@@ -126,14 +132,14 @@ async function requeueStalePending(): Promise<void> {
     if (!workspace || !workspace.isActive) {
       // Mark as FAILED -- workspace deleted or inactive
       await db.eventLog.updateMany({
-        where: { id: { in: events.map((e: { id: string }) => e.id) } },
+        where: { id: { in: workspaceEvents.map((e) => e.id) } },
         data: { status: "FAILED", errorMessage: "Workspace inactive or deleted" },
       });
-      failed += events.length;
+      failed += workspaceEvents.length;
       continue;
     }
 
-    for (const event of events) {
+    for (const event of workspaceEvents) {
       try {
         const payload = (event.payload as Record<string, unknown>) || {};
         const eventData = {
@@ -150,6 +156,8 @@ async function requeueStalePending(): Promise<void> {
           userAgent: event.userAgent || "",
         };
 
+        const retryCountUpdate = incrementRetryCount ? { retryCount: { increment: 1 } } : {};
+
         if (event.destination === "META" && workspace.enableMeta && workspace.metaAccessTokenEncrypted) {
           await getEventQueue().add("send-meta-event", {
             workspaceId: workspace.id,
@@ -163,7 +171,7 @@ async function requeueStalePending(): Promise<void> {
           } satisfies MetaEventJob);
           await db.eventLog.update({
             where: { id: event.id },
-            data: { status: "RETRYING" },
+            data: { status: "RETRYING", ...retryCountUpdate },
           });
           requeued++;
         } else if (event.destination === "GOOGLE_ADS" && workspace.googleAdsConversionIdEncrypted) {
@@ -192,7 +200,7 @@ async function requeueStalePending(): Promise<void> {
           } satisfies DestinationEventJob);
           await db.eventLog.update({
             where: { id: event.id },
-            data: { status: "RETRYING" },
+            data: { status: "RETRYING", ...retryCountUpdate },
           });
           requeued++;
         } else if (event.destination === "TIKTOK" && workspace.tiktokAccessTokenEncrypted) {
@@ -210,7 +218,7 @@ async function requeueStalePending(): Promise<void> {
           } satisfies DestinationEventJob);
           await db.eventLog.update({
             where: { id: event.id },
-            data: { status: "RETRYING" },
+            data: { status: "RETRYING", ...retryCountUpdate },
           });
           requeued++;
         } else if (event.destination === "GA4" && workspace.ga4ApiSecretEncrypted) {
@@ -228,7 +236,7 @@ async function requeueStalePending(): Promise<void> {
           } satisfies DestinationEventJob);
           await db.eventLog.update({
             where: { id: event.id },
-            data: { status: "RETRYING" },
+            data: { status: "RETRYING", ...retryCountUpdate },
           });
           requeued++;
         } else if (event.destination === "KLAVIYO" && workspace.klaviyoApiKeyEncrypted) {
@@ -245,7 +253,7 @@ async function requeueStalePending(): Promise<void> {
           } satisfies DestinationEventJob);
           await db.eventLog.update({
             where: { id: event.id },
-            data: { status: "RETRYING" },
+            data: { status: "RETRYING", ...retryCountUpdate },
           });
           requeued++;
         } else {
@@ -257,7 +265,7 @@ async function requeueStalePending(): Promise<void> {
           failed++;
         }
       } catch (err) {
-        console.error(`[StaleRequeue] Failed to requeue event ${event.id}:`, err);
+        console.error(`[${logPrefix}] Failed to requeue event ${event.id}:`, err);
         await db.eventLog.update({
           where: { id: event.id },
           data: { status: "FAILED", errorMessage: "Requeue failed" },
@@ -267,7 +275,86 @@ async function requeueStalePending(): Promise<void> {
     }
   }
 
+  return { requeued, failed };
+}
+
+async function requeueStalePending(): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS);
+
+  const staleEvents = await db.eventLog.findMany({
+    where: {
+      status: "PENDING",
+      createdAt: { lt: cutoff },
+    },
+    take: 100,
+    select: {
+      id: true,
+      workspaceId: true,
+      eventName: true,
+      eventId: true,
+      destination: true,
+      payload: true,
+      customerIp: true,
+      userAgent: true,
+      fbp: true,
+      fbc: true,
+      pageUrl: true,
+      createdAt: true,
+    },
+  });
+
+  if (staleEvents.length === 0) return;
+
+  console.log(`[StaleRequeue] Found ${staleEvents.length} stale PENDING event(s)`);
+
+  const { requeued, failed } = await requeueEvents(staleEvents, {
+    incrementRetryCount: false,
+    logPrefix: "StaleRequeue",
+  });
+
   console.log(`[StaleRequeue] Done: ${requeued} requeued, ${failed} marked failed`);
+}
+
+async function requeueFailedEvents(): Promise<void> {
+  const cutoff = new Date(Date.now() - FAILED_RETRY_DELAY_MS);
+
+  const failedEvents = await db.eventLog.findMany({
+    where: {
+      status: "FAILED",
+      retryCount: { lt: MAX_RETRY_COUNT },
+      createdAt: { lt: cutoff },
+      errorMessage: {
+        notIn: PERMANENT_FAILURE_MESSAGES,
+      },
+    },
+    take: 50,
+    select: {
+      id: true,
+      workspaceId: true,
+      eventName: true,
+      eventId: true,
+      destination: true,
+      payload: true,
+      customerIp: true,
+      userAgent: true,
+      fbp: true,
+      fbc: true,
+      pageUrl: true,
+      createdAt: true,
+      retryCount: true,
+    },
+  });
+
+  if (failedEvents.length === 0) return;
+
+  console.log(`[FailedRetry] Found ${failedEvents.length} FAILED event(s) eligible for retry`);
+
+  const { requeued, failed } = await requeueEvents(failedEvents, {
+    incrementRetryCount: true,
+    logPrefix: "FailedRetry",
+  });
+
+  console.log(`[FailedRetry] Done: ${requeued} requeued, ${failed} marked failed`);
 }
 
 export async function scheduleStaleRequeue(): Promise<void> {
@@ -291,6 +378,7 @@ export const staleRequeueWorker = new Worker(
   QUEUE_NAME,
   async () => {
     await requeueStalePending();
+    await requeueFailedEvents();
   },
   {
     connection: getConnection() as never,
