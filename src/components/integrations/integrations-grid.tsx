@@ -466,9 +466,12 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               </div>
               <div className="space-y-3">
                 <p className="text-xs font-medium text-foreground">Conversion Labels</p>
+                <p className="text-[10px] text-muted-foreground -mt-1">
+                  Match these to your Google Ads conversion actions. Leave blank to skip.
+                </p>
                 <div className="space-y-1.5">
                   <Label htmlFor="google-view-content-label" className="text-xs text-muted-foreground">
-                    View Content Label
+                    Page View Label <span className="text-muted-foreground/60">(product page views)</span>
                   </Label>
                   <Input
                     id="google-view-content-label"
@@ -490,7 +493,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="google-checkout-label" className="text-xs text-muted-foreground">
-                    Initiate Checkout Label
+                    Begin Checkout Label
                   </Label>
                   <Input
                     id="google-checkout-label"
