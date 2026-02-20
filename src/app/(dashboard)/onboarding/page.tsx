@@ -22,11 +22,11 @@ const KlaviyoIcon: IconType = ({ className, size, ...props }) => (
     className={className}
     width={size ?? "1em"}
     height={size ?? "1em"}
-    viewBox="0 0 24 24"
+    viewBox="0 0 152 152"
     fill="currentColor"
     {...props}
   >
-    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.08 14H7.92L12 8.56z" />
+    <path d="M148.76,124.01H3.24V26.63H148.76l-30.55,48.69,30.55,48.69Z" />
   </svg>
 );
 
