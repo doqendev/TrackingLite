@@ -95,16 +95,12 @@ model Workspace {
   metaAccessTokenTag        String?         // Auth tag for decryption
   metaTestEventCode         String?         // For testing in Meta Events Manager
 
-  // Google Ads fields
-  googleAdsCustomerId         String?
-  googleAdsConversionAction   String?
-  googleAdsAccessTokenEncrypted  String?
-  googleAdsAccessTokenIv      String?
-  googleAdsAccessTokenTag     String?
-  googleAdsRefreshTokenEncrypted String?
-  googleAdsRefreshTokenIv     String?
-  googleAdsRefreshTokenTag    String?
-  googleAdsDeveloperToken     String?
+  // Google Ads fields (Conversion ID + per-event labels)
+  googleAdsConversionId       String?   // e.g. "11366583402"
+  googleAdsViewContentLabel   String?   // per-event conversion label
+  googleAdsAddToCartLabel     String?
+  googleAdsCheckoutLabel      String?
+  googleAdsPurchaseLabel      String?
   enableGoogleAds             Boolean   @default(false)
 
   // TikTok fields

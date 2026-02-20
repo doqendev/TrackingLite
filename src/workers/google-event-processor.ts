@@ -1,10 +1,8 @@
 import { Worker, Job } from "bullmq";
 import IORedis from "ioredis";
-import { decrypt } from "@/lib/encryption";
 import {
-  normalizeToGoogleAdsEvent,
-  sendToGoogleAds,
-  refreshGoogleAdsToken,
+  sendGoogleAdsConversion,
+  getConversionLabel,
   GoogleAdsError,
 } from "@/lib/destinations/google-ads";
 import { db } from "@/lib/db";
@@ -15,97 +13,63 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
   const { workspaceId, eventLogId, event, credentials } = job.data;
 
   try {
-    // Decrypt access token
-    let accessToken = decrypt(
-      credentials.accessToken,
-      credentials.accessTokenIv,
-      credentials.accessTokenTag
-    );
+    const conversionId = credentials.conversionId as string | undefined;
+    if (!conversionId) {
+      await db.eventLog.update({
+        where: { id: eventLogId },
+        data: {
+          status: "FAILED",
+          errorMessage: "Google Ads conversion ID not configured",
+        },
+      });
+      return;
+    }
 
-    // Normalize event to Google Ads format
-    const googleEvent = normalizeToGoogleAdsEvent(
+    // Look up the per-event label from credentials
+    const conversionLabel = getConversionLabel(
       event.eventName,
-      {
-        eventId: event.eventId,
-        timestamp: event.timestamp,
-        userData: event.userData,
-        customData: event.customData,
-        clientIp: event.clientIp,
-      },
-      credentials.conversionAction
+      credentials as Record<string, string>
     );
 
-    if (!googleEvent) {
-      // Event type not supported by Google Ads (PageView, ViewContent) — skip
+    if (!conversionLabel) {
+      // Event type has no label configured — skip silently
       await db.eventLog.update({
         where: { id: eventLogId },
         data: {
           status: "SENT",
-          metaResponse: { skipped: true, reason: "Event type not supported by Google Ads" } as any,
+          metaResponse: {
+            skipped: true,
+            reason: `No conversion label configured for ${event.eventName}`,
+          } as never,
         },
       });
       console.log(
-        `[GoogleWorker] Job ${job.id} skipped: ${event.eventName} not tracked by Google Ads`
+        `[GoogleWorker] Job ${job.id} skipped: no label for ${event.eventName} in workspace ${workspaceId}`
       );
       return;
     }
 
-    // Send to Google Ads — retry once with refreshed token on 401
-    let response: unknown;
-    try {
-      response = await sendToGoogleAds(
-        credentials.customerId,
-        accessToken,
-        credentials.developerToken,
-        [googleEvent]
-      );
-    } catch (err) {
-      if (
-        err instanceof GoogleAdsError &&
-        err.statusCode === 401 &&
-        credentials.refreshToken &&
-        credentials.refreshTokenIv &&
-        credentials.refreshTokenTag
-      ) {
-        // Token expired — attempt refresh
-        console.log(`[GoogleWorker] Job ${job.id}: access token expired, refreshing...`);
-        const refreshToken = decrypt(
-          credentials.refreshToken,
-          credentials.refreshTokenIv,
-          credentials.refreshTokenTag
-        );
+    const cd = event.customData as Record<string, unknown>;
+    const value = cd.value !== undefined && cd.value !== null ? Number(cd.value) : undefined;
+    const currency = cd.currency ? String(cd.currency) : undefined;
+    const orderId = cd.orderId ? String(cd.orderId) : undefined;
+    // gclid is stored in customData by the ingest route via the EventLog gclid field;
+    // the DestinationEventJob event shape does not carry it directly, so read from customData
+    const gclid = cd.gclid ? String(cd.gclid) : undefined;
 
-        const refreshed = await refreshGoogleAdsToken(refreshToken);
-        accessToken = refreshed.accessToken;
+    const response = await sendGoogleAdsConversion({
+      conversionId,
+      conversionLabel,
+      value,
+      currency,
+      orderId,
+      gclid,
+      eventName: event.eventName,
+    });
 
-        // Persist the new encrypted access token to the workspace
-        await db.workspace.update({
-          where: { id: workspaceId },
-          data: {
-            googleAdsAccessTokenEncrypted: refreshed.encrypted,
-            googleAdsAccessTokenIv: refreshed.iv,
-            googleAdsAccessTokenTag: refreshed.tag,
-          },
-        });
-
-        console.log(`[GoogleWorker] Job ${job.id}: token refreshed, retrying...`);
-
-        // Retry with new token
-        response = await sendToGoogleAds(
-          credentials.customerId,
-          accessToken,
-          credentials.developerToken,
-          [googleEvent]
-        );
-      } else {
-        throw err;
-      }
-    }
-
-    // Update EventLog to SENT
     await db.eventLog.update({
       where: { id: eventLogId },
-      data: { status: "SENT", metaResponse: response as any },
+      data: { status: "SENT", metaResponse: response as never },
     });
 
     console.log(

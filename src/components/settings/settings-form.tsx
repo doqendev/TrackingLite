@@ -34,10 +34,31 @@ interface SettingsFormProps {
   userPreferences: UserPreferences;
 }
 
-const CURRENCIES = [
-  "USD", "EUR", "GBP", "CHF", "BRL", "AUD", "CAD", "JPY", "INR", "MXN",
-  "PLN", "SEK", "NOK", "DKK", "CZK", "HUF", "RON", "BGN", "TRY", "ZAR",
-  "NZD", "SGD", "HKD", "KRW",
+const CURRENCIES: { code: string; symbol: string }[] = [
+  { code: "USD", symbol: "$" },
+  { code: "EUR", symbol: "\u20AC" },
+  { code: "GBP", symbol: "\u00A3" },
+  { code: "CHF", symbol: "CHF" },
+  { code: "BRL", symbol: "R$" },
+  { code: "AUD", symbol: "A$" },
+  { code: "CAD", symbol: "C$" },
+  { code: "JPY", symbol: "\u00A5" },
+  { code: "INR", symbol: "\u20B9" },
+  { code: "MXN", symbol: "MX$" },
+  { code: "PLN", symbol: "z\u0142" },
+  { code: "SEK", symbol: "kr" },
+  { code: "NOK", symbol: "kr" },
+  { code: "DKK", symbol: "kr" },
+  { code: "CZK", symbol: "K\u010D" },
+  { code: "HUF", symbol: "Ft" },
+  { code: "RON", symbol: "lei" },
+  { code: "BGN", symbol: "\u043B\u0432" },
+  { code: "TRY", symbol: "\u20BA" },
+  { code: "ZAR", symbol: "R" },
+  { code: "NZD", symbol: "NZ$" },
+  { code: "SGD", symbol: "S$" },
+  { code: "HKD", symbol: "HK$" },
+  { code: "KRW", symbol: "\u20A9" },
 ];
 
 const LANGUAGES = [
@@ -219,7 +240,7 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground">Revenue values will be converted to this currency.</p>

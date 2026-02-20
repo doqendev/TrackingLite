@@ -20,11 +20,11 @@ export default async function IntegrationsPage() {
       metaTestEventCode: true,
       metaAccessTokenEncrypted: true,
       // Google Ads
-      googleAdsCustomerId: true,
-      googleAdsConversionAction: true,
-      googleAdsAccessTokenEncrypted: true,
-      googleAdsRefreshTokenEncrypted: true,
-      googleAdsDeveloperToken: true,
+      googleAdsConversionId: true,
+      googleAdsViewContentLabel: true,
+      googleAdsAddToCartLabel: true,
+      googleAdsCheckoutLabel: true,
+      googleAdsPurchaseLabel: true,
       enableGoogleAds: true,
       // TikTok
       tiktokPixelId: true,
@@ -49,11 +49,11 @@ export default async function IntegrationsPage() {
     metaTestEventCode: workspace.metaTestEventCode,
     hasAccessToken: !!workspace.metaAccessTokenEncrypted,
     // Google Ads
-    googleAdsCustomerId: workspace.googleAdsCustomerId,
-    googleAdsConversionAction: workspace.googleAdsConversionAction,
-    hasGoogleAdsAccessToken: !!workspace.googleAdsAccessTokenEncrypted,
-    hasGoogleAdsRefreshToken: !!workspace.googleAdsRefreshTokenEncrypted,
-    googleAdsDeveloperToken: workspace.googleAdsDeveloperToken,
+    googleAdsConversionId: workspace.googleAdsConversionId,
+    googleAdsViewContentLabel: workspace.googleAdsViewContentLabel,
+    googleAdsAddToCartLabel: workspace.googleAdsAddToCartLabel,
+    googleAdsCheckoutLabel: workspace.googleAdsCheckoutLabel,
+    googleAdsPurchaseLabel: workspace.googleAdsPurchaseLabel,
     enableGoogleAds: workspace.enableGoogleAds,
     // TikTok
     tiktokPixelId: workspace.tiktokPixelId,

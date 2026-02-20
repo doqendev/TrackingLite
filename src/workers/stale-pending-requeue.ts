@@ -90,15 +90,11 @@ async function requeueStalePending(): Promise<void> {
         metaAccessTokenTag: true,
         metaTestEventCode: true,
         enableGoogleAds: true,
-        googleAdsCustomerId: true,
-        googleAdsConversionAction: true,
-        googleAdsAccessTokenEncrypted: true,
-        googleAdsAccessTokenIv: true,
-        googleAdsAccessTokenTag: true,
-        googleAdsRefreshTokenEncrypted: true,
-        googleAdsRefreshTokenIv: true,
-        googleAdsRefreshTokenTag: true,
-        googleAdsDeveloperToken: true,
+        googleAdsConversionId: true,
+        googleAdsViewContentLabel: true,
+        googleAdsAddToCartLabel: true,
+        googleAdsCheckoutLabel: true,
+        googleAdsPurchaseLabel: true,
         enableTikTok: true,
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
@@ -155,22 +151,18 @@ async function requeueStalePending(): Promise<void> {
             eventLogId: event.id,
           } satisfies MetaEventJob);
           requeued++;
-        } else if (event.destination === "GOOGLE_ADS" && workspace.googleAdsAccessTokenEncrypted) {
+        } else if (event.destination === "GOOGLE_ADS" && workspace.googleAdsConversionId) {
           await getGoogleQueue().add("send-google-event", {
             workspaceId: workspace.id,
             destination: "GOOGLE_ADS",
             eventLogId: event.id,
             event: { ...eventData, ttclid: null },
             credentials: {
-              customerId: workspace.googleAdsCustomerId || "",
-              conversionAction: workspace.googleAdsConversionAction || "",
-              accessToken: workspace.googleAdsAccessTokenEncrypted!,
-              accessTokenIv: workspace.googleAdsAccessTokenIv!,
-              accessTokenTag: workspace.googleAdsAccessTokenTag!,
-              refreshToken: workspace.googleAdsRefreshTokenEncrypted || "",
-              refreshTokenIv: workspace.googleAdsRefreshTokenIv || "",
-              refreshTokenTag: workspace.googleAdsRefreshTokenTag || "",
-              developerToken: workspace.googleAdsDeveloperToken || "",
+              conversionId: workspace.googleAdsConversionId || "",
+              viewContentLabel: workspace.googleAdsViewContentLabel || "",
+              addToCartLabel: workspace.googleAdsAddToCartLabel || "",
+              checkoutLabel: workspace.googleAdsCheckoutLabel || "",
+              purchaseLabel: workspace.googleAdsPurchaseLabel || "",
             },
           } satisfies DestinationEventJob);
           requeued++;

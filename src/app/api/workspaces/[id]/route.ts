@@ -17,11 +17,11 @@ const UpdateWorkspaceSchema = z.object({
   enableInitiateCheckout: z.boolean().optional(),
   enablePurchase: z.boolean().optional(),
   // Google Ads
-  googleAdsCustomerId: z.string().optional().nullable(),
-  googleAdsConversionAction: z.string().optional().nullable(),
-  googleAdsAccessToken: z.string().optional().nullable(),
-  googleAdsRefreshToken: z.string().optional().nullable(),
-  googleAdsDeveloperToken: z.string().optional().nullable(),
+  googleAdsConversionId: z.string().optional().nullable(),
+  googleAdsViewContentLabel: z.string().optional().nullable(),
+  googleAdsAddToCartLabel: z.string().optional().nullable(),
+  googleAdsCheckoutLabel: z.string().optional().nullable(),
+  googleAdsPurchaseLabel: z.string().optional().nullable(),
   enableGoogleAds: z.boolean().optional(),
   // TikTok
   tiktokPixelId: z.string().optional().nullable(),
@@ -39,8 +39,6 @@ const UpdateWorkspaceSchema = z.object({
 // Sensitive fields that need encryption: [inputFieldName, encryptedField, ivField, tagField]
 const ENCRYPTED_FIELDS: Array<[string, string, string, string]> = [
   ["metaAccessToken", "metaAccessTokenEncrypted", "metaAccessTokenIv", "metaAccessTokenTag"],
-  ["googleAdsAccessToken", "googleAdsAccessTokenEncrypted", "googleAdsAccessTokenIv", "googleAdsAccessTokenTag"],
-  ["googleAdsRefreshToken", "googleAdsRefreshTokenEncrypted", "googleAdsRefreshTokenIv", "googleAdsRefreshTokenTag"],
   ["tiktokAccessToken", "tiktokAccessTokenEncrypted", "tiktokAccessTokenIv", "tiktokAccessTokenTag"],
   ["ga4ApiSecret", "ga4ApiSecretEncrypted", "ga4ApiSecretIv", "ga4ApiSecretTag"],
   ["klaviyoApiKey", "klaviyoApiKeyEncrypted", "klaviyoApiKeyIv", "klaviyoApiKeyTag"],
@@ -78,10 +76,11 @@ export async function GET(
       isActive: true,
       eventsForwardedCount: true,
       // Google Ads
-      googleAdsCustomerId: true,
-      googleAdsConversionAction: true,
-      googleAdsAccessTokenEncrypted: true,
-      googleAdsDeveloperToken: true,
+      googleAdsConversionId: true,
+      googleAdsViewContentLabel: true,
+      googleAdsAddToCartLabel: true,
+      googleAdsCheckoutLabel: true,
+      googleAdsPurchaseLabel: true,
       enableGoogleAds: true,
       // TikTok
       tiktokPixelId: true,
@@ -106,7 +105,6 @@ export async function GET(
   // Replace encrypted tokens with boolean flags
   const {
     metaAccessTokenEncrypted,
-    googleAdsAccessTokenEncrypted,
     tiktokAccessTokenEncrypted,
     ga4ApiSecretEncrypted,
     klaviyoApiKeyEncrypted,
@@ -116,7 +114,6 @@ export async function GET(
   return NextResponse.json({
     ...rest,
     hasMetaAccessToken: metaAccessTokenEncrypted !== null,
-    hasGoogleAdsAccessToken: googleAdsAccessTokenEncrypted !== null,
     hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
     hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
     hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
@@ -201,10 +198,11 @@ export async function PATCH(
         isActive: true,
         eventsForwardedCount: true,
         // Google Ads
-        googleAdsCustomerId: true,
-        googleAdsConversionAction: true,
-        googleAdsAccessTokenEncrypted: true,
-        googleAdsDeveloperToken: true,
+        googleAdsConversionId: true,
+        googleAdsViewContentLabel: true,
+        googleAdsAddToCartLabel: true,
+        googleAdsCheckoutLabel: true,
+        googleAdsPurchaseLabel: true,
         enableGoogleAds: true,
         // TikTok
         tiktokPixelId: true,
@@ -224,7 +222,6 @@ export async function PATCH(
 
     const {
       metaAccessTokenEncrypted,
-      googleAdsAccessTokenEncrypted,
       tiktokAccessTokenEncrypted,
       ga4ApiSecretEncrypted,
       klaviyoApiKeyEncrypted,
@@ -234,7 +231,6 @@ export async function PATCH(
     return NextResponse.json({
       ...rest,
       hasMetaAccessToken: metaAccessTokenEncrypted !== null,
-      hasGoogleAdsAccessToken: googleAdsAccessTokenEncrypted !== null,
       hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
       hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
       hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,

@@ -16,11 +16,11 @@ export interface IntegrationWorkspace {
   metaTestEventCode: string | null;
   hasAccessToken: boolean;
   // Google Ads
-  googleAdsCustomerId: string | null;
-  googleAdsConversionAction: string | null;
-  hasGoogleAdsAccessToken: boolean;
-  hasGoogleAdsRefreshToken: boolean;
-  googleAdsDeveloperToken: string | null;
+  googleAdsConversionId: string | null;
+  googleAdsViewContentLabel: string | null;
+  googleAdsAddToCartLabel: string | null;
+  googleAdsCheckoutLabel: string | null;
+  googleAdsPurchaseLabel: string | null;
   enableGoogleAds: boolean;
   // TikTok
   tiktokPixelId: string | null;
@@ -120,16 +120,20 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [savingMeta, setSavingMeta] = useState(false);
 
   // Google Ads state
-  const [googleCustomerId, setGoogleCustomerId] = useState(
-    workspace.googleAdsCustomerId ?? ""
+  const [googleConversionId, setGoogleConversionId] = useState(
+    workspace.googleAdsConversionId ?? ""
   );
-  const [googleConversionAction, setGoogleConversionAction] = useState(
-    workspace.googleAdsConversionAction ?? ""
+  const [googleViewContentLabel, setGoogleViewContentLabel] = useState(
+    workspace.googleAdsViewContentLabel ?? ""
   );
-  const [googleAccessToken, setGoogleAccessToken] = useState("");
-  const [googleRefreshToken, setGoogleRefreshToken] = useState("");
-  const [googleDeveloperToken, setGoogleDeveloperToken] = useState(
-    workspace.googleAdsDeveloperToken ?? ""
+  const [googleAddToCartLabel, setGoogleAddToCartLabel] = useState(
+    workspace.googleAdsAddToCartLabel ?? ""
+  );
+  const [googleCheckoutLabel, setGoogleCheckoutLabel] = useState(
+    workspace.googleAdsCheckoutLabel ?? ""
+  );
+  const [googlePurchaseLabel, setGooglePurchaseLabel] = useState(
+    workspace.googleAdsPurchaseLabel ?? ""
   );
   const [googleEnabled, setGoogleEnabled] = useState(workspace.enableGoogleAds);
   const [savingGoogle, setSavingGoogle] = useState(false);
@@ -210,13 +214,13 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     setSavingGoogle(true);
     try {
       const body: Record<string, string | boolean | null> = {
-        googleAdsCustomerId: googleCustomerId || null,
-        googleAdsConversionAction: googleConversionAction || null,
-        googleAdsDeveloperToken: googleDeveloperToken || null,
+        googleAdsConversionId: googleConversionId || null,
+        googleAdsViewContentLabel: googleViewContentLabel || null,
+        googleAdsAddToCartLabel: googleAddToCartLabel || null,
+        googleAdsCheckoutLabel: googleCheckoutLabel || null,
+        googleAdsPurchaseLabel: googlePurchaseLabel || null,
         enableGoogleAds: googleEnabled,
       };
-      if (googleAccessToken) body.googleAdsAccessToken = googleAccessToken;
-      if (googleRefreshToken) body.googleAdsRefreshToken = googleRefreshToken;
 
       const res = await fetch(`/api/workspaces/${workspace.id}`, {
         method: "PATCH",
@@ -225,8 +229,6 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       });
       if (!res.ok) throw new Error("Failed to save");
       toast.success(t("credentialsSaved", { platform: "Google Ads" }));
-      setGoogleAccessToken("");
-      setGoogleRefreshToken("");
     } catch {
       toast.error(t("failedToSave", { platform: "Google Ads" }));
     } finally {
@@ -307,10 +309,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
 
   const metaConnected =
     workspace.hasAccessToken && !!workspace.metaPixelId;
-  const googleConnected =
-    workspace.hasGoogleAdsAccessToken &&
-    !!workspace.googleAdsCustomerId &&
-    !!workspace.googleAdsConversionAction;
+  const googleConnected = !!workspace.googleAdsConversionId;
   const tiktokConnected =
     workspace.hasTiktokAccessToken && !!workspace.tiktokPixelId;
   const ga4Connected =
@@ -446,95 +445,74 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "google" ? "max-h-[600px]" : "max-h-0"
+            expandedCard === "google" ? "max-h-[800px]" : "max-h-0"
           }`}
         >
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
             <div className="pt-4 space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="google-customer-id" className="text-xs">
-                  {t("customerId")}
+                <Label htmlFor="google-conversion-id" className="text-xs">
+                  Conversion ID
                 </Label>
                 <Input
-                  id="google-customer-id"
-                  value={googleCustomerId}
-                  onChange={(e) => setGoogleCustomerId(e.target.value)}
-                  placeholder="e.g. 123-456-7890"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="google-conversion-action" className="text-xs">
-                  {t("conversionAction")}
-                </Label>
-                <Input
-                  id="google-conversion-action"
-                  value={googleConversionAction}
-                  onChange={(e) => setGoogleConversionAction(e.target.value)}
-                  placeholder="e.g. customers/1234567890/conversionActions/123456"
+                  id="google-conversion-id"
+                  value={googleConversionId}
+                  onChange={(e) => setGoogleConversionId(e.target.value)}
+                  placeholder="e.g. 11366583402"
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  {t("conversionActionHelp")}
+                  Find this in Google Ads &gt; Goals &gt; Conversions &gt; Settings &gt; Tag setup
                 </p>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="google-access-token" className="text-xs">
-                    {t("accessToken")}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-foreground">Conversion Labels</p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="google-view-content-label" className="text-xs text-muted-foreground">
+                    View Content Label
                   </Label>
-                  {workspace.hasGoogleAdsAccessToken && <EncryptedBadge label={t("encryptedAtRest")} />}
+                  <Input
+                    id="google-view-content-label"
+                    value={googleViewContentLabel}
+                    onChange={(e) => setGoogleViewContentLabel(e.target.value)}
+                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                  />
                 </div>
-                <Input
-                  id="google-access-token"
-                  type="password"
-                  value={googleAccessToken}
-                  onChange={(e) => setGoogleAccessToken(e.target.value)}
-                  placeholder={
-                    workspace.hasGoogleAdsAccessToken
-                      ? t("leaveBlankToKeep")
-                      : "ya29.xxx..."
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="google-refresh-token" className="text-xs">
-                    {t("refreshToken")}
+                <div className="space-y-1.5">
+                  <Label htmlFor="google-add-to-cart-label" className="text-xs text-muted-foreground">
+                    Add to Cart Label
                   </Label>
-                  {workspace.hasGoogleAdsRefreshToken && <EncryptedBadge label={t("encryptedAtRest")} />}
+                  <Input
+                    id="google-add-to-cart-label"
+                    value={googleAddToCartLabel}
+                    onChange={(e) => setGoogleAddToCartLabel(e.target.value)}
+                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                  />
                 </div>
-                <Input
-                  id="google-refresh-token"
-                  type="password"
-                  value={googleRefreshToken}
-                  onChange={(e) => setGoogleRefreshToken(e.target.value)}
-                  placeholder={
-                    workspace.hasGoogleAdsRefreshToken
-                      ? t("leaveBlankToKeep")
-                      : "1//0xxxxxx..."
-                  }
-                />
+                <div className="space-y-1.5">
+                  <Label htmlFor="google-checkout-label" className="text-xs text-muted-foreground">
+                    Initiate Checkout Label
+                  </Label>
+                  <Input
+                    id="google-checkout-label"
+                    value={googleCheckoutLabel}
+                    onChange={(e) => setGoogleCheckoutLabel(e.target.value)}
+                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="google-purchase-label" className="text-xs text-muted-foreground">
+                    Purchase Label
+                  </Label>
+                  <Input
+                    id="google-purchase-label"
+                    value={googlePurchaseLabel}
+                    onChange={(e) => setGooglePurchaseLabel(e.target.value)}
+                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                  />
+                </div>
                 <p className="text-[10px] text-muted-foreground">
-                  {t("refreshTokenHelp")}
+                  Find your Conversion Labels in Google Ads &gt; Goals &gt; Conversions &gt; Details
                 </p>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="google-developer-token" className="text-xs">
-                    {t("developerToken")}
-                  </Label>
-                  {workspace.googleAdsDeveloperToken && <EncryptedBadge label={t("encryptedAtRest")} />}
-                </div>
-                <Input
-                  id="google-developer-token"
-                  type="password"
-                  value={googleDeveloperToken}
-                  onChange={(e) => setGoogleDeveloperToken(e.target.value)}
-                  placeholder={
-                    workspace.googleAdsDeveloperToken
-                      ? t("leaveBlankToKeep")
-                      : "xxxxxxxxxxxxxxxx"
-                  }
-                />
               </div>
               <div className="flex justify-end pt-2">
                 <Button

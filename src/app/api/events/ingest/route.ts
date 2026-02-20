@@ -81,15 +81,11 @@ export async function POST(request: NextRequest) {
         metaTestEventCode: true,
         // Google Ads fields
         enableGoogleAds: true,
-        googleAdsCustomerId: true,
-        googleAdsConversionAction: true,
-        googleAdsAccessTokenEncrypted: true,
-        googleAdsAccessTokenIv: true,
-        googleAdsAccessTokenTag: true,
-        googleAdsRefreshTokenEncrypted: true,
-        googleAdsRefreshTokenIv: true,
-        googleAdsRefreshTokenTag: true,
-        googleAdsDeveloperToken: true,
+        googleAdsConversionId: true,
+        googleAdsViewContentLabel: true,
+        googleAdsAddToCartLabel: true,
+        googleAdsCheckoutLabel: true,
+        googleAdsPurchaseLabel: true,
         // TikTok fields
         enableTikTok: true,
         tiktokPixelId: true,
@@ -127,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Check that at least one destination has credentials configured
     const hasMetaCredentials = !!(workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-    const hasGoogleAdsCredentials = !!(workspace.enableGoogleAds && workspace.googleAdsAccessTokenEncrypted);
+    const hasGoogleAdsCredentials = !!(workspace.enableGoogleAds && workspace.googleAdsConversionId);
     const hasTiktokCredentials = !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
     const hasGA4Credentials = !!(workspace.enableGA4 && workspace.ga4ApiSecretEncrypted);
     const hasKlaviyoCredentials = !!(workspace.enableKlaviyo && workspace.klaviyoApiKeyEncrypted);
@@ -216,15 +212,11 @@ export async function POST(request: NextRequest) {
         queue: getGoogleQueue(),
         jobName: "send-google-event",
         credentials: {
-          customerId: workspace.googleAdsCustomerId || "",
-          conversionAction: workspace.googleAdsConversionAction || "",
-          accessToken: workspace.googleAdsAccessTokenEncrypted!,
-          accessTokenIv: workspace.googleAdsAccessTokenIv!,
-          accessTokenTag: workspace.googleAdsAccessTokenTag!,
-          refreshToken: workspace.googleAdsRefreshTokenEncrypted || "",
-          refreshTokenIv: workspace.googleAdsRefreshTokenIv || "",
-          refreshTokenTag: workspace.googleAdsRefreshTokenTag || "",
-          developerToken: workspace.googleAdsDeveloperToken || "",
+          conversionId: workspace.googleAdsConversionId || "",
+          viewContentLabel: workspace.googleAdsViewContentLabel || "",
+          addToCartLabel: workspace.googleAdsAddToCartLabel || "",
+          checkoutLabel: workspace.googleAdsCheckoutLabel || "",
+          purchaseLabel: workspace.googleAdsPurchaseLabel || "",
         },
       });
     }
