@@ -96,6 +96,11 @@ export function normalizeToKlaviyoEvent(
     profileAttributes.location = location;
   }
 
+  // Klaviyo requires at least one profile identifier (email or phone)
+  if (!profileAttributes.email && !profileAttributes.phone_number) {
+    return null;
+  }
+
   // Build properties from customData
   const properties: Record<string, unknown> = {};
   if (cd.contentIds !== undefined) properties.content_ids = cd.contentIds;

@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Klaviyo (skip PageView - too noisy for email platform)
-    if (hasKlaviyoCredentials && payload.eventName !== "PageView") {
+    if (hasKlaviyoCredentials && payload.eventName !== "PageView" && (payload.userData?.email || payload.userData?.phone)) {
       destinations.push({
         destination: "KLAVIYO",
         queue: getKlaviyoQueue(),
