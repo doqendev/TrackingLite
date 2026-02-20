@@ -22,10 +22,7 @@ RUN pnpm next build
 RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && cp -r messages .next/standalone/messages
 
 ENV NODE_ENV=production
-ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
-
-EXPOSE 3000
 
 CMD ["sh", "-c", "pnpm prisma db push --accept-data-loss && node .next/standalone/server.js"]
