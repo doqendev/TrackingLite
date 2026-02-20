@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+function sanitizeForJs(value: string): string {
+  return value.replace(/[\\'"<>&]/g, "");
+}
+
 function generateSnippet(apiKey: string, pixelId: string | null, ingestUrl: string): string {
   return `// Track Clear - Server-Side Meta CAPI
 (function(){
-var K="${apiKey}",E="${ingestUrl}";
-${pixelId ? `var P="${pixelId}";` : ""}
+var K="${sanitizeForJs(apiKey)}",E="${sanitizeForJs(ingestUrl)}";
+${pixelId ? `var P="${sanitizeForJs(pixelId)}";` : ""}
 function gc(n){try{var m=document.cookie.match(new RegExp("(^| )"+n+"=([^;]+)"));return m?m[2]:null}catch(e){return null}}
 function gp(n){try{var u=new URL(location.href);return u.searchParams.get(n)}catch(e){return null}}
 var utm={s:gp("utm_source"),m:gp("utm_medium"),c:gp("utm_campaign"),n:gp("utm_content"),t:gp("utm_term")};

@@ -135,3 +135,7 @@ alertWorker.on("completed", () => {
 alertWorker.on("failed", (_job, err) => {
   console.error("[AlertChecker] Alert check job failed:", err);
 });
+
+alertWorker.on("error", (err) => {
+  console.error("[AlertChecker] Worker error:", err.message);
+});

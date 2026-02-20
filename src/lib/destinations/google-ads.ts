@@ -48,6 +48,7 @@ export async function sendGoogleAdsConversion(params: {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: formData.toString(),
+    signal: AbortSignal.timeout(30000),
   });
 
   if (!response.ok) {

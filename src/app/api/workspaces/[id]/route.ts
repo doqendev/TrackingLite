@@ -7,7 +7,7 @@ import { z } from "zod";
 const UpdateWorkspaceSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   domain: z.string().optional().nullable(),
-  metaPixelId: z.string().optional().nullable(),
+  metaPixelId: z.string().regex(/^\d+$/, "Pixel ID must be numeric").optional().nullable(),
   metaAccessToken: z.string().optional().nullable(),
   metaTestEventCode: z.string().optional().nullable(),
   enableMeta: z.boolean().optional(),
@@ -18,22 +18,24 @@ const UpdateWorkspaceSchema = z.object({
   enableInitiateCheckout: z.boolean().optional(),
   enablePurchase: z.boolean().optional(),
   // Google Ads
-  googleAdsConversionId: z.string().optional().nullable(),
-  googleAdsViewContentLabel: z.string().optional().nullable(),
-  googleAdsAddToCartLabel: z.string().optional().nullable(),
-  googleAdsCheckoutLabel: z.string().optional().nullable(),
-  googleAdsPurchaseLabel: z.string().optional().nullable(),
+  googleAdsConversionId: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid Conversion ID format").optional().nullable(),
+  googleAdsViewContentLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
+  googleAdsAddToCartLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
+  googleAdsCheckoutLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
+  googleAdsPurchaseLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
   enableGoogleAds: z.boolean().optional(),
+  // Note: googleAds* fields above are input names; they get encrypted to *Encrypted/*Iv/*Tag triplets
   // TikTok
-  tiktokPixelId: z.string().optional().nullable(),
+  tiktokPixelId: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid Pixel ID format").optional().nullable(),
   tiktokAccessToken: z.string().optional().nullable(),
   enableTikTok: z.boolean().optional(),
   // GA4
-  ga4MeasurementId: z.string().optional().nullable(),
+  ga4MeasurementId: z.string().regex(/^G-[A-Za-z0-9]+$/, "Must be format G-XXXXXXX").optional().nullable(),
   ga4ApiSecret: z.string().optional().nullable(),
   enableGA4: z.boolean().optional(),
   // Klaviyo
   klaviyoApiKey: z.string().optional().nullable(),
+  klaviyoCompanyId: z.string().regex(/^[A-Za-z0-9]+$/, "Invalid Company ID format").optional().nullable(),
   enableKlaviyo: z.boolean().optional(),
 });
 
@@ -43,6 +45,12 @@ const ENCRYPTED_FIELDS: Array<[string, string, string, string]> = [
   ["tiktokAccessToken", "tiktokAccessTokenEncrypted", "tiktokAccessTokenIv", "tiktokAccessTokenTag"],
   ["ga4ApiSecret", "ga4ApiSecretEncrypted", "ga4ApiSecretIv", "ga4ApiSecretTag"],
   ["klaviyoApiKey", "klaviyoApiKeyEncrypted", "klaviyoApiKeyIv", "klaviyoApiKeyTag"],
+  // Google Ads fields — Conversion ID and per-event labels
+  ["googleAdsConversionId", "googleAdsConversionIdEncrypted", "googleAdsConversionIdIv", "googleAdsConversionIdTag"],
+  ["googleAdsViewContentLabel", "googleAdsViewContentLabelEncrypted", "googleAdsViewContentLabelIv", "googleAdsViewContentLabelTag"],
+  ["googleAdsAddToCartLabel", "googleAdsAddToCartLabelEncrypted", "googleAdsAddToCartLabelIv", "googleAdsAddToCartLabelTag"],
+  ["googleAdsCheckoutLabel", "googleAdsCheckoutLabelEncrypted", "googleAdsCheckoutLabelIv", "googleAdsCheckoutLabelTag"],
+  ["googleAdsPurchaseLabel", "googleAdsPurchaseLabelEncrypted", "googleAdsPurchaseLabelIv", "googleAdsPurchaseLabelTag"],
 ];
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -78,11 +86,11 @@ export async function GET(
       isActive: true,
       eventsForwardedCount: true,
       // Google Ads
-      googleAdsConversionId: true,
-      googleAdsViewContentLabel: true,
-      googleAdsAddToCartLabel: true,
-      googleAdsCheckoutLabel: true,
-      googleAdsPurchaseLabel: true,
+      googleAdsConversionIdEncrypted: true,
+      googleAdsViewContentLabelEncrypted: true,
+      googleAdsAddToCartLabelEncrypted: true,
+      googleAdsCheckoutLabelEncrypted: true,
+      googleAdsPurchaseLabelEncrypted: true,
       enableGoogleAds: true,
       // TikTok
       tiktokPixelId: true,
@@ -104,12 +112,17 @@ export async function GET(
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  // Replace encrypted tokens with boolean flags
+  // Replace encrypted fields with boolean flags
   const {
     metaAccessTokenEncrypted,
     tiktokAccessTokenEncrypted,
     ga4ApiSecretEncrypted,
     klaviyoApiKeyEncrypted,
+    googleAdsConversionIdEncrypted,
+    googleAdsViewContentLabelEncrypted,
+    googleAdsAddToCartLabelEncrypted,
+    googleAdsCheckoutLabelEncrypted,
+    googleAdsPurchaseLabelEncrypted,
     ...rest
   } = workspace;
 
@@ -119,6 +132,11 @@ export async function GET(
     hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
     hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
     hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
+    hasGoogleAdsConversionId: googleAdsConversionIdEncrypted !== null,
+    hasGoogleAdsViewContentLabel: googleAdsViewContentLabelEncrypted !== null,
+    hasGoogleAdsAddToCartLabel: googleAdsAddToCartLabelEncrypted !== null,
+    hasGoogleAdsCheckoutLabel: googleAdsCheckoutLabelEncrypted !== null,
+    hasGoogleAdsPurchaseLabel: googleAdsPurchaseLabelEncrypted !== null,
   });
 }
 
@@ -201,11 +219,11 @@ export async function PATCH(
         isActive: true,
         eventsForwardedCount: true,
         // Google Ads
-        googleAdsConversionId: true,
-        googleAdsViewContentLabel: true,
-        googleAdsAddToCartLabel: true,
-        googleAdsCheckoutLabel: true,
-        googleAdsPurchaseLabel: true,
+        googleAdsConversionIdEncrypted: true,
+        googleAdsViewContentLabelEncrypted: true,
+        googleAdsAddToCartLabelEncrypted: true,
+        googleAdsCheckoutLabelEncrypted: true,
+        googleAdsPurchaseLabelEncrypted: true,
         enableGoogleAds: true,
         // TikTok
         tiktokPixelId: true,
@@ -228,6 +246,11 @@ export async function PATCH(
       tiktokAccessTokenEncrypted,
       ga4ApiSecretEncrypted,
       klaviyoApiKeyEncrypted,
+      googleAdsConversionIdEncrypted,
+      googleAdsViewContentLabelEncrypted,
+      googleAdsAddToCartLabelEncrypted,
+      googleAdsCheckoutLabelEncrypted,
+      googleAdsPurchaseLabelEncrypted,
       ...rest
     } = updated;
 
@@ -237,6 +260,11 @@ export async function PATCH(
       hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
       hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
       hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
+      hasGoogleAdsConversionId: googleAdsConversionIdEncrypted !== null,
+      hasGoogleAdsViewContentLabel: googleAdsViewContentLabelEncrypted !== null,
+      hasGoogleAdsAddToCartLabel: googleAdsAddToCartLabelEncrypted !== null,
+      hasGoogleAdsCheckoutLabel: googleAdsCheckoutLabelEncrypted !== null,
+      hasGoogleAdsPurchaseLabel: googleAdsPurchaseLabelEncrypted !== null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -10,7 +10,7 @@ import {
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { shouldSendEvent } from "@/lib/consent";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { checkOrderLimits, incrementOrderCount } from "@/lib/billing";
+import { checkOrderLimits } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import { z } from "zod";
@@ -83,11 +83,21 @@ export async function POST(request: NextRequest) {
         enableMeta: true,
         // Google Ads fields
         enableGoogleAds: true,
-        googleAdsConversionId: true,
-        googleAdsViewContentLabel: true,
-        googleAdsAddToCartLabel: true,
-        googleAdsCheckoutLabel: true,
-        googleAdsPurchaseLabel: true,
+        googleAdsConversionIdEncrypted: true,
+        googleAdsConversionIdIv: true,
+        googleAdsConversionIdTag: true,
+        googleAdsViewContentLabelEncrypted: true,
+        googleAdsViewContentLabelIv: true,
+        googleAdsViewContentLabelTag: true,
+        googleAdsAddToCartLabelEncrypted: true,
+        googleAdsAddToCartLabelIv: true,
+        googleAdsAddToCartLabelTag: true,
+        googleAdsCheckoutLabelEncrypted: true,
+        googleAdsCheckoutLabelIv: true,
+        googleAdsCheckoutLabelTag: true,
+        googleAdsPurchaseLabelEncrypted: true,
+        googleAdsPurchaseLabelIv: true,
+        googleAdsPurchaseLabelTag: true,
         // TikTok fields
         enableTikTok: true,
         tiktokPixelId: true,
@@ -125,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Check that at least one destination has credentials configured
     const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-    const hasGoogleAdsCredentials = !!(workspace.enableGoogleAds && workspace.googleAdsConversionId);
+    const hasGoogleAdsCredentials = !!(workspace.enableGoogleAds && workspace.googleAdsConversionIdEncrypted);
     const hasTiktokCredentials = !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
     const hasGA4Credentials = !!(workspace.enableGA4 && workspace.ga4ApiSecretEncrypted);
     const hasKlaviyoCredentials = !!(workspace.enableKlaviyo && workspace.klaviyoApiKeyEncrypted);
@@ -214,11 +224,21 @@ export async function POST(request: NextRequest) {
         queue: getGoogleQueue(),
         jobName: "send-google-event",
         credentials: {
-          conversionId: workspace.googleAdsConversionId || "",
-          viewContentLabel: workspace.googleAdsViewContentLabel || "",
-          addToCartLabel: workspace.googleAdsAddToCartLabel || "",
-          checkoutLabel: workspace.googleAdsCheckoutLabel || "",
-          purchaseLabel: workspace.googleAdsPurchaseLabel || "",
+          conversionId: workspace.googleAdsConversionIdEncrypted!,
+          conversionIdIv: workspace.googleAdsConversionIdIv!,
+          conversionIdTag: workspace.googleAdsConversionIdTag!,
+          viewContentLabel: workspace.googleAdsViewContentLabelEncrypted || "",
+          viewContentLabelIv: workspace.googleAdsViewContentLabelIv || "",
+          viewContentLabelTag: workspace.googleAdsViewContentLabelTag || "",
+          addToCartLabel: workspace.googleAdsAddToCartLabelEncrypted || "",
+          addToCartLabelIv: workspace.googleAdsAddToCartLabelIv || "",
+          addToCartLabelTag: workspace.googleAdsAddToCartLabelTag || "",
+          checkoutLabel: workspace.googleAdsCheckoutLabelEncrypted || "",
+          checkoutLabelIv: workspace.googleAdsCheckoutLabelIv || "",
+          checkoutLabelTag: workspace.googleAdsCheckoutLabelTag || "",
+          purchaseLabel: workspace.googleAdsPurchaseLabelEncrypted || "",
+          purchaseLabelIv: workspace.googleAdsPurchaseLabelIv || "",
+          purchaseLabelTag: workspace.googleAdsPurchaseLabelTag || "",
         },
       });
     }
@@ -369,12 +389,7 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // 13. Increment order count only for Purchase events
-    if (payload.eventName === "Purchase") {
-      await incrementOrderCount(workspace.userId);
-    }
-
-    // 14. Return success
+    // 13. Return success
     const response: any = {
       success: true,
       eventId: payload.eventId,

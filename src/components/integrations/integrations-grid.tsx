@@ -17,12 +17,12 @@ export interface IntegrationWorkspace {
   metaTestEventCode: string | null;
   hasAccessToken: boolean;
   enableMeta: boolean;
-  // Google Ads
-  googleAdsConversionId: string | null;
-  googleAdsViewContentLabel: string | null;
-  googleAdsAddToCartLabel: string | null;
-  googleAdsCheckoutLabel: string | null;
-  googleAdsPurchaseLabel: string | null;
+  // Google Ads — boolean flags only (values are encrypted at rest, never sent to client)
+  hasGoogleAdsConversionId: boolean;
+  hasGoogleAdsViewContentLabel: boolean;
+  hasGoogleAdsAddToCartLabel: boolean;
+  hasGoogleAdsCheckoutLabel: boolean;
+  hasGoogleAdsPurchaseLabel: boolean;
   enableGoogleAds: boolean;
   // TikTok
   tiktokPixelId: string | null;
@@ -90,22 +90,12 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [metaEnabled, setMetaEnabled] = useState(workspace.enableMeta);
   const [savingMeta, setSavingMeta] = useState(false);
 
-  // Google Ads state
-  const [googleConversionId, setGoogleConversionId] = useState(
-    workspace.googleAdsConversionId ?? ""
-  );
-  const [googleViewContentLabel, setGoogleViewContentLabel] = useState(
-    workspace.googleAdsViewContentLabel ?? ""
-  );
-  const [googleAddToCartLabel, setGoogleAddToCartLabel] = useState(
-    workspace.googleAdsAddToCartLabel ?? ""
-  );
-  const [googleCheckoutLabel, setGoogleCheckoutLabel] = useState(
-    workspace.googleAdsCheckoutLabel ?? ""
-  );
-  const [googlePurchaseLabel, setGooglePurchaseLabel] = useState(
-    workspace.googleAdsPurchaseLabel ?? ""
-  );
+  // Google Ads state — fields are encrypted at rest; inputs always start empty
+  const [googleConversionId, setGoogleConversionId] = useState("");
+  const [googleViewContentLabel, setGoogleViewContentLabel] = useState("");
+  const [googleAddToCartLabel, setGoogleAddToCartLabel] = useState("");
+  const [googleCheckoutLabel, setGoogleCheckoutLabel] = useState("");
+  const [googlePurchaseLabel, setGooglePurchaseLabel] = useState("");
   const [googleEnabled, setGoogleEnabled] = useState(workspace.enableGoogleAds);
   const [savingGoogle, setSavingGoogle] = useState(false);
 
@@ -187,13 +177,14 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     setSavingGoogle(true);
     try {
       const body: Record<string, string | boolean | null> = {
-        googleAdsConversionId: googleConversionId || null,
-        googleAdsViewContentLabel: googleViewContentLabel || null,
-        googleAdsAddToCartLabel: googleAddToCartLabel || null,
-        googleAdsCheckoutLabel: googleCheckoutLabel || null,
-        googleAdsPurchaseLabel: googlePurchaseLabel || null,
         enableGoogleAds: googleEnabled,
       };
+      // Only send a field if the user typed a new value; empty means "keep existing"
+      if (googleConversionId) body.googleAdsConversionId = googleConversionId;
+      if (googleViewContentLabel) body.googleAdsViewContentLabel = googleViewContentLabel;
+      if (googleAddToCartLabel) body.googleAdsAddToCartLabel = googleAddToCartLabel;
+      if (googleCheckoutLabel) body.googleAdsCheckoutLabel = googleCheckoutLabel;
+      if (googlePurchaseLabel) body.googleAdsPurchaseLabel = googlePurchaseLabel;
 
       const res = await fetch(`/api/workspaces/${workspace.id}`, {
         method: "PATCH",
@@ -202,6 +193,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       });
       if (!res.ok) throw new Error("Failed to save");
       toast.success(t("credentialsSaved", { platform: "Google Ads" }));
+      setGoogleConversionId("");
+      setGoogleViewContentLabel("");
+      setGoogleAddToCartLabel("");
+      setGoogleCheckoutLabel("");
+      setGooglePurchaseLabel("");
     } catch {
       toast.error(t("failedToSave", { platform: "Google Ads" }));
     } finally {
@@ -282,7 +278,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
 
   const metaConnected =
     workspace.hasAccessToken && !!workspace.metaPixelId;
-  const googleConnected = !!workspace.googleAdsConversionId;
+  const googleConnected = workspace.hasGoogleAdsConversionId;
   const tiktokConnected =
     workspace.hasTiktokAccessToken && !!workspace.tiktokPixelId;
   const ga4Connected =
@@ -433,14 +429,17 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
             <div className="pt-4 space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="google-conversion-id" className="text-xs">
-                  Conversion ID
-                </Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="google-conversion-id" className="text-xs">
+                    Conversion ID
+                  </Label>
+                  {workspace.hasGoogleAdsConversionId && <EncryptedBadge label={t("encryptedAtRest")} />}
+                </div>
                 <Input
                   id="google-conversion-id"
                   value={googleConversionId}
                   onChange={(e) => setGoogleConversionId(e.target.value)}
-                  placeholder="e.g. 11366583402"
+                  placeholder={workspace.hasGoogleAdsConversionId ? t("leaveBlankToKeep") : "e.g. 11366583402"}
                 />
                 <p className="text-[10px] text-muted-foreground">
                   Find this in Google Ads &gt; Goals &gt; Conversions &gt; Settings &gt; Tag setup
@@ -452,47 +451,59 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   Match these to your Google Ads conversion actions. Leave blank to skip.
                 </p>
                 <div className="space-y-1.5">
-                  <Label htmlFor="google-view-content-label" className="text-xs text-muted-foreground">
-                    Page View Label <span className="text-muted-foreground/60">(product page views)</span>
-                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="google-view-content-label" className="text-xs text-muted-foreground">
+                      Page View Label <span className="text-muted-foreground/60">(product page views)</span>
+                    </Label>
+                    {workspace.hasGoogleAdsViewContentLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
+                  </div>
                   <Input
                     id="google-view-content-label"
                     value={googleViewContentLabel}
                     onChange={(e) => setGoogleViewContentLabel(e.target.value)}
-                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                    placeholder={workspace.hasGoogleAdsViewContentLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="google-add-to-cart-label" className="text-xs text-muted-foreground">
-                    Add to Cart Label
-                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="google-add-to-cart-label" className="text-xs text-muted-foreground">
+                      Add to Cart Label
+                    </Label>
+                    {workspace.hasGoogleAdsAddToCartLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
+                  </div>
                   <Input
                     id="google-add-to-cart-label"
                     value={googleAddToCartLabel}
                     onChange={(e) => setGoogleAddToCartLabel(e.target.value)}
-                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                    placeholder={workspace.hasGoogleAdsAddToCartLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="google-checkout-label" className="text-xs text-muted-foreground">
-                    Begin Checkout Label
-                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="google-checkout-label" className="text-xs text-muted-foreground">
+                      Begin Checkout Label
+                    </Label>
+                    {workspace.hasGoogleAdsCheckoutLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
+                  </div>
                   <Input
                     id="google-checkout-label"
                     value={googleCheckoutLabel}
                     onChange={(e) => setGoogleCheckoutLabel(e.target.value)}
-                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                    placeholder={workspace.hasGoogleAdsCheckoutLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="google-purchase-label" className="text-xs text-muted-foreground">
-                    Purchase Label
-                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="google-purchase-label" className="text-xs text-muted-foreground">
+                      Purchase Label
+                    </Label>
+                    {workspace.hasGoogleAdsPurchaseLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
+                  </div>
                   <Input
                     id="google-purchase-label"
                     value={googlePurchaseLabel}
                     onChange={(e) => setGooglePurchaseLabel(e.target.value)}
-                    placeholder="e.g. P_HrCM-G0eAaEOqYgawq"
+                    placeholder={workspace.hasGoogleAdsPurchaseLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
                   />
                 </div>
                 <p className="text-[10px] text-muted-foreground">

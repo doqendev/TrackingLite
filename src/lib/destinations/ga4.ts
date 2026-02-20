@@ -130,6 +130,7 @@ export async function sendToGA4(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
   });
 
   // GA4 Measurement Protocol returns 204 on success with no body.

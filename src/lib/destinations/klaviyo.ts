@@ -149,6 +149,7 @@ export async function sendToKlaviyo(
       "revision": KLAVIYO_API_REVISION,
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30000),
   });
 
   // Klaviyo returns 202 Accepted on success with no body

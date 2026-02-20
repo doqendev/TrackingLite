@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isPublicRoute = ["/", "/login", "/signup", "/api/events/ingest", "/api/stripe/webhook", "/api/health"].some(
+  const isPublicRoute = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/api/events/ingest", "/api/stripe/webhook", "/api/health"].some(
     (path) => req.nextUrl.pathname === path || req.nextUrl.pathname.startsWith("/api/auth")
   );
 

@@ -23,14 +23,23 @@ export interface BillingCheck {
 }
 
 /**
- * Check if a Purchase event is allowed for this user.
- * Non-Purchase events are always allowed (free & unlimited).
+ * Check if a Purchase event is allowed for this user, and atomically increment
+ * the order count if allowed. Non-Purchase events are always allowed (free & unlimited).
+ *
+ * Uses INCR-first pattern to eliminate TOCTOU race conditions:
+ * 1. INCR the counter atomically
+ * 2. If new count is within limit: allowed (count already incremented)
+ * 3. If over limit: DECR to rollback, then attempt auto-upgrade
+ * 4. If auto-upgrade succeeds: INCR again and allow
+ * 5. Otherwise: return blocked
+ *
+ * Callers must NOT call incrementOrderCount separately for Purchase events.
  */
 export async function checkOrderLimits(
   userId: string,
   eventName: string
 ): Promise<BillingCheck> {
-  // Non-Purchase events are always free
+  // Non-Purchase events are always free — no increment needed
   if (eventName !== "Purchase") {
     return { allowed: true };
   }
@@ -48,24 +57,35 @@ export async function checkOrderLimits(
     return { allowed: false, reason: "Subscription inactive" };
   }
 
-  // PAST_DUE: Allow with grace period
+  // PAST_DUE: Allow with grace period (still increment so usage is tracked)
   if (status === "PAST_DUE") {
+    await incrementOrderCount(userId);
     return { allowed: true };
   }
 
-  // Check order count against plan limit
-  const monthKey = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const redisKey = `orders:${userId}:${monthKey}`;
-  const count = parseInt((await getRedis().get(redisKey)) || "0", 10);
   const planConfig = BILLING_PLANS[plan as keyof typeof BILLING_PLANS];
 
   if (!planConfig) {
+    // Unknown plan — allow without incrementing
     return { allowed: true };
   }
 
-  if (count < planConfig.ordersPerMonth) {
+  // Atomically increment first, then check
+  const monthKey = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const redisKey = `orders:${userId}:${monthKey}`;
+  const r = getRedis();
+
+  const newCount = await r.incr(redisKey);
+  // Ensure expiry is set (safe to call on every increment; Redis ignores if already set)
+  await r.expire(redisKey, 35 * 24 * 60 * 60);
+
+  if (newCount <= planConfig.ordersPerMonth) {
+    // Within limit — increment already applied
     return { allowed: true };
   }
+
+  // Over limit — rollback the increment
+  await r.decr(redisKey);
 
   // Limit reached — handle based on plan type
   if (plan === "FREE") {
@@ -74,7 +94,7 @@ export async function checkOrderLimits(
       allowed: false,
       reason: "Order limit reached. Upgrade to continue tracking purchases.",
       limit: planConfig.ordersPerMonth,
-      used: count,
+      used: newCount - 1,
     };
   }
 
@@ -86,13 +106,15 @@ export async function checkOrderLimits(
       allowed: false,
       reason: "Order limit reached. Contact us for enterprise pricing.",
       limit: planConfig.ordersPerMonth,
-      used: count,
+      used: newCount - 1,
     };
   }
 
   // Auto-upgrade to next tier
   const upgraded = await autoUpgrade(userId, nextPlan);
   if (upgraded) {
+    // Upgrade succeeded — now apply the increment and allow
+    await incrementOrderCount(userId);
     return {
       allowed: true,
       upgraded: true,
@@ -102,6 +124,7 @@ export async function checkOrderLimits(
 
   // Auto-upgrade failed — allow the event anyway (don't block commerce), log error
   console.error(`[Billing] Auto-upgrade failed for user ${userId} from ${plan} to ${nextPlan}`);
+  await incrementOrderCount(userId);
   return { allowed: true };
 }
 

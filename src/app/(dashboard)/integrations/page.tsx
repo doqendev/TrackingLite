@@ -21,11 +21,11 @@ export default async function IntegrationsPage() {
       metaAccessTokenEncrypted: true,
       enableMeta: true,
       // Google Ads
-      googleAdsConversionId: true,
-      googleAdsViewContentLabel: true,
-      googleAdsAddToCartLabel: true,
-      googleAdsCheckoutLabel: true,
-      googleAdsPurchaseLabel: true,
+      googleAdsConversionIdEncrypted: true,
+      googleAdsViewContentLabelEncrypted: true,
+      googleAdsAddToCartLabelEncrypted: true,
+      googleAdsCheckoutLabelEncrypted: true,
+      googleAdsPurchaseLabelEncrypted: true,
       enableGoogleAds: true,
       // TikTok
       tiktokPixelId: true,
@@ -50,12 +50,12 @@ export default async function IntegrationsPage() {
     metaTestEventCode: workspace.metaTestEventCode,
     hasAccessToken: !!workspace.metaAccessTokenEncrypted,
     enableMeta: workspace.enableMeta,
-    // Google Ads
-    googleAdsConversionId: workspace.googleAdsConversionId,
-    googleAdsViewContentLabel: workspace.googleAdsViewContentLabel,
-    googleAdsAddToCartLabel: workspace.googleAdsAddToCartLabel,
-    googleAdsCheckoutLabel: workspace.googleAdsCheckoutLabel,
-    googleAdsPurchaseLabel: workspace.googleAdsPurchaseLabel,
+    // Google Ads — pass boolean flags only, never expose encrypted values to client
+    hasGoogleAdsConversionId: !!workspace.googleAdsConversionIdEncrypted,
+    hasGoogleAdsViewContentLabel: !!workspace.googleAdsViewContentLabelEncrypted,
+    hasGoogleAdsAddToCartLabel: !!workspace.googleAdsAddToCartLabelEncrypted,
+    hasGoogleAdsCheckoutLabel: !!workspace.googleAdsCheckoutLabelEncrypted,
+    hasGoogleAdsPurchaseLabel: !!workspace.googleAdsPurchaseLabelEncrypted,
     enableGoogleAds: workspace.enableGoogleAds,
     // TikTok
     tiktokPixelId: workspace.tiktokPixelId,

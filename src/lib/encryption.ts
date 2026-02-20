@@ -5,6 +5,9 @@ const ALGORITHM = "aes-256-gcm";
 function getKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
   if (!key) throw new Error("ENCRYPTION_KEY environment variable is required");
+  if (key.length !== 64 || !/^[0-9a-fA-F]+$/.test(key)) {
+    throw new Error("ENCRYPTION_KEY must be exactly 64 hexadecimal characters (32 bytes)");
+  }
   return Buffer.from(key, "hex");
 }
 

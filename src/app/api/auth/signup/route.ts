@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { checkAuthRateLimit } from "@/lib/rate-limit";
 
 const SignupSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -11,6 +12,12 @@ const SignupSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = await checkAuthRateLimit(ip, "signup", 3, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
     const body = await request.json();
     const { name, email, password } = SignupSchema.parse(body);
 

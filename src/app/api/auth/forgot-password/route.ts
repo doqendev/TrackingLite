@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
 import { z } from "zod";
+import { checkAuthRateLimit } from "@/lib/rate-limit";
 
 const ForgotPasswordSchema = z.object({
   email: z.string().email(),
@@ -10,6 +11,12 @@ const ForgotPasswordSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = await checkAuthRateLimit(ip, "forgot-password", 3, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
     const body = await request.json();
     const { email } = ForgotPasswordSchema.parse(body);
 

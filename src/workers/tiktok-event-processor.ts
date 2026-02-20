@@ -104,6 +104,7 @@ export const tiktokWorker = new Worker<DestinationEventJob>(
   {
     connection: connection as never,
     concurrency: 10,
+    lockDuration: 60000,
   }
 );
 

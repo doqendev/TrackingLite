@@ -144,6 +144,7 @@ export async function sendToTikTok(
       "Access-Token": accessToken,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
   });
 
   const result = await response.json();

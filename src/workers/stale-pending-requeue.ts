@@ -91,11 +91,21 @@ async function requeueStalePending(): Promise<void> {
         metaTestEventCode: true,
         enableMeta: true,
         enableGoogleAds: true,
-        googleAdsConversionId: true,
-        googleAdsViewContentLabel: true,
-        googleAdsAddToCartLabel: true,
-        googleAdsCheckoutLabel: true,
-        googleAdsPurchaseLabel: true,
+        googleAdsConversionIdEncrypted: true,
+        googleAdsConversionIdIv: true,
+        googleAdsConversionIdTag: true,
+        googleAdsViewContentLabelEncrypted: true,
+        googleAdsViewContentLabelIv: true,
+        googleAdsViewContentLabelTag: true,
+        googleAdsAddToCartLabelEncrypted: true,
+        googleAdsAddToCartLabelIv: true,
+        googleAdsAddToCartLabelTag: true,
+        googleAdsCheckoutLabelEncrypted: true,
+        googleAdsCheckoutLabelIv: true,
+        googleAdsCheckoutLabelTag: true,
+        googleAdsPurchaseLabelEncrypted: true,
+        googleAdsPurchaseLabelIv: true,
+        googleAdsPurchaseLabelTag: true,
         enableTikTok: true,
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
@@ -152,18 +162,28 @@ async function requeueStalePending(): Promise<void> {
             eventLogId: event.id,
           } satisfies MetaEventJob);
           requeued++;
-        } else if (event.destination === "GOOGLE_ADS" && workspace.googleAdsConversionId) {
+        } else if (event.destination === "GOOGLE_ADS" && workspace.googleAdsConversionIdEncrypted) {
           await getGoogleQueue().add("send-google-event", {
             workspaceId: workspace.id,
             destination: "GOOGLE_ADS",
             eventLogId: event.id,
             event: { ...eventData, ttclid: null },
             credentials: {
-              conversionId: workspace.googleAdsConversionId || "",
-              viewContentLabel: workspace.googleAdsViewContentLabel || "",
-              addToCartLabel: workspace.googleAdsAddToCartLabel || "",
-              checkoutLabel: workspace.googleAdsCheckoutLabel || "",
-              purchaseLabel: workspace.googleAdsPurchaseLabel || "",
+              conversionId: workspace.googleAdsConversionIdEncrypted!,
+              conversionIdIv: workspace.googleAdsConversionIdIv!,
+              conversionIdTag: workspace.googleAdsConversionIdTag!,
+              viewContentLabel: workspace.googleAdsViewContentLabelEncrypted || "",
+              viewContentLabelIv: workspace.googleAdsViewContentLabelIv || "",
+              viewContentLabelTag: workspace.googleAdsViewContentLabelTag || "",
+              addToCartLabel: workspace.googleAdsAddToCartLabelEncrypted || "",
+              addToCartLabelIv: workspace.googleAdsAddToCartLabelIv || "",
+              addToCartLabelTag: workspace.googleAdsAddToCartLabelTag || "",
+              checkoutLabel: workspace.googleAdsCheckoutLabelEncrypted || "",
+              checkoutLabelIv: workspace.googleAdsCheckoutLabelIv || "",
+              checkoutLabelTag: workspace.googleAdsCheckoutLabelTag || "",
+              purchaseLabel: workspace.googleAdsPurchaseLabelEncrypted || "",
+              purchaseLabelIv: workspace.googleAdsPurchaseLabelIv || "",
+              purchaseLabelTag: workspace.googleAdsPurchaseLabelTag || "",
             },
           } satisfies DestinationEventJob);
           requeued++;
@@ -264,4 +284,8 @@ staleRequeueWorker.on("completed", () => {
 
 staleRequeueWorker.on("failed", (_job, err) => {
   console.error("[StaleRequeue] Job failed:", err);
+});
+
+staleRequeueWorker.on("error", (err) => {
+  console.error("[StaleRequeue] Worker error:", err.message);
 });

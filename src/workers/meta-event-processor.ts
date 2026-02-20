@@ -108,6 +108,7 @@ export const worker = new Worker<MetaEventJob>(
   {
     connection: connection as never,
     concurrency: 10,
+    lockDuration: 60000,
   }
 );
 

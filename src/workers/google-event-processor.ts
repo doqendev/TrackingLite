@@ -5,6 +5,7 @@ import {
   getConversionLabel,
   GoogleAdsError,
 } from "@/lib/destinations/google-ads";
+import { decrypt } from "@/lib/encryption";
 import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import type { DestinationEventJob } from "@/lib/queue";
@@ -13,8 +14,11 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
   const { workspaceId, eventLogId, event, credentials } = job.data;
 
   try {
-    const conversionId = credentials.conversionId as string | undefined;
-    if (!conversionId) {
+    const conversionIdEnc = credentials.conversionId as string | undefined;
+    const conversionIdIv = credentials.conversionIdIv as string | undefined;
+    const conversionIdTag = credentials.conversionIdTag as string | undefined;
+
+    if (!conversionIdEnc || !conversionIdIv || !conversionIdTag) {
       await db.eventLog.update({
         where: { id: eventLogId },
         data: {
@@ -25,10 +29,42 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
       return;
     }
 
-    // Look up the per-event label from credentials
+    // Decrypt the conversion ID
+    const conversionId = decrypt(conversionIdEnc, conversionIdIv, conversionIdTag);
+
+    // Decrypt per-event labels (empty string means not configured)
+    const decryptLabel = (enc: string, iv: string, tag: string): string => {
+      if (!enc || !iv || !tag) return "";
+      return decrypt(enc, iv, tag);
+    };
+
+    const decryptedCredentials: Record<string, string> = {
+      viewContentLabel: decryptLabel(
+        credentials.viewContentLabel as string,
+        credentials.viewContentLabelIv as string,
+        credentials.viewContentLabelTag as string
+      ),
+      addToCartLabel: decryptLabel(
+        credentials.addToCartLabel as string,
+        credentials.addToCartLabelIv as string,
+        credentials.addToCartLabelTag as string
+      ),
+      checkoutLabel: decryptLabel(
+        credentials.checkoutLabel as string,
+        credentials.checkoutLabelIv as string,
+        credentials.checkoutLabelTag as string
+      ),
+      purchaseLabel: decryptLabel(
+        credentials.purchaseLabel as string,
+        credentials.purchaseLabelIv as string,
+        credentials.purchaseLabelTag as string
+      ),
+    };
+
+    // Look up the per-event label from decrypted credentials
     const conversionLabel = getConversionLabel(
       event.eventName,
-      credentials as Record<string, string>
+      decryptedCredentials
     );
 
     if (!conversionLabel) {
@@ -114,6 +150,7 @@ export const googleWorker = new Worker<DestinationEventJob>(
   {
     connection: connection as never,
     concurrency: 10,
+    lockDuration: 60000,
   }
 );
 
