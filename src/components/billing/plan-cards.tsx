@@ -199,7 +199,7 @@ function PlanCard({
           ) : (
             <>
               <span className="text-4xl font-extrabold text-foreground tabular-nums">${plan.priceMonthly}</span>
-              <span className="text-xs text-muted-foreground/60">/month</span>
+              <span className="text-xs text-muted-foreground/60">/{t("perMonthUnit")}</span>
             </>
           )}
         </div>

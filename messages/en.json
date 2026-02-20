@@ -232,7 +232,8 @@
     "pastDue": "Past Due",
     "canceled": "Canceled",
     "unpaid": "Unpaid",
-    "autoUpgradeTo": "Auto-upgrades to {plan} if you exceed {limit} orders"
+    "autoUpgradeTo": "Auto-upgrades to {plan} if you exceed {limit} orders",
+    "perMonthUnit": "mo"
   },
   "integrations": {
     "title": "Integrations",
