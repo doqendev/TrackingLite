@@ -11,10 +11,56 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Track Clear - Server-Side Tracking for Shopify",
+  title: {
+    default: "Track Clear - Server-Side Tracking for Shopify",
+    template: "%s | Track Clear",
+  },
   description:
-    "Fix your Meta tracking in 10 minutes. Accurate server-side event tracking for Shopify stores.",
-  keywords: ["shopify", "meta tracking", "server-side tracking", "facebook pixel", "capi"],
+    "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest. Bypass ad blockers. Setup in 10 minutes.",
+  keywords: [
+    "shopify server side tracking",
+    "meta conversions api",
+    "shopify capi",
+    "server side tracking shopify",
+    "facebook pixel alternative",
+    "tiktok tracking shopify",
+    "ga4 server side",
+    "shopify conversion tracking",
+    "ios 14 tracking fix",
+    "ad blocker bypass tracking",
+  ],
+  metadataBase: new URL("https://trackclear.io"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://trackclear.io",
+    siteName: "Track Clear",
+    title: "Track Clear - Server-Side Tracking for Shopify",
+    description:
+      "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest. Bypass ad blockers.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Track Clear - Server-Side Tracking for Shopify",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Track Clear - Server-Side Tracking for Shopify",
+    description:
+      "Server-side event tracking for Shopify. Forward conversions to 6 ad platforms. Bypass ad blockers.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default async function RootLayout({

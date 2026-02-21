@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { SidebarNav, SidebarFooter, MobileNav } from "@/components/dashboard/sidebar-nav";
 
+export const metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");

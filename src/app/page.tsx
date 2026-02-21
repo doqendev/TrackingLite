@@ -18,6 +18,65 @@ import {
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "Organization",
+                "name": "Track Clear",
+                "url": "https://trackclear.io",
+                "description": "Server-side event tracking for Shopify stores",
+              },
+              {
+                "@type": "WebSite",
+                "name": "Track Clear",
+                "url": "https://trackclear.io",
+              },
+              {
+                "@type": "SoftwareApplication",
+                "name": "Track Clear",
+                "applicationCategory": "BusinessApplication",
+                "operatingSystem": "Web",
+                "description": "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest.",
+                "offers": [
+                  {
+                    "@type": "Offer",
+                    "name": "Free",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                    "description": "50 orders/month, unlimited other events",
+                  },
+                  {
+                    "@type": "Offer",
+                    "name": "Starter",
+                    "price": "29",
+                    "priceCurrency": "USD",
+                    "description": "500 orders/month, unlimited other events",
+                  },
+                  {
+                    "@type": "Offer",
+                    "name": "Growth",
+                    "price": "49",
+                    "priceCurrency": "USD",
+                    "description": "1000 orders/month, 30-day event log",
+                  },
+                  {
+                    "@type": "Offer",
+                    "name": "Scale",
+                    "price": "99",
+                    "priceCurrency": "USD",
+                    "description": "5000 orders/month, 30-day event log, priority support",
+                  },
+                ],
+              },
+            ],
+          }),
+        }}
+      />
       {/* ───────────────────────── Navigation ───────────────────────── */}
       <header className="relative z-10 bg-transparent">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -966,18 +1025,26 @@ export default function HomePage() {
                 Product
               </h4>
               <ul className="space-y-2.5">
-                {["Features", "Pricing", "Dashboard", "Documentation"].map(
-                  (item) => (
-                    <li key={item}>
-                      <a
-                        href="#"
-                        className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
-                      >
-                        {item}
-                      </a>
-                    </li>
-                  )
-                )}
+                <li>
+                  <a href="#features" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <a href="#pricing" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Pricing
+                  </a>
+                </li>
+                <li>
+                  <a href="/login" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Dashboard
+                  </a>
+                </li>
+                <li>
+                  <a href="#how-it-works" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Documentation
+                  </a>
+                </li>
               </ul>
             </div>
 
@@ -986,20 +1053,21 @@ export default function HomePage() {
                 Resources
               </h4>
               <ul className="space-y-2.5">
-                {[
-                  "How it works",
-                  "Shopify setup guide",
-                  "Meta CAPI docs",
-                ].map((item) => (
-                  <li key={item}>
-                    <a
-                      href="#"
-                      className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
-                    >
-                      {item}
-                    </a>
-                  </li>
-                ))}
+                <li>
+                  <a href="#how-it-works" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    How it works
+                  </a>
+                </li>
+                <li>
+                  <a href="#how-it-works" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Shopify setup guide
+                  </a>
+                </li>
+                <li>
+                  <a href="#features" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Meta CAPI docs
+                  </a>
+                </li>
               </ul>
             </div>
 
@@ -1008,16 +1076,21 @@ export default function HomePage() {
                 Company
               </h4>
               <ul className="space-y-2.5">
-                {["About", "Contact", "Status"].map((item) => (
-                  <li key={item}>
-                    <a
-                      href="#"
-                      className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
-                    >
-                      {item}
-                    </a>
-                  </li>
-                ))}
+                <li>
+                  <a href="#" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    About
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Contact
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground">
+                    Status
+                  </a>
+                </li>
               </ul>
             </div>
 
