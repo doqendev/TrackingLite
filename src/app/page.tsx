@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
 import { AnimatedDashboard } from "@/components/landing/animated-dashboard";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import {
   FaMeta,
   FaTiktok,
@@ -363,15 +364,17 @@ export default function HomePage() {
                 { value: "<150ms", label: "Avg. processing" },
                 { value: "$0", label: "To get started" },
                 { value: "10 min", label: "Setup to first event" },
-              ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <div className="text-2xl font-bold tracking-tight text-brand-400 tabular-nums sm:text-3xl">
-                    {stat.value}
+              ].map((stat, i) => (
+                <ScrollReveal key={stat.label} delay={i * 100}>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold tracking-tight text-brand-400 tabular-nums sm:text-3xl">
+                      {stat.value}
+                    </div>
+                    <div className="mt-1.5 text-xs text-muted-foreground/60">
+                      {stat.label}
+                    </div>
                   </div>
-                  <div className="mt-1.5 text-xs text-muted-foreground/60">
-                    {stat.label}
-                  </div>
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </div>
@@ -380,57 +383,65 @@ export default function HomePage() {
         {/* ───────────────────────── Problem Section ───────────────────────── */}
         <section id="features" className="border-b border-white/[0.06]">
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
-            <div className="mb-14 text-center">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-                The problem
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Your pixel data is incomplete
-              </h2>
-            </div>
+            <ScrollReveal>
+              <div className="mb-14 text-center">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+                  The problem
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  Your pixel data is incomplete
+                </h2>
+              </div>
+            </ScrollReveal>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
-                <CardContent className="p-6">
-                  <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Ad blockers kill the pixel
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    ~30% of desktop users run ad blockers. Every one silently
-                    drops requests to{" "}
-                    <code className="font-mono text-xs text-foreground/60">
-                      connect.facebook.net
-                    </code>{" "}
-                    before your pixel fires.
-                  </p>
-                </CardContent>
-              </Card>
+              <ScrollReveal delay={0}>
+                <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
+                  <CardContent className="p-6">
+                    <h3 className="mb-2 text-sm font-semibold text-foreground">
+                      Ad blockers kill the pixel
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      ~30% of desktop users run ad blockers. Every one silently
+                      drops requests to{" "}
+                      <code className="font-mono text-xs text-foreground/60">
+                        connect.facebook.net
+                      </code>{" "}
+                      before your pixel fires.
+                    </p>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
-                <CardContent className="p-6">
-                  <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    iOS 14+ breaks attribution
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    Apple&apos;s ATT prompt and Intelligent Tracking Prevention
-                    limit cookie lifetimes to 7 days and suppress cross-site
-                    signals on Safari.
-                  </p>
-                </CardContent>
-              </Card>
+              <ScrollReveal delay={150}>
+                <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
+                  <CardContent className="p-6">
+                    <h3 className="mb-2 text-sm font-semibold text-foreground">
+                      iOS 14+ breaks attribution
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Apple&apos;s ATT prompt and Intelligent Tracking Prevention
+                      limit cookie lifetimes to 7 days and suppress cross-site
+                      signals on Safari.
+                    </p>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
-                <CardContent className="p-6">
-                  <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Missing events waste ad spend
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    Meta&apos;s algorithm optimizes on the conversions it sees.
-                    Incomplete data means it targets the wrong people and
-                    overpays for them.
-                  </p>
-                </CardContent>
-              </Card>
+              <ScrollReveal delay={300}>
+                <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
+                  <CardContent className="p-6">
+                    <h3 className="mb-2 text-sm font-semibold text-foreground">
+                      Missing events waste ad spend
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Meta&apos;s algorithm optimizes on the conversions it sees.
+                      Incomplete data means it targets the wrong people and
+                      overpays for them.
+                    </p>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
             </div>
           </div>
         </section>
@@ -440,6 +451,7 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
               {/* Left: Content */}
+              <ScrollReveal direction="left">
               <div>
                 <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                   How it works
@@ -473,8 +485,10 @@ export default function HomePage() {
                   ))}
                 </ul>
               </div>
+              </ScrollReveal>
 
               {/* Right: Event Pipeline Terminal */}
+              <ScrollReveal direction="right">
               <div className="overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02]">
                 {/* Terminal chrome */}
                 <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
@@ -592,6 +606,7 @@ export default function HomePage() {
                   </code>
                 </pre>
               </div>
+              </ScrollReveal>
             </div>
           </div>
         </section>
@@ -601,6 +616,7 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
               {/* Left: Code Snippet Visual */}
+              <ScrollReveal direction="left">
               <div className="overflow-hidden rounded-lg border border-white/[0.06] glow-card bg-white/[0.02] lg:order-1">
                 <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
                   <div className="h-2.5 w-2.5 rounded-full bg-white/[0.08]" />
@@ -673,8 +689,10 @@ export default function HomePage() {
                   </code>
                 </pre>
               </div>
+              </ScrollReveal>
 
               {/* Right: Content */}
+              <ScrollReveal direction="right">
               <div className="lg:order-2">
                 <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                   Integration
@@ -706,6 +724,7 @@ export default function HomePage() {
                   ))}
                 </ul>
               </div>
+              </ScrollReveal>
             </div>
           </div>
         </section>
@@ -713,55 +732,63 @@ export default function HomePage() {
         {/* ───────────── Feature: Monitor & Dashboard (3 cards) ───────────── */}
         <section className="border-b border-white/[0.06]">
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
-            <div className="mb-14 text-center">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-                Visibility
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Complete tracking visibility
-              </h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-                Everything you need to know your tracking is working.
-              </p>
-            </div>
+            <ScrollReveal>
+              <div className="mb-14 text-center">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+                  Visibility
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  Complete tracking visibility
+                </h2>
+                <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+                  Everything you need to know your tracking is working.
+                </p>
+              </div>
+            </ScrollReveal>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
-                <CardContent className="p-6">
-                  <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Revenue tracking
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    See exactly how much revenue flows through your funnel
-                    &mdash; AddToCart, Checkout, and Purchase values with daily
-                    comparisons.
-                  </p>
-                </CardContent>
-              </Card>
+              <ScrollReveal delay={0}>
+                <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
+                  <CardContent className="p-6">
+                    <h3 className="mb-2 text-sm font-semibold text-foreground">
+                      Revenue tracking
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      See exactly how much revenue flows through your funnel
+                      &mdash; AddToCart, Checkout, and Purchase values with daily
+                      comparisons.
+                    </p>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
-                <CardContent className="p-6">
-                  <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Event funnel
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    Watch events flow from PageView to Purchase. Know exactly how
-                    many events fire at each stage, compared to yesterday.
-                  </p>
-                </CardContent>
-              </Card>
+              <ScrollReveal delay={150}>
+                <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
+                  <CardContent className="p-6">
+                    <h3 className="mb-2 text-sm font-semibold text-foreground">
+                      Event funnel
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Watch events flow from PageView to Purchase. Know exactly how
+                      many events fire at each stage, compared to yesterday.
+                    </p>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
-                <CardContent className="p-6">
-                  <h3 className="mb-2 text-sm font-semibold text-foreground">
-                    Delivery health
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    Real-time success rates with green/yellow/red status
-                    indicators. Know instantly if something breaks.
-                  </p>
-                </CardContent>
-              </Card>
+              <ScrollReveal delay={300}>
+                <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
+                  <CardContent className="p-6">
+                    <h3 className="mb-2 text-sm font-semibold text-foreground">
+                      Delivery health
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Real-time success rates with green/yellow/red status
+                      indicators. Know instantly if something breaks.
+                    </p>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
             </div>
           </div>
         </section>
@@ -769,17 +796,19 @@ export default function HomePage() {
         {/* ───────────── Animated Dashboard Showcase ───────────── */}
         <section className="border-b border-white/[0.06]">
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
-            <div className="mb-14 text-center">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-                Dashboard
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Your dashboard, in real time
-              </h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-                Revenue, funnels, and live event delivery &mdash; all in one place.
-              </p>
-            </div>
+            <ScrollReveal>
+              <div className="mb-14 text-center">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+                  Dashboard
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  Your dashboard, in real time
+                </h2>
+                <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+                  Revenue, funnels, and live event delivery &mdash; all in one place.
+                </p>
+              </div>
+            </ScrollReveal>
 
             <AnimatedDashboard />
           </div>
@@ -788,20 +817,23 @@ export default function HomePage() {
         {/* ───────────────────────── Pricing ───────────────────────── */}
         <section id="pricing" className="border-b border-white/[0.06]">
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
-            <div className="mb-14 text-center">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-                Pricing
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                The most affordable server-side tracking
-              </h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-                Other tools charge $100&ndash;300/mo for the same thing. Track Clear starts free &mdash; no credit card required &mdash; and only charges for Purchase events. All other events are unlimited on every plan.
-              </p>
-            </div>
+            <ScrollReveal>
+              <div className="mb-14 text-center">
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+                  Pricing
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  The most affordable server-side tracking
+                </h2>
+                <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+                  Other tools charge $100&ndash;300/mo for the same thing. Track Clear starts free &mdash; no credit card required &mdash; and only charges for Purchase events. All other events are unlimited on every plan.
+                </p>
+              </div>
+            </ScrollReveal>
 
             <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* Free */}
+              <ScrollReveal delay={0}>
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
@@ -843,8 +875,10 @@ export default function HomePage() {
                   </p>
                 </CardContent>
               </Card>
+              </ScrollReveal>
 
               {/* Starter */}
+              <ScrollReveal delay={100}>
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
@@ -887,8 +921,10 @@ export default function HomePage() {
                   </Button>
                 </CardContent>
               </Card>
+              </ScrollReveal>
 
               {/* Growth (highlighted) */}
+              <ScrollReveal delay={200}>
               <Card className="relative border-brand-500/20 bg-gradient-to-b from-brand-500/[0.03] to-transparent shadow-none ring-1 ring-brand-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 flex items-center gap-2">
@@ -939,8 +975,10 @@ export default function HomePage() {
                   </Button>
                 </CardContent>
               </Card>
+              </ScrollReveal>
 
               {/* Scale */}
+              <ScrollReveal delay={300}>
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
                 <CardContent className="flex flex-col p-6">
                   <div className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
@@ -983,13 +1021,16 @@ export default function HomePage() {
                   </Button>
                 </CardContent>
               </Card>
+              </ScrollReveal>
             </div>
 
-            <p className="mt-6 text-center text-xs text-muted-foreground/50">
-              All plans include unlimited stores. Paid plans auto-upgrade when
-              you exceed your order limit &mdash; your tracking never stops. No
-              credit card required to start free.
-            </p>
+            <ScrollReveal>
+              <p className="mt-6 text-center text-xs text-muted-foreground/50">
+                All plans include unlimited stores. Paid plans auto-upgrade when
+                you exceed your order limit &mdash; your tracking never stops. No
+                credit card required to start free.
+              </p>
+            </ScrollReveal>
           </div>
         </section>
 
@@ -1012,23 +1053,25 @@ export default function HomePage() {
           />
 
           <div className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
-            <div className="mx-auto max-w-lg text-center">
-              <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-400/80">
-                Nothing blocked. Everything clear.
-              </p>
-              <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                Start tracking in 10 minutes
-              </h2>
-              <p className="mb-8 text-sm text-muted-foreground">
-                Free forever up to 50 orders/mo. No credit card. One snippet, six platforms, complete server-side tracking.
-              </p>
-              <Button variant="brand" size="lg" asChild className="gap-2">
-                <Link href="/signup">
-                  Create your account
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
+            <ScrollReveal>
+              <div className="mx-auto max-w-lg text-center">
+                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-400/80">
+                  Nothing blocked. Everything clear.
+                </p>
+                <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                  Start tracking in 10 minutes
+                </h2>
+                <p className="mb-8 text-sm text-muted-foreground">
+                  Free forever up to 50 orders/mo. No credit card. One snippet, six platforms, complete server-side tracking.
+                </p>
+                <Button variant="brand" size="lg" asChild className="gap-2">
+                  <Link href="/signup">
+                    Create your account
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </ScrollReveal>
           </div>
         </section>
       </main>
