@@ -101,7 +101,7 @@ export default function HomePage() {
       />
 
       {/* ───────────────────────── Navigation ───────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 bg-transparent">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link
             href="/"
