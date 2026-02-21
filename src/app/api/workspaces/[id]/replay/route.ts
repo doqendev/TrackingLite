@@ -3,10 +3,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   getEventQueue,
-  getGoogleQueue,
   getTiktokQueue,
   getGA4Queue,
   getKlaviyoQueue,
+  getRedditQueue,
+  getPinterestQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkReplayCooldown } from "@/lib/replay-rate-limit";
@@ -15,10 +16,11 @@ import type { Queue } from "bullmq";
 
 const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = {
   META: { queue: getEventQueue, jobName: "send-meta-event" },
-  GOOGLE_ADS: { queue: getGoogleQueue, jobName: "send-google-event" },
   TIKTOK: { queue: getTiktokQueue, jobName: "send-tiktok-event" },
   GA4: { queue: getGA4Queue, jobName: "send-ga4-event" },
   KLAVIYO: { queue: getKlaviyoQueue, jobName: "send-klaviyo-event" },
+  REDDIT: { queue: getRedditQueue, jobName: "send-reddit-event" },
+  PINTEREST: { queue: getPinterestQueue, jobName: "send-pinterest-event" },
 };
 
 function workspaceHasCredentials(
@@ -28,14 +30,16 @@ function workspaceHasCredentials(
   switch (destination) {
     case "META":
       return !!(workspace.enableMeta && workspace.metaAccessTokenEncrypted);
-    case "GOOGLE_ADS":
-      return !!workspace.googleAdsConversionIdEncrypted;
     case "TIKTOK":
       return !!workspace.tiktokAccessTokenEncrypted;
     case "GA4":
       return !!workspace.ga4ApiSecretEncrypted;
     case "KLAVIYO":
       return !!workspace.klaviyoApiKeyEncrypted;
+    case "REDDIT":
+      return !!(workspace.enableReddit && workspace.redditAccessTokenEncrypted);
+    case "PINTEREST":
+      return !!(workspace.enablePinterest && workspace.pinterestConversionTokenEncrypted);
     default:
       return false;
   }
@@ -64,10 +68,13 @@ export async function POST(
       id: true,
       enableMeta: true,
       metaAccessTokenEncrypted: true,
-      googleAdsConversionIdEncrypted: true,
       tiktokAccessTokenEncrypted: true,
       ga4ApiSecretEncrypted: true,
       klaviyoApiKeyEncrypted: true,
+      enableReddit: true,
+      redditAccessTokenEncrypted: true,
+      enablePinterest: true,
+      pinterestConversionTokenEncrypted: true,
     },
   });
 
@@ -172,7 +179,7 @@ export async function POST(
           workspaceId: workspace.id,
           destination: event.destination,
           eventLogId: event.id,
-          event: { ...eventData, ttclid: null },
+          event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null },
         } satisfies DestinationEventJob);
       }
 

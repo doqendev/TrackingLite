@@ -85,10 +85,11 @@ export const RATE_LIMIT = {
 
 export const QUEUE_CONFIG = {
   QUEUE_NAME: "meta-events",
-  GOOGLE_QUEUE_NAME: "google-events",
   TIKTOK_QUEUE_NAME: "tiktok-events",
   GA4_QUEUE_NAME: "ga4-events",
   KLAVIYO_QUEUE_NAME: "klaviyo-events",
+  REDDIT_QUEUE_NAME: "reddit-events",
+  PINTEREST_QUEUE_NAME: "pinterest-events",
   MAX_ATTEMPTS: 3,
   BACKOFF_DELAY_MS: 2000, // 2s, 4s, 8s exponential
 } as const;

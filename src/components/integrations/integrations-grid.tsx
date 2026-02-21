@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
-import { SiMeta, SiGoogleads, SiTiktok, SiGoogleanalytics } from "react-icons/si";
+import { SiMeta, SiTiktok, SiGoogleanalytics } from "react-icons/si";
+import { FaReddit, FaPinterest } from "react-icons/fa";
 
 export interface IntegrationWorkspace {
   id: string;
@@ -17,13 +18,6 @@ export interface IntegrationWorkspace {
   metaTestEventCode: string | null;
   hasAccessToken: boolean;
   enableMeta: boolean;
-  // Google Ads — boolean flags only (values are encrypted at rest, never sent to client)
-  hasGoogleAdsConversionId: boolean;
-  hasGoogleAdsViewContentLabel: boolean;
-  hasGoogleAdsAddToCartLabel: boolean;
-  hasGoogleAdsCheckoutLabel: boolean;
-  hasGoogleAdsPurchaseLabel: boolean;
-  enableGoogleAds: boolean;
   // TikTok
   tiktokPixelId: string | null;
   hasTiktokAccessToken: boolean;
@@ -35,6 +29,14 @@ export interface IntegrationWorkspace {
   // Klaviyo
   hasKlaviyoApiKey: boolean;
   enableKlaviyo: boolean;
+  // Reddit
+  redditAccountId: string | null;
+  hasRedditAccessToken: boolean;
+  enableReddit: boolean;
+  // Pinterest
+  pinterestAdAccountId: string | null;
+  hasPinterestConversionToken: boolean;
+  enablePinterest: boolean;
 }
 
 interface IntegrationsGridProps {
@@ -90,15 +92,6 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [metaEnabled, setMetaEnabled] = useState(workspace.enableMeta);
   const [savingMeta, setSavingMeta] = useState(false);
 
-  // Google Ads state — fields are encrypted at rest; inputs always start empty
-  const [googleConversionId, setGoogleConversionId] = useState("");
-  const [googleViewContentLabel, setGoogleViewContentLabel] = useState("");
-  const [googleAddToCartLabel, setGoogleAddToCartLabel] = useState("");
-  const [googleCheckoutLabel, setGoogleCheckoutLabel] = useState("");
-  const [googlePurchaseLabel, setGooglePurchaseLabel] = useState("");
-  const [googleEnabled, setGoogleEnabled] = useState(workspace.enableGoogleAds);
-  const [savingGoogle, setSavingGoogle] = useState(false);
-
   // TikTok state
   const [tiktokPixelId, setTiktokPixelId] = useState(
     workspace.tiktokPixelId ?? ""
@@ -120,6 +113,18 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [klaviyoEnabled, setKlaviyoEnabled] = useState(workspace.enableKlaviyo);
   const [savingKlaviyo, setSavingKlaviyo] = useState(false);
 
+  // Reddit state
+  const [redditAccountId, setRedditAccountId] = useState(workspace.redditAccountId ?? "");
+  const [redditAccessToken, setRedditAccessToken] = useState("");
+  const [redditEnabled, setRedditEnabled] = useState(workspace.enableReddit);
+  const [savingReddit, setSavingReddit] = useState(false);
+
+  // Pinterest state
+  const [pinterestAdAccountId, setPinterestAdAccountId] = useState(workspace.pinterestAdAccountId ?? "");
+  const [pinterestConversionToken, setPinterestConversionToken] = useState("");
+  const [pinterestEnabled, setPinterestEnabled] = useState(workspace.enablePinterest);
+  const [savingPinterest, setSavingPinterest] = useState(false);
+
   function toggleCard(key: string) {
     setExpandedCard((prev) => (prev === key ? null : key));
   }
@@ -127,10 +132,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   async function handleToggle(platform: string, enabled: boolean, platformName: string) {
     const fieldMap: Record<string, string> = {
       meta: "enableMeta",
-      google: "enableGoogleAds",
       tiktok: "enableTikTok",
       ga4: "enableGA4",
       klaviyo: "enableKlaviyo",
+      reddit: "enableReddit",
+      pinterest: "enablePinterest",
     };
     const field = fieldMap[platform];
     if (!field) return;
@@ -170,38 +176,6 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       toast.error(t("failedToSave", { platform: "Meta" }));
     } finally {
       setSavingMeta(false);
-    }
-  }
-
-  async function saveGoogle() {
-    setSavingGoogle(true);
-    try {
-      const body: Record<string, string | boolean | null> = {
-        enableGoogleAds: googleEnabled,
-      };
-      // Only send a field if the user typed a new value; empty means "keep existing"
-      if (googleConversionId) body.googleAdsConversionId = googleConversionId;
-      if (googleViewContentLabel) body.googleAdsViewContentLabel = googleViewContentLabel;
-      if (googleAddToCartLabel) body.googleAdsAddToCartLabel = googleAddToCartLabel;
-      if (googleCheckoutLabel) body.googleAdsCheckoutLabel = googleCheckoutLabel;
-      if (googlePurchaseLabel) body.googleAdsPurchaseLabel = googlePurchaseLabel;
-
-      const res = await fetch(`/api/workspaces/${workspace.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      toast.success(t("credentialsSaved", { platform: "Google Ads" }));
-      setGoogleConversionId("");
-      setGoogleViewContentLabel("");
-      setGoogleAddToCartLabel("");
-      setGoogleCheckoutLabel("");
-      setGooglePurchaseLabel("");
-    } catch {
-      toast.error(t("failedToSave", { platform: "Google Ads" }));
-    } finally {
-      setSavingGoogle(false);
     }
   }
 
@@ -276,14 +250,60 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     }
   }
 
-  const metaConnected =
-    workspace.hasAccessToken && !!workspace.metaPixelId;
-  const googleConnected = workspace.hasGoogleAdsConversionId;
-  const tiktokConnected =
-    workspace.hasTiktokAccessToken && !!workspace.tiktokPixelId;
-  const ga4Connected =
-    workspace.hasGA4ApiSecret && !!workspace.ga4MeasurementId;
+  async function saveReddit() {
+    setSavingReddit(true);
+    try {
+      const body: Record<string, string | boolean | null> = {
+        redditAccountId: redditAccountId || null,
+        enableReddit: redditEnabled,
+      };
+      if (redditAccessToken) body.redditAccessToken = redditAccessToken;
+
+      const res = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast.success(t("credentialsSaved", { platform: "Reddit" }));
+      setRedditAccessToken("");
+    } catch {
+      toast.error(t("failedToSave", { platform: "Reddit" }));
+    } finally {
+      setSavingReddit(false);
+    }
+  }
+
+  async function savePinterest() {
+    setSavingPinterest(true);
+    try {
+      const body: Record<string, string | boolean | null> = {
+        pinterestAdAccountId: pinterestAdAccountId || null,
+        enablePinterest: pinterestEnabled,
+      };
+      if (pinterestConversionToken) body.pinterestConversionToken = pinterestConversionToken;
+
+      const res = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast.success(t("credentialsSaved", { platform: "Pinterest" }));
+      setPinterestConversionToken("");
+    } catch {
+      toast.error(t("failedToSave", { platform: "Pinterest" }));
+    } finally {
+      setSavingPinterest(false);
+    }
+  }
+
+  const metaConnected = workspace.hasAccessToken && !!workspace.metaPixelId;
+  const tiktokConnected = workspace.hasTiktokAccessToken && !!workspace.tiktokPixelId;
+  const ga4Connected = workspace.hasGA4ApiSecret && !!workspace.ga4MeasurementId;
   const klaviyoConnected = workspace.hasKlaviyoApiKey;
+  const redditConnected = workspace.hasRedditAccessToken;
+  const pinterestConnected = workspace.hasPinterestConversionToken;
 
   return (
     <div className="space-y-8">
@@ -291,6 +311,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("advertisingPlatforms")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+
       {/* Meta CAPI */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-blue-500 overflow-hidden">
         <div
@@ -388,143 +409,6 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
       </div>
 
-      {/* Google Ads */}
-      <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-amber-500 overflow-hidden">
-        <div
-          className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
-          onClick={() => toggleCard("google")}
-        >
-          <div className="text-amber-500 shrink-0">
-            <SiGoogleads className="h-5 w-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground text-sm">Google Ads</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {t("googleDesc")}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge connected={googleConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
-            <Switch
-              checked={googleEnabled}
-              onCheckedChange={(val) => {
-                setGoogleEnabled(val);
-                handleToggle("google", val, "Google Ads");
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="scale-90"
-            />
-            <ChevronDown
-              className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                expandedCard === "google" ? "rotate-180" : ""
-              }`}
-            />
-          </div>
-        </div>
-        <div
-          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "google" ? "max-h-[800px]" : "max-h-0"
-          }`}
-        >
-          <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
-            <div className="pt-4 space-y-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="google-conversion-id" className="text-xs">
-                    Conversion ID
-                  </Label>
-                  {workspace.hasGoogleAdsConversionId && <EncryptedBadge label={t("encryptedAtRest")} />}
-                </div>
-                <Input
-                  id="google-conversion-id"
-                  value={googleConversionId}
-                  onChange={(e) => setGoogleConversionId(e.target.value)}
-                  placeholder={workspace.hasGoogleAdsConversionId ? t("leaveBlankToKeep") : "e.g. 11366583402"}
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Find this in Google Ads &gt; Goals &gt; Conversions &gt; Settings &gt; Tag setup
-                </p>
-              </div>
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-foreground">Conversion Labels</p>
-                <p className="text-[10px] text-muted-foreground -mt-1">
-                  Match these to your Google Ads conversion actions. Leave blank to skip.
-                </p>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="google-view-content-label" className="text-xs text-muted-foreground">
-                      View Content Label <span className="text-muted-foreground/60">(product page views)</span>
-                    </Label>
-                    {workspace.hasGoogleAdsViewContentLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
-                  </div>
-                  <Input
-                    id="google-view-content-label"
-                    value={googleViewContentLabel}
-                    onChange={(e) => setGoogleViewContentLabel(e.target.value)}
-                    placeholder={workspace.hasGoogleAdsViewContentLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="google-add-to-cart-label" className="text-xs text-muted-foreground">
-                      Add to Cart Label
-                    </Label>
-                    {workspace.hasGoogleAdsAddToCartLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
-                  </div>
-                  <Input
-                    id="google-add-to-cart-label"
-                    value={googleAddToCartLabel}
-                    onChange={(e) => setGoogleAddToCartLabel(e.target.value)}
-                    placeholder={workspace.hasGoogleAdsAddToCartLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="google-checkout-label" className="text-xs text-muted-foreground">
-                      Begin Checkout Label
-                    </Label>
-                    {workspace.hasGoogleAdsCheckoutLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
-                  </div>
-                  <Input
-                    id="google-checkout-label"
-                    value={googleCheckoutLabel}
-                    onChange={(e) => setGoogleCheckoutLabel(e.target.value)}
-                    placeholder={workspace.hasGoogleAdsCheckoutLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="google-purchase-label" className="text-xs text-muted-foreground">
-                      Purchase Label
-                    </Label>
-                    {workspace.hasGoogleAdsPurchaseLabel && <EncryptedBadge label={t("encryptedAtRest")} />}
-                  </div>
-                  <Input
-                    id="google-purchase-label"
-                    value={googlePurchaseLabel}
-                    onChange={(e) => setGooglePurchaseLabel(e.target.value)}
-                    placeholder={workspace.hasGoogleAdsPurchaseLabel ? t("leaveBlankToKeep") : "e.g. P_HrCM-G0eAaEOqYgawq"}
-                  />
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Find your Conversion Labels in Google Ads &gt; Goals &gt; Conversions &gt; Details
-                </p>
-              </div>
-              <div className="flex justify-end pt-2">
-                <Button
-                  variant="brand"
-                  size="sm"
-                  onClick={saveGoogle}
-                  disabled={savingGoogle}
-                >
-                  {savingGoogle ? tc("saving") : t("saveCredentials")}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* TikTok */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-pink-500 overflow-hidden">
         <div
@@ -610,6 +494,176 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
       </div>
 
+      {/* Reddit */}
+      <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-orange-500 overflow-hidden">
+        <div
+          className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+          onClick={() => toggleCard("reddit")}
+        >
+          <div className="text-orange-500 shrink-0">
+            <FaReddit className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-foreground text-sm">{t("redditTitle")}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {t("redditDesc")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <StatusBadge connected={redditConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
+            <Switch
+              checked={redditEnabled}
+              onCheckedChange={(val) => {
+                setRedditEnabled(val);
+                handleToggle("reddit", val, "Reddit");
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="scale-90"
+            />
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                expandedCard === "reddit" ? "rotate-180" : ""
+              }`}
+            />
+          </div>
+        </div>
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            expandedCard === "reddit" ? "max-h-[600px]" : "max-h-0"
+          }`}
+        >
+          <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
+            <div className="pt-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="reddit-account-id" className="text-xs">
+                  {t("redditAccountId")}
+                </Label>
+                <Input
+                  id="reddit-account-id"
+                  value={redditAccountId}
+                  onChange={(e) => setRedditAccountId(e.target.value)}
+                  placeholder={t("redditAccountIdPlaceholder")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="reddit-access-token" className="text-xs">
+                    {t("redditAccessToken")}
+                  </Label>
+                  {workspace.hasRedditAccessToken && <EncryptedBadge label={t("encryptedAtRest")} />}
+                </div>
+                <Input
+                  id="reddit-access-token"
+                  type="password"
+                  value={redditAccessToken}
+                  onChange={(e) => setRedditAccessToken(e.target.value)}
+                  placeholder={
+                    workspace.hasRedditAccessToken
+                      ? t("leaveBlankToKeep")
+                      : t("redditAccessTokenPlaceholder")
+                  }
+                />
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="brand"
+                  size="sm"
+                  onClick={saveReddit}
+                  disabled={savingReddit}
+                >
+                  {savingReddit ? tc("saving") : t("saveCredentials")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pinterest */}
+      <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-red-500 overflow-hidden">
+        <div
+          className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+          onClick={() => toggleCard("pinterest")}
+        >
+          <div className="text-red-500 shrink-0">
+            <FaPinterest className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-foreground text-sm">{t("pinterestTitle")}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {t("pinterestDesc")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <StatusBadge connected={pinterestConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
+            <Switch
+              checked={pinterestEnabled}
+              onCheckedChange={(val) => {
+                setPinterestEnabled(val);
+                handleToggle("pinterest", val, "Pinterest");
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="scale-90"
+            />
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                expandedCard === "pinterest" ? "rotate-180" : ""
+              }`}
+            />
+          </div>
+        </div>
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            expandedCard === "pinterest" ? "max-h-[600px]" : "max-h-0"
+          }`}
+        >
+          <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
+            <div className="pt-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="pinterest-ad-account-id" className="text-xs">
+                  {t("pinterestAdAccountId")}
+                </Label>
+                <Input
+                  id="pinterest-ad-account-id"
+                  value={pinterestAdAccountId}
+                  onChange={(e) => setPinterestAdAccountId(e.target.value)}
+                  placeholder={t("pinterestAdAccountIdPlaceholder")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="pinterest-conversion-token" className="text-xs">
+                    {t("pinterestConversionToken")}
+                  </Label>
+                  {workspace.hasPinterestConversionToken && <EncryptedBadge label={t("encryptedAtRest")} />}
+                </div>
+                <Input
+                  id="pinterest-conversion-token"
+                  type="password"
+                  value={pinterestConversionToken}
+                  onChange={(e) => setPinterestConversionToken(e.target.value)}
+                  placeholder={
+                    workspace.hasPinterestConversionToken
+                      ? t("leaveBlankToKeep")
+                      : t("pinterestConversionTokenPlaceholder")
+                  }
+                />
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="brand"
+                  size="sm"
+                  onClick={savePinterest}
+                  disabled={savingPinterest}
+                >
+                  {savingPinterest ? tc("saving") : t("saveCredentials")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
         </div>
       </div>
 
@@ -617,13 +671,14 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("analyticsAutomation")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+
       {/* GA4 */}
-      <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-orange-500 overflow-hidden">
+      <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-amber-500 overflow-hidden">
         <div
           className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
           onClick={() => toggleCard("ga4")}
         >
-          <div className="text-orange-500 shrink-0">
+          <div className="text-amber-500 shrink-0">
             <SiGoogleanalytics className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -775,6 +830,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           </div>
         </div>
       </div>
+
         </div>
       </div>
     </div>

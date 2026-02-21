@@ -11,17 +11,18 @@ export type DestinationCategory = "analytics" | "marketing";
 // Map each destination to its consent category
 export const DESTINATION_CONSENT_CATEGORY: Record<string, DestinationCategory> = {
   META: "marketing",
-  GOOGLE_ADS: "marketing",
   TIKTOK: "marketing",
-  KLAVIYO: "marketing",
   GA4: "analytics",
+  KLAVIYO: "marketing",
+  REDDIT: "marketing",
+  PINTEREST: "marketing",
 };
 
 /**
  * Per-destination consent evaluation.
  *
  * Analytics destinations (GA4) check analyticsAllowed.
- * Marketing destinations (Meta, Google Ads, TikTok, Klaviyo) check marketingAllowed.
+ * Marketing destinations (Meta, TikTok, Klaviyo, Reddit, Pinterest) check marketingAllowed.
  *
  * Backward compatibility:
  * - If marketingAllowed is undefined/null (not explicitly set), treat as allowed.

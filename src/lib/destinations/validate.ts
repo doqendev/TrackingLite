@@ -85,17 +85,34 @@ export async function validateKlaviyo(encryptedKey: string, iv: string, tag: str
   }
 }
 
-export async function validateGoogleAds(encryptedConversionId: string, iv: string, tag: string): Promise<ValidationResult> {
+export async function validateReddit(accountId: string, encryptedToken: string, iv: string, tag: string): Promise<ValidationResult> {
   try {
-    // Basic validation: decrypt and check format
-    const conversionId = decrypt(encryptedConversionId, iv, tag);
-    if (!conversionId || conversionId.length < 3) {
-      return { connected: false, message: "Invalid conversion ID format" };
+    const accessToken = decrypt(encryptedToken, iv, tag);
+    const res = await fetch(`https://ads-api.reddit.com/api/v2.0/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (res.ok) {
+      return { connected: true, message: "Reddit API token is valid" };
     }
-    // Google Ads tracking pixel doesn't have a simple validation endpoint
-    // Just verify we can decrypt the credential
-    return { connected: true, message: `Conversion ID configured: ${conversionId.slice(0, 4)}****` };
+    const error = await res.json().catch(() => ({}));
+    return { connected: false, message: (error as Record<string, unknown>)?.message as string || `HTTP ${res.status}` };
   } catch (err) {
-    return { connected: false, message: err instanceof Error ? err.message : "Decryption failed" };
+    return { connected: false, message: err instanceof Error ? err.message : "Connection failed" };
+  }
+}
+
+export async function validatePinterest(encryptedToken: string, iv: string, tag: string): Promise<ValidationResult> {
+  try {
+    const token = decrypt(encryptedToken, iv, tag);
+    const res = await fetch("https://api.pinterest.com/v5/user_account", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      return { connected: true, message: "Pinterest API token is valid" };
+    }
+    const error = await res.json().catch(() => ({}));
+    return { connected: false, message: (error as Record<string, unknown>)?.message as string || `HTTP ${res.status}` };
+  } catch (err) {
+    return { connected: false, message: err instanceof Error ? err.message : "Connection failed" };
   }
 }

@@ -20,13 +20,6 @@ export default async function IntegrationsPage() {
       metaTestEventCode: true,
       metaAccessTokenEncrypted: true,
       enableMeta: true,
-      // Google Ads
-      googleAdsConversionIdEncrypted: true,
-      googleAdsViewContentLabelEncrypted: true,
-      googleAdsAddToCartLabelEncrypted: true,
-      googleAdsCheckoutLabelEncrypted: true,
-      googleAdsPurchaseLabelEncrypted: true,
-      enableGoogleAds: true,
       // TikTok
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
@@ -38,6 +31,14 @@ export default async function IntegrationsPage() {
       // Klaviyo
       klaviyoApiKeyEncrypted: true,
       enableKlaviyo: true,
+      // Reddit
+      redditAccountId: true,
+      redditAccessTokenEncrypted: true,
+      enableReddit: true,
+      // Pinterest
+      pinterestAdAccountId: true,
+      pinterestConversionTokenEncrypted: true,
+      enablePinterest: true,
     },
   });
 
@@ -50,13 +51,6 @@ export default async function IntegrationsPage() {
     metaTestEventCode: workspace.metaTestEventCode,
     hasAccessToken: !!workspace.metaAccessTokenEncrypted,
     enableMeta: workspace.enableMeta,
-    // Google Ads — pass boolean flags only, never expose encrypted values to client
-    hasGoogleAdsConversionId: !!workspace.googleAdsConversionIdEncrypted,
-    hasGoogleAdsViewContentLabel: !!workspace.googleAdsViewContentLabelEncrypted,
-    hasGoogleAdsAddToCartLabel: !!workspace.googleAdsAddToCartLabelEncrypted,
-    hasGoogleAdsCheckoutLabel: !!workspace.googleAdsCheckoutLabelEncrypted,
-    hasGoogleAdsPurchaseLabel: !!workspace.googleAdsPurchaseLabelEncrypted,
-    enableGoogleAds: workspace.enableGoogleAds,
     // TikTok
     tiktokPixelId: workspace.tiktokPixelId,
     hasTiktokAccessToken: !!workspace.tiktokAccessTokenEncrypted,
@@ -68,6 +62,14 @@ export default async function IntegrationsPage() {
     // Klaviyo
     hasKlaviyoApiKey: !!workspace.klaviyoApiKeyEncrypted,
     enableKlaviyo: workspace.enableKlaviyo,
+    // Reddit
+    redditAccountId: workspace.redditAccountId,
+    hasRedditAccessToken: !!workspace.redditAccessTokenEncrypted,
+    enableReddit: workspace.enableReddit,
+    // Pinterest
+    pinterestAdAccountId: workspace.pinterestAdAccountId,
+    hasPinterestConversionToken: !!workspace.pinterestConversionTokenEncrypted,
+    enablePinterest: workspace.enablePinterest,
   };
 
   return (

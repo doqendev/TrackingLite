@@ -4,10 +4,11 @@ import { db } from "@/lib/db";
 import { verifyShopifyWebhook } from "@/lib/shopify-webhook";
 import {
   getEventQueue,
-  getGoogleQueue,
   getTiktokQueue,
   getGA4Queue,
   getKlaviyoQueue,
+  getRedditQueue,
+  getPinterestQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkOrderLimits } from "@/lib/billing";
@@ -51,8 +52,10 @@ export async function POST(request: NextRequest) {
         enableMeta: true,
         metaPixelId: true,
         metaAccessTokenEncrypted: true,
-        enableGoogleAds: true,
-        googleAdsConversionIdEncrypted: true,
+        enableReddit: true,
+        redditAccessTokenEncrypted: true,
+        enablePinterest: true,
+        pinterestConversionTokenEncrypted: true,
         enableTikTok: true,
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
@@ -164,14 +167,18 @@ export async function POST(request: NextRequest) {
           jobName: "send-meta-event",
         });
       }
-      if (
-        workspace.enableGoogleAds &&
-        workspace.googleAdsConversionIdEncrypted
-      ) {
+      if (workspace.enableReddit && workspace.redditAccessTokenEncrypted) {
         destinations.push({
-          destination: "GOOGLE_ADS",
-          queue: getGoogleQueue(),
-          jobName: "send-google-event",
+          destination: "REDDIT",
+          queue: getRedditQueue(),
+          jobName: "send-reddit-event",
+        });
+      }
+      if (workspace.enablePinterest && workspace.pinterestConversionTokenEncrypted) {
+        destinations.push({
+          destination: "PINTEREST",
+          queue: getPinterestQueue(),
+          jobName: "send-pinterest-event",
         });
       }
       if (workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted) {
@@ -343,7 +350,7 @@ export async function POST(request: NextRequest) {
               destination: dest.destination,
               requestId,
               eventLogId,
-              event: { ...eventData, ttclid: null, gclid: null },
+              event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null },
             } satisfies DestinationEventJob);
           }
         })

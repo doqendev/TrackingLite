@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Check, Copy } from "lucide-react";
-import { SiMeta, SiGoogleads, SiTiktok, SiGoogleanalytics } from "react-icons/si";
+import { SiMeta, SiTiktok, SiGoogleanalytics } from "react-icons/si";
+import { FaReddit, FaPinterest } from "react-icons/fa";
 import type { IconType } from "react-icons";
 
 type Step = 0 | 1 | 2;
@@ -32,10 +33,11 @@ const KlaviyoIcon: IconType = ({ className, size, ...props }) => (
 
 const PLATFORMS = [
   { key: "meta", color: "bg-blue-500/15", textColor: "text-blue-400", borderColor: "border-blue-500/30", label: "Meta", descKey: "metaDescription" as const, Icon: SiMeta },
-  { key: "google", color: "bg-amber-500/15", textColor: "text-amber-400", borderColor: "border-amber-500/30", label: "Google Ads", descKey: "googleDescription" as const, Icon: SiGoogleads },
   { key: "tiktok", color: "bg-pink-500/15", textColor: "text-pink-400", borderColor: "border-pink-500/30", label: "TikTok", descKey: "tiktokDescription" as const, Icon: SiTiktok },
   { key: "ga4", color: "bg-orange-500/15", textColor: "text-orange-400", borderColor: "border-orange-500/30", label: "GA4", descKey: "ga4Description" as const, Icon: SiGoogleanalytics },
   { key: "klaviyo", color: "bg-emerald-500/15", textColor: "text-emerald-400", borderColor: "border-emerald-500/30", label: "Klaviyo", descKey: "klaviyoDescription" as const, Icon: KlaviyoIcon },
+  { key: "reddit", color: "bg-orange-500/15", textColor: "text-orange-400", borderColor: "border-orange-500/30", label: "Reddit", descKey: "redditDescription" as const, Icon: FaReddit },
+  { key: "pinterest", color: "bg-red-500/15", textColor: "text-red-400", borderColor: "border-red-500/30", label: "Pinterest", descKey: "pinterestDescription" as const, Icon: FaPinterest },
 ] as const;
 
 export default function OnboardingPage() {

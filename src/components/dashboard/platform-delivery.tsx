@@ -10,10 +10,11 @@ interface PlatformDeliveryProps {
 
 const DESTINATION_CONFIG: Record<string, { label: string; dotColor: string }> = {
   META: { label: "Meta", dotColor: "bg-blue-500" },
-  GOOGLE_ADS: { label: "Google Ads", dotColor: "bg-yellow-500" },
   TIKTOK: { label: "TikTok", dotColor: "bg-pink-500" },
-  GA4: { label: "GA4", dotColor: "bg-orange-500" },
+  GA4: { label: "GA4", dotColor: "bg-amber-500" },
   KLAVIYO: { label: "Klaviyo", dotColor: "bg-green-500" },
+  REDDIT: { label: "Reddit", dotColor: "bg-orange-500" },
+  PINTEREST: { label: "Pinterest", dotColor: "bg-red-500" },
 };
 
 function getSuccessRateColor(rate: number): string {

@@ -4,10 +4,11 @@ import { db } from "@/lib/db";
 import { lookupWorkspaceByApiKey } from "@/lib/api-key-cache";
 import {
   getEventQueue,
-  getGoogleQueue,
   getTiktokQueue,
   getGA4Queue,
   getKlaviyoQueue,
+  getRedditQueue,
+  getPinterestQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { shouldSendToDestination } from "@/lib/consent";
@@ -33,6 +34,8 @@ const IngestPayloadSchema = z.object({
   utmContent: z.string().nullable().optional(),
   utmTerm: z.string().nullable().optional(),
   gclid: z.string().nullable().optional(),
+  rdtCid: z.string().nullable().optional(),
+  epik: z.string().nullable().optional(),
   consent: z.object({
     analyticsAllowed: z.boolean().optional(),
     marketingAllowed: z.boolean().optional(),
@@ -86,12 +89,13 @@ export async function POST(request: NextRequest) {
 
     // 3. Check that at least one destination has credentials configured
     const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-    const hasGoogleAdsCredentials = !!(workspace.enableGoogleAds && workspace.googleAdsConversionIdEncrypted);
     const hasTiktokCredentials = !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
     const hasGA4Credentials = !!(workspace.enableGA4 && workspace.ga4ApiSecretEncrypted);
     const hasKlaviyoCredentials = !!(workspace.enableKlaviyo && workspace.klaviyoApiKeyEncrypted);
+    const hasRedditCredentials = !!(workspace.enableReddit && workspace.redditAccessTokenEncrypted);
+    const hasPinterestCredentials = !!(workspace.enablePinterest && workspace.pinterestConversionTokenEncrypted);
 
-    if (!hasMetaCredentials && !hasGoogleAdsCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials) {
+    if (!hasMetaCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials && !hasRedditCredentials && !hasPinterestCredentials) {
       return NextResponse.json({ error: "No destination credentials configured" }, { status: 422, headers: corsHeaders });
     }
 
@@ -162,15 +166,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Google Ads
-    if (hasGoogleAdsCredentials) {
-      destinations.push({
-        destination: "GOOGLE_ADS",
-        queue: getGoogleQueue(),
-        jobName: "send-google-event",
-      });
-    }
-
     // TikTok
     if (hasTiktokCredentials) {
       destinations.push({
@@ -198,15 +193,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Reddit
+    if (hasRedditCredentials) {
+      destinations.push({
+        destination: "REDDIT",
+        queue: getRedditQueue(),
+        jobName: "send-reddit-event",
+      });
+    }
+
+    // Pinterest
+    if (hasPinterestCredentials) {
+      destinations.push({
+        destination: "PINTEREST",
+        queue: getPinterestQueue(),
+        jobName: "send-pinterest-event",
+      });
+    }
+
     // Filter out destinations where this event type is not mapped (null)
     const filteredDestinations = destinations.filter((dest) => {
       const map = DESTINATION_EVENT_MAP[dest.destination as keyof typeof DESTINATION_EVENT_MAP];
       if (!map) return true; // unknown destination, allow
       return map[payload.eventName as keyof typeof map] !== null;
     });
-
-    // Google Ads label check is now handled by the worker after DB lookup.
-    // All Google Ads events pass through here; the worker will skip if no label is configured.
 
     // Filter to specific destinations if requested (used by checkout_contact_info_submitted for Klaviyo-only)
     const targetDestinations = payload.onlyDestinations
@@ -338,6 +348,8 @@ export async function POST(request: NextRequest) {
               fbc: payload.fbc,
               ttclid: payload.ttclid,
               gclid: payload.gclid || null,
+              rdtCid: payload.rdtCid || null,
+              epik: payload.epik || null,
               userData: payload.userData,
               customData: payload.customData,
               clientIp,

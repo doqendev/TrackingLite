@@ -20,14 +20,14 @@ const UpdateWorkspaceSchema = z.object({
   enableInitiateCheckout: z.boolean().optional(),
   enablePurchase: z.boolean().optional(),
   isActive: z.boolean().optional(),
-  // Google Ads
-  googleAdsConversionId: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid Conversion ID format").optional().nullable(),
-  googleAdsViewContentLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
-  googleAdsAddToCartLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
-  googleAdsCheckoutLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
-  googleAdsPurchaseLabel: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid label format").optional().nullable(),
-  enableGoogleAds: z.boolean().optional(),
-  // Note: googleAds* fields above are input names; they get encrypted to *Encrypted/*Iv/*Tag triplets
+  // Reddit
+  redditAccountId: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid Account ID format").optional().nullable(),
+  redditAccessToken: z.string().optional().nullable(),
+  enableReddit: z.boolean().optional(),
+  // Pinterest
+  pinterestAdAccountId: z.string().regex(/^[A-Za-z0-9]+$/, "Invalid Ad Account ID format").optional().nullable(),
+  pinterestConversionToken: z.string().optional().nullable(),
+  enablePinterest: z.boolean().optional(),
   // TikTok
   tiktokPixelId: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid Pixel ID format").optional().nullable(),
   tiktokAccessToken: z.string().optional().nullable(),
@@ -51,12 +51,8 @@ const ENCRYPTED_FIELDS: Array<[string, string, string, string]> = [
   ["tiktokAccessToken", "tiktokAccessTokenEncrypted", "tiktokAccessTokenIv", "tiktokAccessTokenTag"],
   ["ga4ApiSecret", "ga4ApiSecretEncrypted", "ga4ApiSecretIv", "ga4ApiSecretTag"],
   ["klaviyoApiKey", "klaviyoApiKeyEncrypted", "klaviyoApiKeyIv", "klaviyoApiKeyTag"],
-  // Google Ads fields — Conversion ID and per-event labels
-  ["googleAdsConversionId", "googleAdsConversionIdEncrypted", "googleAdsConversionIdIv", "googleAdsConversionIdTag"],
-  ["googleAdsViewContentLabel", "googleAdsViewContentLabelEncrypted", "googleAdsViewContentLabelIv", "googleAdsViewContentLabelTag"],
-  ["googleAdsAddToCartLabel", "googleAdsAddToCartLabelEncrypted", "googleAdsAddToCartLabelIv", "googleAdsAddToCartLabelTag"],
-  ["googleAdsCheckoutLabel", "googleAdsCheckoutLabelEncrypted", "googleAdsCheckoutLabelIv", "googleAdsCheckoutLabelTag"],
-  ["googleAdsPurchaseLabel", "googleAdsPurchaseLabelEncrypted", "googleAdsPurchaseLabelIv", "googleAdsPurchaseLabelTag"],
+  ["redditAccessToken", "redditAccessTokenEncrypted", "redditAccessTokenIv", "redditAccessTokenTag"],
+  ["pinterestConversionToken", "pinterestConversionTokenEncrypted", "pinterestConversionTokenIv", "pinterestConversionTokenTag"],
 ];
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -91,13 +87,6 @@ export async function GET(
       enablePurchase: true,
       isActive: true,
       eventsForwardedCount: true,
-      // Google Ads
-      googleAdsConversionIdEncrypted: true,
-      googleAdsViewContentLabelEncrypted: true,
-      googleAdsAddToCartLabelEncrypted: true,
-      googleAdsCheckoutLabelEncrypted: true,
-      googleAdsPurchaseLabelEncrypted: true,
-      enableGoogleAds: true,
       // TikTok
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
@@ -109,6 +98,14 @@ export async function GET(
       // Klaviyo
       klaviyoApiKeyEncrypted: true,
       enableKlaviyo: true,
+      // Reddit
+      redditAccountId: true,
+      redditAccessTokenEncrypted: true,
+      enableReddit: true,
+      // Pinterest
+      pinterestAdAccountId: true,
+      pinterestConversionTokenEncrypted: true,
+      enablePinterest: true,
       // Shopify webhook
       shopifyDomain: true,
       shopifyWebhookSecret: true,
@@ -127,11 +124,8 @@ export async function GET(
     tiktokAccessTokenEncrypted,
     ga4ApiSecretEncrypted,
     klaviyoApiKeyEncrypted,
-    googleAdsConversionIdEncrypted,
-    googleAdsViewContentLabelEncrypted,
-    googleAdsAddToCartLabelEncrypted,
-    googleAdsCheckoutLabelEncrypted,
-    googleAdsPurchaseLabelEncrypted,
+    redditAccessTokenEncrypted,
+    pinterestConversionTokenEncrypted,
     shopifyWebhookSecret,
     ...rest
   } = workspace;
@@ -142,11 +136,8 @@ export async function GET(
     hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
     hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
     hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
-    hasGoogleAdsConversionId: googleAdsConversionIdEncrypted !== null,
-    hasGoogleAdsViewContentLabel: googleAdsViewContentLabelEncrypted !== null,
-    hasGoogleAdsAddToCartLabel: googleAdsAddToCartLabelEncrypted !== null,
-    hasGoogleAdsCheckoutLabel: googleAdsCheckoutLabelEncrypted !== null,
-    hasGoogleAdsPurchaseLabel: googleAdsPurchaseLabelEncrypted !== null,
+    hasRedditAccessToken: redditAccessTokenEncrypted !== null,
+    hasPinterestConversionToken: pinterestConversionTokenEncrypted !== null,
     hasShopifyWebhookSecret: shopifyWebhookSecret !== null,
   });
 }
@@ -229,13 +220,6 @@ export async function PATCH(
         enablePurchase: true,
         isActive: true,
         eventsForwardedCount: true,
-        // Google Ads
-        googleAdsConversionIdEncrypted: true,
-        googleAdsViewContentLabelEncrypted: true,
-        googleAdsAddToCartLabelEncrypted: true,
-        googleAdsCheckoutLabelEncrypted: true,
-        googleAdsPurchaseLabelEncrypted: true,
-        enableGoogleAds: true,
         // TikTok
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
@@ -247,6 +231,14 @@ export async function PATCH(
         // Klaviyo
         klaviyoApiKeyEncrypted: true,
         enableKlaviyo: true,
+        // Reddit
+        redditAccountId: true,
+        redditAccessTokenEncrypted: true,
+        enableReddit: true,
+        // Pinterest
+        pinterestAdAccountId: true,
+        pinterestConversionTokenEncrypted: true,
+        enablePinterest: true,
         // Shopify webhook
         shopifyDomain: true,
         shopifyWebhookSecret: true,
@@ -264,11 +256,8 @@ export async function PATCH(
       tiktokAccessTokenEncrypted,
       ga4ApiSecretEncrypted,
       klaviyoApiKeyEncrypted,
-      googleAdsConversionIdEncrypted,
-      googleAdsViewContentLabelEncrypted,
-      googleAdsAddToCartLabelEncrypted,
-      googleAdsCheckoutLabelEncrypted,
-      googleAdsPurchaseLabelEncrypted,
+      redditAccessTokenEncrypted,
+      pinterestConversionTokenEncrypted,
       shopifyWebhookSecret: updatedShopifyWebhookSecret,
       ...rest
     } = updated;
@@ -279,11 +268,8 @@ export async function PATCH(
       hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
       hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
       hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
-      hasGoogleAdsConversionId: googleAdsConversionIdEncrypted !== null,
-      hasGoogleAdsViewContentLabel: googleAdsViewContentLabelEncrypted !== null,
-      hasGoogleAdsAddToCartLabel: googleAdsAddToCartLabelEncrypted !== null,
-      hasGoogleAdsCheckoutLabel: googleAdsCheckoutLabelEncrypted !== null,
-      hasGoogleAdsPurchaseLabel: googleAdsPurchaseLabelEncrypted !== null,
+      hasRedditAccessToken: redditAccessTokenEncrypted !== null,
+      hasPinterestConversionToken: pinterestConversionTokenEncrypted !== null,
       hasShopifyWebhookSecret: updatedShopifyWebhookSecret !== null,
     });
   } catch (error) {

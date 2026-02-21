@@ -13,10 +13,11 @@ function getRedis(): IORedis {
 
 const QUEUE_NAMES = [
   "meta-events",
-  "google-events",
   "tiktok-events",
   "ga4-events",
   "klaviyo-events",
+  "reddit-events",
+  "pinterest-events",
   "event-log-cleanup",
 ];
 

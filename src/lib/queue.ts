@@ -37,19 +37,6 @@ export function getEventQueue(): Queue {
   return _eventQueue;
 }
 
-// Google Ads queue
-let _googleQueue: Queue | null = null;
-
-export function getGoogleQueue(): Queue {
-  if (!_googleQueue) {
-    _googleQueue = new Queue(QUEUE_CONFIG.GOOGLE_QUEUE_NAME, {
-      connection: getConnection() as never,
-      defaultJobOptions,
-    });
-  }
-  return _googleQueue;
-}
-
 // TikTok queue
 let _tiktokQueue: Queue | null = null;
 
@@ -89,6 +76,32 @@ export function getKlaviyoQueue(): Queue {
   return _klaviyoQueue;
 }
 
+// Reddit queue
+let _redditQueue: Queue | null = null;
+
+export function getRedditQueue(): Queue {
+  if (!_redditQueue) {
+    _redditQueue = new Queue(QUEUE_CONFIG.REDDIT_QUEUE_NAME, {
+      connection: getConnection() as never,
+      defaultJobOptions,
+    });
+  }
+  return _redditQueue;
+}
+
+// Pinterest queue
+let _pinterestQueue: Queue | null = null;
+
+export function getPinterestQueue(): Queue {
+  if (!_pinterestQueue) {
+    _pinterestQueue = new Queue(QUEUE_CONFIG.PINTEREST_QUEUE_NAME, {
+      connection: getConnection() as never,
+      defaultJobOptions,
+    });
+  }
+  return _pinterestQueue;
+}
+
 export interface MetaEventJob {
   workspaceId: string;
   requestId?: string;
@@ -123,6 +136,8 @@ export interface DestinationEventJob {
     fbc?: string | null;
     ttclid?: string | null;
     gclid?: string | null;
+    rdtCid?: string | null;
+    epik?: string | null;
     userData: Record<string, unknown>;
     customData: Record<string, unknown>;
     clientIp: string;

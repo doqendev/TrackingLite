@@ -18,10 +18,11 @@ const PAGE_SIZE = 50;
 
 const destinationLabels: Record<Destination, { label: string; className: string }> = {
   META: { label: "Meta", className: "text-blue-400" },
-  GOOGLE_ADS: { label: "Google", className: "text-amber-400" },
   TIKTOK: { label: "TikTok", className: "text-pink-400" },
-  GA4: { label: "GA4", className: "text-orange-400" },
+  GA4: { label: "GA4", className: "text-green-400" },
   KLAVIYO: { label: "Klaviyo", className: "text-emerald-400" },
+  REDDIT: { label: "Reddit", className: "text-orange-400" },
+  PINTEREST: { label: "Pinterest", className: "text-red-500" },
 };
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;

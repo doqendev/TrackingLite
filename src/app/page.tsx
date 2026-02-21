@@ -166,7 +166,7 @@ export default function HomePage() {
                 </h1>
 
                 <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
-                  Server-side tracking for Shopify &mdash; forward events to Meta, Google, TikTok, GA4, and Klaviyo. Setup takes 10 minutes.
+                  Server-side tracking for Shopify &mdash; forward events to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest. Setup takes 10 minutes.
                 </p>
 
                 <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
@@ -290,7 +290,7 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl px-6 py-14">
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
               {[
-                { value: "5", label: "Platforms supported" },
+                { value: "6", label: "Platforms supported" },
                 { value: "<150ms", label: "Avg. processing" },
                 { value: "5", label: "Event types captured" },
                 { value: "10 min", label: "Setup to first event" },
@@ -937,7 +937,7 @@ export default function HomePage() {
                 Start tracking in 10 minutes
               </h2>
               <p className="mb-8 text-sm text-muted-foreground">
-                One snippet. Five events. Complete server-side data flowing to all your ad platforms.
+                One snippet. Five events. Complete server-side data flowing to all your ad platforms across 6 destinations.
               </p>
               <Button variant="brand" size="lg" asChild className="gap-2">
                 <Link href="/signup">

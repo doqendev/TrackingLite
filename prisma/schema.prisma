@@ -96,24 +96,6 @@ model Workspace {
   metaTestEventCode         String?         // For testing in Meta Events Manager
   enableMeta                Boolean   @default(true)
 
-  // Google Ads fields (Conversion ID + per-event labels, all AES-256-GCM encrypted)
-  googleAdsConversionIdEncrypted      String?
-  googleAdsConversionIdIv             String?
-  googleAdsConversionIdTag            String?
-  googleAdsViewContentLabelEncrypted  String?
-  googleAdsViewContentLabelIv         String?
-  googleAdsViewContentLabelTag        String?
-  googleAdsAddToCartLabelEncrypted    String?
-  googleAdsAddToCartLabelIv           String?
-  googleAdsAddToCartLabelTag          String?
-  googleAdsCheckoutLabelEncrypted     String?
-  googleAdsCheckoutLabelIv            String?
-  googleAdsCheckoutLabelTag           String?
-  googleAdsPurchaseLabelEncrypted     String?
-  googleAdsPurchaseLabelIv            String?
-  googleAdsPurchaseLabelTag           String?
-  enableGoogleAds                     Boolean   @default(false)
-
   // TikTok fields
   tiktokPixelId               String?
   tiktokAccessTokenEncrypted  String?
@@ -133,6 +115,20 @@ model Workspace {
   klaviyoApiKeyIv             String?
   klaviyoApiKeyTag            String?
   enableKlaviyo               Boolean   @default(false)
+
+  // Reddit fields
+  redditAccountId                 String?
+  redditAccessTokenEncrypted      String?
+  redditAccessTokenIv             String?
+  redditAccessTokenTag            String?
+  enableReddit                    Boolean   @default(false)
+
+  // Pinterest fields
+  pinterestAdAccountId                  String?
+  pinterestConversionTokenEncrypted     String?
+  pinterestConversionTokenIv            String?
+  pinterestConversionTokenTag           String?
+  enablePinterest                       Boolean   @default(false)
 
   // Shopify webhook fields
   shopifyWebhookSecret  String?   // Shopify webhook signing secret (plain text - used for HMAC verification)
@@ -285,8 +281,9 @@ enum SubscriptionStatus {
 
 enum Destination {
   META
-  GOOGLE_ADS
   TIKTOK
   GA4
   KLAVIYO
+  REDDIT
+  PINTEREST
 }

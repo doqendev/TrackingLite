@@ -6,7 +6,8 @@ import {
   validateTikTok,
   validateGA4,
   validateKlaviyo,
-  validateGoogleAds,
+  validateReddit,
+  validatePinterest,
 } from "@/lib/destinations/validate";
 
 export async function POST(
@@ -28,9 +29,6 @@ export async function POST(
       metaAccessTokenEncrypted: true,
       metaAccessTokenIv: true,
       metaAccessTokenTag: true,
-      googleAdsConversionIdEncrypted: true,
-      googleAdsConversionIdIv: true,
-      googleAdsConversionIdTag: true,
       tiktokAccessTokenEncrypted: true,
       tiktokAccessTokenIv: true,
       tiktokAccessTokenTag: true,
@@ -41,6 +39,13 @@ export async function POST(
       klaviyoApiKeyEncrypted: true,
       klaviyoApiKeyIv: true,
       klaviyoApiKeyTag: true,
+      redditAccountId: true,
+      redditAccessTokenEncrypted: true,
+      redditAccessTokenIv: true,
+      redditAccessTokenTag: true,
+      pinterestConversionTokenEncrypted: true,
+      pinterestConversionTokenIv: true,
+      pinterestConversionTokenTag: true,
     },
   });
 
@@ -70,14 +75,26 @@ export async function POST(
       );
       return NextResponse.json(result);
     }
-    case "GOOGLE_ADS": {
-      if (!workspace.googleAdsConversionIdEncrypted) {
-        return NextResponse.json({ connected: false, message: "Google Ads credentials not configured" });
+    case "REDDIT": {
+      if (!workspace.redditAccessTokenEncrypted) {
+        return NextResponse.json({ connected: false, message: "Reddit credentials not configured" });
       }
-      const result = await validateGoogleAds(
-        workspace.googleAdsConversionIdEncrypted,
-        workspace.googleAdsConversionIdIv!,
-        workspace.googleAdsConversionIdTag!
+      const result = await validateReddit(
+        workspace.redditAccountId!,
+        workspace.redditAccessTokenEncrypted,
+        workspace.redditAccessTokenIv!,
+        workspace.redditAccessTokenTag!
+      );
+      return NextResponse.json(result);
+    }
+    case "PINTEREST": {
+      if (!workspace.pinterestConversionTokenEncrypted) {
+        return NextResponse.json({ connected: false, message: "Pinterest credentials not configured" });
+      }
+      const result = await validatePinterest(
+        workspace.pinterestConversionTokenEncrypted,
+        workspace.pinterestConversionTokenIv!,
+        workspace.pinterestConversionTokenTag!
       );
       return NextResponse.json(result);
     }

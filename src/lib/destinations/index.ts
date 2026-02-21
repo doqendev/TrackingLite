@@ -1,10 +1,11 @@
 // Destination-specific API clients and normalizers
 // Each destination has its own module:
 // - meta.ts (existing: src/lib/meta-capi.ts + src/lib/event-normalizer.ts)
-// - google-ads.ts
 // - tiktok.ts
 // - ga4.ts
 // - klaviyo.ts
+// - reddit.ts
+// - pinterest.ts
 
 export const DESTINATION_EVENT_MAP = {
   META: {
@@ -13,13 +14,6 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "AddToCart",
     InitiateCheckout: "InitiateCheckout",
     Purchase: "Purchase",
-  },
-  GOOGLE_ADS: {
-    PageView: null, // not tracked
-    ViewContent: null, // not tracked
-    AddToCart: "add_to_cart",
-    InitiateCheckout: "begin_checkout",
-    Purchase: "purchase",
   },
   TIKTOK: {
     PageView: "Pageview",
@@ -41,5 +35,19 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "Added to Cart",
     InitiateCheckout: "Started Checkout",
     Purchase: "Placed Order",
+  },
+  REDDIT: {
+    PageView: "PageVisit",
+    ViewContent: "ViewContent",
+    AddToCart: "AddToCart",
+    InitiateCheckout: null,
+    Purchase: "Purchase",
+  },
+  PINTEREST: {
+    PageView: "page_visit",
+    ViewContent: "view_content",
+    AddToCart: "add_to_cart",
+    InitiateCheckout: "initiate_checkout",
+    Purchase: "checkout",
   },
 } as const;

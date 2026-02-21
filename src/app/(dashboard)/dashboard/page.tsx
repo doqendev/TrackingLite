@@ -41,10 +41,11 @@ export default async function DashboardPage() {
       metaPixelId: true,
       metaAccessTokenEncrypted: true,
       enableMeta: true,
-      enableGoogleAds: true,
       enableTikTok: true,
       enableGA4: true,
       enableKlaviyo: true,
+      enableReddit: true,
+      enablePinterest: true,
     },
   });
 
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
 
   // Check which destinations have credentials configured
   const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-  const hasAnyDestination = hasMetaCredentials || workspace.enableGoogleAds || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo;
+  const hasAnyDestination = hasMetaCredentials || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
 
   // Get user's display currency
   const user = await db.user.findUnique({
@@ -163,7 +164,7 @@ export default async function DashboardPage() {
           <AlertDescription className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-amber-400">No destinations configured</p>
             <p className="text-sm text-amber-400/80 mt-0.5">
-              Connect at least one platform (Meta, Google Ads, TikTok, GA4, or Klaviyo) to start forwarding events.
+              Connect at least one platform (Meta, TikTok, GA4, Klaviyo, Reddit, or Pinterest) to start forwarding events.
             </p>
           </AlertDescription>
           <Button variant="outline" size="sm" className="border-amber-500/20 text-amber-400 hover:bg-amber-500/10 flex-shrink-0" asChild>

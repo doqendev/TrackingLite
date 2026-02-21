@@ -4,7 +4,8 @@ import { validateEnv } from "@/lib/env-validation";
 validateEnv();
 
 import { worker as metaWorker } from "./meta-event-processor";
-import { googleWorker } from "./google-event-processor";
+import { redditWorker } from "./reddit-event-processor";
+import { pinterestWorker } from "./pinterest-event-processor";
 import { tiktokWorker } from "./tiktok-event-processor";
 import { ga4Worker } from "./ga4-event-processor";
 import { klaviyoWorker } from "./klaviyo-event-processor";
@@ -23,11 +24,11 @@ process.on("unhandledRejection", (reason) => {
   log.error("Unhandled rejection", { error: String(reason) });
 });
 
-const workers = [metaWorker, googleWorker, tiktokWorker, ga4Worker, klaviyoWorker, alertWorker, staleRequeueWorker, cleanupWorker];
+const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorker, pinterestWorker, alertWorker, staleRequeueWorker, cleanupWorker];
 
 log.info("Starting event processors");
 log.info("Redis configured", { redisUrl: (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/\/\/.*@/, "//***@") });
-log.info("Listening for jobs", { queues: ["meta-events", "google-events", "tiktok-events", "ga4-events", "klaviyo-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
+log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
 
 // Schedule the hourly alert-check repeatable job
 scheduleAlertChecks().catch((err) => {
