@@ -118,6 +118,19 @@ const config = {
   			'shimmer': {
   				'0%': { backgroundPosition: '-200% 0' },
   				'100%': { backgroundPosition: '200% 0' }
+  			},
+  			'bar-fill': {
+  				from: { width: '0%' },
+  				to: { width: 'var(--bar-width)' }
+  			},
+  			'slide-up-row': {
+  				from: { opacity: '0', transform: 'translateY(16px)' },
+  				to: { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'pop-in': {
+  				'0%': { opacity: '0', transform: 'scale(0.8)' },
+  				'70%': { transform: 'scale(1.05)' },
+  				'100%': { opacity: '1', transform: 'scale(1)' }
   			}
   		},
   		animation: {
@@ -127,7 +140,10 @@ const config = {
   			'fade-in-up': 'fade-in-up 0.6s ease-out',
   			'slide-up': 'slide-up 0.4s ease-out',
   			'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
-  			'shimmer': 'shimmer 2s linear infinite'
+  			'shimmer': 'shimmer 2s linear infinite',
+  			'bar-fill': 'bar-fill 1.5s ease-out forwards',
+  			'slide-up-row': 'slide-up-row 0.5s ease-out forwards',
+  			'pop-in': 'pop-in 0.4s ease-out forwards'
   		}
   	}
   },
