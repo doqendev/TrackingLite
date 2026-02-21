@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
             order_id: orderId,
           },
           hasUserData: !!(email || phone),
-        } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        } as any, // eslint-disable-line
         customerIp:
           request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
           "unknown",
@@ -270,10 +270,10 @@ export async function POST(request: NextRequest) {
             return await db.eventLog.create({
               data: {
                 ...eventLogBaseData,
-                destination: dest.destination as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                destination: dest.destination as any, // eslint-disable-line
               },
             });
-          } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+          } catch (err: any) { // eslint-disable-line
             if (err?.code === "P2002") return null; // duplicate
             throw err;
           }
