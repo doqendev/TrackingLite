@@ -338,29 +338,38 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
 
       {/* JS Snippet */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>JS Snippet</CardTitle>
-            <CardDescription>Add this script to your Shopify Custom Pixel.</CardDescription>
-          </div>
-          <Button variant="ghost" size="sm" onClick={handleCopySnippet}>
-            {copied ? (
-              <>
-                <Check className="h-4 w-4 text-green-600" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" />
-                Copy
-              </>
-            )}
-          </Button>
+        <CardHeader>
+          <CardTitle>JS Snippet</CardTitle>
+          <CardDescription>Add this script to your Shopify Custom Pixel.</CardDescription>
         </CardHeader>
         <CardContent>
-          <pre className="bg-black/40 text-foreground/80 rounded-lg p-4 text-xs overflow-x-auto leading-relaxed font-mono whitespace-pre-wrap break-all border border-white/[0.06]">
-            {snippet || "Loading snippet\u2026"}
-          </pre>
+          <div className="relative">
+            <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
+              <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
+                {snippet || "Loading snippet\u2026"}
+              </pre>
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pt-12 pb-3 px-4 rounded-b-lg">
+                <Button
+                  type="button"
+                  variant="brand"
+                  className="w-full"
+                  onClick={handleCopySnippet}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy snippet
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
           <p className="text-xs text-muted-foreground mt-3">
             Go to Shopify Admin &gt; Settings &gt; Customer Events &gt; Add Custom Pixel, then paste the snippet above.
           </p>
