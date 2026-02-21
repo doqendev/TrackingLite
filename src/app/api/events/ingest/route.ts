@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createLogger } from "@/lib/logger";
 import { db } from "@/lib/db";
 import { lookupWorkspaceByApiKey } from "@/lib/api-key-cache";
 import {
@@ -9,7 +10,7 @@ import {
   getKlaviyoQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
-import { shouldSendEvent } from "@/lib/consent";
+import { shouldSendToDestination } from "@/lib/consent";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkOrderLimits } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
@@ -62,6 +63,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+  const log = createLogger({ component: "ingest", requestId });
+
   try {
     // 1. Extract and validate API key
     const apiKey = request.headers.get("X-TL-API-Key");
@@ -132,14 +136,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, eventId: payload.eventId, skipped: true }, { status: 200, headers: corsHeaders });
     }
 
-    // 8. Check consent
-    const customerConsent = {
-      analytics: payload.consent?.analyticsAllowed,
-      marketing: payload.consent?.marketingAllowed,
-    };
-    if (!shouldSendEvent(workspace.consentMode, customerConsent)) {
-      return NextResponse.json({ success: true, eventId: payload.eventId, skipped: true }, { status: 200, headers: corsHeaders });
-    }
+    // 8. Consent is now checked per-destination after building the destinations list (step 11b)
 
     // 9. Extract IP and User-Agent from request
     // Validate IP format and truncate to 45 chars (max IPv6 length)
@@ -154,7 +151,6 @@ export async function POST(request: NextRequest) {
       destination: string;
       queue: Queue;
       jobName: string;
-      credentials: Record<string, string>;
     }> = [];
 
     // Meta (if credentials are configured - preserves existing behavior)
@@ -163,13 +159,6 @@ export async function POST(request: NextRequest) {
         destination: "META",
         queue: getEventQueue(),
         jobName: "send-meta-event",
-        credentials: {
-          pixelId: workspace.metaPixelId!,
-          accessToken: workspace.metaAccessTokenEncrypted!,
-          accessTokenIv: workspace.metaAccessTokenIv!,
-          accessTokenTag: workspace.metaAccessTokenTag!,
-          testEventCode: workspace.metaTestEventCode || "",
-        },
       });
     }
 
@@ -179,23 +168,6 @@ export async function POST(request: NextRequest) {
         destination: "GOOGLE_ADS",
         queue: getGoogleQueue(),
         jobName: "send-google-event",
-        credentials: {
-          conversionId: workspace.googleAdsConversionIdEncrypted!,
-          conversionIdIv: workspace.googleAdsConversionIdIv!,
-          conversionIdTag: workspace.googleAdsConversionIdTag!,
-          viewContentLabel: workspace.googleAdsViewContentLabelEncrypted || "",
-          viewContentLabelIv: workspace.googleAdsViewContentLabelIv || "",
-          viewContentLabelTag: workspace.googleAdsViewContentLabelTag || "",
-          addToCartLabel: workspace.googleAdsAddToCartLabelEncrypted || "",
-          addToCartLabelIv: workspace.googleAdsAddToCartLabelIv || "",
-          addToCartLabelTag: workspace.googleAdsAddToCartLabelTag || "",
-          checkoutLabel: workspace.googleAdsCheckoutLabelEncrypted || "",
-          checkoutLabelIv: workspace.googleAdsCheckoutLabelIv || "",
-          checkoutLabelTag: workspace.googleAdsCheckoutLabelTag || "",
-          purchaseLabel: workspace.googleAdsPurchaseLabelEncrypted || "",
-          purchaseLabelIv: workspace.googleAdsPurchaseLabelIv || "",
-          purchaseLabelTag: workspace.googleAdsPurchaseLabelTag || "",
-        },
       });
     }
 
@@ -205,12 +177,6 @@ export async function POST(request: NextRequest) {
         destination: "TIKTOK",
         queue: getTiktokQueue(),
         jobName: "send-tiktok-event",
-        credentials: {
-          pixelId: workspace.tiktokPixelId || "",
-          accessToken: workspace.tiktokAccessTokenEncrypted!,
-          accessTokenIv: workspace.tiktokAccessTokenIv!,
-          accessTokenTag: workspace.tiktokAccessTokenTag!,
-        },
       });
     }
 
@@ -220,12 +186,6 @@ export async function POST(request: NextRequest) {
         destination: "GA4",
         queue: getGA4Queue(),
         jobName: "send-ga4-event",
-        credentials: {
-          measurementId: workspace.ga4MeasurementId || "",
-          apiSecret: workspace.ga4ApiSecretEncrypted!,
-          apiSecretIv: workspace.ga4ApiSecretIv!,
-          apiSecretTag: workspace.ga4ApiSecretTag!,
-        },
       });
     }
 
@@ -235,11 +195,6 @@ export async function POST(request: NextRequest) {
         destination: "KLAVIYO",
         queue: getKlaviyoQueue(),
         jobName: "send-klaviyo-event",
-        credentials: {
-          apiKey: workspace.klaviyoApiKeyEncrypted!,
-          apiKeyIv: workspace.klaviyoApiKeyIv!,
-          apiKeyTag: workspace.klaviyoApiKeyTag!,
-        },
       });
     }
 
@@ -250,24 +205,29 @@ export async function POST(request: NextRequest) {
       return map[payload.eventName as keyof typeof map] !== null;
     });
 
-    // For Google Ads, also check that the per-event label is configured
-    const EVENT_LABEL_FIELD_MAP: Record<string, string> = {
-      AddToCart: "addToCartLabel",
-      InitiateCheckout: "checkoutLabel",
-      Purchase: "purchaseLabel",
-    };
-
-    const finalDestinations = filteredDestinations.filter((dest) => {
-      if (dest.destination !== "GOOGLE_ADS") return true;
-      const labelField = EVENT_LABEL_FIELD_MAP[payload.eventName];
-      if (!labelField) return true; // event type not in map, allow through
-      return !!dest.credentials[labelField]; // only allow if label is configured (non-empty)
-    });
+    // Google Ads label check is now handled by the worker after DB lookup.
+    // All Google Ads events pass through here; the worker will skip if no label is configured.
 
     // Filter to specific destinations if requested (used by checkout_contact_info_submitted for Klaviyo-only)
     const targetDestinations = payload.onlyDestinations
-      ? finalDestinations.filter((d) => payload.onlyDestinations!.includes(d.destination))
-      : finalDestinations;
+      ? filteredDestinations.filter((d) => payload.onlyDestinations!.includes(d.destination))
+      : filteredDestinations;
+
+    // 11b. Filter destinations by per-destination consent
+    const consentFilteredDestinations = targetDestinations.filter((dest) =>
+      shouldSendToDestination(
+        workspace.consentMode,
+        { analytics: payload.consent?.analyticsAllowed, marketing: payload.consent?.marketingAllowed },
+        dest.destination
+      )
+    );
+
+    if (consentFilteredDestinations.length === 0) {
+      return NextResponse.json(
+        { success: true, eventId: payload.eventId, skipped: true },
+        { status: 200, headers: corsHeaders }
+      );
+    }
 
     // 12. Create EventLog entries (only for conversions) and queue jobs for each destination
     const CONVERSION_EVENTS = new Set(["AddToCart", "InitiateCheckout", "Purchase"]);
@@ -303,12 +263,12 @@ export async function POST(request: NextRequest) {
     // Create EventLog entries ONLY for conversion events (AddToCart, InitiateCheckout, Purchase)
     // PageView and ViewContent are fire-and-forget: sent to APIs but not stored
     let validEntries: Array<{ id: string }> = [];
-    let validDestinations = targetDestinations;
+    let validDestinations = consentFilteredDestinations;
 
     if (isConversion) {
       // Create all EventLog entries (one per destination), skip duplicates
       const eventLogEntries = await Promise.all(
-        targetDestinations.map(async (dest) => {
+        consentFilteredDestinations.map(async (dest) => {
           try {
             return await db.eventLog.create({
               data: {
@@ -328,7 +288,7 @@ export async function POST(request: NextRequest) {
 
       // Filter out duplicates (null entries)
       validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
-      validDestinations = targetDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
+      validDestinations = consentFilteredDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
 
       if (validEntries.length === 0) {
         return NextResponse.json(
@@ -338,20 +298,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Queue jobs for all destinations in parallel
+    // Queue jobs for all destinations in parallel (credentials looked up by workers from DB)
     await Promise.all(
       validDestinations.map((dest, idx) => {
         const eventLogId = isConversion ? validEntries[idx].id : null;
 
         if (dest.destination === "META") {
-          // Use existing MetaEventJob format for backward compatibility
           return dest.queue.add(dest.jobName, {
             workspaceId: workspace.id,
-            pixelId: dest.credentials.pixelId,
-            accessToken: dest.credentials.accessToken,
-            accessTokenIv: dest.credentials.accessTokenIv,
-            accessTokenTag: dest.credentials.accessTokenTag,
-            testEventCode: dest.credentials.testEventCode || undefined,
+            requestId,
             event: {
               eventName: payload.eventName,
               eventId: payload.eventId,
@@ -368,10 +323,10 @@ export async function POST(request: NextRequest) {
             eventLogId,
           } satisfies MetaEventJob);
         } else {
-          // Use generic DestinationEventJob format
           return dest.queue.add(dest.jobName, {
             workspaceId: workspace.id,
             destination: dest.destination,
+            requestId,
             eventLogId,
             event: {
               eventName: payload.eventName,
@@ -388,7 +343,6 @@ export async function POST(request: NextRequest) {
               clientIp,
               userAgent,
             },
-            credentials: dest.credentials,
           } satisfies DestinationEventJob);
         }
       })
@@ -409,7 +363,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid payload", details: error.errors }, { status: 422, headers: corsHeaders });
     }
-    console.error("[Ingest] Error:", error);
+    log.error("Ingest error", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: corsHeaders });
   }
 }

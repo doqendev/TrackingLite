@@ -8,18 +8,45 @@ import {
 } from "@/lib/destinations/klaviyo";
 import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
+import { createLogger } from "@/lib/logger";
+import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event, credentials } = job.data;
+  const { workspaceId, eventLogId, event } = job.data;
+
+  const log = createLogger({
+    component: "klaviyo-worker",
+    jobId: job.id,
+    workspaceId,
+    eventName: event.eventName,
+    requestId: job.data.requestId,
+  });
 
   try {
-    // Decrypt API key
-    const apiKey = decrypt(
-      credentials.apiKey,
-      credentials.apiKeyIv,
-      credentials.apiKeyTag
-    );
+    // Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
+    let apiKey: string;
+
+    const oldCredentials = (job.data as unknown as Record<string, unknown>).credentials as Record<string, string> | undefined;
+
+    if (oldCredentials?.apiKey) {
+      // Old format: credentials in job data (drain existing queued jobs)
+      apiKey = decrypt(oldCredentials.apiKey, oldCredentials.apiKeyIv, oldCredentials.apiKeyTag);
+    } else {
+      // New format: look up workspace from DB
+      const workspace = await getWorkspaceForDestination(workspaceId, "KLAVIYO");
+      if (!workspace || !workspace.isActive) {
+        throw new Error(`Workspace ${workspaceId} not found or inactive`);
+      }
+      if (!workspace.klaviyoApiKeyEncrypted) {
+        throw new Error(`Klaviyo credentials not configured for workspace ${workspaceId}`);
+      }
+      apiKey = decrypt(
+        workspace.klaviyoApiKeyEncrypted as string,
+        workspace.klaviyoApiKeyIv as string,
+        workspace.klaviyoApiKeyTag as string
+      );
+    }
 
     // Normalize event to Klaviyo format
     const klaviyoEvent = normalizeToKlaviyoEvent(event.eventName, {
@@ -40,9 +67,7 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
           },
         });
       }
-      console.log(
-        `[KlaviyoWorker] Job ${job.id} skipped: ${event.eventName} not tracked by Klaviyo`
-      );
+      log.info("Job skipped: event type not tracked by Klaviyo");
       return;
     }
 
@@ -57,9 +82,7 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
       });
     }
 
-    console.log(
-      `[KlaviyoWorker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`
-    );
+    log.info("Job completed");
   } catch (error) {
     const errorMessage =
       error instanceof KlaviyoApiError
@@ -79,10 +102,7 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
           },
         })
         .catch((dbErr) => {
-          console.error(
-            `[KlaviyoWorker] Failed to update EventLog ${eventLogId}:`,
-            dbErr
-          );
+          log.error("Failed to update EventLog", { eventLogId, error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
         });
     }
 
@@ -106,16 +126,18 @@ export const klaviyoWorker = new Worker<DestinationEventJob>(
   }
 );
 
+const workerLog = createLogger({ component: "klaviyo-worker" });
+
 klaviyoWorker.on("completed", (job) => {
-  console.log(`[KlaviyoWorker] Job ${job.id} completed successfully`);
+  workerLog.info("Job completed", { jobId: job.id });
 });
 
 klaviyoWorker.on("failed", (job, err) => {
-  console.error(`[KlaviyoWorker] Job ${job?.id} failed:`, err.message);
+  workerLog.error("Job failed", { jobId: job?.id, error: err.message });
 });
 
 klaviyoWorker.on("error", (err) => {
-  console.error("[KlaviyoWorker] Worker error:", err);
+  workerLog.error("Worker error", { error: err.message });
 });
 
 export { processKlaviyoEvent };

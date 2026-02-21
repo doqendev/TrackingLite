@@ -8,18 +8,48 @@ import {
 } from "@/lib/destinations/ga4";
 import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
+import { createLogger } from "@/lib/logger";
+import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event, credentials } = job.data;
+  const { workspaceId, eventLogId, event } = job.data;
+
+  const log = createLogger({
+    component: "ga4-worker",
+    jobId: job.id,
+    workspaceId,
+    eventName: event.eventName,
+    requestId: job.data.requestId,
+  });
 
   try {
-    // Decrypt GA4 API secret
-    const apiSecret = decrypt(
-      credentials.apiSecret,
-      credentials.apiSecretIv,
-      credentials.apiSecretTag
-    );
+    // Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
+    let apiSecret: string;
+    let measurementId: string;
+
+    const oldCredentials = (job.data as unknown as Record<string, unknown>).credentials as Record<string, string> | undefined;
+
+    if (oldCredentials?.apiSecret) {
+      // Old format: credentials in job data (drain existing queued jobs)
+      apiSecret = decrypt(oldCredentials.apiSecret, oldCredentials.apiSecretIv, oldCredentials.apiSecretTag);
+      measurementId = oldCredentials.measurementId || "";
+    } else {
+      // New format: look up workspace from DB
+      const workspace = await getWorkspaceForDestination(workspaceId, "GA4");
+      if (!workspace || !workspace.isActive) {
+        throw new Error(`Workspace ${workspaceId} not found or inactive`);
+      }
+      if (!workspace.ga4ApiSecretEncrypted) {
+        throw new Error(`GA4 credentials not configured for workspace ${workspaceId}`);
+      }
+      apiSecret = decrypt(
+        workspace.ga4ApiSecretEncrypted as string,
+        workspace.ga4ApiSecretIv as string,
+        workspace.ga4ApiSecretTag as string
+      );
+      measurementId = (workspace.ga4MeasurementId as string) || "";
+    }
 
     // Normalize event to GA4 Measurement Protocol format
     const ga4Event = normalizeToGA4Event(event.eventName, {
@@ -44,9 +74,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
           },
         });
       }
-      console.log(
-        `[GA4Worker] Job ${job.id} skipped: ${event.eventName} not tracked by GA4`
-      );
+      log.info("Job skipped: event type not tracked by GA4");
       return;
     }
 
@@ -55,7 +83,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
 
     // Send to GA4 Measurement Protocol
     const response = await sendToGA4(
-      credentials.measurementId,
+      measurementId,
       apiSecret,
       clientId,
       [ga4Event]
@@ -69,9 +97,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       });
     }
 
-    console.log(
-      `[GA4Worker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`
-    );
+    log.info("Job completed");
   } catch (error) {
     const errorMessage =
       error instanceof GA4ApiError
@@ -91,10 +117,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
           },
         })
         .catch((dbErr) => {
-          console.error(
-            `[GA4Worker] Failed to update EventLog ${eventLogId}:`,
-            dbErr
-          );
+          log.error("Failed to update EventLog", { eventLogId, error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
         });
     }
 
@@ -118,16 +141,18 @@ export const ga4Worker = new Worker<DestinationEventJob>(
   }
 );
 
+const workerLog = createLogger({ component: "ga4-worker" });
+
 ga4Worker.on("completed", (job) => {
-  console.log(`[GA4Worker] Job ${job.id} completed successfully`);
+  workerLog.info("Job completed", { jobId: job.id });
 });
 
 ga4Worker.on("failed", (job, err) => {
-  console.error(`[GA4Worker] Job ${job?.id} failed:`, err.message);
+  workerLog.error("Job failed", { jobId: job?.id, error: err.message });
 });
 
 ga4Worker.on("error", (err) => {
-  console.error("[GA4Worker] Worker error:", err);
+  workerLog.error("Worker error", { error: err.message });
 });
 
 export { processGA4Event };

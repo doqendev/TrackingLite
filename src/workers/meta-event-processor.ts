@@ -5,24 +5,55 @@ import { normalizeToMetaCapiEvent } from "@/lib/event-normalizer";
 import { sendToMetaCapi, MetaCapiError } from "@/lib/meta-capi";
 import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
+import { createLogger } from "@/lib/logger";
+import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import type { MetaEventJob } from "@/lib/queue";
 import type { SnippetEventPayload } from "@/types/events";
 
 async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
-  const {
+  const { workspaceId, event, eventLogId } = job.data;
+
+  const log = createLogger({
+    component: "meta-worker",
+    jobId: job.id,
     workspaceId,
-    pixelId,
-    accessToken,
-    accessTokenIv,
-    accessTokenTag,
-    testEventCode,
-    event,
-    eventLogId,
-  } = job.data;
+    eventName: event.eventName,
+    requestId: job.data.requestId,
+  });
 
   try {
-    // 1. Decrypt Meta access token
-    const decryptedToken = decrypt(accessToken, accessTokenIv, accessTokenTag);
+    // 1. Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
+    let pixelId: string;
+    let decryptedToken: string;
+    let testEventCode: string | undefined;
+
+    const jobData = job.data as unknown as Record<string, unknown>;
+    if (jobData.pixelId && jobData.accessToken) {
+      // Old format: credentials in job data (drain existing queued jobs)
+      pixelId = jobData.pixelId as string;
+      decryptedToken = decrypt(
+        jobData.accessToken as string,
+        jobData.accessTokenIv as string,
+        jobData.accessTokenTag as string
+      );
+      testEventCode = (jobData.testEventCode as string) || undefined;
+    } else {
+      // New format: look up workspace from DB
+      const workspace = await getWorkspaceForDestination(workspaceId, "META");
+      if (!workspace || !workspace.isActive) {
+        throw new Error(`Workspace ${workspaceId} not found or inactive`);
+      }
+      if (!workspace.metaPixelId || !workspace.metaAccessTokenEncrypted) {
+        throw new Error(`Meta credentials not configured for workspace ${workspaceId}`);
+      }
+      pixelId = workspace.metaPixelId as string;
+      decryptedToken = decrypt(
+        workspace.metaAccessTokenEncrypted as string,
+        workspace.metaAccessTokenIv as string,
+        workspace.metaAccessTokenTag as string
+      );
+      testEventCode = (workspace.metaTestEventCode as string) || undefined;
+    }
 
     // 2. Build SnippetEventPayload for normalizer
     const payload: SnippetEventPayload = {
@@ -71,7 +102,7 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       },
     });
 
-    console.log(`[Worker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`);
+    log.info("Job completed");
   } catch (error) {
     // Update EventLog to FAILED
     const errorMessage =
@@ -92,7 +123,7 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
           },
         })
         .catch((dbErr) => {
-          console.error(`[Worker] Failed to update EventLog ${eventLogId}:`, dbErr);
+          log.error("Failed to update EventLog", { eventLogId, error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
         });
     }
 
@@ -117,16 +148,18 @@ export const worker = new Worker<MetaEventJob>(
   }
 );
 
+const workerLog = createLogger({ component: "meta-worker" });
+
 worker.on("completed", (job) => {
-  console.log(`[Worker] Job ${job.id} completed successfully`);
+  workerLog.info("Job completed", { jobId: job.id });
 });
 
 worker.on("failed", (job, err) => {
-  console.error(`[Worker] Job ${job?.id} failed:`, err.message);
+  workerLog.error("Job failed", { jobId: job?.id, error: err.message });
 });
 
 worker.on("error", (err) => {
-  console.error("[Worker] Worker error:", err);
+  workerLog.error("Worker error", { error: err.message });
 });
 
 export { processMetaEvent };

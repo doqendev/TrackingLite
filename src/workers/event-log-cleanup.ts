@@ -2,9 +2,12 @@ import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import { BILLING_PLANS, BillingPlanKey } from "@/lib/constants";
+import { createLogger } from "@/lib/logger";
 
 const QUEUE_NAME = "event-log-cleanup";
 const JOB_NAME = "run-event-log-cleanup";
+
+const log = createLogger({ component: "cleanup" });
 
 let _connection: IORedis | null = null;
 
@@ -38,7 +41,7 @@ function getQueue(): Queue {
 }
 
 async function runEventLogCleanup(): Promise<void> {
-  console.log("[Cleanup] Starting event log retention cleanup...");
+  log.info("Starting event log retention cleanup");
 
   // Single query: fetch all active workspaces with their owner's subscription plan
   const workspaces = await db.workspace.findMany({
@@ -56,7 +59,7 @@ async function runEventLogCleanup(): Promise<void> {
     },
   });
 
-  console.log(`[Cleanup] Checking retention for ${workspaces.length} active workspace(s)...`);
+  log.info("Checking retention for workspaces", { count: workspaces.length });
 
   // Group workspace IDs by retention period (days)
   const retentionGroups = new Map<number, string[]>();
@@ -79,14 +82,16 @@ async function runEventLogCleanup(): Promise<void> {
       where: { workspaceId: { in: workspaceIds }, createdAt: { lt: cutoff } },
     });
     if (result.count > 0) {
-      console.log(
-        `[Cleanup] Deleted ${result.count} event(s) from ${workspaceIds.length} workspace(s) with ${days}d retention`
-      );
+      log.info("Deleted events for retention period", {
+        count: result.count,
+        workspaceCount: workspaceIds.length,
+        retentionDays: days,
+      });
     }
     totalDeleted += result.count;
   }
 
-  console.log(`[Cleanup] Run complete. ${totalDeleted} total event(s) deleted.`);
+  log.info("Cleanup run complete", { totalDeleted });
 }
 
 // Register the repeatable job on the queue
@@ -109,7 +114,7 @@ export async function scheduleEventLogCleanup(): Promise<void> {
     }
   );
 
-  console.log("[Cleanup] Repeatable event-log-cleanup job scheduled (hourly).");
+  log.info("Repeatable event-log-cleanup job scheduled", { interval: "hourly" });
 }
 
 // BullMQ worker that processes event-log-cleanup jobs
@@ -125,13 +130,13 @@ export const cleanupWorker = new Worker(
 );
 
 cleanupWorker.on("completed", () => {
-  console.log("[Cleanup] Event log cleanup job completed.");
+  log.info("Event log cleanup job completed");
 });
 
 cleanupWorker.on("failed", (_job, err) => {
-  console.error("[Cleanup] Event log cleanup job failed:", err);
+  log.error("Event log cleanup job failed", { error: err instanceof Error ? err.message : String(err) });
 });
 
 cleanupWorker.on("error", (err) => {
-  console.error("[Cleanup] Worker error:", err.message);
+  log.error("Worker error", { error: err.message });
 });

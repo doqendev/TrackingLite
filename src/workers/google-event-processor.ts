@@ -8,70 +8,95 @@ import {
 import { decrypt } from "@/lib/encryption";
 import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
+import { createLogger } from "@/lib/logger";
+import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event, credentials } = job.data;
-    console.log(`[GoogleWorker] Processing job ${job.id}: event=${event.eventName} workspace=${workspaceId} eventLogId=${eventLogId || "fire-and-forget"}`);
+  const { workspaceId, eventLogId, event } = job.data;
+
+  const log = createLogger({
+    component: "google-worker",
+    jobId: job.id,
+    workspaceId,
+    eventName: event.eventName,
+    requestId: job.data.requestId,
+  });
+
+  log.info("Processing job", { eventLogId: eventLogId ?? "fire-and-forget" });
 
   try {
-    const conversionIdEnc = credentials.conversionId as string | undefined;
-    const conversionIdIv = credentials.conversionIdIv as string | undefined;
-    const conversionIdTag = credentials.conversionIdTag as string | undefined;
+    // Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
+    const decryptLabel = (enc: unknown, iv: unknown, tag: unknown): string => {
+      if (!enc || !iv || !tag) return "";
+      return decrypt(enc as string, iv as string, tag as string);
+    };
 
-    if (!conversionIdEnc || !conversionIdIv || !conversionIdTag) {
-      if (eventLogId) {
-        await db.eventLog.update({
-          where: { id: eventLogId },
-          data: {
-            status: "FAILED",
-            errorMessage: "Google Ads conversion ID not configured",
-          },
-        });
+    let conversionId: string;
+    let decryptedCredentials: Record<string, string>;
+
+    const oldCredentials = (job.data as unknown as Record<string, unknown>).credentials as Record<string, string> | undefined;
+
+    if (oldCredentials?.conversionId) {
+      // Old format: credentials in job data (drain existing queued jobs)
+      if (!oldCredentials.conversionIdIv || !oldCredentials.conversionIdTag) {
+        if (eventLogId) {
+          await db.eventLog.update({
+            where: { id: eventLogId },
+            data: { status: "FAILED", errorMessage: "Google Ads conversion ID not configured" },
+          });
+        }
+        return;
       }
-      return;
+      conversionId = decrypt(oldCredentials.conversionId, oldCredentials.conversionIdIv, oldCredentials.conversionIdTag);
+      decryptedCredentials = {
+        viewContentLabel: decryptLabel(oldCredentials.viewContentLabel, oldCredentials.viewContentLabelIv, oldCredentials.viewContentLabelTag),
+        addToCartLabel: decryptLabel(oldCredentials.addToCartLabel, oldCredentials.addToCartLabelIv, oldCredentials.addToCartLabelTag),
+        checkoutLabel: decryptLabel(oldCredentials.checkoutLabel, oldCredentials.checkoutLabelIv, oldCredentials.checkoutLabelTag),
+        purchaseLabel: decryptLabel(oldCredentials.purchaseLabel, oldCredentials.purchaseLabelIv, oldCredentials.purchaseLabelTag),
+      };
+    } else {
+      // New format: look up workspace from DB
+      const workspace = await getWorkspaceForDestination(workspaceId, "GOOGLE_ADS");
+      if (!workspace || !workspace.isActive) {
+        throw new Error(`Workspace ${workspaceId} not found or inactive`);
+      }
+      if (!workspace.googleAdsConversionIdEncrypted) {
+        if (eventLogId) {
+          await db.eventLog.update({
+            where: { id: eventLogId },
+            data: { status: "FAILED", errorMessage: "Google Ads conversion ID not configured" },
+          });
+        }
+        return;
+      }
+      conversionId = decrypt(
+        workspace.googleAdsConversionIdEncrypted as string,
+        workspace.googleAdsConversionIdIv as string,
+        workspace.googleAdsConversionIdTag as string
+      );
+      decryptedCredentials = {
+        viewContentLabel: decryptLabel(workspace.googleAdsViewContentLabelEncrypted, workspace.googleAdsViewContentLabelIv, workspace.googleAdsViewContentLabelTag),
+        addToCartLabel: decryptLabel(workspace.googleAdsAddToCartLabelEncrypted, workspace.googleAdsAddToCartLabelIv, workspace.googleAdsAddToCartLabelTag),
+        checkoutLabel: decryptLabel(workspace.googleAdsCheckoutLabelEncrypted, workspace.googleAdsCheckoutLabelIv, workspace.googleAdsCheckoutLabelTag),
+        purchaseLabel: decryptLabel(workspace.googleAdsPurchaseLabelEncrypted, workspace.googleAdsPurchaseLabelIv, workspace.googleAdsPurchaseLabelTag),
+      };
     }
 
-    // Decrypt the conversion ID
-    const conversionId = decrypt(conversionIdEnc, conversionIdIv, conversionIdTag);
-    console.log(`[GoogleWorker] Decrypted conversionId: ${conversionId.slice(0, 4)}**** (${conversionId.length} chars)`);
-
-    // Decrypt per-event labels (empty string means not configured)
-    const decryptLabel = (enc: string, iv: string, tag: string): string => {
-      if (!enc || !iv || !tag) return "";
-      return decrypt(enc, iv, tag);
-    };
-
-    const decryptedCredentials: Record<string, string> = {
-      viewContentLabel: decryptLabel(
-        credentials.viewContentLabel as string,
-        credentials.viewContentLabelIv as string,
-        credentials.viewContentLabelTag as string
-      ),
-      addToCartLabel: decryptLabel(
-        credentials.addToCartLabel as string,
-        credentials.addToCartLabelIv as string,
-        credentials.addToCartLabelTag as string
-      ),
-      checkoutLabel: decryptLabel(
-        credentials.checkoutLabel as string,
-        credentials.checkoutLabelIv as string,
-        credentials.checkoutLabelTag as string
-      ),
-      purchaseLabel: decryptLabel(
-        credentials.purchaseLabel as string,
-        credentials.purchaseLabelIv as string,
-        credentials.purchaseLabelTag as string
-      ),
-    };
-    console.log(`[GoogleWorker] Decrypted labels: viewContent=${decryptedCredentials.viewContentLabel ? "set" : "empty"} addToCart=${decryptedCredentials.addToCartLabel ? "set" : "empty"} checkout=${decryptedCredentials.checkoutLabel ? "set" : "empty"} purchase=${decryptedCredentials.purchaseLabel ? "set" : "empty"}`);
+    log.debug("Decrypted conversionId", { length: conversionId.length });
+    log.debug("Decrypted labels", {
+      viewContent: !!decryptedCredentials.viewContentLabel,
+      addToCart: !!decryptedCredentials.addToCartLabel,
+      checkout: !!decryptedCredentials.checkoutLabel,
+      purchase: !!decryptedCredentials.purchaseLabel,
+    });
 
     // Look up the per-event label from decrypted credentials
     const conversionLabel = getConversionLabel(
       event.eventName,
       decryptedCredentials
     );
-    console.log(`[GoogleWorker] Resolved label for ${event.eventName}: ${conversionLabel ? conversionLabel.slice(0, 6) + "****" : "null"}`);
+    log.debug("Resolved conversion label", { hasLabel: !!conversionLabel });
 
     if (!conversionLabel) {
       // Event type has no label configured — skip silently
@@ -87,9 +112,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
           },
         });
       }
-      console.log(
-        `[GoogleWorker] Job ${job.id} skipped: no label for ${event.eventName} in workspace ${workspaceId}`
-      );
+      log.info("Job skipped: no label configured for event");
       return;
     }
 
@@ -116,9 +139,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
       });
     }
 
-    console.log(
-      `[GoogleWorker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`
-    );
+    log.info("Job completed");
   } catch (error) {
     const errorMessage =
       error instanceof GoogleAdsError
@@ -127,7 +148,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
         ? `${error.name}: ${error.message}`
         : "Unknown error";
 
-    console.error(`[GoogleWorker] Job ${job.id} ERROR: ${errorMessage}`, error instanceof Error ? error.stack : "");
+    log.error("Job error", { error: errorMessage });
 
     if (eventLogId) {
       await db.eventLog
@@ -140,10 +161,7 @@ async function processGoogleEvent(job: Job<DestinationEventJob>): Promise<void> 
           },
         })
         .catch((dbErr) => {
-          console.error(
-            `[GoogleWorker] Failed to update EventLog ${eventLogId}:`,
-            dbErr
-          );
+          log.error("Failed to update EventLog", { eventLogId, error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
         });
     }
 
@@ -167,16 +185,18 @@ export const googleWorker = new Worker<DestinationEventJob>(
   }
 );
 
+const workerLog = createLogger({ component: "google-worker" });
+
 googleWorker.on("completed", (job) => {
-  console.log(`[GoogleWorker] Job ${job.id} completed successfully`);
+  workerLog.info("Job completed", { jobId: job.id });
 });
 
 googleWorker.on("failed", (job, err) => {
-  console.error(`[GoogleWorker] Job ${job?.id} failed:`, err.message);
+  workerLog.error("Job failed", { jobId: job?.id, error: err.message });
 });
 
 googleWorker.on("error", (err) => {
-  console.error("[GoogleWorker] Worker error:", err);
+  workerLog.error("Worker error", { error: err.message });
 });
 
 export { processGoogleEvent };

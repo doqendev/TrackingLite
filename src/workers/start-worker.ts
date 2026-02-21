@@ -11,41 +11,44 @@ import { klaviyoWorker } from "./klaviyo-event-processor";
 import { alertWorker, scheduleAlertChecks } from "./alert-checker";
 import { staleRequeueWorker, scheduleStaleRequeue } from "./stale-pending-requeue";
 import { cleanupWorker, scheduleEventLogCleanup } from "./event-log-cleanup";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "worker-main" });
 
 process.on("uncaughtException", (err) => {
-  console.error("[Worker] Uncaught exception:", err.message);
+  log.error("Uncaught exception", { error: err.message });
 });
 
 process.on("unhandledRejection", (reason) => {
-  console.error("[Worker] Unhandled rejection:", reason);
+  log.error("Unhandled rejection", { error: String(reason) });
 });
 
 const workers = [metaWorker, googleWorker, tiktokWorker, ga4Worker, klaviyoWorker, alertWorker, staleRequeueWorker, cleanupWorker];
 
-console.log("[Worker] Starting event processors...");
-console.log(`[Worker] Redis URL: ${process.env.REDIS_URL ?? "redis://localhost:6379"}`);
-console.log("[Worker] Listening for jobs on queues: meta-events, google-events, tiktok-events, ga4-events, klaviyo-events, alert-checks, stale-pending-requeue, event-log-cleanup");
+log.info("Starting event processors");
+log.info("Redis configured", { redisUrl: (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/\/\/.*@/, "//***@") });
+log.info("Listening for jobs", { queues: ["meta-events", "google-events", "tiktok-events", "ga4-events", "klaviyo-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
 
 // Schedule the hourly alert-check repeatable job
 scheduleAlertChecks().catch((err) => {
-  console.error("[Worker] Failed to schedule alert checks:", err);
+  log.error("Failed to schedule alert checks", { error: err instanceof Error ? err.message : String(err) });
 });
 
 // Schedule the stale-pending requeue job (every 5 minutes)
 scheduleStaleRequeue().catch((err) => {
-  console.error("[Worker] Failed to schedule stale requeue:", err);
+  log.error("Failed to schedule stale requeue", { error: err instanceof Error ? err.message : String(err) });
 });
 
 // Schedule the event-log cleanup job (hourly)
 scheduleEventLogCleanup().catch((err) => {
-  console.error("[Worker] Failed to schedule event log cleanup:", err);
+  log.error("Failed to schedule event log cleanup", { error: err instanceof Error ? err.message : String(err) });
 });
 
 // Graceful shutdown
 async function shutdown(signal: string) {
-  console.log(`[Worker] Received ${signal}, shutting down gracefully...`);
+  log.info("Received signal, shutting down", { signal });
   await Promise.all(workers.map(w => w.close()));
-  console.log("[Worker] All workers stopped.");
+  log.info("All workers stopped");
   process.exit(0);
 }
 

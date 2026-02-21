@@ -2,9 +2,12 @@ import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import { evaluateAlerts, shouldSendAlert, sendAndLogAlert } from "@/lib/alerts";
+import { createLogger } from "@/lib/logger";
 
 const ALERT_QUEUE_NAME = "alert-checks";
 const ALERT_JOB_NAME = "run-alert-checks";
+
+const log = createLogger({ component: "alert-checker" });
 
 let _alertConnection: IORedis | null = null;
 
@@ -38,7 +41,7 @@ function getAlertQueue(): Queue {
 }
 
 async function runAlertChecks(): Promise<void> {
-  console.log("[AlertChecker] Starting alert evaluation run...");
+  log.info("Starting alert evaluation run");
 
   // Find all users who have at least one active workspace
   const usersWithWorkspaces = await db.user.findMany({
@@ -53,9 +56,7 @@ async function runAlertChecks(): Promise<void> {
     },
   });
 
-  console.log(
-    `[AlertChecker] Evaluating alerts for ${usersWithWorkspaces.length} user(s)...`
-  );
+  log.info("Evaluating alerts for users", { count: usersWithWorkspaces.length });
 
   let totalSent = 0;
 
@@ -70,27 +71,24 @@ async function runAlertChecks(): Promise<void> {
 
           await sendAndLogAlert(user.email, alert);
           totalSent++;
-          console.log(
-            `[AlertChecker] Sent ${alert.alertType} alert to ${user.email} (workspace: ${alert.workspaceName})`
-          );
+          log.info("Sent alert", { alertType: alert.alertType, workspaceName: alert.workspaceName });
         } catch (alertErr) {
-          console.error(
-            `[AlertChecker] Failed to send ${alert.alertType} alert for user ${user.id}:`,
-            alertErr
-          );
+          log.error("Failed to send alert", {
+            alertType: alert.alertType,
+            userId: user.id,
+            error: alertErr instanceof Error ? alertErr.message : String(alertErr),
+          });
         }
       }
     } catch (userErr) {
-      console.error(
-        `[AlertChecker] Failed to evaluate alerts for user ${user.id}:`,
-        userErr
-      );
+      log.error("Failed to evaluate alerts for user", {
+        userId: user.id,
+        error: userErr instanceof Error ? userErr.message : String(userErr),
+      });
     }
   }
 
-  console.log(
-    `[AlertChecker] Run complete. ${totalSent} alert(s) sent.`
-  );
+  log.info("Alert run complete", { totalSent });
 }
 
 // Register the repeatable job on the queue
@@ -113,7 +111,7 @@ export async function scheduleAlertChecks(): Promise<void> {
     }
   );
 
-  console.log("[AlertChecker] Repeatable alert-check job scheduled (hourly).");
+  log.info("Repeatable alert-check job scheduled", { interval: "hourly" });
 }
 
 // BullMQ worker that processes alert-check jobs
@@ -129,13 +127,13 @@ export const alertWorker = new Worker(
 );
 
 alertWorker.on("completed", () => {
-  console.log("[AlertChecker] Alert check job completed.");
+  log.info("Alert check job completed");
 });
 
 alertWorker.on("failed", (_job, err) => {
-  console.error("[AlertChecker] Alert check job failed:", err);
+  log.error("Alert check job failed", { error: err instanceof Error ? err.message : String(err) });
 });
 
 alertWorker.on("error", (err) => {
-  console.error("[AlertChecker] Worker error:", err.message);
+  log.error("Worker error", { error: err.message });
 });

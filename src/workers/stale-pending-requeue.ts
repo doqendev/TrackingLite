@@ -1,6 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
 import {
   getEventQueue,
   getGoogleQueue,
@@ -20,6 +21,8 @@ const PERMANENT_FAILURE_MESSAGES = [
   "Workspace inactive or deleted",
   "Destination credentials missing on requeue",
 ];
+
+const log = createLogger({ component: "stale-requeue" });
 
 let _connection: IORedis | null = null;
 
@@ -66,14 +69,44 @@ type RequeueOptions = {
   logPrefix: string;
 };
 
+// Destination queue routing map
+const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = {
+  META: { queue: getEventQueue, jobName: "send-meta-event" },
+  GOOGLE_ADS: { queue: getGoogleQueue, jobName: "send-google-event" },
+  TIKTOK: { queue: getTiktokQueue, jobName: "send-tiktok-event" },
+  GA4: { queue: getGA4Queue, jobName: "send-ga4-event" },
+  KLAVIYO: { queue: getKlaviyoQueue, jobName: "send-klaviyo-event" },
+};
+
+function checkWorkspaceHasDestinationCredentials(
+  workspace: Record<string, unknown>,
+  destination: string
+): boolean {
+  switch (destination) {
+    case "META":
+      return !!(workspace.enableMeta && workspace.metaAccessTokenEncrypted);
+    case "GOOGLE_ADS":
+      return !!workspace.googleAdsConversionIdEncrypted;
+    case "TIKTOK":
+      return !!workspace.tiktokAccessTokenEncrypted;
+    case "GA4":
+      return !!workspace.ga4ApiSecretEncrypted;
+    case "KLAVIYO":
+      return !!workspace.klaviyoApiKeyEncrypted;
+    default:
+      return false;
+  }
+}
+
 // Shared routing logic for both PENDING stale requeue and FAILED event retry
+// Workers look up credentials from DB themselves; we only pass workspaceId + event data
 async function requeueEvents(
   events: EventToRequeue[],
   options: RequeueOptions
 ): Promise<{ requeued: number; failed: number }> {
-  const { incrementRetryCount, logPrefix } = options;
+  const { incrementRetryCount } = options;
 
-  // Group by workspace to batch credential lookups
+  // Group by workspace to batch workspace lookups
   const byWorkspace = new Map<string, EventToRequeue[]>();
   for (const event of events) {
     const list = byWorkspace.get(event.workspaceId) || [];
@@ -90,42 +123,12 @@ async function requeueEvents(
       select: {
         id: true,
         isActive: true,
-        metaPixelId: true,
-        metaAccessTokenEncrypted: true,
-        metaAccessTokenIv: true,
-        metaAccessTokenTag: true,
-        metaTestEventCode: true,
         enableMeta: true,
-        enableGoogleAds: true,
+        metaAccessTokenEncrypted: true,
         googleAdsConversionIdEncrypted: true,
-        googleAdsConversionIdIv: true,
-        googleAdsConversionIdTag: true,
-        googleAdsViewContentLabelEncrypted: true,
-        googleAdsViewContentLabelIv: true,
-        googleAdsViewContentLabelTag: true,
-        googleAdsAddToCartLabelEncrypted: true,
-        googleAdsAddToCartLabelIv: true,
-        googleAdsAddToCartLabelTag: true,
-        googleAdsCheckoutLabelEncrypted: true,
-        googleAdsCheckoutLabelIv: true,
-        googleAdsCheckoutLabelTag: true,
-        googleAdsPurchaseLabelEncrypted: true,
-        googleAdsPurchaseLabelIv: true,
-        googleAdsPurchaseLabelTag: true,
-        enableTikTok: true,
-        tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
-        tiktokAccessTokenIv: true,
-        tiktokAccessTokenTag: true,
-        enableGA4: true,
-        ga4MeasurementId: true,
         ga4ApiSecretEncrypted: true,
-        ga4ApiSecretIv: true,
-        ga4ApiSecretTag: true,
-        enableKlaviyo: true,
         klaviyoApiKeyEncrypted: true,
-        klaviyoApiKeyIv: true,
-        klaviyoApiKeyTag: true,
       },
     });
 
@@ -158,114 +161,52 @@ async function requeueEvents(
 
         const retryCountUpdate = incrementRetryCount ? { retryCount: { increment: 1 } } : {};
 
-        if (event.destination === "META" && workspace.enableMeta && workspace.metaAccessTokenEncrypted) {
-          await getEventQueue().add("send-meta-event", {
-            workspaceId: workspace.id,
-            pixelId: workspace.metaPixelId!,
-            accessToken: workspace.metaAccessTokenEncrypted!,
-            accessTokenIv: workspace.metaAccessTokenIv!,
-            accessTokenTag: workspace.metaAccessTokenTag!,
-            testEventCode: workspace.metaTestEventCode || undefined,
-            event: eventData,
-            eventLogId: event.id,
-          } satisfies MetaEventJob);
+        const destConfig = DEST_QUEUE_MAP[event.destination];
+        if (!destConfig) {
           await db.eventLog.update({
             where: { id: event.id },
-            data: { status: "RETRYING", ...retryCountUpdate },
+            data: { status: "FAILED", errorMessage: "Unknown destination" },
           });
-          requeued++;
-        } else if (event.destination === "GOOGLE_ADS" && workspace.googleAdsConversionIdEncrypted) {
-          await getGoogleQueue().add("send-google-event", {
-            workspaceId: workspace.id,
-            destination: "GOOGLE_ADS",
-            eventLogId: event.id,
-            event: { ...eventData, ttclid: null },
-            credentials: {
-              conversionId: workspace.googleAdsConversionIdEncrypted!,
-              conversionIdIv: workspace.googleAdsConversionIdIv!,
-              conversionIdTag: workspace.googleAdsConversionIdTag!,
-              viewContentLabel: workspace.googleAdsViewContentLabelEncrypted || "",
-              viewContentLabelIv: workspace.googleAdsViewContentLabelIv || "",
-              viewContentLabelTag: workspace.googleAdsViewContentLabelTag || "",
-              addToCartLabel: workspace.googleAdsAddToCartLabelEncrypted || "",
-              addToCartLabelIv: workspace.googleAdsAddToCartLabelIv || "",
-              addToCartLabelTag: workspace.googleAdsAddToCartLabelTag || "",
-              checkoutLabel: workspace.googleAdsCheckoutLabelEncrypted || "",
-              checkoutLabelIv: workspace.googleAdsCheckoutLabelIv || "",
-              checkoutLabelTag: workspace.googleAdsCheckoutLabelTag || "",
-              purchaseLabel: workspace.googleAdsPurchaseLabelEncrypted || "",
-              purchaseLabelIv: workspace.googleAdsPurchaseLabelIv || "",
-              purchaseLabelTag: workspace.googleAdsPurchaseLabelTag || "",
-            },
-          } satisfies DestinationEventJob);
-          await db.eventLog.update({
-            where: { id: event.id },
-            data: { status: "RETRYING", ...retryCountUpdate },
-          });
-          requeued++;
-        } else if (event.destination === "TIKTOK" && workspace.tiktokAccessTokenEncrypted) {
-          await getTiktokQueue().add("send-tiktok-event", {
-            workspaceId: workspace.id,
-            destination: "TIKTOK",
-            eventLogId: event.id,
-            event: { ...eventData, ttclid: null },
-            credentials: {
-              pixelId: workspace.tiktokPixelId || "",
-              accessToken: workspace.tiktokAccessTokenEncrypted!,
-              accessTokenIv: workspace.tiktokAccessTokenIv!,
-              accessTokenTag: workspace.tiktokAccessTokenTag!,
-            },
-          } satisfies DestinationEventJob);
-          await db.eventLog.update({
-            where: { id: event.id },
-            data: { status: "RETRYING", ...retryCountUpdate },
-          });
-          requeued++;
-        } else if (event.destination === "GA4" && workspace.ga4ApiSecretEncrypted) {
-          await getGA4Queue().add("send-ga4-event", {
-            workspaceId: workspace.id,
-            destination: "GA4",
-            eventLogId: event.id,
-            event: { ...eventData, ttclid: null },
-            credentials: {
-              measurementId: workspace.ga4MeasurementId || "",
-              apiSecret: workspace.ga4ApiSecretEncrypted!,
-              apiSecretIv: workspace.ga4ApiSecretIv!,
-              apiSecretTag: workspace.ga4ApiSecretTag!,
-            },
-          } satisfies DestinationEventJob);
-          await db.eventLog.update({
-            where: { id: event.id },
-            data: { status: "RETRYING", ...retryCountUpdate },
-          });
-          requeued++;
-        } else if (event.destination === "KLAVIYO" && workspace.klaviyoApiKeyEncrypted) {
-          await getKlaviyoQueue().add("send-klaviyo-event", {
-            workspaceId: workspace.id,
-            destination: "KLAVIYO",
-            eventLogId: event.id,
-            event: { ...eventData, ttclid: null },
-            credentials: {
-              apiKey: workspace.klaviyoApiKeyEncrypted!,
-              apiKeyIv: workspace.klaviyoApiKeyIv!,
-              apiKeyTag: workspace.klaviyoApiKeyTag!,
-            },
-          } satisfies DestinationEventJob);
-          await db.eventLog.update({
-            where: { id: event.id },
-            data: { status: "RETRYING", ...retryCountUpdate },
-          });
-          requeued++;
-        } else {
-          // No credentials for this destination
+          failed++;
+          continue;
+        }
+
+        // Check workspace has credentials for this destination (basic check)
+        const hasCredentials = checkWorkspaceHasDestinationCredentials(
+          workspace as unknown as Record<string, unknown>,
+          event.destination
+        );
+        if (!hasCredentials) {
           await db.eventLog.update({
             where: { id: event.id },
             data: { status: "FAILED", errorMessage: "Destination credentials missing on requeue" },
           });
           failed++;
+          continue;
         }
+
+        if (event.destination === "META") {
+          await destConfig.queue().add(destConfig.jobName, {
+            workspaceId: workspace.id,
+            event: eventData,
+            eventLogId: event.id,
+          } satisfies MetaEventJob);
+        } else {
+          await destConfig.queue().add(destConfig.jobName, {
+            workspaceId: workspace.id,
+            destination: event.destination,
+            eventLogId: event.id,
+            event: { ...eventData, ttclid: null },
+          } satisfies DestinationEventJob);
+        }
+
+        await db.eventLog.update({
+          where: { id: event.id },
+          data: { status: "RETRYING", ...retryCountUpdate },
+        });
+        requeued++;
       } catch (err) {
-        console.error(`[${logPrefix}] Failed to requeue event ${event.id}:`, err);
+        log.error("Failed to requeue event", { eventId: event.id, error: err instanceof Error ? err.message : String(err) });
         await db.eventLog.update({
           where: { id: event.id },
           data: { status: "FAILED", errorMessage: "Requeue failed" },
@@ -305,14 +246,14 @@ async function requeueStalePending(): Promise<void> {
 
   if (staleEvents.length === 0) return;
 
-  console.log(`[StaleRequeue] Found ${staleEvents.length} stale PENDING event(s)`);
+  log.info("Found stale PENDING events", { count: staleEvents.length });
 
   const { requeued, failed } = await requeueEvents(staleEvents, {
     incrementRetryCount: false,
     logPrefix: "StaleRequeue",
   });
 
-  console.log(`[StaleRequeue] Done: ${requeued} requeued, ${failed} marked failed`);
+  log.info("Stale requeue complete", { requeued, failed });
 }
 
 async function requeueFailedEvents(): Promise<void> {
@@ -347,14 +288,14 @@ async function requeueFailedEvents(): Promise<void> {
 
   if (failedEvents.length === 0) return;
 
-  console.log(`[FailedRetry] Found ${failedEvents.length} FAILED event(s) eligible for retry`);
+  log.info("Found FAILED events eligible for retry", { count: failedEvents.length });
 
   const { requeued, failed } = await requeueEvents(failedEvents, {
     incrementRetryCount: true,
     logPrefix: "FailedRetry",
   });
 
-  console.log(`[FailedRetry] Done: ${requeued} requeued, ${failed} marked failed`);
+  log.info("Failed retry complete", { requeued, failed });
 }
 
 export async function scheduleStaleRequeue(): Promise<void> {
@@ -371,7 +312,7 @@ export async function scheduleStaleRequeue(): Promise<void> {
     repeat: { every: 5 * 60 * 1000 }, // every 5 minutes
   });
 
-  console.log("[StaleRequeue] Repeatable stale-pending requeue job scheduled (every 5 min).");
+  log.info("Repeatable stale-pending requeue job scheduled", { interval: "5min" });
 }
 
 export const staleRequeueWorker = new Worker(
@@ -391,9 +332,9 @@ staleRequeueWorker.on("completed", () => {
 });
 
 staleRequeueWorker.on("failed", (_job, err) => {
-  console.error("[StaleRequeue] Job failed:", err);
+  log.error("Job failed", { error: err instanceof Error ? err.message : String(err) });
 });
 
 staleRequeueWorker.on("error", (err) => {
-  console.error("[StaleRequeue] Worker error:", err.message);
+  log.error("Worker error", { error: err.message });
 });

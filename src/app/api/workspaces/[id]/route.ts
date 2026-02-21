@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { encrypt } from "@/lib/encryption";
 import { invalidateApiKeyCache } from "@/lib/api-key-cache";
+import { invalidateWorkspaceCache } from "@/lib/workspace-cache";
 import { z } from "zod";
 
 const UpdateWorkspaceSchema = z.object({
@@ -39,6 +40,9 @@ const UpdateWorkspaceSchema = z.object({
   klaviyoApiKey: z.string().optional().nullable(),
   klaviyoCompanyId: z.string().regex(/^[A-Za-z0-9]+$/, "Invalid Company ID format").optional().nullable(),
   enableKlaviyo: z.boolean().optional(),
+  // Shopify webhook
+  shopifyWebhookSecret: z.string().optional().nullable(),
+  shopifyDomain: z.string().optional().nullable(),
 });
 
 // Sensitive fields that need encryption: [inputFieldName, encryptedField, ivField, tagField]
@@ -105,6 +109,9 @@ export async function GET(
       // Klaviyo
       klaviyoApiKeyEncrypted: true,
       enableKlaviyo: true,
+      // Shopify webhook
+      shopifyDomain: true,
+      shopifyWebhookSecret: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -125,6 +132,7 @@ export async function GET(
     googleAdsAddToCartLabelEncrypted,
     googleAdsCheckoutLabelEncrypted,
     googleAdsPurchaseLabelEncrypted,
+    shopifyWebhookSecret,
     ...rest
   } = workspace;
 
@@ -139,6 +147,7 @@ export async function GET(
     hasGoogleAdsAddToCartLabel: googleAdsAddToCartLabelEncrypted !== null,
     hasGoogleAdsCheckoutLabel: googleAdsCheckoutLabelEncrypted !== null,
     hasGoogleAdsPurchaseLabel: googleAdsPurchaseLabelEncrypted !== null,
+    hasShopifyWebhookSecret: shopifyWebhookSecret !== null,
   });
 }
 
@@ -238,6 +247,9 @@ export async function PATCH(
         // Klaviyo
         klaviyoApiKeyEncrypted: true,
         enableKlaviyo: true,
+        // Shopify webhook
+        shopifyDomain: true,
+        shopifyWebhookSecret: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -245,6 +257,7 @@ export async function PATCH(
 
     // Invalidate API key cache so ingest route picks up changes immediately
     await invalidateApiKeyCache(workspace.apiKey).catch(() => {});
+    invalidateWorkspaceCache(id);
 
     const {
       metaAccessTokenEncrypted,
@@ -256,6 +269,7 @@ export async function PATCH(
       googleAdsAddToCartLabelEncrypted,
       googleAdsCheckoutLabelEncrypted,
       googleAdsPurchaseLabelEncrypted,
+      shopifyWebhookSecret: updatedShopifyWebhookSecret,
       ...rest
     } = updated;
 
@@ -270,6 +284,7 @@ export async function PATCH(
       hasGoogleAdsAddToCartLabel: googleAdsAddToCartLabelEncrypted !== null,
       hasGoogleAdsCheckoutLabel: googleAdsCheckoutLabelEncrypted !== null,
       hasGoogleAdsPurchaseLabel: googleAdsPurchaseLabelEncrypted !== null,
+      hasShopifyWebhookSecret: updatedShopifyWebhookSecret !== null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

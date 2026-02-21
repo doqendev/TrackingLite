@@ -158,7 +158,7 @@ export default function HomePage() {
             <div className="relative mx-auto max-w-6xl px-6 pb-8 pt-24 sm:pb-12 sm:pt-28">
               <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
                 <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
-                  Your Meta Pixel misses
+                  Your ad pixels miss
                   <br />
                   20&ndash;40% of conversions.
                   <br />
@@ -166,7 +166,7 @@ export default function HomePage() {
                 </h1>
 
                 <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
-                  Server-side tracking for Shopify &mdash; setup takes 10 minutes
+                  Server-side tracking for Shopify &mdash; forward events to Meta, Google, TikTok, GA4, and Klaviyo. Setup takes 10 minutes.
                 </p>
 
                 <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
@@ -251,7 +251,7 @@ export default function HomePage() {
                           Forwarding
                         </div>
                         <div className="text-sm font-medium text-foreground">Meta CAPI</div>
-                        <div className="mt-1 text-xs text-muted-foreground/50">99.9% delivery</div>
+                        <div className="mt-1 text-xs text-muted-foreground/50">Live</div>
                       </div>
                     </div>
 
@@ -290,9 +290,9 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl px-6 py-14">
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
               {[
-                { value: "18M+", label: "Events forwarded" },
-                { value: "99.9%", label: "API uptime" },
+                { value: "5", label: "Platforms supported" },
                 { value: "<150ms", label: "Avg. processing" },
+                { value: "5", label: "Event types captured" },
                 { value: "10 min", label: "Setup to first event" },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
@@ -449,7 +449,7 @@ export default function HomePage() {
                     </span>
                     {"\n"}
                     <span className="text-muted-foreground/60">
-                      {"  \u2514"} Sent to Meta CAPI
+                      {"  \u2514"} Forwarded to 3 destinations
                     </span>
                     <span className="text-muted-foreground/40">
                       {"        142ms  "}
@@ -485,7 +485,7 @@ export default function HomePage() {
                     </span>
                     {"\n"}
                     <span className="text-muted-foreground/60">
-                      {"  \u2514"} Sent to Meta CAPI
+                      {"  \u2514"} Forwarded to 5 destinations
                     </span>
                     <span className="text-muted-foreground/40">
                       {"        138ms  "}
@@ -514,7 +514,7 @@ export default function HomePage() {
                     </span>
                     {"\n"}
                     <span className="text-muted-foreground/60">
-                      {"  \u2514"} Sent to Meta CAPI
+                      {"  \u2514"} Forwarded to 4 destinations
                     </span>
                     <span className="text-muted-foreground/40">
                       {"        129ms  "}
@@ -937,8 +937,7 @@ export default function HomePage() {
                 Start tracking in 10 minutes
               </h2>
               <p className="mb-8 text-sm text-muted-foreground">
-                One snippet. Five events. Complete server-side data flowing to
-                Meta.
+                One snippet. Five events. Complete server-side data flowing to all your ad platforms.
               </p>
               <Button variant="brand" size="lg" asChild className="gap-2">
                 <Link href="/signup">
@@ -1027,16 +1026,22 @@ export default function HomePage() {
                 Legal
               </h4>
               <ul className="space-y-2.5">
-                {["Privacy", "Terms"].map((item) => (
-                  <li key={item}>
-                    <a
-                      href="#"
-                      className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
-                    >
-                      {item}
-                    </a>
-                  </li>
-                ))}
+                <li>
+                  <Link
+                    href="/privacy"
+                    className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
+                  >
+                    Privacy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/terms"
+                    className="text-sm text-muted-foreground/50 transition-colors hover:text-foreground"
+                  >
+                    Terms
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>

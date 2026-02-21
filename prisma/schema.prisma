@@ -134,6 +134,10 @@ model Workspace {
   klaviyoApiKeyTag            String?
   enableKlaviyo               Boolean   @default(false)
 
+  // Shopify webhook fields
+  shopifyWebhookSecret  String?   // Shopify webhook signing secret (plain text - used for HMAC verification)
+  shopifyDomain         String?   // e.g., "mystore.myshopify.com"
+
   consentMode               ConsentMode     @default(STRICT)
   isActive                  Boolean         @default(true)
   enablePageView            Boolean         @default(true)
@@ -148,6 +152,7 @@ model Workspace {
 
   @@index([userId])
   @@index([apiKey])
+  @@index([shopifyDomain])
 }
 
 model EventLog {
@@ -177,6 +182,7 @@ model EventLog {
   utmTerm        String?
   gclid          String?
   destination    Destination  @default(META)
+  source         String?     @default("snippet")  // "snippet" | "webhook"
   createdAt      DateTime    @default(now())
 
   @@index([workspaceId, createdAt])

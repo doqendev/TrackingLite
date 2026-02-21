@@ -19,6 +19,12 @@ vi.mock("bullmq", () => ({
   }),
 }));
 
+// Mock workspace-cache (must be before imports)
+const mockGetWorkspaceForDestination = vi.fn();
+vi.mock("@/lib/workspace-cache", () => ({
+  getWorkspaceForDestination: (...args: unknown[]) => mockGetWorkspaceForDestination(...args),
+}));
+
 // Mock dependencies
 const mockDecrypt = vi.fn();
 vi.mock("@/lib/encryption", () => ({
@@ -62,17 +68,12 @@ vi.mock("@/lib/constants", () => ({
 // Import AFTER all mocks
 const { processMetaEvent } = await import("@/workers/meta-event-processor");
 
-// Test data factory
+// Test data factory (new format: no credentials in job data; worker looks up from DB)
 function createMockJob(overrides?: Partial<MetaEventJob>): Job<MetaEventJob> {
   return {
     id: "test-job-1",
     data: {
       workspaceId: "ws-123",
-      pixelId: "pixel-456",
-      accessToken: "encrypted-token",
-      accessTokenIv: "test-iv",
-      accessTokenTag: "test-tag",
-      testEventCode: null,
       event: {
         eventName: "PageView",
         eventId: "evt-789",
@@ -93,8 +94,19 @@ function createMockJob(overrides?: Partial<MetaEventJob>): Job<MetaEventJob> {
 }
 
 describe("processMetaEvent", () => {
+  const mockWorkspace = {
+    id: "ws-123",
+    isActive: true,
+    metaPixelId: "pixel-456",
+    metaAccessTokenEncrypted: "encrypted-token",
+    metaAccessTokenIv: "test-iv",
+    metaAccessTokenTag: "test-tag",
+    metaTestEventCode: null,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetWorkspaceForDestination.mockResolvedValue(mockWorkspace);
     mockDecrypt.mockReturnValue("decrypted-access-token");
     mockNormalize.mockReturnValue({ event_name: "PageView", event_time: 1700000000 });
     mockSendToMetaCapi.mockResolvedValue({ events_received: 1 });
@@ -102,11 +114,14 @@ describe("processMetaEvent", () => {
     mockWorkspaceUpdate.mockResolvedValue({});
   });
 
-  it("should decrypt token, normalize event, send to Meta, and update EventLog to SENT", async () => {
+  it("should look up workspace, decrypt token, normalize event, send to Meta, and update EventLog to SENT", async () => {
     const job = createMockJob();
     await processMetaEvent(job);
 
-    // Verify decrypt called with correct args
+    // Verify workspace lookup
+    expect(mockGetWorkspaceForDestination).toHaveBeenCalledWith("ws-123", "META");
+
+    // Verify decrypt called with correct args from workspace
     expect(mockDecrypt).toHaveBeenCalledWith("encrypted-token", "test-iv", "test-tag");
 
     // Verify normalize called
@@ -195,7 +210,12 @@ describe("processMetaEvent", () => {
   });
 
   it("should pass testEventCode to Meta CAPI when provided", async () => {
-    const job = createMockJob({ testEventCode: "TEST12345" });
+    mockGetWorkspaceForDestination.mockResolvedValue({
+      ...mockWorkspace,
+      metaTestEventCode: "TEST12345",
+    });
+
+    const job = createMockJob();
     await processMetaEvent(job);
 
     expect(mockSendToMetaCapi).toHaveBeenCalledWith(

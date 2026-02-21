@@ -91,11 +91,7 @@ export function getKlaviyoQueue(): Queue {
 
 export interface MetaEventJob {
   workspaceId: string;
-  pixelId: string;
-  accessToken: string;
-  accessTokenIv: string;
-  accessTokenTag: string;
-  testEventCode?: string | null;
+  requestId?: string;
   event: {
     eventName: string;
     eventId: string;
@@ -115,6 +111,7 @@ export interface MetaEventJob {
 export interface DestinationEventJob {
   workspaceId: string;
   destination: string;
+  requestId?: string;
   eventLogId: string | null;  // null for fire-and-forget events (PageView, ViewContent)
   event: {
     eventName: string;
@@ -131,5 +128,4 @@ export interface DestinationEventJob {
     clientIp: string;
     userAgent: string;
   };
-  credentials: Record<string, string>;
 }

@@ -178,7 +178,14 @@ export default function SignupPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        By signing up, you agree to our{" "}
+        <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link>
+        {" "}and{" "}
+        <Link href="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
+      </p>
+
+      <p className="mt-4 text-center text-sm text-muted-foreground">
         {t("alreadyHaveAccount")}{" "}
         <Link href="/login" className="font-medium text-brand-500 hover:text-brand-400">
           {t("signIn")}

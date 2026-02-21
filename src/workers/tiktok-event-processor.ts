@@ -8,18 +8,48 @@ import {
 } from "@/lib/destinations/tiktok";
 import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
+import { createLogger } from "@/lib/logger";
+import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event, credentials } = job.data;
+  const { workspaceId, eventLogId, event } = job.data;
+
+  const log = createLogger({
+    component: "tiktok-worker",
+    jobId: job.id,
+    workspaceId,
+    eventName: event.eventName,
+    requestId: job.data.requestId,
+  });
 
   try {
-    // Decrypt access token
-    const accessToken = decrypt(
-      credentials.accessToken,
-      credentials.accessTokenIv,
-      credentials.accessTokenTag
-    );
+    // Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
+    let accessToken: string;
+    let pixelId: string;
+
+    const oldCredentials = (job.data as unknown as Record<string, unknown>).credentials as Record<string, string> | undefined;
+
+    if (oldCredentials?.accessToken) {
+      // Old format: credentials in job data (drain existing queued jobs)
+      accessToken = decrypt(oldCredentials.accessToken, oldCredentials.accessTokenIv, oldCredentials.accessTokenTag);
+      pixelId = oldCredentials.pixelId || "";
+    } else {
+      // New format: look up workspace from DB
+      const workspace = await getWorkspaceForDestination(workspaceId, "TIKTOK");
+      if (!workspace || !workspace.isActive) {
+        throw new Error(`Workspace ${workspaceId} not found or inactive`);
+      }
+      if (!workspace.tiktokAccessTokenEncrypted) {
+        throw new Error(`TikTok credentials not configured for workspace ${workspaceId}`);
+      }
+      accessToken = decrypt(
+        workspace.tiktokAccessTokenEncrypted as string,
+        workspace.tiktokAccessTokenIv as string,
+        workspace.tiktokAccessTokenTag as string
+      );
+      pixelId = (workspace.tiktokPixelId as string) || "";
+    }
 
     // Normalize event to TikTok format
     const tiktokEvent = normalizeToTikTokEvent(event.eventName, {
@@ -45,15 +75,13 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
           },
         });
       }
-      console.log(
-        `[TikTokWorker] Job ${job.id} skipped: ${event.eventName} not tracked by TikTok`
-      );
+      log.info("Job skipped: event type not tracked by TikTok");
       return;
     }
 
     // Send to TikTok Events API
     const response = await sendToTikTok(
-      credentials.pixelId,
+      pixelId,
       accessToken,
       [tiktokEvent]
     );
@@ -66,9 +94,7 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
       });
     }
 
-    console.log(
-      `[TikTokWorker] Job ${job.id} completed: ${event.eventName} for workspace ${workspaceId}`
-    );
+    log.info("Job completed");
   } catch (error) {
     const errorMessage =
       error instanceof TikTokApiError
@@ -88,10 +114,7 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
           },
         })
         .catch((dbErr) => {
-          console.error(
-            `[TikTokWorker] Failed to update EventLog ${eventLogId}:`,
-            dbErr
-          );
+          log.error("Failed to update EventLog", { eventLogId, error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
         });
     }
 
@@ -115,16 +138,18 @@ export const tiktokWorker = new Worker<DestinationEventJob>(
   }
 );
 
+const workerLog = createLogger({ component: "tiktok-worker" });
+
 tiktokWorker.on("completed", (job) => {
-  console.log(`[TikTokWorker] Job ${job.id} completed successfully`);
+  workerLog.info("Job completed", { jobId: job.id });
 });
 
 tiktokWorker.on("failed", (job, err) => {
-  console.error(`[TikTokWorker] Job ${job?.id} failed:`, err.message);
+  workerLog.error("Job failed", { jobId: job?.id, error: err.message });
 });
 
 tiktokWorker.on("error", (err) => {
-  console.error("[TikTokWorker] Worker error:", err);
+  workerLog.error("Worker error", { error: err.message });
 });
 
 export { processTikTokEvent };
