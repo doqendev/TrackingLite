@@ -24,6 +24,6 @@ RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
-ENV NODE_OPTIONS="--max-old-space-size=512"
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 
 CMD ["sh", "-c", "pnpm tsx scripts/migrate-google-ads-encryption.ts && pnpm prisma db push --accept-data-loss && node .next/standalone/server.js"]
