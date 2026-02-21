@@ -107,8 +107,8 @@ export default function HomePage() {
             href="/"
             className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground"
           >
-            <Image src="/logo.png" alt="Track Clear" width={24} height={24} className="h-6 w-6" />
-            www.trackclear.io
+            <img src="/logo.png" alt="Track Clear" width={24} height={24} className="h-6 w-6" />
+            trackclear.io
           </Link>
 
           <nav className="hidden items-center gap-8 sm:flex">
@@ -1161,8 +1161,8 @@ export default function HomePage() {
           {/* Bottom bar */}
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/[0.06] pt-8 sm:flex-row">
             <span className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
-              <Image src="/logo.png" alt="Track Clear" width={20} height={20} className="h-5 w-5" />
-              www.trackclear.io
+              <img src="/logo.png" alt="Track Clear" width={20} height={20} className="h-5 w-5" />
+              trackclear.io
             </span>
             <span className="text-xs text-muted-foreground/40">
               &copy; {new Date().getFullYear()} Track Clear. All rights
