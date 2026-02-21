@@ -14,6 +14,27 @@ import {
   Activity,
   HeartPulse,
 } from "lucide-react";
+import {
+  FaMeta,
+  FaTiktok,
+  FaPinterest,
+  FaRedditAlien,
+} from "react-icons/fa6";
+import { SiGoogleanalytics } from "react-icons/si";
+
+function KlaviyoIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="1em"
+      height="1em"
+      viewBox="0 0 152 152"
+      fill="currentColor"
+    >
+      <path d="M148.76,124.01H3.24V26.63H148.76l-30.55,48.69,30.55,48.69Z" />
+    </svg>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -77,8 +98,9 @@ export default function HomePage() {
           }),
         }}
       />
+
       {/* ───────────────────────── Navigation ───────────────────────── */}
-      <header className="relative z-10 bg-transparent">
+      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link
             href="/"
@@ -121,231 +143,226 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* ───────────────────────── Hero ───────────────────────── */}
-        <div className="px-6 pt-2 sm:px-12 sm:pt-3">
-          <section
-            className="relative overflow-hidden rounded-t-2xl sm:rounded-t-3xl"
-            style={{ background: "linear-gradient(180deg, hsl(180,30%,6%) 0%, hsl(200,40%,5%) 100%)" }}
-          >
-            {/* Dot grid */}
-            <div
-              className="pointer-events-none absolute inset-0 opacity-30"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
-                backgroundSize: "24px 24px",
-              }}
-            />
+        <section className="relative overflow-hidden">
+          {/* Deep dark background */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(180deg, hsl(220,40%,5%) 0%, hsl(220,30%,4%) 100%)",
+            }}
+          />
 
-            {/* Teal atmospheric glow — center top */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 110% 60% at 50% -5%, rgba(20,184,166,0.14) 0%, rgba(16,185,129,0.04) 40%, transparent 70%)",
-              }}
-            />
-            {/* Secondary glow — right side */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 60% 80% at 90% 30%, rgba(16,185,129,0.08) 0%, transparent 60%)",
-              }}
-            />
-            {/* Subtle glow — left bottom */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 50% 50% at 10% 70%, rgba(20,184,166,0.05) 0%, transparent 50%)",
-              }}
-            />
+          {/* Dot grid */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-25"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          />
 
-            {/* ── Circuit board traces (SVG) ── */}
-            <svg
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              xmlns="http://www.w3.org/2000/svg"
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id="traceGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="rgba(16,185,129,0)" />
-                  <stop offset="30%" stopColor="rgba(16,185,129,0.3)" />
-                  <stop offset="70%" stopColor="rgba(16,185,129,0.3)" />
-                  <stop offset="100%" stopColor="rgba(16,185,129,0)" />
-                </linearGradient>
-                <linearGradient id="traceGradV" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(16,185,129,0)" />
-                  <stop offset="40%" stopColor="rgba(16,185,129,0.25)" />
-                  <stop offset="100%" stopColor="rgba(16,185,129,0)" />
-                </linearGradient>
-              </defs>
-              {/* Right-side horizontal traces */}
-              <line x1="65%" y1="18%" x2="100%" y2="18%" stroke="url(#traceGrad)" strokeWidth="1" />
-              <line x1="70%" y1="25%" x2="100%" y2="25%" stroke="url(#traceGrad)" strokeWidth="1" />
-              <line x1="75%" y1="32%" x2="100%" y2="15%" stroke="url(#traceGrad)" strokeWidth="0.5" />
-              {/* Right diagonal */}
-              <line x1="80%" y1="8%" x2="100%" y2="28%" stroke="url(#traceGrad)" strokeWidth="0.5" />
-              {/* Left-side traces */}
-              <line x1="0%" y1="65%" x2="30%" y2="65%" stroke="url(#traceGrad)" strokeWidth="1" />
-              <line x1="0%" y1="72%" x2="25%" y2="72%" stroke="url(#traceGrad)" strokeWidth="0.5" />
-              <line x1="5%" y1="58%" x2="20%" y2="75%" stroke="url(#traceGradV)" strokeWidth="0.5" />
-              {/* Vertical traces */}
-              <line x1="88%" y1="0%" x2="88%" y2="35%" stroke="url(#traceGradV)" strokeWidth="0.5" />
-              <line x1="92%" y1="5%" x2="92%" y2="40%" stroke="url(#traceGradV)" strokeWidth="0.5" />
-              {/* Connection nodes */}
-              <circle cx="88%" cy="18%" r="2.5" fill="rgba(16,185,129,0.4)" />
-              <circle cx="92%" cy="25%" r="2" fill="rgba(16,185,129,0.35)" />
-              <circle cx="80%" cy="18%" r="2" fill="rgba(16,185,129,0.3)" />
-              <circle cx="25%" cy="65%" r="2.5" fill="rgba(16,185,129,0.35)" />
-              <circle cx="20%" cy="72%" r="2" fill="rgba(16,185,129,0.3)" />
-              <circle cx="15%" cy="65%" r="1.5" fill="rgba(16,185,129,0.25)" />
-              {/* Right lower trace */}
-              <line x1="75%" y1="80%" x2="100%" y2="70%" stroke="url(#traceGrad)" strokeWidth="0.5" />
-              <circle cx="85%" cy="76%" r="1.5" fill="rgba(16,185,129,0.25)" />
-            </svg>
+          {/* Blue atmospheric glow -- center top */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 110% 60% at 50% -5%, rgba(59,130,246,0.14) 0%, rgba(6,182,212,0.04) 40%, transparent 70%)",
+            }}
+          />
+          {/* Cyan secondary glow -- right side */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 60% 80% at 90% 30%, rgba(6,182,212,0.08) 0%, transparent 60%)",
+            }}
+          />
+          {/* Subtle blue glow -- left bottom */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 50% 50% at 10% 70%, rgba(59,130,246,0.05) 0%, transparent 50%)",
+            }}
+          />
 
-            {/* Bottom fade to page background */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(to bottom, transparent 70%, hsl(200,40%,5%) 100%)",
-              }}
-            />
+          {/* Bottom fade to page background */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent 75%, hsl(222,28%,4%) 100%)",
+            }}
+          />
 
-            <div className="relative mx-auto max-w-6xl px-6 pb-8 pt-24 sm:pb-12 sm:pt-28">
-              <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
-                <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
-                  Your ad pixels miss
-                  <br />
-                  20&ndash;40% of conversions.
-                  <br />
-                  <span className="text-gradient">We catch them.</span>
-                </h1>
+          <div className="relative mx-auto max-w-6xl px-6 pb-16 pt-24 sm:pb-20 sm:pt-32">
+            <div className="mx-auto max-w-3xl text-center animate-fade-in-up">
+              <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
+                Your ad pixels miss
+                <br />
+                20&ndash;40% of conversions.
+                <br />
+                <span className="text-gradient">We catch them.</span>
+              </h1>
 
-                <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
-                  Server-side tracking for Shopify &mdash; forward events to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest. Setup takes 10 minutes.
-                </p>
+              <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-muted-foreground">
+                Server-side tracking for Shopify &mdash; forward events to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest. Setup takes 10 minutes.
+              </p>
 
-                <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-                  <Button variant="brand" size="lg" asChild className="gap-2 rounded-lg border border-white/[0.15] px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:brightness-110">
-                    <Link href="/signup">
-                      Get Started Free
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    asChild
-                    className="rounded-lg border-white/[0.15] bg-transparent px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:bg-white/[0.04] hover:brightness-110"
-                  >
-                    <Link href="#how-it-works">See how it works</Link>
-                  </Button>
-                </div>
-              </div>
-
-              {/* ── Product Visual ── */}
-              <div className="relative mx-auto mt-16 max-w-4xl sm:mt-20">
-                {/* Glow behind the card */}
-                <div
-                  className="pointer-events-none absolute -inset-6 rounded-2xl"
-                  style={{
-                    background:
-                      "radial-gradient(ellipse at center, rgba(16,185,129,0.10) 0%, transparent 70%)",
-                  }}
-                />
-                <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02] shadow-2xl shadow-emerald-500/[0.03] backdrop-blur-sm">
-                  {/* Mock header bar */}
-                  <div className="flex items-center gap-1 border-b border-white/[0.06] px-4 py-2.5">
-                    <div className="flex items-center gap-1.5 mr-4">
-                      <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
-                    </div>
-                    {["Dashboard", "Events", "Settings"].map((tab, i) => (
-                      <span
-                        key={tab}
-                        className={`rounded-md px-3 py-1 text-[11px] font-medium ${
-                          i === 0
-                            ? "bg-white/[0.06] text-foreground"
-                            : "text-muted-foreground/50"
-                        }`}
-                      >
-                        {tab}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Pipeline cards with connectors */}
-                  <div className="relative p-5">
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                      {/* Shopify card */}
-                      <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
-                        <Image src="/shopify.svg" alt="Shopify" width={20} height={20} className="absolute right-3 top-3 opacity-70" style={{ filter: "brightness(0) saturate(100%) invert(73%) sepia(52%) saturate(452%) hue-rotate(107deg) brightness(96%) contrast(92%) drop-shadow(0 0 6px rgba(16,185,129,0.5)) drop-shadow(0 0 12px rgba(16,185,129,0.25))" }} />
-                        <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Connected
-                        </div>
-                        <div className="text-sm font-medium text-foreground">Shopify Snippet</div>
-                        <div className="mt-1 text-xs text-muted-foreground/50">5 event types</div>
-                      </div>
-
-                      {/* Track Clear API card (highlighted) */}
-                      <div className="relative rounded-lg border border-emerald-500/20 bg-emerald-500/[0.03] p-4">
-                        <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Processing events
-                        </div>
-                        <div className="text-sm font-medium text-foreground">Track Clear API</div>
-                        <div className="mt-1 text-xs text-muted-foreground/50">142ms avg</div>
-                      </div>
-
-                      {/* Meta CAPI card */}
-                      <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
-                        <Image src="/meta.svg" alt="Meta" width={20} height={20} className="absolute right-3 top-3 opacity-70" style={{ filter: "brightness(0) saturate(100%) invert(73%) sepia(52%) saturate(452%) hue-rotate(107deg) brightness(96%) contrast(92%) drop-shadow(0 0 6px rgba(16,185,129,0.5)) drop-shadow(0 0 12px rgba(16,185,129,0.25))" }} />
-                        <div className="mb-3 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Forwarding
-                        </div>
-                        <div className="text-sm font-medium text-foreground">Meta CAPI</div>
-                        <div className="mt-1 text-xs text-muted-foreground/50">Live</div>
-                      </div>
-                    </div>
-
-                    {/* Connector lines between cards (desktop only) */}
-                    <svg
-                      className="pointer-events-none absolute inset-0 hidden h-full w-full sm:block"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      {/* Line from card 1 to card 2 */}
-                      <line
-                        x1="34.5%" y1="50%" x2="37%" y2="50%"
-                        stroke="rgba(16,185,129,0.3)"
-                        strokeWidth="2"
-                        strokeDasharray="4 3"
-                      />
-                      <circle cx="37%" cy="50%" r="3" fill="rgba(16,185,129,0.5)" />
-                      {/* Line from card 2 to card 3 */}
-                      <line
-                        x1="64.5%" y1="50%" x2="67%" y2="50%"
-                        stroke="rgba(16,185,129,0.3)"
-                        strokeWidth="2"
-                        strokeDasharray="4 3"
-                      />
-                      <circle cx="67%" cy="50%" r="3" fill="rgba(16,185,129,0.5)" />
-                    </svg>
-                  </div>
-                </div>
-
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                <Button
+                  variant="brand"
+                  size="lg"
+                  asChild
+                  className="gap-2 rounded-lg border border-white/[0.15] px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:brightness-110"
+                >
+                  <Link href="/signup">
+                    Get Started Free
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  asChild
+                  className="rounded-lg border-white/[0.15] bg-transparent px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:bg-white/[0.04] hover:brightness-110"
+                >
+                  <Link href="#how-it-works">See how it works</Link>
+                </Button>
               </div>
             </div>
-          </section>
-        </div>
+
+            {/* ── Platform Logo Strip ── */}
+            <div className="mx-auto mt-14 max-w-xl animate-fade-in-up-delay-1">
+              <p className="mb-5 text-center text-xs font-medium uppercase tracking-widest text-muted-foreground/40">
+                Forward events to all your platforms
+              </p>
+              <div className="flex items-center justify-center gap-6 sm:gap-10">
+                {[
+                  { Icon: FaMeta, label: "Meta" },
+                  { Icon: FaTiktok, label: "TikTok" },
+                  { Icon: SiGoogleanalytics, label: "GA4" },
+                  { Icon: KlaviyoIcon, label: "Klaviyo" },
+                  { Icon: FaRedditAlien, label: "Reddit" },
+                  { Icon: FaPinterest, label: "Pinterest" },
+                ].map(({ Icon, label }) => (
+                  <div
+                    key={label}
+                    className="flex flex-col items-center gap-1.5"
+                    title={label}
+                  >
+                    <Icon className="h-5 w-5 text-muted-foreground/40 transition-colors hover:text-brand-400" />
+                    <span className="hidden text-[10px] text-muted-foreground/30 sm:block">
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Product Visual ── */}
+            <div className="relative mx-auto mt-14 max-w-4xl animate-fade-in-up-delay-2">
+              {/* Glow behind the card */}
+              <div
+                className="pointer-events-none absolute -inset-6 rounded-2xl"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at center, rgba(59,130,246,0.10) 0%, transparent 70%)",
+                }}
+              />
+              <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02] shadow-2xl shadow-brand-500/[0.03] backdrop-blur-sm">
+                {/* Mock header bar */}
+                <div className="flex items-center gap-1 border-b border-white/[0.06] px-4 py-2.5">
+                  <div className="flex items-center gap-1.5 mr-4">
+                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.10]" />
+                  </div>
+                  {["Dashboard", "Events", "Settings"].map((tab, i) => (
+                    <span
+                      key={tab}
+                      className={`rounded-md px-3 py-1 text-[11px] font-medium ${
+                        i === 0
+                          ? "bg-white/[0.06] text-foreground"
+                          : "text-muted-foreground/50"
+                      }`}
+                    >
+                      {tab}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Pipeline cards with connectors */}
+                <div className="relative p-5">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                    {/* Shopify card */}
+                    <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+                      <Image src="/shopify.svg" alt="Shopify" width={20} height={20} className="absolute right-3 top-3 opacity-70" style={{ filter: "brightness(0) saturate(100%) invert(55%) sepia(60%) saturate(2000%) hue-rotate(196deg) brightness(100%) contrast(96%) drop-shadow(0 0 6px rgba(59,130,246,0.5)) drop-shadow(0 0 12px rgba(59,130,246,0.25))" }} />
+                      <div className="mb-3 flex items-center gap-1.5 text-[11px] text-cyan-400/80">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        Connected
+                      </div>
+                      <div className="text-sm font-medium text-foreground">Shopify Snippet</div>
+                      <div className="mt-1 text-xs text-muted-foreground/50">5 event types</div>
+                    </div>
+
+                    {/* Track Clear API card (highlighted) */}
+                    <div className="relative rounded-lg border border-brand-500/20 bg-brand-500/[0.03] p-4">
+                      <div className="mb-3 flex items-center gap-1.5 text-[11px] text-cyan-400/80">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        Processing events
+                      </div>
+                      <div className="text-sm font-medium text-foreground">Track Clear API</div>
+                      <div className="mt-1 text-xs text-muted-foreground/50">142ms avg</div>
+                    </div>
+
+                    {/* Destinations card */}
+                    <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+                      <div className="mb-3 flex items-center gap-1.5 text-[11px] text-cyan-400/80">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        Forwarding
+                      </div>
+                      <div className="text-sm font-medium text-foreground">6 Destinations</div>
+                      <div className="mt-1 text-xs text-muted-foreground/50">Live</div>
+                    </div>
+                  </div>
+
+                  {/* Connector lines between cards (desktop only) */}
+                  <svg
+                    className="pointer-events-none absolute inset-0 hidden h-full w-full sm:block"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <line
+                      x1="34.5%" y1="50%" x2="37%" y2="50%"
+                      stroke="rgba(59,130,246,0.3)"
+                      strokeWidth="2"
+                      strokeDasharray="4 3"
+                    />
+                    <circle cx="37%" cy="50%" r="3" fill="rgba(59,130,246,0.5)" />
+                    <line
+                      x1="64.5%" y1="50%" x2="67%" y2="50%"
+                      stroke="rgba(59,130,246,0.3)"
+                      strokeWidth="2"
+                      strokeDasharray="4 3"
+                    />
+                    <circle cx="67%" cy="50%" r="3" fill="rgba(59,130,246,0.5)" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* ───────────────────────── Stats Strip ───────────────────────── */}
-        <section className="border-y border-white/[0.06] bg-white/[0.015]">
+        <section
+          className="border-y border-transparent bg-white/[0.015]"
+          style={{
+            borderImage:
+              "linear-gradient(to right, transparent, rgba(59,130,246,0.12), transparent) 1",
+          }}
+        >
           <div className="mx-auto max-w-6xl px-6 py-14">
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
               {[
@@ -355,7 +372,7 @@ export default function HomePage() {
                 { value: "10 min", label: "Setup to first event" },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
-                  <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums sm:text-3xl">
+                  <div className="text-2xl font-bold tracking-tight text-brand-400 tabular-nums sm:text-3xl">
                     {stat.value}
                   </div>
                   <div className="mt-1.5 text-xs text-muted-foreground/60">
@@ -380,7 +397,7 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
                   <Shield className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -397,7 +414,7 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
                   <Smartphone className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -411,7 +428,7 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
                   <BarChart3 className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -513,7 +530,7 @@ export default function HomePage() {
                     <span className="text-muted-foreground/40">
                       {"        142ms  "}
                     </span>
-                    <span className="text-brand-500">
+                    <span className="text-cyan-400">
                       <span className="animate-pulse-glow">{"\u2713"}</span>
                       {" 200 OK"}
                     </span>
@@ -549,7 +566,7 @@ export default function HomePage() {
                     <span className="text-muted-foreground/40">
                       {"        138ms  "}
                     </span>
-                    <span className="text-brand-500">
+                    <span className="text-cyan-400">
                       <span className="animate-pulse-glow">{"\u2713"}</span>
                       {" 200 OK"}
                     </span>
@@ -578,7 +595,7 @@ export default function HomePage() {
                     <span className="text-muted-foreground/40">
                       {"        129ms  "}
                     </span>
-                    <span className="text-brand-500">
+                    <span className="text-cyan-400">
                       <span className="animate-pulse-glow">{"\u2713"}</span>
                       {" 200 OK"}
                     </span>
@@ -609,9 +626,9 @@ export default function HomePage() {
                       {"// Shopify Custom Pixel"}
                     </span>
                     {"\n"}
-                    <span className="text-brand-500">{"analytics"}</span>
+                    <span className="text-brand-400">{"analytics"}</span>
                     <span className="text-foreground/70">{".subscribe("}</span>
-                    <span className="text-amber-400/80">
+                    <span className="text-cyan-400">
                       {"\"all_events\""}
                     </span>
                     <span className="text-foreground/70">
@@ -619,9 +636,9 @@ export default function HomePage() {
                     </span>
                     {"\n"}
                     <span className="text-foreground/70">{"  "}</span>
-                    <span className="text-brand-500">{"fetch"}</span>
+                    <span className="text-brand-400">{"fetch"}</span>
                     <span className="text-foreground/70">{"("}</span>
-                    <span className="text-amber-400/80">
+                    <span className="text-cyan-400">
                       {"\"https://api.trackclear.io\""}
                     </span>
                     <span className="text-foreground/70">{", {"}</span>
@@ -629,11 +646,11 @@ export default function HomePage() {
                     <span className="text-foreground/70">
                       {"    method: "}
                     </span>
-                    <span className="text-amber-400/80">{"\"POST\""}</span>
+                    <span className="text-cyan-400">{"\"POST\""}</span>
                     <span className="text-foreground/70">{","}</span>
                     {"\n"}
                     <span className="text-foreground/70">{"    body: "}</span>
-                    <span className="text-brand-500">{"JSON"}</span>
+                    <span className="text-brand-400">{"JSON"}</span>
                     <span className="text-foreground/70">
                       {".stringify({"}
                     </span>
@@ -645,7 +662,7 @@ export default function HomePage() {
                     <span className="text-foreground/70">
                       {"      event_id: "}
                     </span>
-                    <span className="text-brand-500">{"crypto"}</span>
+                    <span className="text-brand-400">{"crypto"}</span>
                     <span className="text-foreground/70">
                       {".randomUUID(),"}
                     </span>
@@ -653,7 +670,7 @@ export default function HomePage() {
                     <span className="text-foreground/70">
                       {"      pixel_id: "}
                     </span>
-                    <span className="text-amber-400/80">
+                    <span className="text-cyan-400">
                       {"\"YOUR_PIXEL_ID\""}
                     </span>
                     {"\n"}
@@ -719,7 +736,7 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
                   <DollarSign className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -733,7 +750,7 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
                   <Activity className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -746,7 +763,7 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10] hover:glow-card">
+              <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
                   <HeartPulse className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
@@ -971,25 +988,25 @@ export default function HomePage() {
 
         {/* ───────────────────────── Final CTA ───────────────────────── */}
         <section className="relative overflow-hidden">
-          {/* Blue gradient overlay */}
+          {/* Blue/cyan gradient overlays */}
           <div
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse at center, rgba(59,130,246,0.06) 0%, transparent 70%)",
+                "radial-gradient(ellipse at center, rgba(59,130,246,0.08) 0%, transparent 70%)",
             }}
           />
           <div
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse at center bottom, rgba(20,184,166,0.04) 0%, transparent 50%)",
+                "radial-gradient(ellipse at center bottom, rgba(6,182,212,0.04) 0%, transparent 50%)",
             }}
           />
 
           <div className="mx-auto max-w-6xl px-6 py-28 sm:py-32">
             <div className="mx-auto max-w-lg text-center">
-              <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-500/80">
+              <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-400/80">
                 Nothing blocked. Everything clear.
               </p>
               <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
@@ -1014,7 +1031,7 @@ export default function HomePage() {
         className="border-t border-transparent"
         style={{
           borderImage:
-            "linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent) 1",
+            "linear-gradient(to right, transparent, rgba(59,130,246,0.1), transparent) 1",
         }}
       >
         <div className="mx-auto max-w-6xl px-6 py-16">

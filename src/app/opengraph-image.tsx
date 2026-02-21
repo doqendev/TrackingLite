@@ -14,7 +14,7 @@ export default async function Image() {
     (
       <div
         style={{
-          background: "linear-gradient(135deg, #0a0f1a 0%, #0d1520 50%, #0a1a15 100%)",
+          background: "linear-gradient(135deg, #0a0f1a 0%, #0d1520 50%, #0a1028 100%)",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -33,7 +33,7 @@ export default async function Image() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "radial-gradient(ellipse at 50% 30%, rgba(16,185,129,0.15) 0%, transparent 60%)",
+            background: "radial-gradient(ellipse at 50% 30%, rgba(59,130,246,0.15) 0%, transparent 60%)",
             display: "flex",
           }}
         />
@@ -62,7 +62,7 @@ export default async function Image() {
               letterSpacing: "-0.02em",
             }}
           >
-            <span style={{ color: "#10b981" }}>Track</span>
+            <span style={{ color: "#3b82f6" }}>Track</span>
             <span style={{ color: "#e5e7eb" }}> Clear</span>
           </div>
 
@@ -108,9 +108,9 @@ export default async function Image() {
                   style={{
                     padding: "8px 16px",
                     borderRadius: "8px",
-                    border: "1px solid rgba(16,185,129,0.3)",
-                    background: "rgba(16,185,129,0.08)",
-                    color: "#10b981",
+                    border: "1px solid rgba(59,130,246,0.3)",
+                    background: "rgba(59,130,246,0.08)",
+                    color: "#3b82f6",
                     fontSize: "14px",
                     fontWeight: 600,
                   }}
