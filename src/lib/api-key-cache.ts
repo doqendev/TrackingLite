@@ -87,3 +87,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
 
   return workspace;
 }
+
+export async function invalidateApiKeyCache(apiKey: string): Promise<void> {
+  await getRedis().del(`apikey:${apiKey}`);
+}

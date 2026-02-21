@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { encrypt } from "@/lib/encryption";
+import { invalidateApiKeyCache } from "@/lib/api-key-cache";
 import { z } from "zod";
 
 const UpdateWorkspaceSchema = z.object({
@@ -241,6 +242,9 @@ export async function PATCH(
         updatedAt: true,
       },
     });
+
+    // Invalidate API key cache so ingest route picks up changes immediately
+    await invalidateApiKeyCache(workspace.apiKey).catch(() => {});
 
     const {
       metaAccessTokenEncrypted,
