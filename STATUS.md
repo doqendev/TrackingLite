@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-02-19 (post feature expansion: Phases 1-5)
+Last updated: 2026-02-21 (post feature expansion: Phases 1-7)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test`) | 239/239 passing (13 files) |
+| Tests (`pnpm test`) | 263/263 passing (13 files) |
 | TypeScript | 0 source errors (2 pre-existing test file errors) |
 | ESLint | 0 warnings/errors |
 
@@ -40,11 +40,11 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-5)
 | `/api/workspaces` | GET, POST | Session | Working | Unlimited workspaces, encrypts credentials |
 | `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, all destinations |
 | `/api/workspaces/[id]/rotate-key` | POST | Session | Working | Generates new API key |
-| `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown) |
+| `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown) — all destinations supported |
 | `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics (60s Redis cache, destination filter, currency conversion) |
 | `/api/user/preferences` | PATCH | Session | Working | Update user display currency and language |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
-| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, UTMs, gclid) |
+| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid) |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
@@ -52,15 +52,16 @@ Last updated: 2026-02-19 (post feature expansion: Phases 1-5)
 
 ### Multi-Destination Event Pipeline
 
-Track Clear supports 5 ad/analytics destinations with server-side event forwarding:
+Track Clear supports 6 ad/analytics destinations with server-side event forwarding:
 
 | Destination | Events Supported | Auth Method | API |
 |-------------|-----------------|-------------|-----|
 | Meta CAPI | All 5 | Pixel ID + Access Token | Graph API v21.0 |
-| Google Ads | AddToCart, InitiateCheckout, Purchase | Customer ID + OAuth + Developer Token | Ads API v18 |
 | TikTok | All 5 | Pixel ID + Access Token | Events API v1.3 |
 | GA4 | All 5 | Measurement ID + API Secret | Measurement Protocol |
 | Klaviyo | ViewContent, AddToCart, InitiateCheckout, Purchase | API Key | Events API |
+| Reddit | All 5 | Account ID + Bearer Token | Conversions API v1 |
+| Pinterest | All 5 | Ad Account ID + Bearer Token | Conversions API v5 |
 
 Each destination has:
 - Normalizer + API client in `src/lib/destinations/`
@@ -69,7 +70,7 @@ Each destination has:
 - Encrypted credential storage (AES-256-GCM)
 - Settings UI card with enable toggle
 
-### Core Library Modules (25+ files in src/lib/)
+### Core Library Modules (26+ files in src/lib/)
 
 | Module | Status | What it does |
 |--------|--------|-------------|
@@ -83,10 +84,10 @@ Each destination has:
 | `api-key.ts` | Working | Generate `tl_` + 64 hex chars, format validation |
 | `stripe.ts` | Working | Stripe client (API version 2024-12-18.acacia), plan constants |
 | `billing.ts` | Working | Order limit checking, auto-upgrade, Redis counter. Lazy Redis |
-| `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (5 queues) |
+| `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (6 queues) |
 | `meta-capi.ts` | Working | POST to Meta Graph API, MetaCapiError with status/response |
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case |
-| `queue.ts` | Working | Lazy BullMQ queues (5 destinations), MetaEventJob + DestinationEventJob interfaces |
+| `queue.ts` | Working | Lazy BullMQ queues (6 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
 | `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection, keyed by destination+currency) |
@@ -95,29 +96,25 @@ Each destination has:
 | `alerts.ts` | Working | Alert evaluation: tracking down, high error rate, order limit warnings |
 | `replay-rate-limit.ts` | Working | Redis cooldown for event replay (5min per workspace) |
 | `extract-custom-data.ts` | Working | Extract value/currency/numItems/orderId from customData |
-| `destinations/index.ts` | Working | DESTINATION_EVENT_MAP for all 5 platforms |
-| `destinations/google-ads.ts` | Working | Google Ads normalizer + API client |
+| `destinations/index.ts` | Working | DESTINATION_EVENT_MAP for all 6 platforms |
 | `destinations/tiktok.ts` | Working | TikTok normalizer + API client |
 | `destinations/ga4.ts` | Working | GA4 Measurement Protocol normalizer + API client |
 | `destinations/klaviyo.ts` | Working | Klaviyo normalizer + API client (raw email, not hashed) |
+| `destinations/reddit.ts` | Working | Reddit Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII, rdt_cid click ID) |
+| `destinations/pinterest.ts` | Working | Pinterest Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII in arrays, epik click ID, value as string) |
 | `api-key-cache.ts` | **Dead code** | Redis-cached workspace lookup, never imported anywhere |
-
-### Known Limitations
-
-| Limitation | Status |
-|------------|--------|
-| Event replay route (`/api/workspaces/:id/replay`) | Only supports Meta events; multi-destination replay not yet implemented |
 
 ### Workers (9 files in src/workers/)
 
 | File | Status | What it does |
 |------|--------|-------------|
-| `start-worker.ts` | Working | Entry point, starts all 7 workers, graceful shutdown |
+| `start-worker.ts` | Working | Entry point, starts all 8 workers, graceful shutdown |
 | `meta-event-processor.ts` | Working | Meta CAPI worker: decrypt, normalize, send, update EventLog |
-| `google-event-processor.ts` | Working | Google Ads worker: decrypt, normalize, send, update EventLog |
 | `tiktok-event-processor.ts` | Working | TikTok worker: decrypt, normalize, send, update EventLog |
 | `ga4-event-processor.ts` | Working | GA4 worker: decrypt API secret, normalize, send, update EventLog |
 | `klaviyo-event-processor.ts` | Working | Klaviyo worker: decrypt API key, normalize, send, update EventLog |
+| `reddit-event-processor.ts` | Working | Reddit worker: decrypt Bearer token, normalize, send, update EventLog |
+| `pinterest-event-processor.ts` | Working | Pinterest worker: decrypt Bearer token, normalize, send, update EventLog |
 | `alert-checker.ts` | Working | Hourly repeatable job: evaluates alerts, sends email notifications |
 | `stale-pending-requeue.ts` | Working | Every 5min: finds stale PENDING events, re-queues to destination queues |
 
@@ -133,9 +130,9 @@ Each destination has:
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (17 files, 284 tests)
+### Test Coverage (17 files, 308 tests)
 
-#### Unit Tests (13 files, 239 tests)
+#### Unit Tests (13 files, 263 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -169,7 +166,7 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 
 **9 models:** User, Account, Session, VerificationToken, PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog
 
-**7 enums:** Platform, EventName, EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/GOOGLE_ADS/TIKTOK/GA4/KLAVIYO)
+**7 enums:** Platform, EventName, EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST)
 
 **Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[eventId]`. AlertLog on `[userId, alertType, sentAt]`.
 
@@ -243,6 +240,14 @@ None currently tracked.
 3. **react-icons Dependency** - Added react-icons 5.5.0 for brand icons in settings and onboarding.
 4. **Translation Structure** - Added `onboarding` namespace (~36 keys) to all 6 language files (EN, PT, ES, FR, DE, IT).
 
+### Phase 7: Destination Swap — Reddit & Pinterest (2026-02-21)
+1. **Google Ads Removed** - Google Ads used the browser pixel endpoint server-side, which silently failed without returning errors. Removed entirely to avoid misleading merchants.
+2. **Reddit Conversions API** - New destination using Bearer token auth. SHA-256 hashed PII (email, phone). Captures `rdt_cid` (Reddit click ID) from snippet URL params.
+3. **Pinterest Conversions API** - New destination using Bearer token auth. SHA-256 hashed PII passed in arrays per Pinterest schema. Captures `epik` (Pinterest click ID) from snippet URL params. Revenue value sent as string per API requirement.
+4. **Snippet Updated** - Now captures `rdtCid` and `epik` alongside existing `ttclid`, `gclid`, and UTM params.
+5. **Event Replay — All Destinations** - Replay route previously only supported Meta. Now supports all 6 destinations.
+6. **Test Suite Expanded** - Unit tests grown from 239 to 263 (added Reddit and Pinterest normalizer/client tests).
+
 ---
 
 ## Billing Model
@@ -266,8 +271,6 @@ None currently tracked.
 | Feature | Notes |
 |---------|-------|
 | Event log retention cleanup | No scheduled job to purge old EventLog records per plan retention (7/30 days) |
-| Google Ads OAuth flow | Currently manual token entry; needs OAuth callback route for token refresh |
-| Pinterest destination | Deferred to post-Phase 3 |
 | Team access | Invite members to workspace |
 | Custom ingest domain | e.g., `t.mystore.com` |
 | Batch ingestion | Multiple events per request |
