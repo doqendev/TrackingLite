@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { lookupWorkspaceByApiKey } from "@/lib/api-key-cache";
 import {
   getEventQueue,
   getGoogleQueue,
@@ -68,63 +69,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing API key" }, { status: 401, headers: corsHeaders });
     }
 
-    // 2. Look up workspace by API key (include all destination fields)
-    const workspace = await db.workspace.findUnique({
-      where: { apiKey },
-      select: {
-        id: true,
-        userId: true,
-        isActive: true,
-        // Meta fields
-        metaPixelId: true,
-        metaAccessTokenEncrypted: true,
-        metaAccessTokenIv: true,
-        metaAccessTokenTag: true,
-        metaTestEventCode: true,
-        enableMeta: true,
-        // Google Ads fields
-        enableGoogleAds: true,
-        googleAdsConversionIdEncrypted: true,
-        googleAdsConversionIdIv: true,
-        googleAdsConversionIdTag: true,
-        googleAdsViewContentLabelEncrypted: true,
-        googleAdsViewContentLabelIv: true,
-        googleAdsViewContentLabelTag: true,
-        googleAdsAddToCartLabelEncrypted: true,
-        googleAdsAddToCartLabelIv: true,
-        googleAdsAddToCartLabelTag: true,
-        googleAdsCheckoutLabelEncrypted: true,
-        googleAdsCheckoutLabelIv: true,
-        googleAdsCheckoutLabelTag: true,
-        googleAdsPurchaseLabelEncrypted: true,
-        googleAdsPurchaseLabelIv: true,
-        googleAdsPurchaseLabelTag: true,
-        // TikTok fields
-        enableTikTok: true,
-        tiktokPixelId: true,
-        tiktokAccessTokenEncrypted: true,
-        tiktokAccessTokenIv: true,
-        tiktokAccessTokenTag: true,
-        // GA4 fields
-        enableGA4: true,
-        ga4MeasurementId: true,
-        ga4ApiSecretEncrypted: true,
-        ga4ApiSecretIv: true,
-        ga4ApiSecretTag: true,
-        // Klaviyo fields
-        enableKlaviyo: true,
-        klaviyoApiKeyEncrypted: true,
-        klaviyoApiKeyIv: true,
-        klaviyoApiKeyTag: true,
-        // Event toggles and consent
-        consentMode: true,
-        enablePageView: true,
-        enableViewContent: true,
-        enableAddToCart: true,
-        enableInitiateCheckout: true,
-        enablePurchase: true,
-      },
-    });
+    // 2. Look up workspace by API key (Redis-cached, falls back to DB)
+    const workspace = await lookupWorkspaceByApiKey(apiKey);
 
     if (!workspace) {
       return NextResponse.json({ error: "Invalid API key" }, { status: 401, headers: corsHeaders });

@@ -1,6 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
+import { BILLING_PLANS, BillingPlanKey } from "@/lib/constants";
 
 const QUEUE_NAME = "event-log-cleanup";
 const JOB_NAME = "run-event-log-cleanup";
@@ -57,43 +58,29 @@ async function runEventLogCleanup(): Promise<void> {
 
   console.log(`[Cleanup] Checking retention for ${workspaces.length} active workspace(s)...`);
 
-  // Group workspace IDs by retention period
-  const freeWorkspaceIds: string[] = [];
-  const paidWorkspaceIds: string[] = [];
+  // Group workspace IDs by retention period (days)
+  const retentionGroups = new Map<number, string[]>();
 
   for (const ws of workspaces) {
-    const plan = ws.user?.subscription?.plan ?? "FREE";
-    if (plan === "FREE") {
-      freeWorkspaceIds.push(ws.id);
-    } else {
-      paidWorkspaceIds.push(ws.id);
-    }
-  }
+    const plan = (ws.user?.subscription?.plan ?? "FREE") as BillingPlanKey;
+    const retentionDays = BILLING_PLANS[plan]?.eventLogRetentionDays ?? 7;
 
-  const freeCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const paidCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    if (!retentionGroups.has(retentionDays)) {
+      retentionGroups.set(retentionDays, []);
+    }
+    retentionGroups.get(retentionDays)!.push(ws.id);
+  }
 
   let totalDeleted = 0;
 
-  if (freeWorkspaceIds.length > 0) {
+  for (const [days, workspaceIds] of Array.from(retentionGroups)) {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const result = await db.eventLog.deleteMany({
-      where: { workspaceId: { in: freeWorkspaceIds }, createdAt: { lt: freeCutoff } },
+      where: { workspaceId: { in: workspaceIds }, createdAt: { lt: cutoff } },
     });
     if (result.count > 0) {
       console.log(
-        `[Cleanup] Deleted ${result.count} event(s) from ${freeWorkspaceIds.length} FREE workspace(s) (>7d old)`
-      );
-    }
-    totalDeleted += result.count;
-  }
-
-  if (paidWorkspaceIds.length > 0) {
-    const result = await db.eventLog.deleteMany({
-      where: { workspaceId: { in: paidWorkspaceIds }, createdAt: { lt: paidCutoff } },
-    });
-    if (result.count > 0) {
-      console.log(
-        `[Cleanup] Deleted ${result.count} event(s) from ${paidWorkspaceIds.length} paid workspace(s) (>30d old)`
+        `[Cleanup] Deleted ${result.count} event(s) from ${workspaceIds.length} workspace(s) with ${days}d retention`
       );
     }
     totalDeleted += result.count;
