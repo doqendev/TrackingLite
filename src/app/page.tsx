@@ -34,7 +34,7 @@ function KlaviyoIcon({ className }: { className?: string }) {
 }
 
 export default function HomePage() {
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
+  const [billingCycle, setBillingCycle] = useState("yearly");
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
