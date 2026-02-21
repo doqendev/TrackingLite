@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AnimatedDashboard } from "@/components/landing/animated-dashboard";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { SpotlightCard } from "@/components/landing/spotlight-card";
@@ -552,20 +553,20 @@ export default function HomePage() {
                       <span className="text-brand-400">{"analytics"}</span>
                       <span className="text-foreground/70">{".subscribe("}</span>
                       <span className="text-cyan-400">{"\"all_events\""}</span>
-                      <span className="text-foreground/70">{", (event) => {"}
+                      <span className="text-foreground/70">{", (event) => {"}</span>
                       {"\n"}
                       <span className="text-foreground/70">{"  "}</span>
                       <span className="text-brand-400">{"fetch"}</span>
                       <span className="text-foreground/70">{"("}</span>
                       <span className="text-cyan-400">{"\"https://api.trackclear.io\""}</span>
-                      <span className="text-foreground/70">{", {"}
+                      <span className="text-foreground/70">{", {"}</span>
                       {"\n"}
                       <span className="text-foreground/70">{"    method: "}</span>
                       <span className="text-cyan-400">{"\"POST\""}</span>
                       {"\n"}
                       <span className="text-foreground/70">{"    body: "}</span>
                       <span className="text-brand-400">{"JSON"}</span>
-                      <span className="text-foreground/70">{".stringify({"}
+                      <span className="text-foreground/70">{".stringify({"}</span>
                       {"\n"}
                       <span className="text-foreground/70">{"      event_name: event.name,"}</span>
                       {"\n"}
