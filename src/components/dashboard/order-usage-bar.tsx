@@ -3,7 +3,6 @@
 import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart } from "lucide-react";
 
 interface OrderUsageBarProps {
   plan: string;
@@ -60,9 +59,6 @@ export function OrderUsageBar({
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 bg-brand-600/10 rounded-md">
-              <ShoppingCart className="h-4 w-4 text-brand-500" />
-            </span>
             <p className="text-sm font-medium text-muted-foreground">
               {t("ordersThisMonth")}
             </p>

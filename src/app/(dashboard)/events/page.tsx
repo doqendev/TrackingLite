@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ClipboardList } from "lucide-react";
 import { ReplayButton } from "@/components/dashboard/replay-button";
 import { getTranslations } from "next-intl/server";
 
@@ -212,7 +211,6 @@ export default async function EventsPage({
       {/* Events table */}
       {events.length === 0 ? (
         <Card className="p-12 text-center">
-          <ClipboardList className="h-14 w-14 text-brand-500/30 mx-auto mb-4" />
           <p className="text-base font-semibold text-foreground">{t("noEventsFound")}</p>
           <p className="text-sm text-muted-foreground mt-1">
             {filterEventName || filterStatus

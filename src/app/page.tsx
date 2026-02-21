@@ -4,16 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import {
-  ArrowRight,
-  Check,
-  Shield,
-  BarChart3,
-  Smartphone,
-  DollarSign,
-  Activity,
-  HeartPulse,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { AnimatedDashboard } from "@/components/landing/animated-dashboard";
 import {
   FaMeta,
@@ -401,7 +392,6 @@ export default function HomePage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
-                  <Shield className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
                     Ad blockers kill the pixel
                   </h3>
@@ -418,7 +408,6 @@ export default function HomePage() {
 
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
-                  <Smartphone className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
                     iOS 14+ breaks attribution
                   </h3>
@@ -432,7 +421,6 @@ export default function HomePage() {
 
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
-                  <BarChart3 className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
                     Missing events waste ad spend
                   </h3>
@@ -477,7 +465,7 @@ export default function HomePage() {
                     "Works alongside your existing Meta browser pixel",
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-2.5">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                      <span className="mt-0.5 shrink-0 text-brand-500 leading-none">·</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
                         {item}
                       </span>
@@ -710,7 +698,7 @@ export default function HomePage() {
                     "Automatic dedup via shared event_id with browser pixel",
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-2.5">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                      <span className="mt-0.5 shrink-0 text-brand-500 leading-none">·</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
                         {item}
                       </span>
@@ -740,7 +728,6 @@ export default function HomePage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
-                  <DollarSign className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
                     Revenue tracking
                   </h3>
@@ -754,7 +741,6 @@ export default function HomePage() {
 
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
-                  <Activity className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
                     Event funnel
                   </h3>
@@ -767,7 +753,6 @@ export default function HomePage() {
 
               <Card className="border-white/[0.06] bg-white/[0.02] shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-500/10 hover:glow-card">
                 <CardContent className="p-6">
-                  <HeartPulse className="mb-4 h-5 w-5 text-brand-500" />
                   <h3 className="mb-2 text-sm font-semibold text-foreground">
                     Delivery health
                   </h3>
@@ -833,15 +818,15 @@ export default function HomePage() {
                   <Separator className="mb-4 bg-white/[0.06]" />
                   <ul className="flex-1 space-y-2.5 text-sm text-muted-foreground">
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       50 orders/month
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       Unlimited other events
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       7-day event log
                     </li>
                   </ul>
@@ -876,19 +861,19 @@ export default function HomePage() {
                   <Separator className="mb-4 bg-white/[0.06]" />
                   <ul className="flex-1 space-y-2.5 text-sm text-muted-foreground">
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       500 orders/month
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       Unlimited other events
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       7-day event log
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       Email support
                     </li>
                   </ul>
@@ -928,19 +913,19 @@ export default function HomePage() {
                   <Separator className="mb-4 bg-white/[0.06]" />
                   <ul className="flex-1 space-y-2.5 text-sm text-muted-foreground">
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       1,000 orders/month
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       Unlimited other events
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       30-day event log
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       Priority support
                     </li>
                   </ul>
@@ -972,19 +957,19 @@ export default function HomePage() {
                   <Separator className="mb-4 bg-white/[0.06]" />
                   <ul className="flex-1 space-y-2.5 text-sm text-muted-foreground">
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       5,000 orders/month
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       Unlimited other events
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       30-day event log
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                      <span className="shrink-0 text-brand-500 leading-none">·</span>
                       Priority support
                     </li>
                   </ul>

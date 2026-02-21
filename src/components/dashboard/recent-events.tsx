@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardList, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 interface RecentEventsProps {
@@ -66,7 +66,6 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
   if (events.length === 0) {
     return (
       <Card className="p-8 text-center">
-        <ClipboardList className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
         <p className="text-sm font-medium text-muted-foreground">{t("noEventsYet")}</p>
         <p className="text-xs text-muted-foreground mt-1">{t("eventsAppearHere")}</p>
       </Card>
