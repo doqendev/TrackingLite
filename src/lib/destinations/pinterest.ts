@@ -1,4 +1,4 @@
-import { hashPii } from "@/lib/hash-pii";
+import { hashPii, hashPhonePii } from "@/lib/hash-pii";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 
 const PINTEREST_API_BASE = "https://api.pinterest.com/v5/ad_accounts";
@@ -72,7 +72,7 @@ export function normalizeToPinterestEvent(
     if (hashedEmail) userData.em = [hashedEmail];
   }
   if (ud.phone && typeof ud.phone === "string") {
-    const hashedPhone = hashPii(ud.phone);
+    const hashedPhone = hashPhonePii(ud.phone, ud.countryCode as string | undefined);
     if (hashedPhone) userData.ph = [hashedPhone];
   }
   if (eventData.clientIp) {
@@ -101,10 +101,13 @@ export function normalizeToPinterestEvent(
   const customData: NonNullable<PinterestEvent["custom_data"]> = {};
   if (cd.value !== undefined) customData.value = String(cd.value); // STRING!
   if (cd.currency) customData.currency = String(cd.currency);
-  if (cd.numItems !== undefined) customData.num_items = Number(cd.numItems);
-  if (cd.orderId) customData.order_id = String(cd.orderId);
-  if (cd.contentIds && Array.isArray(cd.contentIds)) {
-    customData.content_ids = (cd.contentIds as string[]).map(String);
+  const numItems = cd.numItems ?? cd.num_items;
+  if (numItems !== undefined) customData.num_items = Number(numItems);
+  const orderId = cd.orderId ?? cd.order_id;
+  if (orderId) customData.order_id = String(orderId);
+  const contentIds = cd.contentIds ?? cd.content_ids;
+  if (contentIds && Array.isArray(contentIds)) {
+    customData.content_ids = (contentIds as string[]).map(String);
   }
   if (cd.contents && Array.isArray(cd.contents)) {
     customData.contents = (

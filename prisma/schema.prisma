@@ -177,6 +177,9 @@ model EventLog {
   utmContent     String?
   utmTerm        String?
   gclid          String?
+  ttclid         String?
+  rdtCid         String?
+  epik           String?
   destination    Destination  @default(META)
   source         String?     @default("snippet")  // "snippet" | "webhook"
   createdAt      DateTime    @default(now())

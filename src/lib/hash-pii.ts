@@ -8,6 +8,12 @@ export function hashPii(value: string | undefined | null): string | undefined {
   return createHash("sha256").update(normalized).digest("hex");
 }
 
+export function hashPhonePii(phone: string | undefined | null, countryCode?: string | null): string | undefined {
+  if (!phone) return undefined;
+  const normalized = normalizePhoneToE164(phone, countryCode);
+  return hashPii(normalized || phone);
+}
+
 export interface UserDataInput {
   email?: string | null;
   phone?: string | null;

@@ -53,11 +53,9 @@ vi.mock("@/lib/meta-capi", () => ({
 }));
 
 const mockEventLogUpdate = vi.fn();
-const mockWorkspaceUpdate = vi.fn();
 vi.mock("@/lib/db", () => ({
   db: {
     eventLog: { update: (...args: unknown[]) => mockEventLogUpdate(...args) },
-    workspace: { update: (...args: unknown[]) => mockWorkspaceUpdate(...args) },
   },
 }));
 
@@ -72,6 +70,8 @@ const { processMetaEvent } = await import("@/workers/meta-event-processor");
 function createMockJob(overrides?: Partial<MetaEventJob>): Job<MetaEventJob> {
   return {
     id: "test-job-1",
+    attemptsMade: 0,
+    opts: { attempts: 3 },
     data: {
       workspaceId: "ws-123",
       event: {
@@ -111,7 +111,6 @@ describe("processMetaEvent", () => {
     mockNormalize.mockReturnValue({ event_name: "PageView", event_time: 1700000000 });
     mockSendToMetaCapi.mockResolvedValue({ events_received: 1 });
     mockEventLogUpdate.mockResolvedValue({});
-    mockWorkspaceUpdate.mockResolvedValue({});
   });
 
   it("should look up workspace, decrypt token, normalize event, send to Meta, and update EventLog to SENT", async () => {
@@ -147,13 +146,6 @@ describe("processMetaEvent", () => {
       })
     );
 
-    // Verify workspace count incremented
-    expect(mockWorkspaceUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "ws-123" },
-        data: { eventsForwardedCount: { increment: 1 } },
-      })
-    );
   });
 
   it("should update EventLog to FAILED and re-throw on Meta CAPI error", async () => {
@@ -163,19 +155,16 @@ describe("processMetaEvent", () => {
     const job = createMockJob();
     await expect(processMetaEvent(job)).rejects.toThrow(metaError);
 
-    // Verify EventLog updated to FAILED
+    // Verify EventLog updated to RETRYING (attemptsMade=0, will retry)
     expect(mockEventLogUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "log-001" },
         data: expect.objectContaining({
-          status: "FAILED",
+          status: "RETRYING",
           errorMessage: "Meta CAPI 429: Rate limited",
         }),
       })
     );
-
-    // Workspace count NOT incremented
-    expect(mockWorkspaceUpdate).not.toHaveBeenCalled();
   });
 
   it("should update EventLog to FAILED and re-throw on decrypt failure", async () => {
@@ -184,11 +173,11 @@ describe("processMetaEvent", () => {
     const job = createMockJob();
     await expect(processMetaEvent(job)).rejects.toThrow("Invalid auth tag");
 
-    // Verify EventLog updated to FAILED
+    // Verify EventLog updated to RETRYING (attemptsMade=0, will retry)
     expect(mockEventLogUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: "FAILED",
+          status: "RETRYING",
           errorMessage: "Invalid auth tag",
         }),
       })

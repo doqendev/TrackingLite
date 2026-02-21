@@ -1,4 +1,4 @@
-import { hashPii } from "@/lib/hash-pii";
+import { hashPii, hashPhonePii } from "@/lib/hash-pii";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 
 const TIKTOK_API_URL = "https://business-api.tiktok.com/open_api/v1.3/event/track/";
@@ -74,7 +74,7 @@ export function normalizeToTikTokEvent(
     user.email = hashPii(ud.email);
   }
   if (ud.phone && typeof ud.phone === "string") {
-    user.phone = hashPii(ud.phone);
+    user.phone = hashPhonePii(ud.phone, ud.countryCode as string | undefined);
   }
   if (eventData.ttclid) {
     user.ttclid = eventData.ttclid;
@@ -90,13 +90,15 @@ export function normalizeToTikTokEvent(
   const properties: TikTokEvent["properties"] = {};
   if (cd.value !== undefined) properties.value = Number(cd.value);
   if (cd.currency) properties.currency = String(cd.currency);
-  if (cd.contentType) properties.content_type = String(cd.contentType);
+  const contentType = cd.contentType ?? cd.content_type;
+  if (contentType) properties.content_type = String(contentType);
 
   // Build contents array
-  if (cd.contentIds && Array.isArray(cd.contentIds)) {
-    properties.contents = (cd.contentIds as string[]).map((id) => ({
+  const contentIds = cd.contentIds ?? cd.content_ids;
+  if (contentIds && Array.isArray(contentIds)) {
+    properties.contents = (contentIds as string[]).map((id) => ({
       content_id: String(id),
-      content_type: cd.contentType ? String(cd.contentType) : "product",
+      content_type: contentType ? String(contentType) : "product",
     }));
   } else if (cd.contents && Array.isArray(cd.contents)) {
     properties.contents = (

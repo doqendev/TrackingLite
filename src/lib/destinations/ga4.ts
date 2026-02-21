@@ -78,15 +78,17 @@ export function normalizeToGA4Event(
 
   // Purchase-specific
   if (ga4EventName === "purchase") {
-    if (cd.orderId != null) params.transaction_id = String(cd.orderId);
+    const orderId = cd.orderId ?? cd.order_id;
+    if (orderId != null) params.transaction_id = String(orderId);
   }
 
   // Build items array for add_to_cart, view_item, begin_checkout, purchase
   const items: GA4EventItem[] = [];
 
-  if (cd.contentIds && Array.isArray(cd.contentIds)) {
+  const contentIds = cd.contentIds ?? cd.content_ids;
+  if (contentIds && Array.isArray(contentIds)) {
     // contentIds is a flat array of IDs
-    (cd.contentIds as string[]).forEach((id) => {
+    (contentIds as string[]).forEach((id) => {
       items.push({ item_id: String(id) });
     });
   } else if (cd.contents && Array.isArray(cd.contents)) {

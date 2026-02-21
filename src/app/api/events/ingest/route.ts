@@ -22,7 +22,7 @@ import type { Queue } from "bullmq";
 const IngestPayloadSchema = z.object({
   eventName: z.enum(["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"]),
   eventId: z.string().min(1),
-  timestamp: z.number(),
+  timestamp: z.number().positive(),
   url: z.string().optional().default(""),
   referrer: z.string().optional().default(""),
   fbp: z.string().nullable().optional(),
@@ -41,14 +41,14 @@ const IngestPayloadSchema = z.object({
     marketingAllowed: z.boolean().optional(),
   }).optional().default({}),
   userData: z.object({
-    email: z.string().nullable().optional(),
-    phone: z.string().nullable().optional(),
-    firstName: z.string().nullable().optional(),
-    lastName: z.string().nullable().optional(),
-    city: z.string().nullable().optional(),
-    state: z.string().nullable().optional(),
-    zip: z.string().nullable().optional(),
-    countryCode: z.string().nullable().optional(),
+    email: z.string().max(254).nullable().optional(),
+    phone: z.string().max(30).nullable().optional(),
+    firstName: z.string().max(100).nullable().optional(),
+    lastName: z.string().max(100).nullable().optional(),
+    city: z.string().max(100).nullable().optional(),
+    state: z.string().max(100).nullable().optional(),
+    zip: z.string().max(20).nullable().optional(),
+    countryCode: z.string().max(10).nullable().optional(),
   }).optional().default({}),
   customData: z.record(z.unknown()).optional().default({}),
   onlyDestinations: z.array(z.string()).optional(),
@@ -106,14 +106,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Parse and validate payload (need eventName before billing check)
-    const contentLength = parseInt(request.headers.get("content-length") || "0");
-    if (contentLength > 102400) { // 100KB max
+    let rawBody: string;
+    try {
+      rawBody = await request.text();
+    } catch {
+      return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: corsHeaders });
+    }
+
+    if (rawBody.length > 102400) { // 100KB max
       return NextResponse.json({ error: "Payload too large" }, { status: 413, headers: corsHeaders });
     }
 
     let body;
     try {
-      body = await request.json();
+      body = JSON.parse(rawBody);
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400, headers: corsHeaders });
     }
@@ -268,6 +274,9 @@ export async function POST(request: NextRequest) {
       utmContent: payload.utmContent || null,
       utmTerm: payload.utmTerm || null,
       gclid: payload.gclid || null,
+      ttclid: payload.ttclid || null,
+      rdtCid: payload.rdtCid || null,
+      epik: payload.epik || null,
     };
 
     // Create EventLog entries ONLY for conversion events (AddToCart, InitiateCheckout, Purchase)

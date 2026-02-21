@@ -19,8 +19,8 @@ export interface SnippetEventPayload {
     countryCode?: string;
   };
   consent?: {
-    analytics?: boolean;
-    marketing?: boolean;
+    analyticsAllowed?: boolean;
+    marketingAllowed?: boolean;
   };
   ttclid?: string | null;
   rdtCid?: string | null;
@@ -31,5 +31,5 @@ export interface SnippetEventPayload {
   utmContent?: string | null;
   utmTerm?: string | null;
   gclid?: string | null;
+  onlyDestinations?: string[];
 }
-

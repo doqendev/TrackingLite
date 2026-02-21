@@ -92,11 +92,12 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
         : "Unknown error";
 
     if (eventLogId) {
+      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
       await db.eventLog
         .update({
           where: { id: eventLogId },
           data: {
-            status: "FAILED",
+            status: willRetry ? "RETRYING" : "FAILED",
             errorMessage,
             retryCount: { increment: 1 },
           },

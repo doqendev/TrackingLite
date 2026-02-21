@@ -94,14 +94,6 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       });
     }
 
-    // 6. Increment workspace forwarded count
-    await db.workspace.update({
-      where: { id: workspaceId },
-      data: {
-        eventsForwardedCount: { increment: 1 },
-      },
-    });
-
     log.info("Job completed");
   } catch (error) {
     // Update EventLog to FAILED
@@ -113,11 +105,12 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
         : "Unknown error";
 
     if (eventLogId) {
+      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
       await db.eventLog
         .update({
           where: { id: eventLogId },
           data: {
-            status: "FAILED",
+            status: willRetry ? "RETRYING" : "FAILED",
             errorMessage,
             retryCount: { increment: 1 },
           },

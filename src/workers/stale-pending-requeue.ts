@@ -61,6 +61,9 @@ type EventToRequeue = {
   userAgent: string | null;
   fbp: string | null;
   fbc: string | null;
+  ttclid: string | null;
+  rdtCid: string | null;
+  epik: string | null;
   pageUrl: string | null;
   createdAt: Date;
 };
@@ -201,7 +204,7 @@ async function requeueEvents(
             workspaceId: workspace.id,
             destination: event.destination,
             eventLogId: event.id,
-            event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null },
+            event: { ...eventData, ttclid: event.ttclid || null, gclid: null, rdtCid: event.rdtCid || null, epik: event.epik || null },
           } satisfies DestinationEventJob);
         }
 
@@ -244,6 +247,9 @@ async function requeueStalePending(): Promise<void> {
       userAgent: true,
       fbp: true,
       fbc: true,
+      ttclid: true,
+      rdtCid: true,
+      epik: true,
       pageUrl: true,
       createdAt: true,
     },
@@ -285,6 +291,9 @@ async function requeueFailedEvents(): Promise<void> {
       userAgent: true,
       fbp: true,
       fbc: true,
+      ttclid: true,
+      rdtCid: true,
+      epik: true,
       pageUrl: true,
       createdAt: true,
       retryCount: true,

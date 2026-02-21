@@ -75,9 +75,16 @@ export async function checkOrderLimits(
   const redisKey = `orders:${userId}:${monthKey}`;
   const r = getRedis();
 
-  const newCount = await r.incr(redisKey);
-  // Ensure expiry is set (safe to call on every increment; Redis ignores if already set)
-  await r.expire(redisKey, 35 * 24 * 60 * 60);
+  let newCount: number;
+  try {
+    newCount = await r.incr(redisKey);
+    // Ensure expiry is set (safe to call on every increment; Redis ignores if already set)
+    await r.expire(redisKey, 35 * 24 * 60 * 60);
+  } catch {
+    // Redis down — fail open (don't block commerce)
+    console.error(`[Billing] Redis error for user ${userId}, failing open`);
+    return { allowed: true };
+  }
 
   if (newCount <= planConfig.ordersPerMonth) {
     // Within limit — increment already applied
@@ -85,7 +92,11 @@ export async function checkOrderLimits(
   }
 
   // Over limit — rollback the increment
-  await r.decr(redisKey);
+  try {
+    await r.decr(redisKey);
+  } catch {
+    // Redis error on rollback — non-critical, count will be slightly off
+  }
 
   // Limit reached — handle based on plan type
   if (plan === "FREE") {

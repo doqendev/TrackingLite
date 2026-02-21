@@ -185,7 +185,7 @@ src/
     replay-rate-limit.ts              # Redis cooldown for event replay (5min per workspace)
     email.ts                          # Resend client for password reset + alert emails
     alerts.ts                         # Alert evaluation: health, errors, limits
-    api-key-cache.ts                  # Redis-cached workspace lookup (UNUSED - see known issues)
+    api-key-cache.ts                  # Redis-cached workspace lookup by API key (used by ingest route)
     extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
     destinations/
       index.ts                        # DESTINATION_EVENT_MAP for all 6 platforms
@@ -400,8 +400,7 @@ Header: Content-Type: application/json
 ## Known Issues
 
 See `STATUS.md` for the full list. Currently:
-1. **`api-key-cache.ts` is dead code** --- exists but is never imported
-2. **`pnpm build` hangs on Windows** --- pre-existing environment issue, not code-related
+1. **`pnpm build` hangs on Windows** --- pre-existing environment issue, not code-related
 
 All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII storage, forgot password) are fixed.
 

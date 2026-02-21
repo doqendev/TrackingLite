@@ -48,8 +48,17 @@ scheduleEventLogCleanup().catch((err) => {
 // Graceful shutdown
 async function shutdown(signal: string) {
   log.info("Received signal, shutting down", { signal });
-  await Promise.all(workers.map(w => w.close()));
-  log.info("All workers stopped");
+  const timeout = setTimeout(() => {
+    log.error("Shutdown timed out after 30s, forcing exit");
+    process.exit(1);
+  }, 30000);
+  try {
+    await Promise.all(workers.map(w => w.close()));
+    log.info("All workers stopped");
+  } catch (err) {
+    log.error("Error during shutdown", { error: err instanceof Error ? err.message : String(err) });
+  }
+  clearTimeout(timeout);
   process.exit(0);
 }
 

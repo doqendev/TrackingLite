@@ -1,4 +1,4 @@
-import { hashPii } from "@/lib/hash-pii";
+import { hashPii, hashPhonePii } from "@/lib/hash-pii";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 
 const REDDIT_API_BASE = "https://ads-api.reddit.com/api/v2.0/conversions/events";
@@ -63,7 +63,7 @@ export function normalizeToRedditEvent(
     user.email = hashPii(ud.email);
   }
   if (ud.phone && typeof ud.phone === "string") {
-    user.phone_number = hashPii(ud.phone);
+    user.phone_number = hashPhonePii(ud.phone, ud.countryCode as string | undefined);
   }
   if (eventData.clientIp) {
     user.ip_address = hashPii(eventData.clientIp);
@@ -86,7 +86,8 @@ export function normalizeToRedditEvent(
 
   if (cd.value !== undefined) event.value = Number(cd.value);
   if (cd.currency) event.currency = String(cd.currency);
-  if (cd.numItems !== undefined) event.item_count = Number(cd.numItems);
+  const numItems = cd.numItems ?? cd.num_items;
+  if (numItems !== undefined) event.item_count = Number(numItems);
 
   return event;
 }

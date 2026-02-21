@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
+import { hashPii } from "@/lib/hash-pii";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
@@ -78,8 +79,9 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       return;
     }
 
-    // Use fbp cookie as client_id if available, otherwise fall back to eventId
-    const clientId = (event.fbp as string | null | undefined) ?? event.eventId;
+    // Use hashed email as stable client_id for GA4 session stitching, fall back to eventId
+    const ud = event.userData as Record<string, unknown> | undefined;
+    const clientId = (ud?.email && typeof ud.email === "string" ? hashPii(ud.email) : null) ?? event.eventId;
 
     // Send to GA4 Measurement Protocol
     const response = await sendToGA4(
@@ -107,11 +109,12 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
         : "Unknown error";
 
     if (eventLogId) {
+      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
       await db.eventLog
         .update({
           where: { id: eventLogId },
           data: {
-            status: "FAILED",
+            status: willRetry ? "RETRYING" : "FAILED",
             errorMessage,
             retryCount: { increment: 1 },
           },
