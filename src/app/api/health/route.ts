@@ -74,6 +74,7 @@ export async function GET() {
     health.queues = queueMetrics;
   }
 
-  const statusCode = health.status === "ok" ? 200 : 503;
-  return NextResponse.json(health, { status: statusCode });
+  // Always return 200 for Railway health checks (liveness).
+  // The body still contains degraded status info for monitoring.
+  return NextResponse.json(health, { status: 200 });
 }
