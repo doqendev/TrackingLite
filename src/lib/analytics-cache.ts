@@ -1,18 +1,13 @@
-import IORedis from "ioredis";
 import type { DashboardAnalytics } from "@/types/app";
+import { getSharedRedis } from "@/lib/redis";
 
-let redis: IORedis | null = null;
-
-function getRedis(): IORedis {
-  if (!redis) {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      lazyConnect: true,
-    });
-  }
-  return redis;
-}
+// Re-exported for backward compatibility (tests import getRedis from this module)
+const getRedis = getSharedRedis;
 
 const ANALYTICS_CACHE_TTL = 60; // 60 seconds
+
+// Promise coalescing: prevents thundering herd when cache expires
+const inflight = new Map<string, Promise<DashboardAnalytics>>();
 
 export async function getCachedAnalytics(
   workspaceId: string,
@@ -26,7 +21,6 @@ export async function getCachedAnalytics(
     const cached = await getRedis().get(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as DashboardAnalytics;
-      // Restore Date object for lastEventAt
       if (parsed.health.lastEventAt) {
         parsed.health.lastEventAt = new Date(parsed.health.lastEventAt);
       }
@@ -36,20 +30,27 @@ export async function getCachedAnalytics(
     // Redis failure: fall through to computation
   }
 
-  const data = await computeFn();
+  // If another request is already computing this key, wait for it
+  const pending = inflight.get(cacheKey);
+  if (pending) return pending;
 
-  try {
-    await getRedis().setex(
-      cacheKey,
-      ANALYTICS_CACHE_TTL,
-      JSON.stringify(data)
-    );
-  } catch {
-    // Redis failure: return uncached data
-  }
+  // Start computation and store the promise
+  const promise = (async () => {
+    try {
+      const data = await computeFn();
+      try {
+        await getRedis().setex(cacheKey, ANALYTICS_CACHE_TTL, JSON.stringify(data));
+      } catch {
+        // Redis failure: return uncached data
+      }
+      return data;
+    } finally {
+      inflight.delete(cacheKey);
+    }
+  })();
 
-  return data;
+  inflight.set(cacheKey, promise);
+  return promise;
 }
 
-// Export for testing
 export { getRedis, ANALYTICS_CACHE_TTL };

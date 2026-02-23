@@ -88,6 +88,36 @@ async function runAlertChecks(): Promise<void> {
     }
   }
 
+  // Check queue depths for all destination queues
+  const QUEUE_DEPTH_THRESHOLD = 1000;
+  const destinationQueues = ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events"];
+
+  for (const queueName of destinationQueues) {
+    try {
+      const queue = new Queue(queueName, { connection: getAlertConnection() as never });
+      const waiting = await queue.getWaitingCount();
+      const delayed = await queue.getDelayedCount();
+      const total = waiting + delayed;
+
+      if (total > QUEUE_DEPTH_THRESHOLD) {
+        log.warn("Queue depth exceeds threshold", {
+          queue: queueName,
+          waiting,
+          delayed,
+          total,
+          threshold: QUEUE_DEPTH_THRESHOLD,
+        });
+      }
+
+      await queue.close();
+    } catch (err) {
+      log.error("Failed to check queue depth", {
+        queue: queueName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   log.info("Alert run complete", { totalSent });
 }
 

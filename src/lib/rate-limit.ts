@@ -1,19 +1,8 @@
-import IORedis from "ioredis";
 import { RATE_LIMIT } from "./constants";
 import { createLogger } from "./logger";
+import { getSharedRedis } from "@/lib/redis";
 
 const log = createLogger({ component: "rate-limit" });
-
-let redis: IORedis | null = null;
-
-function getRedis(): IORedis {
-  if (!redis) {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      lazyConnect: true,
-    });
-  }
-  return redis;
-}
 
 export async function checkAuthRateLimit(
   ip: string,
@@ -22,7 +11,7 @@ export async function checkAuthRateLimit(
   windowSeconds: number
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
   try {
-    const client = getRedis();
+    const client = getSharedRedis();
     const key = `auth-rl:${endpoint}:${ip}`;
 
     const current = await client.incr(key);
@@ -44,7 +33,7 @@ export async function checkAuthRateLimit(
 
 export async function checkRateLimit(workspaceId: string): Promise<{ allowed: boolean; remaining: number }> {
   try {
-    const client = getRedis();
+    const client = getSharedRedis();
     const key = `ratelimit:ingest:${workspaceId}:${Math.floor(Date.now() / 1000)}`;
     const limit = RATE_LIMIT.INGEST_PER_SECOND_PER_WORKSPACE;
 

@@ -1,20 +1,10 @@
 import { db } from "@/lib/db";
-import IORedis from "ioredis";
 import { BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP } from "@/lib/constants";
 import { stripe } from "@/lib/stripe";
 import { createLogger } from "@/lib/logger";
+import { getSharedRedis } from "@/lib/redis";
 
 const log = createLogger({ component: "billing" });
-
-let redis: IORedis | null = null;
-function getRedis(): IORedis {
-  if (!redis) {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      lazyConnect: true,
-    });
-  }
-  return redis;
-}
 
 export interface BillingCheck {
   allowed: boolean;
@@ -76,7 +66,7 @@ export async function checkOrderLimits(
   // Atomically increment first, then check
   const monthKey = new Date().toISOString().slice(0, 7); // YYYY-MM
   const redisKey = `orders:${userId}:${monthKey}`;
-  const r = getRedis();
+  const r = getSharedRedis();
 
   let newCount: number;
   try {
@@ -149,7 +139,7 @@ export async function checkOrderLimits(
 export async function incrementOrderCount(userId: string): Promise<void> {
   const monthKey = new Date().toISOString().slice(0, 7);
   const redisKey = `orders:${userId}:${monthKey}`;
-  const pipeline = getRedis().pipeline();
+  const pipeline = getSharedRedis().pipeline();
   pipeline.incr(redisKey);
   // Set expiry to 35 days (covers month + buffer)
   pipeline.expire(redisKey, 35 * 24 * 60 * 60);
@@ -162,7 +152,7 @@ export async function incrementOrderCount(userId: string): Promise<void> {
 export async function getOrderCount(userId: string): Promise<number> {
   const monthKey = new Date().toISOString().slice(0, 7);
   const redisKey = `orders:${userId}:${monthKey}`;
-  return parseInt((await getRedis().get(redisKey)) || "0", 10);
+  return parseInt((await getSharedRedis().get(redisKey)) || "0", 10);
 }
 
 /**

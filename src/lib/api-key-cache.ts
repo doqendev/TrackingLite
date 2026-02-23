@@ -1,16 +1,5 @@
-import { Redis } from "ioredis";
 import { db } from "@/lib/db";
-
-let redis: Redis | null = null;
-
-function getRedis(): Redis {
-  if (!redis) {
-    redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      lazyConnect: true,
-    });
-  }
-  return redis;
-}
+import { getSharedRedis } from "@/lib/redis";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -18,7 +7,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
   const cacheKey = `apikey:${apiKey}`;
 
   // Try cache first
-  const cached = await getRedis().get(cacheKey);
+  const cached = await getSharedRedis().get(cacheKey);
   if (cached) {
     return JSON.parse(cached);
   }
@@ -95,11 +84,11 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     hasPinterestCredentials: !!(workspace.enablePinterest && pinterestConversionTokenEncrypted),
   };
 
-  await getRedis().setex(cacheKey, CACHE_TTL, JSON.stringify(sanitized));
+  await getSharedRedis().setex(cacheKey, CACHE_TTL, JSON.stringify(sanitized));
 
   return sanitized;
 }
 
 export async function invalidateApiKeyCache(apiKey: string): Promise<void> {
-  await getRedis().del(`apikey:${apiKey}`);
+  await getSharedRedis().del(`apikey:${apiKey}`);
 }

@@ -7,6 +7,19 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const TTL = 60_000; // 1 minute
+const MAX_SIZE = 500;
+
+function evictIfNeeded(): void {
+  if (cache.size <= MAX_SIZE) return;
+  // Map iterates in insertion order — delete oldest entries
+  const excess = cache.size - MAX_SIZE;
+  let removed = 0;
+  for (const key of Array.from(cache.keys())) {
+    if (removed >= excess) break;
+    cache.delete(key);
+    removed++;
+  }
+}
 
 export async function getWorkspaceForDestination(
   workspaceId: string,
@@ -69,6 +82,7 @@ export async function getWorkspaceForDestination(
       data: workspace as Record<string, unknown>,
       expiry: Date.now() + TTL,
     });
+    evictIfNeeded();
   }
 
   return (workspace as Record<string, unknown>) || null;
