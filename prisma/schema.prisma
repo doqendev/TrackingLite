@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ============================================================
@@ -191,6 +192,8 @@ model EventLog {
   @@index([eventId])
   @@unique([workspaceId, eventId, destination])
   @@index([status, createdAt])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, eventName, destination, createdAt])
 }
 
 model Subscription {

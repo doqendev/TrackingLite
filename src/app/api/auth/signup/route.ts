@@ -3,6 +3,7 @@ import { hash } from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { checkAuthRateLimit } from "@/lib/rate-limit";
+import { sendVerificationEmail } from "@/lib/email";
 
 const SignupSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -32,6 +33,28 @@ export async function POST(request: NextRequest) {
     const user = await db.user.create({
       data: { name, email: normalizedEmail, hashedPassword },
     });
+
+    // Send verification email (fire-and-forget, don't block signup)
+    try {
+      const verificationToken = crypto.randomUUID();
+      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      await db.verificationToken.create({
+        data: {
+          identifier: normalizedEmail,
+          token: verificationToken,
+          expires,
+        },
+      });
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const verifyUrl = `${appUrl}/api/auth/verify-email?token=${verificationToken}`;
+
+      await sendVerificationEmail(normalizedEmail, verifyUrl);
+    } catch (emailErr) {
+      // Log but don't fail signup
+      console.error("[Signup] Failed to send verification email:", emailErr);
+    }
 
     return NextResponse.json(
       { id: user.id, email: user.email, name: user.name },

@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
+import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> {
@@ -80,11 +81,18 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
     }
 
     // Send to TikTok Events API
+    // Circuit breaker check
+    const circuitOk = await isCircuitClosed("TIKTOK");
+    if (!circuitOk) {
+      throw new CircuitOpenError("TIKTOK");
+    }
+
     const response = await sendToTikTok(
       pixelId,
       accessToken,
       [tiktokEvent]
     );
+    await recordSuccess("TIKTOK");
 
     // Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -96,6 +104,7 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
 
     log.info("Job completed");
   } catch (error) {
+    await recordFailure("TIKTOK");
     const errorMessage =
       error instanceof TikTokApiError
         ? `TikTok ${error.statusCode}: ${error.message}`

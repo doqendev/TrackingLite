@@ -161,6 +161,45 @@ export async function sendAlertEmail(
   });
 }
 
+export async function sendVerificationEmail(email: string, verifyUrl: string): Promise<void> {
+  const resend = getResend();
+
+  await resend.emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: "Verify your Track Clear email",
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
+        <h1 style="font-size: 24px; font-weight: 700; color: #111; margin-bottom: 8px;">
+          <span style="color: #14b8a6;">Track</span>&thinsp;Clear
+        </h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 32px;">Email Verification</p>
+
+        <p style="font-size: 15px; color: #333; line-height: 1.6;">
+          Welcome to Track Clear! Please verify your email address by clicking the button below.
+        </p>
+
+        <div style="margin: 32px 0;">
+          <a href="${escapeHtml(verifyUrl)}"
+             style="display: inline-block; background-color: #14b8a6; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Verify Email
+          </a>
+        </div>
+
+        <p style="font-size: 13px; color: #999; line-height: 1.5;">
+          If you didn't create an account, you can safely ignore this email.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+
+        <p style="font-size: 12px; color: #bbb;">
+          Track Clear - Server-side conversion tracking for Shopify
+        </p>
+      </div>
+    `,
+  });
+}
+
 export async function sendPasswordResetEmail(email: string, resetUrl: string): Promise<void> {
   const resend = getResend();
 

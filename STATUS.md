@@ -1,54 +1,58 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-02-21 (post feature expansion: Phases 1-7)
+Last updated: 2026-02-21 (post production readiness improvements)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test`) | 263/263 passing (13 files) |
+| Tests (`pnpm test`) | 263/263 passing (14 files) |
 | TypeScript | 0 source errors (2 pre-existing test file errors) |
 | ESLint | 0 warnings/errors |
 
 ## What's Implemented
 
-### Pages (11 routes)
+### Pages (13 routes)
 
 | Route | Type | Status | Notes |
 |-------|------|--------|-------|
-| `/` | Public | Working | Landing page with hero, pricing, features |
+| `/` | Public | Working | Landing page with hero, pricing, features, scroll animations |
 | `/login` | Public | Working | Email/password + Google OAuth |
-| `/signup` | Public | Working | Registration with auto-login, redirects to onboarding |
+| `/signup` | Public | Working | Registration with auto-login, sends verification email, redirects to onboarding |
 | `/forgot-password` | Public | Working | Sends password reset email via Resend |
 | `/reset-password` | Public | Working | Token-based password reset with confirmation |
+| `/privacy` | Public | Working | Privacy policy (accurate: IP/UA stored, PII hashing, data retention, GDPR rights) |
+| `/terms` | Public | Working | Terms of service (billing, acceptable use, liability, termination) |
 | `/dashboard` | Protected | Working | Rich analytics with per-destination tabs, revenue cards (currency conversion), event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events. Full i18n (6 languages) |
 | `/events` | Protected | Working | Paginated event log with type/status filters, Source/Campaign columns, retry failed events |
 | `/settings` | Protected | Working | 6 destination credential cards, event toggles, consent mode, snippet, alert preferences, language selector, currency selector, danger zone |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
 | `/onboarding` | Protected | Working | 3-step wizard: create workspace, install snippet, connect platforms |
 
-### API Routes (15 endpoints)
+### API Routes (18 endpoints)
 
 | Endpoint | Methods | Auth | Status | Notes |
 |----------|---------|------|--------|-------|
 | `/api/auth/[...nextauth]` | ALL | - | Working | NextAuth handler |
-| `/api/auth/signup` | POST | - | Working | Zod validation, bcrypt, 409 on duplicate |
+| `/api/auth/signup` | POST | - | Working | Zod validation, bcrypt, 409 on duplicate, sends verification email |
 | `/api/auth/forgot-password` | POST | - | Working | Generates token, sends email via Resend |
 | `/api/auth/reset-password` | POST | - | Working | Validates token, updates password |
-| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Multi-destination fan-out pipeline with CORS |
+| `/api/auth/verify-email` | GET | - | Working | Token-based email verification, sets emailVerified on User |
+| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Multi-destination fan-out pipeline with CORS, X-Request-ID header |
 | `/api/workspaces` | GET, POST | Session | Working | Unlimited workspaces, encrypts credentials |
 | `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, all destinations |
 | `/api/workspaces/[id]/rotate-key` | POST | Session | Working | Generates new API key |
 | `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown) — all destinations supported |
 | `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics (60s Redis cache, destination filter, currency conversion) |
 | `/api/user/preferences` | PATCH | Session | Working | Update user display currency and language |
+| `/api/user/account` | DELETE | Session | Working | GDPR account deletion (cancels Stripe, cascades all data) |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
 | `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid) |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
-| `/api/health` | GET | - | Working | DB ping, returns status + uptime |
+| `/api/health` | GET | - | Working | DB + Redis ping, queue depth metrics, uptime |
 
 ### Multi-Destination Event Pipeline
 
@@ -92,7 +96,7 @@ Each destination has:
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
 | `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection, keyed by destination+currency) |
 | `currency.ts` | Working | Exchange rate fetcher (frankfurter.app), Redis-cached 24h, convertCurrency helper |
-| `email.ts` | Working | Resend client for password reset + alert emails |
+| `email.ts` | Working | Resend client for password reset, alert emails, and email verification |
 | `alerts.ts` | Working | Alert evaluation: tracking down, high error rate, order limit warnings |
 | `replay-rate-limit.ts` | Working | Redis cooldown for event replay (5min per workspace) |
 | `extract-custom-data.ts` | Working | Extract value/currency/numItems/orderId from customData |
@@ -102,21 +106,26 @@ Each destination has:
 | `destinations/klaviyo.ts` | Working | Klaviyo normalizer + API client (raw email, not hashed) |
 | `destinations/reddit.ts` | Working | Reddit Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII, rdt_cid click ID) |
 | `destinations/pinterest.ts` | Working | Pinterest Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII in arrays, epik click ID, value as string) |
-| `api-key-cache.ts` | **Dead code** | Redis-cached workspace lookup, never imported anywhere |
+| `api-key-cache.ts` | Working | Redis-cached workspace lookup (used by ingest route) |
+| `circuit-breaker.ts` | Working | Redis-based circuit breaker for destination APIs (5 failures = 60s cooldown) |
+| `env-validation.ts` | Working | Validates required env vars at startup, warns for optional ones |
 
-### Workers (9 files in src/workers/)
+### Workers (10 files in src/workers/)
+
+All 6 destination workers have circuit breaker integration (5 consecutive failures = 60s cooldown).
 
 | File | Status | What it does |
 |------|--------|-------------|
-| `start-worker.ts` | Working | Entry point, starts all 8 workers, graceful shutdown |
-| `meta-event-processor.ts` | Working | Meta CAPI worker: decrypt, normalize, send, update EventLog |
-| `tiktok-event-processor.ts` | Working | TikTok worker: decrypt, normalize, send, update EventLog |
-| `ga4-event-processor.ts` | Working | GA4 worker: decrypt API secret, normalize, send, update EventLog |
-| `klaviyo-event-processor.ts` | Working | Klaviyo worker: decrypt API key, normalize, send, update EventLog |
-| `reddit-event-processor.ts` | Working | Reddit worker: decrypt Bearer token, normalize, send, update EventLog |
-| `pinterest-event-processor.ts` | Working | Pinterest worker: decrypt Bearer token, normalize, send, update EventLog |
+| `start-worker.ts` | Working | Entry point, starts all 9 workers, graceful shutdown (30s timeout) |
+| `meta-event-processor.ts` | Working | Meta CAPI worker: circuit breaker, decrypt, normalize, send, update EventLog |
+| `tiktok-event-processor.ts` | Working | TikTok worker: circuit breaker, decrypt, normalize, send, update EventLog |
+| `ga4-event-processor.ts` | Working | GA4 worker: circuit breaker, decrypt API secret, normalize, send, update EventLog |
+| `klaviyo-event-processor.ts` | Working | Klaviyo worker: circuit breaker, decrypt API key, normalize, send, update EventLog |
+| `reddit-event-processor.ts` | Working | Reddit worker: circuit breaker, decrypt Bearer token, normalize, send, update EventLog |
+| `pinterest-event-processor.ts` | Working | Pinterest worker: circuit breaker, decrypt Bearer token, normalize, send, update EventLog |
 | `alert-checker.ts` | Working | Hourly repeatable job: evaluates alerts, sends email notifications |
 | `stale-pending-requeue.ts` | Working | Every 5min: finds stale PENDING events, re-queues to destination queues |
+| `event-log-cleanup.ts` | Working | Hourly: deletes expired EventLogs per plan retention (7d Free/Starter, 30d Growth/Scale) |
 
 ### Dashboard Analytics Components
 
@@ -168,7 +177,7 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 
 **7 enums:** Platform, EventName, EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST)
 
-**Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[eventId]`. AlertLog on `[userId, alertType, sentAt]`.
+**Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[workspaceId, status, createdAt]`, `[workspaceId, eventName, destination, createdAt]`, `[eventId]`, `[status, createdAt]`. AlertLog on `[userId, alertType, sentAt]`.
 
 ---
 
@@ -182,15 +191,7 @@ None currently tracked.
 
 ### Dead Code
 
-| File | Issue |
-|------|-------|
-| `src/lib/api-key-cache.ts` | Redis-cached workspace lookup. Never imported anywhere. |
-
-### Unused Enums
-
-| Enum Value | Issue |
-|------------|-------|
-| `EventStatus.RETRYING` | Exists in schema but no code ever sets it. |
+None currently tracked.
 
 ### Unused npm Dependencies
 
@@ -266,11 +267,20 @@ None currently tracked.
 - Paid plans: auto-upgrade to next tier via Stripe subscription update when limit exceeded.
 - Unlimited workspaces on all plans, shared order pool per user.
 
+### Phase 8: Production Readiness (2026-02-21)
+1. **Content-Security-Policy** - CSP header added to next.config.mjs (script-src, connect-src for all 6 platforms + Stripe)
+2. **Account Deletion API** - DELETE /api/user/account endpoint for GDPR compliance (cancels Stripe, cascades all data)
+3. **Email Verification** - Verification email sent on signup, GET /api/auth/verify-email endpoint, VerificationToken model
+4. **Circuit Breaker** - Redis-based circuit breaker for all 6 destination workers (5 consecutive failures = 60s cooldown)
+5. **Privacy & Terms Pages** - /privacy and /terms pages with accurate legal content (IP/UA storage, PII hashing, data retention)
+6. **Database Indexes** - Added composite indexes for dashboard and analytics query performance
+7. **Request ID Tracking** - X-Request-ID header on ingest success responses for observability
+8. **Env Validation** - Extended to validate NEXTAUTH_SECRET, warn for optional vars (Stripe, Resend, App URL)
+
 ## Not Yet Implemented
 
 | Feature | Notes |
 |---------|-------|
-| Event log retention cleanup | No scheduled job to purge old EventLog records per plan retention (7/30 days) |
 | Team access | Invite members to workspace |
 | Custom ingest domain | e.g., `t.mystore.com` |
 | Batch ingestion | Multiple events per request |

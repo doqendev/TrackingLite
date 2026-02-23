@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
+import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> {
@@ -66,7 +67,14 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
       return;
     }
 
+    // Circuit breaker check
+    const circuitOk = await isCircuitClosed("REDDIT");
+    if (!circuitOk) {
+      throw new CircuitOpenError("REDDIT");
+    }
+
     const response = await sendToReddit(accountId, accessToken, [redditEvent]);
+    await recordSuccess("REDDIT");
 
     if (eventLogId) {
       await db.eventLog.update({
@@ -77,6 +85,7 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
 
     log.info("Job completed");
   } catch (error) {
+    await recordFailure("REDDIT");
     const errorMessage =
       error instanceof RedditApiError
         ? `Reddit ${error.statusCode}: ${error.message}`

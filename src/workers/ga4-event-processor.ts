@@ -11,6 +11,7 @@ import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import { hashPii } from "@/lib/hash-pii";
+import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
@@ -84,12 +85,19 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
     const clientId = (ud?.email && typeof ud.email === "string" ? hashPii(ud.email) : null) ?? event.eventId;
 
     // Send to GA4 Measurement Protocol
+    // Circuit breaker check
+    const circuitOk = await isCircuitClosed("GA4");
+    if (!circuitOk) {
+      throw new CircuitOpenError("GA4");
+    }
+
     const response = await sendToGA4(
       measurementId,
       apiSecret,
       clientId,
       [ga4Event]
     );
+    await recordSuccess("GA4");
 
     // Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -101,6 +109,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
 
     log.info("Job completed");
   } catch (error) {
+    await recordFailure("GA4");
     const errorMessage =
       error instanceof GA4ApiError
         ? `GA4 ${error.statusCode}: ${error.message}`

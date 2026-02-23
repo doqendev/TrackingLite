@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
+import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
 import type { MetaEventJob } from "@/lib/queue";
 import type { SnippetEventPayload } from "@/types/events";
 
@@ -76,12 +77,19 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
     );
 
     // 4. Send to Meta Conversions API
+    // Circuit breaker check
+    const circuitOk = await isCircuitClosed("META");
+    if (!circuitOk) {
+      throw new CircuitOpenError("META");
+    }
+
     const response = await sendToMetaCapi(
       pixelId,
       decryptedToken,
       [metaCapiEvent],
       testEventCode || undefined
     );
+    await recordSuccess("META");
 
     // 5. Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -96,6 +104,7 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
 
     log.info("Job completed");
   } catch (error) {
+    await recordFailure("META");
     // Update EventLog to FAILED
     const errorMessage =
       error instanceof MetaCapiError

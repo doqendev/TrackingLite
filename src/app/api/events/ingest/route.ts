@@ -379,7 +379,7 @@ export async function POST(request: NextRequest) {
       response.upgraded = true;
       response.newPlan = billing.newPlan;
     }
-    return NextResponse.json(response, { status: 200, headers: corsHeaders });
+    return NextResponse.json(response, { status: 200, headers: { ...corsHeaders, "X-Request-ID": requestId } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid payload", details: error.errors }, { status: 422, headers: corsHeaders });

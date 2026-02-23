@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
+import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void> {
@@ -72,7 +73,14 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
     }
 
     // Send to Klaviyo Events API
+    // Circuit breaker check
+    const circuitOk = await isCircuitClosed("KLAVIYO");
+    if (!circuitOk) {
+      throw new CircuitOpenError("KLAVIYO");
+    }
+
     const response = await sendToKlaviyo(apiKey, klaviyoEvent);
+    await recordSuccess("KLAVIYO");
 
     // Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -84,6 +92,7 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
 
     log.info("Job completed");
   } catch (error) {
+    await recordFailure("KLAVIYO");
     const errorMessage =
       error instanceof KlaviyoApiError
         ? `Klaviyo ${error.statusCode}: ${error.message}`

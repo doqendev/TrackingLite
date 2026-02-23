@@ -20,16 +20,17 @@ Small-to-mid Shopify stores running ads on Meta, TikTok, Reddit, Pinterest, and 
 
 ## Current State
 
-**Feature-complete with multi-destination support, i18n, and currency conversion.** All core features + 5 phases of feature expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 8 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 239/239 passing (13 test files)
+- Unit tests: 263/263 passing (14 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors
 - Lint: 0 warnings/errors
 - 6 destinations: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest
 - Dashboard: per-destination tabs, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
-- Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue
+- Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
+- Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages
 
 See `STATUS.md` for the full audit and remaining work.
 
@@ -113,10 +114,12 @@ src/
     page.tsx                          # Landing page (public marketing)
     layout.tsx                        # Root layout (Inter font, Sonner Toaster, dark mode, NextIntlClientProvider)
     globals.css                       # Tailwind + CSS variable tokens (dark/light)
+    privacy/page.tsx                  # Privacy policy (GDPR-compliant, accurate data disclosures)
+    terms/page.tsx                    # Terms of service
     (auth)/
       layout.tsx                      # Centered card layout
       login/page.tsx                  # Email/password + Google OAuth login
-      signup/page.tsx                 # Name + email + password signup, auto-login
+      signup/page.tsx                 # Name + email + password signup, auto-login, sends verification email
       forgot-password/page.tsx        # Sends password reset email via Resend
       reset-password/page.tsx         # Token-based password reset with confirmation
     (dashboard)/
@@ -130,9 +133,10 @@ src/
         layout.tsx                    # Pass-through (page renders as fixed overlay)
     api/
       auth/[...nextauth]/route.ts     # NextAuth handler
-      auth/signup/route.ts            # POST: create user (Zod, bcrypt, 409 on dupe)
+      auth/signup/route.ts            # POST: create user (Zod, bcrypt, 409 on dupe), sends verification email
       auth/forgot-password/route.ts   # POST: generate token, send reset email
       auth/reset-password/route.ts    # POST: validate token, update password
+      auth/verify-email/route.ts      # GET: token-based email verification, sets emailVerified
       events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS)
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
       workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD
@@ -141,6 +145,7 @@ src/
       workspaces/[id]/replay/route.ts # POST: re-queue failed events (500 max, 5min cooldown)
       alerts/preferences/route.ts     # GET/PUT: alert notification preferences
       user/preferences/route.ts      # PATCH: update display currency and language
+      user/account/route.ts          # DELETE: GDPR account deletion (cancels Stripe, cascades all data)
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
@@ -183,9 +188,11 @@ src/
     queue.ts                          # Lazy BullMQ queues (6 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
     replay-rate-limit.ts              # Redis cooldown for event replay (5min per workspace)
-    email.ts                          # Resend client for password reset + alert emails
+    email.ts                          # Resend client for password reset, alert emails, and email verification
     alerts.ts                         # Alert evaluation: health, errors, limits
     api-key-cache.ts                  # Redis-cached workspace lookup by API key (used by ingest route)
+    circuit-breaker.ts                # Redis-based circuit breaker for destination APIs (5 failures = 60s cooldown)
+    env-validation.ts                 # Validates required env vars at startup, warns for optional
     extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
     destinations/
       index.ts                        # DESTINATION_EVENT_MAP for all 6 platforms
@@ -201,12 +208,12 @@ src/
     next-auth.d.ts                    # Module augmentation (adds id to Session.user)
   workers/
     start-worker.ts                   # Entry point: starts all 8 workers, graceful shutdown
-    meta-event-processor.ts           # BullMQ worker: decrypt, normalize, send to Meta CAPI
-    tiktok-event-processor.ts         # BullMQ worker: TikTok Events API
-    ga4-event-processor.ts            # BullMQ worker: GA4 Measurement Protocol
-    klaviyo-event-processor.ts        # BullMQ worker: Klaviyo Events API
-    reddit-event-processor.ts         # BullMQ worker: Reddit Conversions API
-    pinterest-event-processor.ts      # BullMQ worker: Pinterest Conversions API
+    meta-event-processor.ts           # BullMQ worker: circuit breaker, decrypt, normalize, send to Meta CAPI
+    tiktok-event-processor.ts         # BullMQ worker: circuit breaker, TikTok Events API
+    ga4-event-processor.ts            # BullMQ worker: circuit breaker, GA4 Measurement Protocol
+    klaviyo-event-processor.ts        # BullMQ worker: circuit breaker, Klaviyo Events API
+    reddit-event-processor.ts         # BullMQ worker: circuit breaker, Reddit Conversions API
+    pinterest-event-processor.ts      # BullMQ worker: circuit breaker, Pinterest Conversions API
     alert-checker.ts                  # Hourly repeatable job: evaluate alerts, send emails
     stale-pending-requeue.ts          # Every 5min: re-queue stale PENDING events to destination queues
   i18n/
@@ -312,7 +319,8 @@ All documented in `.env.example`. Critical ones:
 | `POST /api/events/ingest` | POST | Event ingestion from JS snippet. Header: `X-TL-API-Key`. CORS: `*` |
 | `POST /api/stripe/webhook` | POST | Stripe webhook handler (signature verified) |
 | `GET /api/health` | GET | Health check (DB ping) |
-| `POST /api/auth/signup` | POST | User registration |
+| `POST /api/auth/signup` | POST | User registration, sends verification email |
+| `GET /api/auth/verify-email` | GET | Token-based email verification |
 | `POST /api/auth/forgot-password` | POST | Generate reset token, send email |
 | `POST /api/auth/reset-password` | POST | Validate token, update password |
 | `/api/auth/*` | ALL | NextAuth handlers |
@@ -327,6 +335,7 @@ All documented in `.env.example`. Critical ones:
 | `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown) |
 | `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics with destination filter + currency conversion |
 | `PATCH /api/user/preferences` | PATCH | Update user display currency and language |
+| `DELETE /api/user/account` | DELETE | GDPR account deletion (cancels Stripe, cascades all data) |
 | `GET/PUT /api/alerts/preferences` | GET, PUT | Alert notification preferences |
 | `GET /api/snippet/:workspaceId` | GET | Generate JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid) |
 | `POST /api/stripe/checkout` | POST | Create Stripe checkout session |
