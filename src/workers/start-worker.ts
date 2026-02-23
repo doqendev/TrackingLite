@@ -13,7 +13,7 @@ import { validateEnv } from "@/lib/env-validation";
 
 // Validate early — log the exact error so Railway logs show what's missing
 try {
-  validateEnv();
+  validateEnv("worker");
 } catch (err) {
   // logger.ts uses only console.error/console.log internally, safe to inline here
   // before the dynamic imports below so Railway logs capture the failure reason
