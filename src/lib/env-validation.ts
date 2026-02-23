@@ -8,6 +8,8 @@ export function validateEnv() {
     REDIS_URL: process.env.REDIS_URL,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   };
 
   const missing = Object.entries(required)
@@ -25,12 +27,6 @@ export function validateEnv() {
   }
 
   // Optional variable warnings
-  if (!process.env.STRIPE_SECRET_KEY) {
-    log.warn("STRIPE_SECRET_KEY is not set. Stripe billing will not work.");
-  }
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    log.warn("STRIPE_WEBHOOK_SECRET is not set. Stripe webhooks will not work.");
-  }
   if (!process.env.RESEND_API_KEY) {
     log.warn("RESEND_API_KEY is not set. Email sending will not work.");
   }

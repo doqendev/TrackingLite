@@ -54,3 +54,22 @@ export async function checkRateLimit(workspaceId: string): Promise<{ allowed: bo
     };
   }
 }
+
+/**
+ * Tighter rate limit specifically for Purchase events to prevent billing manipulation.
+ * Max 10 Purchase events per minute per workspace.
+ */
+export async function checkPurchaseRateLimit(workspaceId: string): Promise<{ allowed: boolean }> {
+  try {
+    const minute = Math.floor(Date.now() / 60000);
+    const key = `purchase-rl:${workspaceId}:${minute}`;
+    const r = getSharedRedis();
+    const count = await r.incr(key);
+    if (count === 1) {
+      await r.expire(key, 120); // 2min TTL for safety
+    }
+    return { allowed: count <= 10 };
+  } catch {
+    return { allowed: true }; // Fail open
+  }
+}

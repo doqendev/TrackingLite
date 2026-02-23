@@ -39,6 +39,7 @@ import { alertWorker, scheduleAlertChecks } from "./alert-checker";
 import { staleRequeueWorker, scheduleStaleRequeue } from "./stale-pending-requeue";
 import { cleanupWorker, scheduleEventLogCleanup } from "./event-log-cleanup";
 import { createLogger } from "@/lib/logger";
+import { createServer } from "http";
 
 const log = createLogger({ component: "worker-main" });
 
@@ -57,6 +58,21 @@ const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorke
 log.info("Starting event processors", { workerCount: workers.length, pid: process.pid });
 log.info("Redis configured", { redisUrl: (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/\/\/.*@/, "//***@") });
 log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
+
+// Minimal HTTP health check for Railway
+const healthPort = parseInt(process.env.WORKER_HEALTH_PORT || "8080", 10);
+const healthServer = createServer((req, res) => {
+  if (req.url === "/health" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", workers: workers.length, uptime: process.uptime() }));
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+healthServer.listen(healthPort, () => {
+  log.info("Worker health check listening", { port: healthPort });
+});
 
 // Schedule the hourly alert-check repeatable job
 scheduleAlertChecks().catch((err) => {
@@ -81,6 +97,7 @@ async function shutdown(signal: string) {
     process.exit(1);
   }, 30000);
   try {
+    healthServer.close();
     await Promise.all(workers.map(w => w.close()));
     log.info("All workers stopped");
   } catch (err) {

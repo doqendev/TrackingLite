@@ -12,7 +12,7 @@ import {
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { shouldSendToDestination } from "@/lib/consent";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, checkPurchaseRateLimit } from "@/lib/rate-limit";
 import { checkOrderLimits } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
@@ -134,6 +134,14 @@ export async function POST(request: NextRequest) {
         { error: billing.reason || "Order limit reached", limit: billing.limit, used: billing.used },
         { status: 402, headers: corsHeaders }
       );
+    }
+
+    // 6b. Purchase-specific rate limit (prevents billing manipulation via fake events)
+    if (payload.eventName === "Purchase") {
+      const purchaseRL = await checkPurchaseRateLimit(workspace.id);
+      if (!purchaseRL.allowed) {
+        return NextResponse.json({ error: "Purchase rate limited" }, { status: 429, headers: corsHeaders });
+      }
     }
 
     // 7. Check event toggle
@@ -259,7 +267,7 @@ export async function POST(request: NextRequest) {
       payload: {
         eventName: payload.eventName,
         customData: payload.customData,
-        hasUserData: !!(payload.userData?.email || payload.userData?.phone),
+        userData: payload.userData || {},
       } as any,
       customerIp: clientIp,
       userAgent,
