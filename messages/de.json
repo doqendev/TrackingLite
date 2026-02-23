@@ -318,7 +318,12 @@
     "redditDescription": "Reddit-Anzeigen",
     "pinterestDescription": "Pinterest-Anzeigen",
     "setupIntegrations": "Integrationen einrichten",
-    "goToDashboard": "Zum Dashboard"
+    "goToDashboard": "Zum Dashboard",
+    "domainResolving": "Shop wird verifiziert...",
+    "domainVerified": "Shopify-Shop verifiziert: {shopifyDomain}",
+    "domainTaken": "Dieser Shop ist bereits von einem anderen Konto registriert",
+    "domainNotShopify": "Konnte nicht als Shopify-Shop verifiziert werden. Sie koennen trotzdem fortfahren.",
+    "domainError": "Shop konnte nicht verifiziert werden. Bitte versuchen Sie es erneut."
   },
   "auth": {
     "signIn": "Anmelden",

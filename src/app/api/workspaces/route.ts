@@ -5,6 +5,7 @@ import { generateApiKey } from "@/lib/api-key";
 import { encrypt } from "@/lib/encryption";
 import { z } from "zod";
 import { createLogger } from "@/lib/logger";
+import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
 
 const log = createLogger({ component: "workspaces" });
 
@@ -56,6 +57,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = CreateWorkspaceSchema.parse(body);
 
+    // Resolve Shopify domain for uniqueness enforcement
+    let shopifyDomain: string | null = null;
+    if (data.domain) {
+      const resolved = await resolveShopifyDomain(data.domain);
+      if (resolved) {
+        // Check uniqueness
+        const existing = await db.workspace.findFirst({
+          where: { shopifyDomain: resolved.shopifyDomain, isActive: true },
+        });
+        if (existing) {
+          return NextResponse.json(
+            { error: "This Shopify store is already registered", code: "DOMAIN_TAKEN" },
+            { status: 409 }
+          );
+        }
+        shopifyDomain = resolved.shopifyDomain;
+      }
+      // If resolution fails (not Shopify), shopifyDomain stays null — we still allow creation
+    }
+
     const apiKey = generateApiKey();
 
     // Encrypt Meta access token if provided
@@ -74,6 +95,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         name: data.name,
         domain: data.domain || null,
+        shopifyDomain,
         apiKey,
         metaPixelId: data.metaPixelId || null,
         metaTestEventCode: data.metaTestEventCode || null,

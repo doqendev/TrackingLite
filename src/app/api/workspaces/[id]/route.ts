@@ -6,6 +6,7 @@ import { invalidateApiKeyCache } from "@/lib/api-key-cache";
 import { invalidateWorkspaceCache } from "@/lib/workspace-cache";
 import { z } from "zod";
 import { createLogger } from "@/lib/logger";
+import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
 
 const log = createLogger({ component: "workspaces-id" });
 
@@ -41,11 +42,9 @@ const UpdateWorkspaceSchema = z.object({
   enableGA4: z.boolean().optional(),
   // Klaviyo
   klaviyoApiKey: z.string().optional().nullable(),
-  klaviyoCompanyId: z.string().regex(/^[A-Za-z0-9]+$/, "Invalid Company ID format").optional().nullable(),
   enableKlaviyo: z.boolean().optional(),
   // Shopify webhook
   shopifyWebhookSecret: z.string().optional().nullable(),
-  shopifyDomain: z.string().optional().nullable(),
 });
 
 // Sensitive fields that need encryption: [inputFieldName, encryptedField, ivField, tagField]
@@ -168,6 +167,37 @@ export async function PATCH(
     const body = await request.json();
     const data = UpdateWorkspaceSchema.parse(body);
 
+    // Re-resolve shopifyDomain if domain is being updated
+    // shopifyDomain is server-computed only — never accepted from client input
+    let resolvedShopifyDomain: string | null | undefined = undefined; // undefined = no change
+    if (data.domain !== undefined) {
+      if (data.domain) {
+        const resolved = await resolveShopifyDomain(data.domain);
+        if (resolved) {
+          const existing = await db.workspace.findFirst({
+            where: {
+              shopifyDomain: resolved.shopifyDomain,
+              isActive: true,
+              id: { not: id },
+            },
+          });
+          if (existing) {
+            return NextResponse.json(
+              { error: "This Shopify store is already registered", code: "DOMAIN_TAKEN" },
+              { status: 409 }
+            );
+          }
+          resolvedShopifyDomain = resolved.shopifyDomain;
+        } else {
+          // Not a Shopify store or couldn't resolve — clear shopifyDomain
+          resolvedShopifyDomain = null;
+        }
+      } else {
+        // Domain cleared — also clear shopifyDomain
+        resolvedShopifyDomain = null;
+      }
+    }
+
     // Separate sensitive token fields from scalar fields
     const sensitiveFieldNames = ENCRYPTED_FIELDS.map(([inputName]) => inputName);
     const scalarFields: Record<string, unknown> = {};
@@ -183,6 +213,11 @@ export async function PATCH(
 
     // Build the update payload
     const updateData: Record<string, unknown> = { ...scalarFields };
+
+    // Add server-computed shopifyDomain if domain was updated
+    if (resolvedShopifyDomain !== undefined) {
+      updateData.shopifyDomain = resolvedShopifyDomain;
+    }
 
     // Handle encryption for each sensitive field
     for (const [inputName, encField, ivField, tagField] of ENCRYPTED_FIELDS) {

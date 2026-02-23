@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Loader2 } from "lucide-react";
 import { SiMeta, SiTiktok, SiGoogleanalytics } from "react-icons/si";
 import { FaReddit, FaPinterest } from "react-icons/fa";
 import type { IconType } from "react-icons";
@@ -55,9 +55,46 @@ export default function OnboardingPage() {
   const [savingStep0, setSavingStep0] = useState(false);
   const [step0Error, setStep0Error] = useState("");
 
+  // Domain resolution state
+  const [domainStatus, setDomainStatus] = useState<"idle" | "resolving" | "verified" | "taken" | "not_shopify" | "error">("idle");
+  const [resolvedDomain, setResolvedDomain] = useState("");
+
   // Step 1 state
   const [snippet, setSnippet] = useState("");
   const [copied, setCopied] = useState(false);
+
+  async function handleResolveDomain(domain: string) {
+    if (!domain.trim()) {
+      setDomainStatus("idle");
+      setResolvedDomain("");
+      return;
+    }
+    setDomainStatus("resolving");
+    try {
+      const res = await fetch("/api/workspaces/resolve-domain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: domain.trim() }),
+      });
+      if (!res.ok) {
+        setDomainStatus("error");
+        return;
+      }
+      const data = await res.json();
+      if (data.error === "not_shopify_store") {
+        setDomainStatus("not_shopify");
+        setResolvedDomain("");
+      } else if (data.available === false) {
+        setDomainStatus("taken");
+        setResolvedDomain(data.shopifyDomain);
+      } else {
+        setDomainStatus("verified");
+        setResolvedDomain(data.shopifyDomain);
+      }
+    } catch {
+      setDomainStatus("error");
+    }
+  }
 
   async function handleCreateWorkspace(e: React.FormEvent) {
     e.preventDefault();
@@ -195,10 +232,38 @@ export default function OnboardingPage() {
                     type="text"
                     autoComplete="url"
                     value={storeUrl}
-                    onChange={(e) => setStoreUrl(e.target.value)}
+                    onChange={(e) => { setStoreUrl(e.target.value); setDomainStatus("idle"); }}
+                    onBlur={() => handleResolveDomain(storeUrl)}
                     placeholder={t("storeUrlPlaceholder")}
                     required
                   />
+                  {domainStatus === "resolving" && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {t("domainResolving")}
+                    </p>
+                  )}
+                  {domainStatus === "verified" && (
+                    <p className="text-sm text-green-500 flex items-center gap-1.5 mt-1">
+                      <Check className="h-3.5 w-3.5" />
+                      {t("domainVerified", { shopifyDomain: resolvedDomain })}
+                    </p>
+                  )}
+                  {domainStatus === "taken" && (
+                    <p className="text-sm text-red-500 flex items-center gap-1.5 mt-1">
+                      {t("domainTaken")}
+                    </p>
+                  )}
+                  {domainStatus === "not_shopify" && (
+                    <p className="text-sm text-yellow-500 flex items-center gap-1.5 mt-1">
+                      {t("domainNotShopify")}
+                    </p>
+                  )}
+                  {domainStatus === "error" && (
+                    <p className="text-sm text-orange-500 flex items-center gap-1.5 mt-1">
+                      {t("domainError")}
+                    </p>
+                  )}
                 </div>
 
                 {step0Error && (
@@ -218,7 +283,7 @@ export default function OnboardingPage() {
                   <Button
                     type="submit"
                     variant="brand"
-                    disabled={savingStep0}
+                    disabled={savingStep0 || domainStatus === "taken"}
                   >
                     {savingStep0 ? t("creating") : t("continue")}
                   </Button>

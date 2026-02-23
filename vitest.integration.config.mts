@@ -16,6 +16,8 @@ export default defineConfig({
     env: {
       DATABASE_URL:
         "postgresql://trackinglite:localdev@localhost:5433/trackinglite_test",
+      DIRECT_DATABASE_URL:
+        "postgresql://trackinglite:localdev@localhost:5433/trackinglite_test",
       REDIS_URL: "redis://localhost:6379",
       NEXTAUTH_SECRET: "test-secret-at-least-32-characters-long",
       ENCRYPTION_KEY:

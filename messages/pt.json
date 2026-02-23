@@ -318,7 +318,12 @@
     "redditDescription": "Anúncios no Reddit",
     "pinterestDescription": "Anúncios no Pinterest",
     "setupIntegrations": "Configurar Integrações",
-    "goToDashboard": "Ir para o Dashboard"
+    "goToDashboard": "Ir para o Dashboard",
+    "domainResolving": "Verificando loja...",
+    "domainVerified": "Loja Shopify verificada: {shopifyDomain}",
+    "domainTaken": "Esta loja ja esta registrada por outra conta",
+    "domainNotShopify": "Nao foi possivel verificar como loja Shopify. Voce pode continuar mesmo assim.",
+    "domainError": "Nao foi possivel verificar a loja. Tente novamente."
   },
   "auth": {
     "signIn": "Entrar",
