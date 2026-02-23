@@ -26,4 +26,4 @@ ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
 ENV NODE_OPTIONS="--max-old-space-size=1024"
 
-CMD ["sh", "-c", "pnpm prisma migrate resolve --applied 0_init 2>&1 || true; pnpm prisma migrate deploy 2>&1 || true; exec node .next/standalone/server.js"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy 2>&1 || true; exec node .next/standalone/server.js"]
