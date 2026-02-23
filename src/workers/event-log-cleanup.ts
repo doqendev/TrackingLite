@@ -43,7 +43,26 @@ function getQueue(): Queue {
 async function runEventLogCleanup(): Promise<void> {
   log.info("Starting event log retention cleanup");
 
-  // Single query: fetch all active workspaces with their owner's subscription plan
+  // Step 1: Anonymize PII (IP + user agent) on events older than 48 hours
+  const piiCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const anonymized = await db.eventLog.updateMany({
+    where: {
+      createdAt: { lt: piiCutoff },
+      OR: [
+        { customerIp: { not: null } },
+        { userAgent: { not: null } },
+      ],
+    },
+    data: {
+      customerIp: null,
+      userAgent: null,
+    },
+  });
+  if (anonymized.count > 0) {
+    log.info("Anonymized PII on old events", { count: anonymized.count, cutoffHours: 48 });
+  }
+
+  // Step 2: Fetch workspaces with their owner's subscription plan
   const workspaces = await db.workspace.findMany({
     where: { isActive: true },
     select: {
@@ -76,6 +95,7 @@ async function runEventLogCleanup(): Promise<void> {
 
   let totalDeleted = 0;
 
+  // Step 3: Delete old events per retention period
   for (const [days, workspaceIds] of Array.from(retentionGroups)) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const result = await db.eventLog.deleteMany({

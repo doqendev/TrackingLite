@@ -2,6 +2,9 @@ import { db } from "@/lib/db";
 import IORedis from "ioredis";
 import { BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP } from "@/lib/constants";
 import { stripe } from "@/lib/stripe";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "billing" });
 
 let redis: IORedis | null = null;
 function getRedis(): IORedis {
@@ -82,7 +85,7 @@ export async function checkOrderLimits(
     await r.expire(redisKey, 35 * 24 * 60 * 60);
   } catch {
     // Redis down — fail open (don't block commerce)
-    console.error(`[Billing] Redis error for user ${userId}, failing open`);
+    log.error("Redis error for billing check, failing open", { userId });
     return { allowed: true };
   }
 
@@ -134,7 +137,7 @@ export async function checkOrderLimits(
   }
 
   // Auto-upgrade failed — allow the event anyway (don't block commerce), log error
-  console.error(`[Billing] Auto-upgrade failed for user ${userId} from ${plan} to ${nextPlan}`);
+  log.error("Auto-upgrade failed, allowing event", { userId, fromPlan: plan, toPlan: nextPlan });
   await incrementOrderCount(userId);
   return { allowed: true };
 }
@@ -195,7 +198,7 @@ async function autoUpgrade(userId: string, nextPlan: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error("[Billing] Auto-upgrade Stripe error:", error);
+    log.error("Auto-upgrade Stripe error", { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }

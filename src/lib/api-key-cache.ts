@@ -23,49 +23,42 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     return JSON.parse(cached);
   }
 
-  // DB lookup
+  // DB lookup — fetch only non-sensitive fields needed by the ingest route.
+  // Encrypted credential triplets (*Encrypted/*Iv/*Tag) are intentionally
+  // excluded from the cached object to avoid storing secrets in Redis.
+  // The raw encrypted fields are fetched transiently to compute boolean
+  // "has credentials" flags, then discarded before caching.
+  // Workers do their own DB lookups for the actual credentials.
   const workspace = await db.workspace.findUnique({
     where: { apiKey },
     select: {
       id: true,
       userId: true,
       isActive: true,
-      // Meta fields
+      // Meta
       metaPixelId: true,
-      metaAccessTokenEncrypted: true,
-      metaAccessTokenIv: true,
-      metaAccessTokenTag: true,
       metaTestEventCode: true,
       enableMeta: true,
-      // TikTok fields
+      metaAccessTokenEncrypted: true,
+      // TikTok
       enableTikTok: true,
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
-      tiktokAccessTokenIv: true,
-      tiktokAccessTokenTag: true,
-      // GA4 fields
+      // GA4
       enableGA4: true,
       ga4MeasurementId: true,
       ga4ApiSecretEncrypted: true,
-      ga4ApiSecretIv: true,
-      ga4ApiSecretTag: true,
-      // Klaviyo fields
+      // Klaviyo
       enableKlaviyo: true,
       klaviyoApiKeyEncrypted: true,
-      klaviyoApiKeyIv: true,
-      klaviyoApiKeyTag: true,
-      // Reddit fields
+      // Reddit
       enableReddit: true,
       redditAccountId: true,
       redditAccessTokenEncrypted: true,
-      redditAccessTokenIv: true,
-      redditAccessTokenTag: true,
-      // Pinterest fields
+      // Pinterest
       enablePinterest: true,
       pinterestAdAccountId: true,
       pinterestConversionTokenEncrypted: true,
-      pinterestConversionTokenIv: true,
-      pinterestConversionTokenTag: true,
       // Event toggles and consent
       consentMode: true,
       enablePageView: true,
@@ -76,11 +69,35 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     },
   });
 
-  if (workspace) {
-    await getRedis().setex(cacheKey, CACHE_TTL, JSON.stringify(workspace));
+  if (!workspace) {
+    return null;
   }
 
-  return workspace;
+  // Compute boolean "has credentials" flags, then strip all encrypted values
+  // before caching so secrets never land in Redis.
+  const {
+    metaAccessTokenEncrypted,
+    tiktokAccessTokenEncrypted,
+    ga4ApiSecretEncrypted,
+    klaviyoApiKeyEncrypted,
+    redditAccessTokenEncrypted,
+    pinterestConversionTokenEncrypted,
+    ...rest
+  } = workspace;
+
+  const sanitized = {
+    ...rest,
+    hasMetaCredentials: !!(workspace.enableMeta && workspace.metaPixelId && metaAccessTokenEncrypted),
+    hasTikTokCredentials: !!(workspace.enableTikTok && tiktokAccessTokenEncrypted),
+    hasGA4Credentials: !!(workspace.enableGA4 && ga4ApiSecretEncrypted),
+    hasKlaviyoCredentials: !!(workspace.enableKlaviyo && klaviyoApiKeyEncrypted),
+    hasRedditCredentials: !!(workspace.enableReddit && redditAccessTokenEncrypted),
+    hasPinterestCredentials: !!(workspace.enablePinterest && pinterestConversionTokenEncrypted),
+  };
+
+  await getRedis().setex(cacheKey, CACHE_TTL, JSON.stringify(sanitized));
+
+  return sanitized;
 }
 
 export async function invalidateApiKeyCache(apiKey: string): Promise<void> {

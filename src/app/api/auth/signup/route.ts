@@ -4,6 +4,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { checkAuthRateLimit } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/lib/email";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "signup" });
 
 const SignupSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
       await sendVerificationEmail(normalizedEmail, verifyUrl);
     } catch (emailErr) {
       // Log but don't fail signup
-      console.error("[Signup] Failed to send verification email:", emailErr);
+      log.error("Failed to send verification email", { error: emailErr instanceof Error ? emailErr.message : String(emailErr) });
     }
 
     return NextResponse.json(
@@ -64,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors[0].message }, { status: 422 });
     }
-    console.error("[Signup] Error:", error);
+    log.error("Signup failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -3,6 +3,9 @@ import { db } from "@/lib/db";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 import { checkAuthRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "reset-password" });
 
 const ResetPasswordSchema = z.object({
   token: z.string().min(1),
@@ -58,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors[0]?.message || "Invalid input" }, { status: 422 });
     }
-    console.error("[ResetPassword] Error:", error);
+    log.error("Password reset failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

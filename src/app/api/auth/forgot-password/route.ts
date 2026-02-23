@@ -4,6 +4,9 @@ import { sendPasswordResetEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { checkAuthRateLimit } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "forgot-password" });
 
 const ForgotPasswordSchema = z.object({
   email: z.string().email(),
@@ -58,7 +61,7 @@ export async function POST(request: NextRequest) {
     try {
       await sendPasswordResetEmail(user.email, resetUrl);
     } catch (emailError) {
-      console.error("[ForgotPassword] Failed to send email:", emailError);
+      log.error("Failed to send password reset email", { error: emailError instanceof Error ? emailError.message : String(emailError) });
     }
 
     return successResponse;
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 422 });
     }
-    console.error("[ForgotPassword] Error:", error);
+    log.error("Forgot password handler failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

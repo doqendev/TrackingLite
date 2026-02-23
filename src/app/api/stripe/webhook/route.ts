@@ -3,6 +3,9 @@ import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import Stripe from "stripe";
 import IORedis from "ioredis";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "stripe-webhook" });
 
 let redis: IORedis | null = null;
 function getRedis(): IORedis {
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err) {
-    console.error("[Stripe Webhook] Invalid signature:", err);
+    log.error("Stripe webhook invalid signature", { error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
   } catch (redisErr) {
-    console.warn("[Stripe Webhook] Redis idempotency check failed, processing anyway:", redisErr);
+    log.warn("Redis idempotency check failed, processing anyway", { error: redisErr instanceof Error ? redisErr.message : String(redisErr) });
   }
 
   try {
@@ -145,7 +148,7 @@ export async function POST(request: NextRequest) {
       }
     }
   } catch (error) {
-    console.error("[Stripe Webhook] Processing error:", error);
+    log.error("Stripe webhook processing failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 

@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { generateApiKey } from "@/lib/api-key";
 import { encrypt } from "@/lib/encryption";
 import { z } from "zod";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "workspaces" });
 
 const CreateWorkspaceSchema = z.object({
   name: z.string().min(1).max(100),
@@ -87,7 +90,7 @@ export async function POST(request: NextRequest) {
         { status: 422 }
       );
     }
-    console.error("[Workspace] Create error:", error);
+    log.error("Workspace create failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

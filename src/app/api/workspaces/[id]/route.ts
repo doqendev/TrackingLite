@@ -5,6 +5,9 @@ import { encrypt } from "@/lib/encryption";
 import { invalidateApiKeyCache } from "@/lib/api-key-cache";
 import { invalidateWorkspaceCache } from "@/lib/workspace-cache";
 import { z } from "zod";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "workspaces-id" });
 
 const UpdateWorkspaceSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -279,7 +282,7 @@ export async function PATCH(
         { status: 422 }
       );
     }
-    console.error("[Workspace] Update error:", error);
+    log.error("Workspace update failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

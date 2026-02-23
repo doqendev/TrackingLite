@@ -1,3 +1,7 @@
+import { createLogger } from "./logger";
+
+const log = createLogger({ component: "env-validation" });
+
 export function validateEnv() {
   const required: Record<string, string | undefined> = {
     DATABASE_URL: process.env.DATABASE_URL,
@@ -22,15 +26,18 @@ export function validateEnv() {
 
   // Optional variable warnings
   if (!process.env.STRIPE_SECRET_KEY) {
-    console.warn("Warning: STRIPE_SECRET_KEY is not set. Stripe billing will not work.");
+    log.warn("STRIPE_SECRET_KEY is not set. Stripe billing will not work.");
   }
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    console.warn("Warning: STRIPE_WEBHOOK_SECRET is not set. Stripe webhooks will not work.");
+    log.warn("STRIPE_WEBHOOK_SECRET is not set. Stripe webhooks will not work.");
   }
   if (!process.env.RESEND_API_KEY) {
-    console.warn("Warning: RESEND_API_KEY is not set. Email sending will not work.");
+    log.warn("RESEND_API_KEY is not set. Email sending will not work.");
   }
   if (!process.env.NEXT_PUBLIC_APP_URL) {
-    console.warn("Warning: NEXT_PUBLIC_APP_URL is not set. Stripe redirects may not work.");
+    log.warn("NEXT_PUBLIC_APP_URL is not set. Stripe redirects may not work.");
+  }
+  if (!process.env.SENTRY_DSN && !process.env.NEXT_PUBLIC_SENTRY_DSN) {
+    log.warn("SENTRY_DSN is not set. Error tracking via Sentry will be disabled.");
   }
 }

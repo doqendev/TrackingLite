@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "verify-email" });
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -34,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(new URL("/login?verified=true", request.url));
   } catch (error) {
-    console.error("[Verify Email] Error:", error);
+    log.error("Email verification failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.redirect(new URL("/login?error=verification-failed", request.url));
   }
 }

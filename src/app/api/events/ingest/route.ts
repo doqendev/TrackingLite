@@ -87,13 +87,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Workspace inactive" }, { status: 403, headers: corsHeaders });
     }
 
-    // 3. Check that at least one destination has credentials configured
-    const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-    const hasTiktokCredentials = !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
-    const hasGA4Credentials = !!(workspace.enableGA4 && workspace.ga4ApiSecretEncrypted);
-    const hasKlaviyoCredentials = !!(workspace.enableKlaviyo && workspace.klaviyoApiKeyEncrypted);
-    const hasRedditCredentials = !!(workspace.enableReddit && workspace.redditAccessTokenEncrypted);
-    const hasPinterestCredentials = !!(workspace.enablePinterest && workspace.pinterestConversionTokenEncrypted);
+    // 3. Check that at least one destination has credentials configured.
+    // These booleans are pre-computed in api-key-cache.ts before caching so
+    // encrypted values are never stored in Redis.
+    const hasMetaCredentials = !!workspace.hasMetaCredentials;
+    const hasTiktokCredentials = !!workspace.hasTikTokCredentials;
+    const hasGA4Credentials = !!workspace.hasGA4Credentials;
+    const hasKlaviyoCredentials = !!workspace.hasKlaviyoCredentials;
+    const hasRedditCredentials = !!workspace.hasRedditCredentials;
+    const hasPinterestCredentials = !!workspace.hasPinterestCredentials;
 
     if (!hasMetaCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials && !hasRedditCredentials && !hasPinterestCredentials) {
       return NextResponse.json({ error: "No destination credentials configured" }, { status: 422, headers: corsHeaders });

@@ -1,5 +1,8 @@
 import IORedis from "ioredis";
 import { RATE_LIMIT } from "./constants";
+import { createLogger } from "./logger";
+
+const log = createLogger({ component: "rate-limit" });
 
 let redis: IORedis | null = null;
 
@@ -34,7 +37,7 @@ export async function checkAuthRateLimit(
 
     return { allowed: true };
   } catch (error) {
-    console.warn("[auth-rate-limit] Redis unavailable, failing open:", error instanceof Error ? error.message : String(error));
+    log.warn("Auth rate-limit Redis unavailable, failing open", { error: error instanceof Error ? error.message : String(error) });
     return { allowed: true };
   }
 }
@@ -55,7 +58,7 @@ export async function checkRateLimit(workspaceId: string): Promise<{ allowed: bo
       remaining: Math.max(0, limit - current),
     };
   } catch (error) {
-    console.warn("[rate-limit] Redis unavailable, failing open:", error instanceof Error ? error.message : String(error));
+    log.warn("Ingest rate-limit Redis unavailable, failing open", { error: error instanceof Error ? error.message : String(error) });
     return {
       allowed: true,
       remaining: RATE_LIMIT.INGEST_PER_SECOND_PER_WORKSPACE,

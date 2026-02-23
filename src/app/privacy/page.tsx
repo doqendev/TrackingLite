@@ -84,8 +84,8 @@ export default function PrivacyPage() {
 
               <h3 className="text-base font-semibold text-foreground mt-4 mb-2">2.4 Technical and Usage Data</h3>
               <ul className="list-disc pl-5 space-y-1 text-muted-foreground leading-relaxed">
-                <li>IP address of incoming requests (used for rate limiting and fraud prevention; not stored in event logs)</li>
-                <li>User agent strings (used for bot detection; not stored in event logs)</li>
+                <li>IP address of incoming requests (stored temporarily in event logs for debugging and fraud prevention; automatically anonymized after 48 hours)</li>
+                <li>User agent strings (stored temporarily in event logs for bot detection; automatically anonymized after 48 hours)</li>
                 <li>API request logs for security monitoring</li>
               </ul>
             </section>
@@ -193,6 +193,11 @@ export default function PrivacyPage() {
                 <li><strong className="text-foreground">Free and Starter plans:</strong> 7 days</li>
                 <li><strong className="text-foreground">Growth and Scale plans:</strong> 30 days</li>
               </ul>
+              <p className="mt-3 text-muted-foreground leading-relaxed">
+                IP addresses and browser information collected during event processing are automatically
+                anonymized after 48 hours and permanently deleted according to your plan&apos;s retention
+                period (7-30 days).
+              </p>
               <p className="mt-3 text-muted-foreground leading-relaxed">
                 Merchant account data (profile, workspace configuration) is retained for the duration of
                 the account. Following account deletion or termination, we will delete or anonymize all

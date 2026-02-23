@@ -5,13 +5,16 @@ import { validateEnv } from "@/lib/env-validation";
 try {
   validateEnv();
 } catch (err) {
-  console.error(
+  // logger.ts uses only console.error/console.log internally, safe to inline here
+  // before the dynamic imports below so Railway logs capture the failure reason
+  process.stderr.write(
     JSON.stringify({
       level: "error",
+      component: "worker-startup",
       msg: "Worker startup failed: environment validation",
       error: err instanceof Error ? err.message : String(err),
       timestamp: new Date().toISOString(),
-    })
+    }) + "\n"
   );
   process.exit(1);
 }

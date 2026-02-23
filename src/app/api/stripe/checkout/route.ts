@@ -5,6 +5,9 @@ import { db } from "@/lib/db";
 import { PLAN_PRICE_MAP } from "@/lib/constants";
 import { z } from "zod";
 import IORedis from "ioredis";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger({ component: "stripe-checkout" });
 
 let redis: IORedis | null = null;
 function getRedis(): IORedis {
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid request" }, { status: 422 });
     }
-    console.error("[Stripe Checkout] Error:", error);
+    log.error("Stripe checkout failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Failed to create checkout" }, { status: 500 });
   } finally {
     await getRedis().del(lockKey).catch(() => null);
