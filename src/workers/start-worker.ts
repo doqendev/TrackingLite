@@ -1,4 +1,14 @@
 import "dotenv/config";
+import * as Sentry from "@sentry/node";
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 0.1,
+    environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? "development",
+  });
+}
+
 import { validateEnv } from "@/lib/env-validation";
 
 // Validate early — log the exact error so Railway logs show what's missing
@@ -34,10 +44,12 @@ const log = createLogger({ component: "worker-main" });
 
 process.on("uncaughtException", (err) => {
   log.error("Uncaught exception", { error: err.message, stack: err.stack });
+  Sentry.captureException(err);
 });
 
 process.on("unhandledRejection", (reason) => {
   log.error("Unhandled rejection", { error: String(reason) });
+  Sentry.captureException(reason);
 });
 
 const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorker, pinterestWorker, alertWorker, staleRequeueWorker, cleanupWorker];
@@ -75,6 +87,7 @@ async function shutdown(signal: string) {
     log.error("Error during shutdown", { error: err instanceof Error ? err.message : String(err) });
   }
   clearTimeout(timeout);
+  await Sentry.flush(2000).catch(() => null);
   process.exit(0);
 }
 

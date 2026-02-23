@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-02-21 (post production readiness improvements)
+Last updated: 2026-02-23 (post production hardening - P0/P1/P2 audit fixes)
 
 ## Build Health
 
@@ -52,7 +52,8 @@ Last updated: 2026-02-21 (post production readiness improvements)
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
-| `/api/health` | GET | - | Working | DB + Redis ping, queue depth metrics, uptime |
+| `/api/health` | GET | - | Working | Smart liveness probe: DB + Redis ping with 3s timeout, always returns 200, reports ok/degraded |
+| `/api/status` | GET | Session | Working | Auth-gated deep health check: DB + Redis ping with 3s timeout, uptime |
 
 ### Multi-Destination Event Pipeline
 
@@ -79,7 +80,7 @@ Each destination has:
 | Module | Status | What it does |
 |--------|--------|-------------|
 | `auth.ts` | Working | NextAuth v5 config (Google + Credentials providers, JWT sessions) |
-| `db.ts` | Working | Prisma singleton with hot-reload safety |
+| `db.ts` | Working | Prisma singleton with hot-reload safety, connection pool limit (configurable via PRISMA_POOL_SIZE), env-aware logging |
 | `utils.ts` | Working | `cn()` utility (clsx + tailwind-merge) |
 | `encryption.ts` | Working | AES-256-GCM encrypt/decrypt for all credential storage |
 | `hash-pii.ts` | Working | SHA-256 hashing for all PII fields, E.164 phone via phone-normalizer |
@@ -108,6 +109,8 @@ Each destination has:
 | `destinations/pinterest.ts` | Working | Pinterest Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII in arrays, epik click ID, value as string) |
 | `api-key-cache.ts` | Working | Redis-cached workspace lookup (used by ingest route) |
 | `circuit-breaker.ts` | Working | Redis-based circuit breaker for destination APIs (5 failures = 60s cooldown) |
+| `redis.ts` | Working | Shared Redis singleton (lazyConnect) used by all web app modules — eliminates connection sprawl |
+| `logger.ts` | Working | Structured JSON logger (level, msg, timestamp, context) with child loggers |
 | `env-validation.ts` | Working | Validates required env vars at startup, warns for optional ones |
 
 ### Workers (10 files in src/workers/)
@@ -116,7 +119,7 @@ All 6 destination workers have circuit breaker integration (5 consecutive failur
 
 | File | Status | What it does |
 |------|--------|-------------|
-| `start-worker.ts` | Working | Entry point, starts all 9 workers, graceful shutdown (30s timeout) |
+| `start-worker.ts` | Working | Entry point, starts all 9 workers, graceful shutdown (30s timeout), Sentry error tracking |
 | `meta-event-processor.ts` | Working | Meta CAPI worker: circuit breaker, decrypt, normalize, send, update EventLog |
 | `tiktok-event-processor.ts` | Working | TikTok worker: circuit breaker, decrypt, normalize, send, update EventLog |
 | `ga4-event-processor.ts` | Working | GA4 worker: circuit breaker, decrypt API secret, normalize, send, update EventLog |
@@ -276,6 +279,16 @@ None currently tracked.
 6. **Database Indexes** - Added composite indexes for dashboard and analytics query performance
 7. **Request ID Tracking** - X-Request-ID header on ingest success responses for observability
 8. **Env Validation** - Extended to validate NEXTAUTH_SECRET, warn for optional vars (Stripe, Resend, App URL)
+
+### Phase 9: Production Hardening (2026-02-23)
+1. **Smart Health Check** - `/api/health` now checks DB + Redis with 3s timeouts, always returns HTTP 200 (prevents Railway restart loops), reports `ok`/`degraded` status for monitoring
+2. **Auth-Gated Status Endpoint** - `/api/status` for authenticated deep health checks, uses shared Redis (no per-request connection)
+3. **Sentry Worker Integration** - `@sentry/node` added to worker process (start-worker.ts) with conditional init, exception capture in uncaughtException/unhandledRejection handlers, flush on shutdown
+4. **Redis Connection Consolidation** - Eliminated 4 remaining IORedis singletons (stripe/webhook, stripe/checkout, currency.ts, status route) — all web app modules now use shared `getSharedRedis()` from `src/lib/redis.ts`
+5. **Prisma Connection Pool Limit** - `connection_limit` (configurable via `PRISMA_POOL_SIZE` env var, default 10) + `pool_timeout=10s` added to prevent connection exhaustion and indefinite hangs
+6. **Worker Memory Management** - `NODE_OPTIONS="--max-old-space-size=512"` added to Dockerfile.worker for bounded heap usage
+7. **Structured Logging** - All route handlers and workers use `createLogger()` for JSON-structured log output
+8. **Quality Principle** - Added to CLAUDE.md: "Never apply half measures" directive for all future development
 
 ## Not Yet Implemented
 

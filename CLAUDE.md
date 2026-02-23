@@ -4,6 +4,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 **Documentation Rule:** After every implementation, bug fix, or significant change, update this file (CLAUDE.md), STATUS.md, and MEMORY.md to reflect the new state. Keep known issues, project structure, and API reference accurate at all times. Stale documentation is worse than no documentation.
 
+**Quality Principle:** Never apply half measures. This is a serious production product and must be fully optimized and professional. Always aim for the best possible solution — no shortcuts, no "good enough", no deferred improvements. Every change should be production-grade from the start.
+
 ## Project Overview
 
 **Track Clear** is a standalone SaaS that enables Shopify merchants to send ecommerce events server-side to multiple ad platforms (Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest). Primary value: "Fix your tracking in 10 minutes."

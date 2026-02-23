@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import IORedis from "ioredis";
+import { getSharedRedis } from "@/lib/redis";
 
 export async function GET() {
   const session = await auth();
@@ -13,22 +13,21 @@ export async function GET() {
   let redisStatus: "connected" | "disconnected" = "connected";
 
   try {
-    await db.$queryRaw`SELECT 1`;
+    await Promise.race([
+      db.$queryRaw`SELECT 1`,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]);
   } catch {
     dbStatus = "disconnected";
   }
 
-  let redisClient: IORedis | null = null;
   try {
-    redisClient = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      maxRetriesPerRequest: 1,
-      connectTimeout: 3000,
-    });
-    await redisClient.ping();
+    await Promise.race([
+      getSharedRedis().ping(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]);
   } catch {
     redisStatus = "disconnected";
-  } finally {
-    redisClient?.disconnect();
   }
 
   const overall = dbStatus === "connected" && redisStatus === "connected" ? "ok" : "degraded";

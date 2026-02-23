@@ -4,18 +4,10 @@ import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import { PLAN_PRICE_MAP } from "@/lib/constants";
 import { z } from "zod";
-import IORedis from "ioredis";
+import { getSharedRedis } from "@/lib/redis";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger({ component: "stripe-checkout" });
-
-let redis: IORedis | null = null;
-function getRedis(): IORedis {
-  if (!redis) {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", { lazyConnect: true });
-  }
-  return redis;
-}
 
 const CheckoutSchema = z.object({
   plan: z.enum(["STARTER", "GROWTH", "SCALE"]),
@@ -28,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
 
   const lockKey = `checkout-lock:${session.user.id}`;
-  const acquired = await getRedis().set(lockKey, "1", "EX", 30, "NX").catch(() => "OK");
+  const acquired = await getSharedRedis().set(lockKey, "1", "EX", 30, "NX").catch(() => "OK");
   if (!acquired) {
     return NextResponse.json({ error: "Checkout already in progress" }, { status: 429 });
   }
@@ -89,6 +81,6 @@ export async function POST(request: NextRequest) {
     log.error("Stripe checkout failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Failed to create checkout" }, { status: 500 });
   } finally {
-    await getRedis().del(lockKey).catch(() => null);
+    await getSharedRedis().del(lockKey).catch(() => null);
   }
 }

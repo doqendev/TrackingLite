@@ -2,18 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import Stripe from "stripe";
-import IORedis from "ioredis";
+import { getSharedRedis } from "@/lib/redis";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger({ component: "stripe-webhook" });
-
-let redis: IORedis | null = null;
-function getRedis(): IORedis {
-  if (!redis) {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", { lazyConnect: true });
-  }
-  return redis;
-}
 
 function priceIdToPlan(priceId: string | undefined): "STARTER" | "GROWTH" | "SCALE" {
   if (priceId === process.env.STRIPE_SCALE_PRICE_ID) return "SCALE";
@@ -45,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const r = getRedis();
+    const r = getSharedRedis();
     const dedupeKey = `stripe-webhook:${event.id}`;
     const alreadyProcessed = await r.set(dedupeKey, "1", "EX", 172800, "NX"); // 48h TTL, NX = only if not exists
     if (!alreadyProcessed) {

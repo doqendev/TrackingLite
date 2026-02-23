@@ -1,15 +1,4 @@
-import IORedis from "ioredis";
-
-let redis: IORedis | null = null;
-
-function getRedis(): IORedis {
-  if (!redis) {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      lazyConnect: true,
-    });
-  }
-  return redis;
-}
+import { getSharedRedis } from "@/lib/redis";
 
 const EXCHANGE_RATE_TTL = 86400; // 24 hours
 
@@ -38,7 +27,7 @@ export async function getExchangeRate(
 
   // Try cache first
   try {
-    const cached = await getRedis().get(cacheKey);
+    const cached = await getSharedRedis().get(cacheKey);
     if (cached) {
       return parseFloat(cached);
     }
@@ -66,7 +55,7 @@ export async function getExchangeRate(
 
     // Cache the rate
     try {
-      await getRedis().setex(cacheKey, EXCHANGE_RATE_TTL, rate.toString());
+      await getSharedRedis().setex(cacheKey, EXCHANGE_RATE_TTL, rate.toString());
     } catch {
       // Redis failure: rate still usable
     }
