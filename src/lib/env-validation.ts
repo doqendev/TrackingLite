@@ -3,13 +3,12 @@ import { createLogger } from "./logger";
 const log = createLogger({ component: "env-validation" });
 
 export function validateEnv() {
+  // Core vars required by both web and worker
   const required: Record<string, string | undefined> = {
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   };
 
   const missing = Object.entries(required)
@@ -26,11 +25,26 @@ export function validateEnv() {
     throw new Error("ENCRYPTION_KEY must be exactly 64 hexadecimal characters (32 bytes)");
   }
 
+  // Web-only vars: required for billing (worker doesn't handle Stripe)
+  const isWorker = process.argv.some((arg) => arg.includes("start-worker"));
+  if (!isWorker) {
+    const webRequired: Record<string, string | undefined> = {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    };
+    const webMissing = Object.entries(webRequired)
+      .filter(([, v]) => !v)
+      .map(([k]) => k);
+    if (webMissing.length > 0) {
+      throw new Error(`Missing required environment variables (web): ${webMissing.join(", ")}`);
+    }
+  }
+
   // Optional variable warnings
   if (!process.env.RESEND_API_KEY) {
     log.warn("RESEND_API_KEY is not set. Email sending will not work.");
   }
-  if (!process.env.NEXT_PUBLIC_APP_URL) {
+  if (!isWorker && !process.env.NEXT_PUBLIC_APP_URL) {
     log.warn("NEXT_PUBLIC_APP_URL is not set. Stripe redirects may not work.");
   }
   if (!process.env.SENTRY_DSN && !process.env.NEXT_PUBLIC_SENTRY_DSN) {
