@@ -1,7 +1,7 @@
 # ---- Stage 1: Dependencies ----
 FROM node:20-alpine AS deps
 RUN apk add --no-cache openssl
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
@@ -11,7 +11,7 @@ RUN pnpm install --frozen-lockfile
 # ---- Stage 2: Build + Run ----
 FROM node:20-alpine
 RUN apk add --no-cache openssl
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -26,4 +26,4 @@ ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
 ENV NODE_OPTIONS="--max-old-space-size=1024"
 
-CMD ["sh", "-c", "pnpm tsx scripts/migrate-google-ads-encryption.ts && pnpm prisma db push --accept-data-loss && node .next/standalone/server.js"]
+CMD ["sh", "-c", "pnpm tsx scripts/migrate-google-ads-encryption.ts || echo '[WARN] Migration skipped'; pnpm prisma db push --accept-data-loss && node .next/standalone/server.js"]

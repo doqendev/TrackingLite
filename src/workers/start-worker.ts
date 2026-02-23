@@ -1,7 +1,20 @@
 import "dotenv/config";
 import { validateEnv } from "@/lib/env-validation";
 
-validateEnv();
+// Validate early — log the exact error so Railway logs show what's missing
+try {
+  validateEnv();
+} catch (err) {
+  console.error(
+    JSON.stringify({
+      level: "error",
+      msg: "Worker startup failed: environment validation",
+      error: err instanceof Error ? err.message : String(err),
+      timestamp: new Date().toISOString(),
+    })
+  );
+  process.exit(1);
+}
 
 import { worker as metaWorker } from "./meta-event-processor";
 import { redditWorker } from "./reddit-event-processor";
@@ -17,7 +30,7 @@ import { createLogger } from "@/lib/logger";
 const log = createLogger({ component: "worker-main" });
 
 process.on("uncaughtException", (err) => {
-  log.error("Uncaught exception", { error: err.message });
+  log.error("Uncaught exception", { error: err.message, stack: err.stack });
 });
 
 process.on("unhandledRejection", (reason) => {
@@ -26,7 +39,7 @@ process.on("unhandledRejection", (reason) => {
 
 const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorker, pinterestWorker, alertWorker, staleRequeueWorker, cleanupWorker];
 
-log.info("Starting event processors");
+log.info("Starting event processors", { workerCount: workers.length, pid: process.pid });
 log.info("Redis configured", { redisUrl: (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/\/\/.*@/, "//***@") });
 log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
 
