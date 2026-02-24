@@ -132,7 +132,9 @@ model Workspace {
   enablePinterest                       Boolean   @default(false)
 
   // Shopify webhook fields
-  shopifyWebhookSecret  String?   // Shopify webhook signing secret (plain text - used for HMAC verification)
+  shopifyWebhookSecretEncrypted String?   // AES-256-GCM encrypted
+  shopifyWebhookSecretIv        String?   // IV for decryption
+  shopifyWebhookSecretTag       String?   // Auth tag for decryption
   shopifyDomain         String?   // e.g., "mystore.myshopify.com"
 
   consentMode               ConsentMode     @default(STRICT)

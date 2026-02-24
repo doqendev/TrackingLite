@@ -192,6 +192,26 @@ export async function POST(request: NextRequest) {
 
     // 10. Extract monetary fields from customData
     const extracted = extractCustomData(payload.customData);
+    // 10b. Dedup: if this Purchase orderId was already tracked (e.g. by webhook), skip
+    if (payload.eventName === "Purchase") {
+      const orderId = extracted.orderId;
+      if (orderId) {
+        const existingOrder = await db.eventLog.findFirst({
+          where: {
+            workspaceId: workspace.id,
+            orderId,
+            eventName: "Purchase",
+            status: { in: ["SENT", "PENDING", "RETRYING"] },
+          },
+        });
+        if (existingOrder) {
+          return NextResponse.json(
+            { success: true, eventId: payload.eventId, deduplicated: true, destinations: [] },
+            { status: 200, headers: corsHeaders }
+          );
+        }
+      }
+    }
 
     // 11. Build the list of enabled destinations
     const destinations: Array<{

@@ -3,6 +3,7 @@ import type { EventName } from "@prisma/client";
 import { createLogger } from "@/lib/logger";
 import { db } from "@/lib/db";
 import { verifyShopifyWebhook } from "@/lib/shopify-webhook";
+import { decrypt } from "@/lib/encryption";
 import {
   getEventQueue,
   getTiktokQueue,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkOrderLimits, decrementOrderCount } from "@/lib/billing";
-import { shouldSendToDestination } from "@/lib/consent";
 import { lookupSessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
 import type { Queue } from "bullmq";
@@ -58,6 +58,12 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Read raw body for HMAC verification
     rawBody = Buffer.from(await request.arrayBuffer());
+
+    // Fix 4: Payload size guard (512KB)
+    if (rawBody.length > 524288) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+
     const hmacHeader = request.headers.get("x-shopify-hmac-sha256");
     const topic = request.headers.get("x-shopify-topic");
     const shopDomain = request.headers.get("x-shopify-shop-domain");
@@ -65,22 +71,6 @@ export async function POST(request: NextRequest) {
     if (!hmacHeader || !topic || !shopDomain) {
       reqLog.warn("Missing required Shopify headers");
       return NextResponse.json({ error: "Missing headers" }, { status: 400 });
-    }
-
-    // Rate limit: 30 webhooks per minute per domain (atomic Lua to avoid INCR/EXPIRE race)
-    const rateLimitKey = `wh-rl:${shopDomain}`;
-    const redis = getSharedRedis();
-    const luaScript = `
-      local current = redis.call('INCR', KEYS[1])
-      if current == 1 then
-        redis.call('EXPIRE', KEYS[1], 60)
-      end
-      return current
-    `;
-    const whCount = (await redis.eval(luaScript, 1, rateLimitKey)) as number;
-    if (whCount > 30) {
-      reqLog.warn("Webhook rate limit exceeded", { shopDomain, count: whCount });
-      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
     }
 
     // We only handle orders/paid and refunds/create
@@ -99,10 +89,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Route to the appropriate handler
+    // rateLimitChecked is passed by reference so the per-workspace loop can set it once
+    const rateLimitChecked = { value: false };
     if (topic === "orders/paid") {
-      return handleOrderPaid(bodyData, rawBody, hmacHeader, shopDomain, reqLog, requestId, request);
+      return handleOrderPaid(bodyData, rawBody, hmacHeader, shopDomain, reqLog, requestId, request, rateLimitChecked);
     }
-    return handleRefundCreated(bodyData, rawBody, hmacHeader, shopDomain, reqLog, requestId);
+    return handleRefundCreated(bodyData, rawBody, hmacHeader, shopDomain, reqLog, requestId, rateLimitChecked);
   } catch (error) {
     reqLog.error("Webhook processing error", {
       error: error instanceof Error ? error.message : String(error),
@@ -139,19 +131,22 @@ async function handleOrderPaid(
   shopDomain: string,
   reqLog: ReturnType<typeof log.child>,
   requestId: string,
-  request: NextRequest
+  request: NextRequest,
+  rateLimitChecked: { value: boolean }
 ): Promise<NextResponse> {
   // Find ALL active workspaces matching this shop domain
   const matchingWorkspaces = await db.workspace.findMany({
     where: {
       shopifyDomain: shopDomain,
       isActive: true,
-      shopifyWebhookSecret: { not: null },
+      shopifyWebhookSecretEncrypted: { not: null },
     },
     select: {
       id: true,
       userId: true,
-      shopifyWebhookSecret: true,
+      shopifyWebhookSecretEncrypted: true,
+      shopifyWebhookSecretIv: true,
+      shopifyWebhookSecretTag: true,
       enableMeta: true,
       metaPixelId: true,
       metaAccessTokenEncrypted: true,
@@ -229,16 +224,35 @@ async function handleOrderPaid(
   for (const workspace of matchingWorkspaces) {
     const wsLog = reqLog.child({ workspaceId: workspace.id });
 
-    // Verify HMAC
-    if (
-      !verifyShopifyWebhook(
-        rawBody,
-        hmacHeader,
-        workspace.shopifyWebhookSecret!
-      )
-    ) {
+    // Decrypt webhook secret and verify HMAC
+    const webhookSecret = decrypt(
+      workspace.shopifyWebhookSecretEncrypted!,
+      workspace.shopifyWebhookSecretIv!,
+      workspace.shopifyWebhookSecretTag!
+    );
+    if (!verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
       wsLog.warn("HMAC verification failed");
       continue;
+    }
+
+    // Rate limit: 30 webhooks per minute per domain (atomic Lua to avoid INCR/EXPIRE race)
+    // Only check once per request even if multiple workspaces share the same shopDomain
+    if (!rateLimitChecked.value) {
+      const rateLimitKey = `wh-rl:${shopDomain}`;
+      const redis = getSharedRedis();
+      const luaScript = `
+        local current = redis.call('INCR', KEYS[1])
+        if current == 1 then
+          redis.call('EXPIRE', KEYS[1], 60)
+        end
+        return current
+      `;
+      const whCount = (await redis.eval(luaScript, 1, rateLimitKey)) as number;
+      if (whCount > 30) {
+        wsLog.warn("Webhook rate limit exceeded", { shopDomain, count: whCount });
+        return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+      }
+      rateLimitChecked.value = true;
     }
 
     // Check Purchase toggle
@@ -326,23 +340,10 @@ async function handleOrderPaid(
       continue;
     }
 
-    // Filter destinations by consent mode
-    // Use session consent if available (enables STRICT mode webhook events when customer consented during browsing)
-    const customerConsent = sessionContext?.consent
-      ? { analytics: sessionContext.consent.analytics, marketing: sessionContext.consent.marketing }
-      : undefined;
-    const consentFiltered = destinations.filter((dest) =>
-      shouldSendToDestination(workspace.consentMode, customerConsent, dest.destination)
-    );
+    // Fix 3: Webhook events are server-side financial transactions triggered by Shopify,
+    // not browser behavioral tracking. Consent filtering does not apply.
 
-    if (consentFiltered.length === 0) {
-      wsLog.info("All destinations blocked by consent mode", {
-        consentMode: workspace.consentMode,
-      });
-      continue;
-    }
-
-    // Check order limits (after consent -- don't charge for consent-blocked events)
+    // Check order limits
     const billing = await checkOrderLimits(workspace.userId, "Purchase");
     if (!billing.allowed) {
       wsLog.warn("Order limit reached", {
@@ -414,7 +415,7 @@ async function handleOrderPaid(
     };
 
     const eventLogEntries = await Promise.all(
-      consentFiltered.map(async (dest) => {
+      destinations.map(async (dest) => {
         try {
           return await db.eventLog.create({
             data: {
@@ -432,7 +433,7 @@ async function handleOrderPaid(
     const validEntries = eventLogEntries.filter(
       (e): e is NonNullable<typeof e> => e !== null
     );
-    const validDests = consentFiltered.filter(
+    const validDests = destinations.filter(
       (_, idx) => eventLogEntries[idx] !== null
     );
 
@@ -524,7 +525,8 @@ async function handleRefundCreated(
   hmacHeader: string,
   shopDomain: string,
   reqLog: ReturnType<typeof log.child>,
-  requestId: string
+  requestId: string,
+  rateLimitChecked: { value: boolean }
 ): Promise<NextResponse> {
   const refundId = refundData.id ? String(refundData.id) : null;
   const shopifyOrderId = refundData.order_id ? String(refundData.order_id) : null;
@@ -546,21 +548,20 @@ async function handleRefundCreated(
 
   reqLog.info("Processing refund", { refundId, shopifyOrderId });
 
-  // Find matching workspaces
+  // Find matching workspaces (only GA4 fields needed -- Meta has no standard refund event)
   const matchingWorkspaces = await db.workspace.findMany({
     where: {
       shopifyDomain: shopDomain,
       isActive: true,
-      shopifyWebhookSecret: { not: null },
+      shopifyWebhookSecretEncrypted: { not: null },
     },
     select: {
       id: true,
       userId: true,
-      shopifyWebhookSecret: true,
+      shopifyWebhookSecretEncrypted: true,
+      shopifyWebhookSecretIv: true,
+      shopifyWebhookSecretTag: true,
       consentMode: true,
-      enableMeta: true,
-      metaPixelId: true,
-      metaAccessTokenEncrypted: true,
       enableGA4: true,
       ga4MeasurementId: true,
       ga4ApiSecretEncrypted: true,
@@ -572,10 +573,35 @@ async function handleRefundCreated(
   for (const workspace of matchingWorkspaces) {
     const wsLog = reqLog.child({ workspaceId: workspace.id });
 
-    // HMAC verify
-    if (!verifyShopifyWebhook(rawBody, hmacHeader, workspace.shopifyWebhookSecret!)) {
+    // Decrypt webhook secret and verify HMAC
+    const webhookSecret = decrypt(
+      workspace.shopifyWebhookSecretEncrypted!,
+      workspace.shopifyWebhookSecretIv!,
+      workspace.shopifyWebhookSecretTag!
+    );
+    if (!verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
       wsLog.warn("HMAC verification failed for refund");
       continue;
+    }
+
+    // Rate limit: 30 webhooks per minute per domain (atomic Lua to avoid INCR/EXPIRE race)
+    // Only check once per request even if multiple workspaces share the same shopDomain
+    if (!rateLimitChecked.value) {
+      const rateLimitKey = `wh-rl:${shopDomain}`;
+      const redis = getSharedRedis();
+      const luaScript = `
+        local current = redis.call('INCR', KEYS[1])
+        if current == 1 then
+          redis.call('EXPIRE', KEYS[1], 60)
+        end
+        return current
+      `;
+      const whCount = (await redis.eval(luaScript, 1, rateLimitKey)) as number;
+      if (whCount > 30) {
+        wsLog.warn("Webhook rate limit exceeded", { shopDomain, count: whCount });
+        return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+      }
+      rateLimitChecked.value = true;
     }
 
     // Dedup: check if this refund already processed
@@ -598,12 +624,9 @@ async function handleRefundCreated(
       orderBy: { createdAt: "desc" },
     });
 
-    // Build destinations (Meta + GA4 only for refunds)
+    // Only GA4 supports refunds (Meta CAPI has no standard refund event)
     const destinations: Array<{ destination: string; queue: Queue; jobName: string }> = [];
 
-    if (workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted) {
-      destinations.push({ destination: "META", queue: getEventQueue(), jobName: "send-meta-event" });
-    }
     if (workspace.enableGA4 && workspace.ga4MeasurementId && workspace.ga4ApiSecretEncrypted) {
       destinations.push({ destination: "GA4", queue: getGA4Queue(), jobName: "send-ga4-event" });
     }
@@ -678,18 +701,10 @@ async function handleRefundCreated(
       await decrementOrderCount(workspace.userId, purchaseMonth);
     }
 
-    // Queue jobs
+    // Queue jobs (GA4 only for refunds)
     await Promise.all(
       validDests.map((dest, idx) => {
         const eventLogId = validEntries[idx].id;
-        if (dest.destination === "META") {
-          return dest.queue.add(dest.jobName, {
-            workspaceId: workspace.id,
-            requestId,
-            event: eventData,
-            eventLogId,
-          } satisfies MetaEventJob);
-        }
         return dest.queue.add(dest.jobName, {
           workspaceId: workspace.id,
           destination: dest.destination,

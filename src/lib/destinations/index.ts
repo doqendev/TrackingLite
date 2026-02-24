@@ -14,7 +14,7 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "AddToCart",
     InitiateCheckout: "InitiateCheckout",
     Purchase: "Purchase",
-    Refund: "Refund",
+    Refund: null, // Meta CAPI has no standard refund event
   },
   TIKTOK: {
     PageView: "Pageview",

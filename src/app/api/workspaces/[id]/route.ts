@@ -55,6 +55,7 @@ const ENCRYPTED_FIELDS: Array<[string, string, string, string]> = [
   ["klaviyoApiKey", "klaviyoApiKeyEncrypted", "klaviyoApiKeyIv", "klaviyoApiKeyTag"],
   ["redditAccessToken", "redditAccessTokenEncrypted", "redditAccessTokenIv", "redditAccessTokenTag"],
   ["pinterestConversionToken", "pinterestConversionTokenEncrypted", "pinterestConversionTokenIv", "pinterestConversionTokenTag"],
+  ["shopifyWebhookSecret", "shopifyWebhookSecretEncrypted", "shopifyWebhookSecretIv", "shopifyWebhookSecretTag"],
 ];
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -110,7 +111,7 @@ export async function GET(
       enablePinterest: true,
       // Shopify webhook
       shopifyDomain: true,
-      shopifyWebhookSecret: true,
+      shopifyWebhookSecretEncrypted: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -128,7 +129,7 @@ export async function GET(
     klaviyoApiKeyEncrypted,
     redditAccessTokenEncrypted,
     pinterestConversionTokenEncrypted,
-    shopifyWebhookSecret,
+    shopifyWebhookSecretEncrypted,
     ...rest
   } = workspace;
 
@@ -140,7 +141,7 @@ export async function GET(
     hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
     hasRedditAccessToken: redditAccessTokenEncrypted !== null,
     hasPinterestConversionToken: pinterestConversionTokenEncrypted !== null,
-    hasShopifyWebhookSecret: shopifyWebhookSecret !== null,
+    hasShopifyWebhookSecret: shopifyWebhookSecretEncrypted !== null,
   });
 }
 
@@ -279,7 +280,7 @@ export async function PATCH(
         enablePinterest: true,
         // Shopify webhook
         shopifyDomain: true,
-        shopifyWebhookSecret: true,
+        shopifyWebhookSecretEncrypted: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -296,7 +297,7 @@ export async function PATCH(
       klaviyoApiKeyEncrypted,
       redditAccessTokenEncrypted,
       pinterestConversionTokenEncrypted,
-      shopifyWebhookSecret: updatedShopifyWebhookSecret,
+      shopifyWebhookSecretEncrypted: updatedShopifyWebhookSecretEncrypted,
       ...rest
     } = updated;
 
@@ -308,7 +309,7 @@ export async function PATCH(
       hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
       hasRedditAccessToken: redditAccessTokenEncrypted !== null,
       hasPinterestConversionToken: pinterestConversionTokenEncrypted !== null,
-      hasShopifyWebhookSecret: updatedShopifyWebhookSecret !== null,
+      hasShopifyWebhookSecret: updatedShopifyWebhookSecretEncrypted !== null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
