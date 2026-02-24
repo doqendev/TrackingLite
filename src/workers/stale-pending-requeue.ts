@@ -1,6 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
+import { getSharedRedis } from "@/lib/redis";
 import { createLogger } from "@/lib/logger";
 import {
   getEventQueue,
@@ -329,6 +330,45 @@ export async function scheduleStaleRequeue(): Promise<void> {
   log.info("Repeatable stale-pending requeue job scheduled", { interval: "5min" });
 }
 
+async function reconcileOrderCounts(): Promise<void> {
+  const now = new Date();
+  const monthKey = now.toISOString().slice(0, 7); // YYYY-MM
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Get all users with active subscriptions
+  const users = await db.subscription.findMany({
+    where: { status: { in: ["ACTIVE", "PAST_DUE"] } },
+    select: { userId: true },
+  });
+
+  const redis = getSharedRedis();
+  for (const { userId } of users) {
+    const redisKey = `orders:${userId}:${monthKey}`;
+    try {
+      // Count distinct Purchase events by eventId (one billing unit per unique event,
+      // regardless of how many destination fan-out rows were created)
+      const purchases = await db.eventLog.findMany({
+        where: {
+          workspace: { userId },
+          eventName: "Purchase",
+          status: { in: ["SENT", "PENDING", "RETRYING"] },
+          createdAt: { gte: monthStart },
+        },
+        distinct: ["eventId"],
+        select: { eventId: true },
+      });
+      const dbCount = purchases.length;
+      const redisCount = parseInt((await redis.get(redisKey)) ?? "0", 10);
+      if (dbCount > redisCount) {
+        await redis.set(redisKey, String(dbCount));
+        log.info("Order count reconciled", { userId, redisCount, dbCount });
+      }
+    } catch (err) {
+      log.error("Order count reconciliation failed", { userId, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+}
+
 async function cleanupDlq(): Promise<void> {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -347,12 +387,22 @@ async function cleanupDlq(): Promise<void> {
   }
 }
 
+// Run reconciliation once per hour (every 12th cycle of the 5-minute job)
+const RECONCILE_INTERVAL = 12;
+let reconcileCycle = 0;
+
 export const staleRequeueWorker = new Worker(
   QUEUE_NAME,
   async () => {
     await requeueStalePending();
     await requeueFailedEvents();
     await cleanupDlq();
+
+    reconcileCycle++;
+    if (reconcileCycle >= RECONCILE_INTERVAL) {
+      reconcileCycle = 0;
+      await reconcileOrderCounts();
+    }
   },
   {
     connection: getConnection() as never,

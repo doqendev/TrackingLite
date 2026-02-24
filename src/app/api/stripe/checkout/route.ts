@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
   }
 
   const lockKey = `checkout-lock:${session.user.id}`;
-  const acquired = await getSharedRedis().set(lockKey, "1", "EX", 30, "NX").catch(() => "OK");
+  const acquired = await getSharedRedis().set(lockKey, "1", "EX", 30, "NX").catch(() => null);
   if (!acquired) {
-    return NextResponse.json({ error: "Checkout already in progress" }, { status: 429 });
+    return NextResponse.json({ error: "Checkout already in progress. Please try again." }, { status: 429 });
   }
 
   try {

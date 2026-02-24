@@ -77,8 +77,8 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
   const sanitized = {
     ...rest,
     hasMetaCredentials: !!(workspace.enableMeta && workspace.metaPixelId && metaAccessTokenEncrypted),
-    hasTikTokCredentials: !!(workspace.enableTikTok && tiktokAccessTokenEncrypted),
-    hasGA4Credentials: !!(workspace.enableGA4 && ga4ApiSecretEncrypted),
+    hasTikTokCredentials: !!(workspace.enableTikTok && workspace.tiktokPixelId && tiktokAccessTokenEncrypted),
+    hasGA4Credentials: !!(workspace.enableGA4 && workspace.ga4MeasurementId && ga4ApiSecretEncrypted),
     hasKlaviyoCredentials: !!(workspace.enableKlaviyo && klaviyoApiKeyEncrypted),
     hasRedditCredentials: !!(workspace.enableReddit && redditAccessTokenEncrypted),
     hasPinterestCredentials: !!(workspace.enablePinterest && pinterestConversionTokenEncrypted),

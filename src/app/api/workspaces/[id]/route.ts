@@ -353,6 +353,7 @@ export async function DELETE(
 
   const workspace = await db.workspace.findFirst({
     where: { id, userId: session.user.id, isActive: true },
+    select: { id: true, apiKey: true },
   });
 
   if (!workspace) {
@@ -363,6 +364,9 @@ export async function DELETE(
     where: { id },
     data: { isActive: false },
   });
+
+  await invalidateApiKeyCache(workspace.apiKey).catch(() => {});
+  invalidateWorkspaceCache(id);
 
   return NextResponse.json({ success: true });
 }

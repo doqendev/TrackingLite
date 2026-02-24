@@ -30,6 +30,9 @@ export function validateEnv(context: "web" | "worker" = "web") {
     const webRequired: Record<string, string | undefined> = {
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+      STRIPE_STARTER_PRICE_ID: process.env.STRIPE_STARTER_PRICE_ID,
+      STRIPE_GROWTH_PRICE_ID: process.env.STRIPE_GROWTH_PRICE_ID,
+      STRIPE_SCALE_PRICE_ID: process.env.STRIPE_SCALE_PRICE_ID,
     };
     const webMissing = Object.entries(webRequired)
       .filter(([, v]) => !v)

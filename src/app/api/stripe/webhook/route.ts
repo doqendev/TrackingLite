@@ -7,10 +7,12 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger({ component: "stripe-webhook" });
 
-function priceIdToPlan(priceId: string | undefined): "STARTER" | "GROWTH" | "SCALE" {
+function priceIdToPlan(priceId: string | undefined): "STARTER" | "GROWTH" | "SCALE" | null {
+  if (priceId === process.env.STRIPE_STARTER_PRICE_ID) return "STARTER";
   if (priceId === process.env.STRIPE_SCALE_PRICE_ID) return "SCALE";
   if (priceId === process.env.STRIPE_GROWTH_PRICE_ID) return "GROWTH";
-  return "STARTER";
+  console.error(JSON.stringify({ level: "error", msg: "Unknown Stripe price ID", priceId }));
+  return null;
 }
 
 function stripeStatusToLocal(status: string): "ACTIVE" | "PAST_DUE" | "CANCELED" | "UNPAID" {
@@ -61,6 +63,10 @@ export async function POST(request: NextRequest) {
 
         const priceId = subscription.items.data[0]?.price?.id;
         const plan = priceIdToPlan(priceId);
+        if (!plan) {
+          log.error("checkout.session.completed: unknown price ID, skipping plan update", { priceId, userId });
+          break;
+        }
 
         await db.subscription.upsert({
           where: { userId },
@@ -94,6 +100,21 @@ export async function POST(request: NextRequest) {
         const priceId = subscription.items.data[0]?.price?.id;
         const plan = priceIdToPlan(priceId);
         const status = stripeStatusToLocal(subscription.status);
+
+        if (!plan) {
+          log.error("customer.subscription.updated: unknown price ID, skipping plan update", { priceId, subscriptionId: subscription.id });
+          // Still update status and period even if plan is unknown
+          await db.subscription.update({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+              stripePriceId: priceId,
+              status,
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            },
+          });
+          break;
+        }
 
         await db.subscription.update({
           where: { stripeSubscriptionId: subscription.id },
