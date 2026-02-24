@@ -378,16 +378,6 @@ async function handleOrderPaid(
     // Fix 3: Webhook events are server-side financial transactions triggered by Shopify,
     // not browser behavioral tracking. Consent filtering does not apply.
 
-    // Check order limits
-    const billing = await checkOrderLimits(workspace.userId, "Purchase");
-    if (!billing.allowed) {
-      wsLog.warn("Order limit reached", {
-        limit: billing.limit,
-        used: billing.used,
-      });
-      continue;
-    }
-
     // Deterministic eventId for dedup
     const webhookEventId = `webhook-${orderId || orderName || crypto.randomUUID()}`;
 
@@ -419,6 +409,16 @@ async function handleOrderPaid(
         });
         continue;
       }
+    }
+
+    // Check order limits AFTER dedup — billing increment must only happen for new orders
+    const billing = await checkOrderLimits(workspace.userId, "Purchase");
+    if (!billing.allowed) {
+      wsLog.warn("Order limit reached", {
+        limit: billing.limit,
+        used: billing.used,
+      });
+      continue;
     }
 
     // Create EventLog entries with dedup
