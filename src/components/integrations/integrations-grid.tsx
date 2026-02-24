@@ -134,7 +134,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [webhookConnected, setWebhookConnected] = useState(workspace.hasShopifyWebhookSecret);
   const [webhookUrlCopied, setWebhookUrlCopied] = useState(false);
 
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://trackclear.io"}/api/webhooks/shopify`;
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.trackclear.io"}/api/webhooks/shopify`;
 
   function toggleCard(key: string) {
     setExpandedCard((prev) => (prev === key ? null : key));
