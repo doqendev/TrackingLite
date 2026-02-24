@@ -318,7 +318,22 @@
     "pinterestGuideStep2Title": "Finden Sie Ihre Werbekonto-ID",
     "pinterestGuideStep2Desc": "Ihre Werbekonto-ID wird in den Kontoeinstellungen oder in der URL-Leiste angezeigt. Kopieren Sie die numerische ID.",
     "pinterestGuideStep3Title": "Generieren Sie einen Conversion-Token",
-    "pinterestGuideStep3Desc": "In der Conversions API-Einrichtung generieren Sie einen neuen Token. Kopieren Sie ihn und fuegen Sie ihn oben im Conversion-Token-Feld ein."
+    "pinterestGuideStep3Desc": "In der Conversions API-Einrichtung generieren Sie einen neuen Token. Kopieren Sie ihn und fuegen Sie ihn oben im Conversion-Token-Feld ein.",
+    "shopifyWebhookSection": "Kauf-Fallback",
+    "shopifyWebhook": "Shopify Bestell-Webhook",
+    "shopifyWebhookDesc": "Erfasst Kaeufe, die vom Pixel verpasst werden (PayPal, externe Zahlungen)",
+    "shopifyWebhookConnected": "Webhook verbunden",
+    "shopifyWebhookNotConfigured": "Nicht konfiguriert",
+    "webhookUrl": "Webhook-URL",
+    "webhookSigningSecret": "Webhook-Signaturgeheimnis",
+    "webhookSigningSecretPlaceholder": "Fuegen Sie das Signaturgeheimnis von Shopify ein",
+    "webhookSaved": "Webhook-Geheimnis gespeichert",
+    "webhookGuideStep1Title": "Shopify-Benachrichtigungen oeffnen",
+    "webhookGuideStep1Desc": "Gehen Sie zum Shopify Admin > Einstellungen > Benachrichtigungen. Scrollen Sie zum Abschnitt Webhooks.",
+    "webhookGuideStep2Title": "Webhook erstellen",
+    "webhookGuideStep2Desc": "Klicken Sie auf Webhook erstellen. Waehlen Sie 'Bestellzahlung' als Ereignis. Fuegen Sie die oben angezeigte Webhook-URL ein und klicken Sie auf Speichern.",
+    "webhookGuideStep3Title": "Signaturgeheimnis kopieren",
+    "webhookGuideStep3Desc": "Nach dem Erstellen des Webhooks zeigt Shopify ein Signaturgeheimnis an. Kopieren Sie es und fuegen Sie es oben im Feld Signaturgeheimnis ein, dann klicken Sie auf Speichern."
   },
   "onboarding": {
     "step1": "Workspace erstellen",

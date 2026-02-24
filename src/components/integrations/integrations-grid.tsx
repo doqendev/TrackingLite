@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
-import { SiMeta, SiTiktok, SiGoogleanalytics } from "react-icons/si";
+import { SiMeta, SiTiktok, SiGoogleanalytics, SiShopify } from "react-icons/si";
 import { FaReddit, FaPinterest } from "react-icons/fa";
 import { SetupGuide } from "@/components/integrations/setup-guide";
 
@@ -38,6 +38,8 @@ export interface IntegrationWorkspace {
   pinterestAdAccountId: string | null;
   hasPinterestConversionToken: boolean;
   enablePinterest: boolean;
+  // Shopify Webhook
+  hasShopifyWebhookSecret: boolean;
 }
 
 interface IntegrationsGridProps {
@@ -125,6 +127,14 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [pinterestConversionToken, setPinterestConversionToken] = useState("");
   const [pinterestEnabled, setPinterestEnabled] = useState(workspace.enablePinterest);
   const [savingPinterest, setSavingPinterest] = useState(false);
+
+  // Shopify Webhook state
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [savingWebhook, setSavingWebhook] = useState(false);
+  const [webhookConnected, setWebhookConnected] = useState(workspace.hasShopifyWebhookSecret);
+  const [webhookUrlCopied, setWebhookUrlCopied] = useState(false);
+
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://trackclear.io"}/api/webhooks/shopify`;
 
   function toggleCard(key: string) {
     setExpandedCard((prev) => (prev === key ? null : key));
@@ -299,6 +309,38 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     }
   }
 
+  async function saveWebhookSecret() {
+    setSavingWebhook(true);
+    try {
+      const body: Record<string, string> = {};
+      if (webhookSecret) body.shopifyWebhookSecret = webhookSecret;
+      else {
+        setSavingWebhook(false);
+        return;
+      }
+
+      const res = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast.success(t("webhookSaved"));
+      setWebhookSecret("");
+      setWebhookConnected(true);
+    } catch {
+      toast.error(t("failedToSave", { platform: "Shopify Webhook" }));
+    } finally {
+      setSavingWebhook(false);
+    }
+  }
+
+  function copyWebhookUrl() {
+    navigator.clipboard.writeText(webhookUrl);
+    setWebhookUrlCopied(true);
+    setTimeout(() => setWebhookUrlCopied(false), 2000);
+  }
+
   const metaConnected = workspace.hasAccessToken && !!workspace.metaPixelId;
   const tiktokConnected = workspace.hasTiktokAccessToken && !!workspace.tiktokPixelId;
   const ga4Connected = workspace.hasGA4ApiSecret && !!workspace.ga4MeasurementId;
@@ -308,6 +350,102 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
 
   return (
     <div className="space-y-8">
+      {/* Shopify Webhook Fallback */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("shopifyWebhookSection")}</h2>
+        <div className="grid grid-cols-1 gap-4 items-start">
+          <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-green-500 overflow-hidden">
+            <div
+              className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+              onClick={() => toggleCard("shopifyWebhook")}
+            >
+              <div className="text-green-500 shrink-0">
+                <SiShopify className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-foreground text-sm">{t("shopifyWebhook")}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {t("shopifyWebhookDesc")}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <StatusBadge
+                  connected={webhookConnected}
+                  connectedLabel={t("shopifyWebhookConnected")}
+                  notConnectedLabel={t("shopifyWebhookNotConfigured")}
+                />
+                <ChevronDown
+                  className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                    expandedCard === "shopifyWebhook" ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+            </div>
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                expandedCard === "shopifyWebhook" ? "max-h-[1200px]" : "max-h-0"
+              }`}
+            >
+              <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
+                <div className="pt-4 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="webhook-url" className="text-xs">
+                      {t("webhookUrl")}
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="webhook-url"
+                        value={webhookUrl}
+                        readOnly
+                        className="font-mono text-xs"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyWebhookUrl}
+                        className="shrink-0 px-3"
+                      >
+                        {webhookUrlCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="webhook-secret" className="text-xs">
+                        {t("webhookSigningSecret")}
+                      </Label>
+                      {webhookConnected && <EncryptedBadge label={t("encryptedAtRest")} />}
+                    </div>
+                    <Input
+                      id="webhook-secret"
+                      type="password"
+                      value={webhookSecret}
+                      onChange={(e) => setWebhookSecret(e.target.value)}
+                      placeholder={
+                        webhookConnected
+                          ? t("leaveBlankToKeep")
+                          : t("webhookSigningSecretPlaceholder")
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      variant="brand"
+                      size="sm"
+                      onClick={saveWebhookSecret}
+                      disabled={savingWebhook}
+                    >
+                      {savingWebhook ? tc("saving") : t("saveCredentials")}
+                    </Button>
+                  </div>
+                  <SetupGuide platformKey="shopifyWebhook" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Advertising Platforms */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("advertisingPlatforms")}</h2>

@@ -318,7 +318,22 @@
     "pinterestGuideStep2Title": "Find your Ad Account ID",
     "pinterestGuideStep2Desc": "Your Ad Account ID is shown in the account settings or URL bar. Copy the numeric ID.",
     "pinterestGuideStep3Title": "Generate a Conversion Token",
-    "pinterestGuideStep3Desc": "In the Conversions API setup, generate a new token. Copy it and paste it in the Conversion Token field above."
+    "pinterestGuideStep3Desc": "In the Conversions API setup, generate a new token. Copy it and paste it in the Conversion Token field above.",
+    "shopifyWebhookSection": "Purchase Fallback",
+    "shopifyWebhook": "Shopify Order Webhook",
+    "shopifyWebhookDesc": "Catches purchases missed by the pixel (PayPal, off-site payments)",
+    "shopifyWebhookConnected": "Webhook connected",
+    "shopifyWebhookNotConfigured": "Not configured",
+    "webhookUrl": "Webhook URL",
+    "webhookSigningSecret": "Webhook Signing Secret",
+    "webhookSigningSecretPlaceholder": "Paste the signing secret from Shopify",
+    "webhookSaved": "Webhook secret saved",
+    "webhookGuideStep1Title": "Open Shopify Notifications",
+    "webhookGuideStep1Desc": "Go to Shopify Admin > Settings > Notifications. Scroll down to the Webhooks section.",
+    "webhookGuideStep2Title": "Create the Webhook",
+    "webhookGuideStep2Desc": "Click Create Webhook. Select 'Order payment' as the event. Paste the Webhook URL shown above and click Save.",
+    "webhookGuideStep3Title": "Copy the Signing Secret",
+    "webhookGuideStep3Desc": "After creating the webhook, Shopify displays a signing secret. Copy it and paste it in the Signing Secret field above, then click Save."
   },
   "onboarding": {
     "step1": "Create Workspace",

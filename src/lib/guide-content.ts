@@ -35,4 +35,9 @@ export const PLATFORM_GUIDES: Record<string, GuideStep[]> = {
     { titleKey: "pinterestGuideStep2Title", descriptionKey: "pinterestGuideStep2Desc", image: "/guides/pinterest-step-2.png" },
     { titleKey: "pinterestGuideStep3Title", descriptionKey: "pinterestGuideStep3Desc", image: "/guides/pinterest-step-3.png" },
   ],
+  shopifyWebhook: [
+    { titleKey: "webhookGuideStep1Title", descriptionKey: "webhookGuideStep1Desc" },
+    { titleKey: "webhookGuideStep2Title", descriptionKey: "webhookGuideStep2Desc" },
+    { titleKey: "webhookGuideStep3Title", descriptionKey: "webhookGuideStep3Desc" },
+  ],
 };

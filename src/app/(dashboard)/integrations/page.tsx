@@ -43,6 +43,8 @@ export default async function IntegrationsPage() {
       pinterestAdAccountId: true,
       pinterestConversionTokenEncrypted: true,
       enablePinterest: true,
+      // Shopify Webhook
+      shopifyWebhookSecret: true,
     },
   });
 
@@ -74,6 +76,8 @@ export default async function IntegrationsPage() {
     pinterestAdAccountId: workspace.pinterestAdAccountId,
     hasPinterestConversionToken: !!workspace.pinterestConversionTokenEncrypted,
     enablePinterest: workspace.enablePinterest,
+    // Shopify Webhook
+    hasShopifyWebhookSecret: !!workspace.shopifyWebhookSecret,
   };
 
   return (

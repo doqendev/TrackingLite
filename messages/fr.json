@@ -318,7 +318,22 @@
     "pinterestGuideStep2Title": "Trouvez votre ID de Compte Publicitaire",
     "pinterestGuideStep2Desc": "Votre ID de Compte Publicitaire est affiche dans les parametres du compte ou dans la barre d'URL. Copiez l'ID numerique.",
     "pinterestGuideStep3Title": "Generez un Token de Conversion",
-    "pinterestGuideStep3Desc": "Dans la configuration de l'API de Conversions, generez un nouveau token. Copiez-le et collez-le dans le champ Token de Conversion ci-dessus."
+    "pinterestGuideStep3Desc": "Dans la configuration de l'API de Conversions, generez un nouveau token. Copiez-le et collez-le dans le champ Token de Conversion ci-dessus.",
+    "shopifyWebhookSection": "Secours pour les Achats",
+    "shopifyWebhook": "Webhook de Commandes Shopify",
+    "shopifyWebhookDesc": "Capture les achats manques par le pixel (PayPal, paiements hors site)",
+    "shopifyWebhookConnected": "Webhook connecte",
+    "shopifyWebhookNotConfigured": "Non configure",
+    "webhookUrl": "URL du Webhook",
+    "webhookSigningSecret": "Secret de Signature du Webhook",
+    "webhookSigningSecretPlaceholder": "Collez le secret de signature de Shopify",
+    "webhookSaved": "Secret du webhook enregistre",
+    "webhookGuideStep1Title": "Ouvrir les Notifications Shopify",
+    "webhookGuideStep1Desc": "Allez dans l'Admin Shopify > Parametres > Notifications. Descendez jusqu'a la section Webhooks.",
+    "webhookGuideStep2Title": "Creer le Webhook",
+    "webhookGuideStep2Desc": "Cliquez sur Creer un Webhook. Selectionnez 'Paiement de commande' comme evenement. Collez l'URL du Webhook affichee ci-dessus et cliquez sur Enregistrer.",
+    "webhookGuideStep3Title": "Copier le Secret de Signature",
+    "webhookGuideStep3Desc": "Apres avoir cree le webhook, Shopify affiche un secret de signature. Copiez-le et collez-le dans le champ Secret de Signature ci-dessus, puis cliquez sur Enregistrer."
   },
   "onboarding": {
     "step1": "Créer un Espace de Travail",

@@ -318,7 +318,22 @@
     "pinterestGuideStep2Title": "Encontre seu ID da Conta de Anuncios",
     "pinterestGuideStep2Desc": "Seu ID da Conta de Anuncios e exibido nas configuracoes da conta ou na barra de URL. Copie o ID numerico.",
     "pinterestGuideStep3Title": "Gere um Token de Conversao",
-    "pinterestGuideStep3Desc": "Na configuracao da API de Conversoes, gere um novo token. Copie e cole no campo Token de Conversao acima."
+    "pinterestGuideStep3Desc": "Na configuracao da API de Conversoes, gere um novo token. Copie e cole no campo Token de Conversao acima.",
+    "shopifyWebhookSection": "Fallback de Compras",
+    "shopifyWebhook": "Webhook de Pedidos Shopify",
+    "shopifyWebhookDesc": "Captura compras perdidas pelo pixel (PayPal, pagamentos fora do site)",
+    "shopifyWebhookConnected": "Webhook conectado",
+    "shopifyWebhookNotConfigured": "Nao configurado",
+    "webhookUrl": "URL do Webhook",
+    "webhookSigningSecret": "Segredo de Assinatura do Webhook",
+    "webhookSigningSecretPlaceholder": "Cole o segredo de assinatura do Shopify",
+    "webhookSaved": "Segredo do webhook salvo",
+    "webhookGuideStep1Title": "Abra as Notificacoes do Shopify",
+    "webhookGuideStep1Desc": "Va ao Admin do Shopify > Configuracoes > Notificacoes. Role ate a secao de Webhooks.",
+    "webhookGuideStep2Title": "Crie o Webhook",
+    "webhookGuideStep2Desc": "Clique em Criar Webhook. Selecione 'Pagamento do pedido' como evento. Cole a URL do Webhook mostrada acima e clique em Salvar.",
+    "webhookGuideStep3Title": "Copie o Segredo de Assinatura",
+    "webhookGuideStep3Desc": "Apos criar o webhook, o Shopify exibe um segredo de assinatura. Copie-o e cole no campo Segredo de Assinatura acima, depois clique em Salvar."
   },
   "onboarding": {
     "step1": "Criar Workspace",

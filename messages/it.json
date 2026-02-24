@@ -318,7 +318,22 @@
     "pinterestGuideStep2Title": "Trova il tuo ID Account Pubblicitario",
     "pinterestGuideStep2Desc": "Il tuo ID Account Pubblicitario e mostrato nelle impostazioni dell'account o nella barra URL. Copia l'ID numerico.",
     "pinterestGuideStep3Title": "Genera un Token di Conversione",
-    "pinterestGuideStep3Desc": "Nella configurazione dell'API Conversioni, genera un nuovo token. Copialo e incollalo nel campo Token di Conversione qui sopra."
+    "pinterestGuideStep3Desc": "Nella configurazione dell'API Conversioni, genera un nuovo token. Copialo e incollalo nel campo Token di Conversione qui sopra.",
+    "shopifyWebhookSection": "Fallback Acquisti",
+    "shopifyWebhook": "Webhook Ordini Shopify",
+    "shopifyWebhookDesc": "Cattura acquisti persi dal pixel (PayPal, pagamenti fuori dal sito)",
+    "shopifyWebhookConnected": "Webhook connesso",
+    "shopifyWebhookNotConfigured": "Non configurato",
+    "webhookUrl": "URL del Webhook",
+    "webhookSigningSecret": "Segreto di Firma del Webhook",
+    "webhookSigningSecretPlaceholder": "Incolla il segreto di firma da Shopify",
+    "webhookSaved": "Segreto del webhook salvato",
+    "webhookGuideStep1Title": "Apri le Notifiche Shopify",
+    "webhookGuideStep1Desc": "Vai all'Admin Shopify > Impostazioni > Notifiche. Scorri fino alla sezione Webhooks.",
+    "webhookGuideStep2Title": "Crea il Webhook",
+    "webhookGuideStep2Desc": "Clicca su Crea Webhook. Seleziona 'Pagamento ordine' come evento. Incolla l'URL del Webhook mostrato sopra e clicca su Salva.",
+    "webhookGuideStep3Title": "Copia il Segreto di Firma",
+    "webhookGuideStep3Desc": "Dopo aver creato il webhook, Shopify mostra un segreto di firma. Copialo e incollalo nel campo Segreto di Firma qui sopra, poi clicca su Salva."
   },
   "onboarding": {
     "step1": "Crea Spazio di Lavoro",
