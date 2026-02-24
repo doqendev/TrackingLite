@@ -12,6 +12,7 @@ const STALENESS_MS: Record<string, number> = {
   ttclid: 4 * 60 * 60 * 1000,
   rdtCid: 4 * 60 * 60 * 1000,
   epik: 4 * 60 * 60 * 1000,
+  gaClientId: 4 * 60 * 60 * 1000,
   clientIp: 4 * 60 * 60 * 1000,
   userAgent: 4 * 60 * 60 * 1000,
   // UTMs + URL + consent: 24 hours
@@ -29,7 +30,7 @@ const STALENESS_MS: Record<string, number> = {
 const SESSION_TTL_SECONDS = 86400; // 24 hours
 
 const BROWSER_FIELDS = [
-  "fbp", "fbc", "ttclid", "rdtCid", "epik",
+  "fbp", "fbc", "ttclid", "rdtCid", "epik", "gaClientId",
   "clientIp", "userAgent", "url",
   "utmSource", "utmMedium", "utmCampaign", "utmContent", "utmTerm", "gclid",
   "consent:analytics", "consent:marketing",
@@ -41,6 +42,7 @@ export interface SessionContext {
   ttclid?: string;
   rdtCid?: string;
   epik?: string;
+  gaClientId?: string;
   clientIp?: string;
   userAgent?: string;
   url?: string;
@@ -76,6 +78,7 @@ export function storeSessionContext(
     ttclid?: string | null;
     rdtCid?: string | null;
     epik?: string | null;
+    gaClientId?: string | null;
     clientIp?: string | null;
     userAgent?: string | null;
     url?: string | null;
@@ -99,6 +102,7 @@ export function storeSessionContext(
     ["ttclid", context.ttclid],
     ["rdtCid", context.rdtCid],
     ["epik", context.epik],
+    ["gaClientId", context.gaClientId],
     ["clientIp", context.clientIp],
     ["userAgent", context.userAgent],
     ["url", context.url],
@@ -197,6 +201,7 @@ export async function lookupSessionContext(
       ttclid: result.ttclid,
       rdtCid: result.rdtCid,
       epik: result.epik,
+      gaClientId: result.gaClientId,
       clientIp: result.clientIp,
       userAgent: result.userAgent,
       url: result.url,

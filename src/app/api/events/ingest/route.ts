@@ -18,6 +18,7 @@ import { checkOrderLimits } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import { storeSessionContext } from "@/lib/session-enrichment";
+import { getSharedRedis } from "@/lib/redis";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -38,6 +39,7 @@ const IngestPayloadSchema = z.object({
   gclid: z.string().nullable().optional(),
   rdtCid: z.string().nullable().optional(),
   epik: z.string().nullable().optional(),
+  gaClientId: z.string().nullable().optional(),
   consent: z.object({
     analyticsAllowed: z.boolean().optional(),
     marketingAllowed: z.boolean().optional(),
@@ -152,12 +154,12 @@ export async function POST(request: NextRequest) {
     const clientIp = (request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown").slice(0, 45);
     const userAgent = request.headers.get("user-agent") || "";
 
-    // Store browser context for session enrichment (non-Purchase events with email)
+    // Store browser context for session enrichment (all events with email, including Purchase)
     if (
-      payload.eventName !== "Purchase" &&
       payload.userData?.email &&
+      workspace.id &&
       (payload.fbp || payload.fbc || payload.ttclid || payload.rdtCid ||
-       payload.epik || (clientIp && clientIp !== "unknown") || userAgent)
+       payload.epik || payload.gaClientId || (clientIp && clientIp !== "unknown") || userAgent)
     ) {
       storeSessionContext(workspace.id, payload.userData.email, {
         fbp: payload.fbp,
@@ -165,6 +167,7 @@ export async function POST(request: NextRequest) {
         ttclid: payload.ttclid,
         rdtCid: payload.rdtCid,
         epik: payload.epik,
+        gaClientId: payload.gaClientId,
         clientIp,
         userAgent,
         url: payload.url,
@@ -184,6 +187,13 @@ export async function POST(request: NextRequest) {
     if (payload.eventName === "Purchase") {
       const orderId = extracted.orderId;
       if (orderId) {
+        // Atomic orderId dedup lock (prevents race between snippet and webhook)
+        const dedupLockKey = `dedup:purchase:${workspace.id}:${orderId}`;
+        const lockAcquired = await getSharedRedis().set(dedupLockKey, "snippet", "EX", 300, "NX").catch(() => "OK");
+        if (!lockAcquired) {
+          // Another path (webhook) already claimed this orderId
+          return NextResponse.json({ success: true, eventId: payload.eventId, deduplicated: true }, { status: 200, headers: corsHeaders });
+        }
         const existingOrder = await db.eventLog.findFirst({
           where: {
             workspaceId: workspace.id,
@@ -423,6 +433,7 @@ export async function POST(request: NextRequest) {
               gclid: payload.gclid || null,
               rdtCid: payload.rdtCid || null,
               epik: payload.epik || null,
+              gaClientId: payload.gaClientId || null,
               userData: payload.userData,
               customData: payload.customData,
               clientIp,

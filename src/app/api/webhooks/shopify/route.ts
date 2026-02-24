@@ -219,6 +219,10 @@ async function handleOrderPaid(
     | Record<string, unknown>
     | undefined;
 
+  const customerId = orderData.customer
+    ? String((orderData.customer as Record<string, unknown>).id ?? "")
+    : null;
+
   const lineItems =
     (orderData.line_items as Array<Record<string, unknown>>) || [];
   const numItems = lineItems.reduce(
@@ -378,6 +382,14 @@ async function handleOrderPaid(
     // Deterministic eventId for dedup
     const webhookEventId = `webhook-${orderId || orderName || crypto.randomUUID()}`;
 
+    // Atomic orderId dedup lock (prevents race between snippet and webhook)
+    const dedupLockKey = `dedup:purchase:${workspace.id}:${orderId || orderName}`;
+    const lockAcquired = await getSharedRedis().set(dedupLockKey, "webhook", "EX", 300, "NX").catch(() => "OK");
+    if (!lockAcquired) {
+      reqLog.info("Purchase already being processed by another path", { orderId, orderName });
+      continue;
+    }
+
     // Check orderId dedup: if Purchase with this orderId already exists, skip
     const dedupIds = [orderId, orderName].filter(Boolean) as string[];
     if (dedupIds.length > 0) {
@@ -434,6 +446,11 @@ async function handleOrderPaid(
       utmTerm: sessionContext?.utmTerm ?? null,
       gclid: sessionContext?.gclid ?? null,
       pageUrl: sessionContext?.url ?? null,
+      fbp: sessionContext?.fbp ?? null,
+      fbc: sessionContext?.fbc ?? null,
+      ttclid: sessionContext?.ttclid ?? null,
+      rdtCid: sessionContext?.rdtCid ?? null,
+      epik: sessionContext?.epik ?? null,
     };
 
     const eventLogEntries = await Promise.all(
@@ -469,7 +486,7 @@ async function handleOrderPaid(
       eventName: "Purchase",
       eventId: webhookEventId,
       timestamp: Date.now(),
-      url: sessionContext?.url ?? "",
+      url: sessionContext?.url || `https://${shopDomain}`,
       referrer: "",
       fbp: sessionContext?.fbp ?? null,
       fbc: sessionContext?.fbc ?? null,
@@ -488,6 +505,7 @@ async function handleOrderPaid(
         state: (billingAddress?.province_code as string) || null,
         zip: (billingAddress?.zip as string) || null,
         countryCode: (billingAddress?.country_code as string) || null,
+        customerId: customerId || undefined,
       },
       customData: {
         value: totalPrice,
@@ -520,7 +538,7 @@ async function handleOrderPaid(
             destination: dest.destination,
             requestId,
             eventLogId,
-            event: { ...eventData, ttclid: sessionContext?.ttclid ?? null, gclid: sessionContext?.gclid ?? null, rdtCid: sessionContext?.rdtCid ?? null, epik: sessionContext?.epik ?? null },
+            event: { ...eventData, ttclid: sessionContext?.ttclid ?? null, gclid: sessionContext?.gclid ?? null, rdtCid: sessionContext?.rdtCid ?? null, epik: sessionContext?.epik ?? null, gaClientId: sessionContext?.gaClientId ?? null },
           } satisfies DestinationEventJob);
         }
       })
@@ -747,7 +765,7 @@ async function handleRefundCreated(
           destination: dest.destination,
           requestId,
           eventLogId,
-          event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null },
+          event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null, gaClientId: null },
         } satisfies DestinationEventJob);
       })
     );

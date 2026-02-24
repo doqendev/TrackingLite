@@ -80,9 +80,11 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       return;
     }
 
-    // Use hashed email as stable client_id for GA4 session stitching, fall back to eventId
+    // Prefer actual GA4 client_id from browser _ga cookie, fall back to hashed email, then eventId
     const ud = event.userData as Record<string, unknown> | undefined;
-    const clientId = (ud?.email && typeof ud.email === "string" ? hashPii(ud.email) : null) ?? event.eventId;
+    const clientId = event.gaClientId ||
+      (ud?.email && typeof ud.email === "string" ? hashPii(ud.email) : null) ||
+      event.eventId;
 
     // Send to GA4 Measurement Protocol
     // Circuit breaker check

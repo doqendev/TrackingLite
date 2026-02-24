@@ -138,6 +138,7 @@ export interface DestinationEventJob {
     gclid?: string | null;
     rdtCid?: string | null;
     epik?: string | null;
+    gaClientId?: string | null;
     userData: Record<string, unknown>;
     customData: Record<string, unknown>;
     clientIp: string;
