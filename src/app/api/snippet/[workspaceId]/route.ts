@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 function sanitizeForJs(value: string): string {
-  return value.replace(/[\\'"<>&]/g, "");
+  return value.replace(/[\\'"<>&`\n\r\0]/g, "");
 }
 
 function generateSnippet(apiKey: string, pixelId: string | null, ingestUrl: string): string {

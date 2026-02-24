@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 import { db } from "@/lib/db";
 import { lookupWorkspaceByApiKey } from "@/lib/api-key-cache";
+import { isValidApiKeyFormat } from "@/lib/api-key";
 import {
   getEventQueue,
   getTiktokQueue,
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
     const apiKey = request.headers.get("X-TL-API-Key");
     if (!apiKey) {
       return NextResponse.json({ error: "Missing API key" }, { status: 401, headers: corsHeaders });
+    }
+
+    if (!isValidApiKeyFormat(apiKey)) {
+      return NextResponse.json({ error: "Invalid API key" }, { status: 401, headers: corsHeaders });
     }
 
     // 2. Look up workspace by API key (Redis-cached, falls back to DB)

@@ -183,7 +183,9 @@ describe("checkOrderLimits", () => {
   });
 
   it("should allow Purchase for PAST_DUE subscription (grace period)", async () => {
-    mockFindUnique.mockResolvedValue({ plan: "STARTER", status: "PAST_DUE" });
+    mockFindUnique
+      .mockResolvedValueOnce({ plan: "STARTER", status: "PAST_DUE" })
+      .mockResolvedValueOnce({ updatedAt: new Date() }); // within 7-day grace
     const result = await checkOrderLimits(USER_ID, "Purchase");
     expect(result.allowed).toBe(true);
   });

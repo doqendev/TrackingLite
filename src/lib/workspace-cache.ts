@@ -29,6 +29,11 @@ export async function getWorkspaceForDestination(
   const cached = cache.get(key);
   if (cached && cached.expiry > Date.now()) return cached.data;
 
+  // Note: This cache stores encrypted credential triplets in memory for 1 minute.
+  // The encrypted values require ENCRYPTION_KEY to decrypt, so a memory dump alone
+  // does not expose plaintext credentials. This is an acceptable trade-off for
+  // the performance benefit of avoiding DB queries on every job.
+
   // Build select based on destination
   const baseSelect = { id: true, isActive: true };
   const destSelects: Record<string, Record<string, boolean>> = {

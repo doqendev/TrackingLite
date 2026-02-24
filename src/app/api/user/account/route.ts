@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { createLogger } from "@/lib/logger";
+import { deleteWorkspaceSessions } from "@/lib/session-enrichment";
 
 const log = createLogger({ component: "account-deletion" });
 
@@ -37,7 +38,16 @@ export async function DELETE() {
       }
     }
 
-    // 2. Delete user (cascade deletes handle: workspaces, event logs, sessions, accounts, alerts, subscriptions, password reset tokens)
+    // 2. Clean up Redis session enrichment keys for all workspaces (best-effort, don't block deletion)
+    const workspaces = await db.workspace.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    await Promise.allSettled(
+      workspaces.map((ws) => deleteWorkspaceSessions(ws.id))
+    );
+
+    // 3. Delete user (cascade deletes handle: workspaces, event logs, sessions, accounts, alerts, subscriptions, password reset tokens)
     // The Prisma schema has onDelete: Cascade on all relations pointing to User
     await db.user.delete({
       where: { id: userId },

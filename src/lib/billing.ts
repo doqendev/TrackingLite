@@ -50,8 +50,21 @@ export async function checkOrderLimits(
     return { allowed: false, reason: "Subscription inactive" };
   }
 
-  // PAST_DUE: Allow with grace period (still increment so usage is tracked)
+  // PAST_DUE: Allow with a 7-day grace period for payment recovery
   if (status === "PAST_DUE") {
+    const sub = await db.subscription.findUnique({
+      where: { userId },
+      select: { updatedAt: true },
+    });
+    const gracePeriodMs = 7 * 24 * 60 * 60 * 1000;
+    if (sub && Date.now() - sub.updatedAt.getTime() > gracePeriodMs) {
+      return {
+        allowed: false,
+        reason: "Payment past due for more than 7 days. Please update your payment method.",
+        limit: 0,
+        used: 0,
+      };
+    }
     await incrementOrderCount(userId);
     return { allowed: true };
   }
