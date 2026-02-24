@@ -238,7 +238,8 @@ async function queryRevenueMetrics(
     return groups.reduce((sum, g) => {
       const val = g._sum.value ?? 0;
       if (val === 0) return sum;
-      const rate = rates.get(g.currency ?? displayCurrency) ?? 1;
+      const rate = rates.get(g.currency ?? displayCurrency) ?? 0;
+      if (rate === 0) return sum; // unsupported currency — skip
       return sum + val * rate;
     }, 0);
   }
@@ -249,7 +250,8 @@ async function queryRevenueMetrics(
     if (!g.paymentGateway) continue;
     const val = g._sum.value ?? 0;
     if (val === 0) continue;
-    const rate = rates.get(g.currency ?? displayCurrency) ?? 1;
+    const rate = rates.get(g.currency ?? displayCurrency) ?? 0;
+    if (rate === 0) continue; // unsupported currency — skip
     gatewayMap.set(
       g.paymentGateway,
       (gatewayMap.get(g.paymentGateway) ?? 0) + val * rate
@@ -436,9 +438,9 @@ async function queryCampaignPerformance(
       events: 0,
       revenue: 0,
     };
-    const rate = rates.get(c.currency ?? displayCurrency) ?? 1;
+    const rate = rates.get(c.currency ?? displayCurrency) ?? 0;
     existing.events += c._count;
-    existing.revenue += (c._sum?.value ?? 0) * rate;
+    existing.revenue += rate === 0 ? 0 : (c._sum?.value ?? 0) * rate;
     campMap.set(key, existing);
   }
 

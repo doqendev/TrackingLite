@@ -3,8 +3,8 @@ import { getSharedRedis } from "@/lib/redis";
 const EXCHANGE_RATE_TTL = 86400; // 24 hours
 
 /**
- * Get the exchange rate from one currency to another.
- * Caches in Redis for 24 hours. Falls back to 1.0 if API fails.
+ * Convert amount between currencies.
+ * Returns 0 if the currency pair is unsupported (safer than inflating).
  */
 export async function convertCurrency(
   amount: number,
@@ -43,14 +43,15 @@ export async function getExchangeRate(
     );
 
     if (!res.ok) {
-      return 1;
+      // API doesn't support this currency pair — exclude from totals
+      return 0;
     }
 
     const data = await res.json();
     const rate = data?.rates?.[to];
 
     if (typeof rate !== "number" || rate <= 0) {
-      return 1;
+      return 0;
     }
 
     // Cache the rate
@@ -62,7 +63,7 @@ export async function getExchangeRate(
 
     return rate;
   } catch {
-    // API failure: return 1.0 (show unconverted rather than error)
-    return 1;
+    // API failure: exclude from totals rather than inflating with 1:1 rate
+    return 0;
   }
 }
