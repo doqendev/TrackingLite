@@ -187,6 +187,7 @@ model EventLog {
   refundAmount   Float?
   destination    Destination  @default(META)
   source         String?     @default("snippet")  // "snippet" | "webhook"
+  paymentGateway String?     // e.g. "paypal", "shopify_payments", "klarna" (webhook only)
   createdAt      DateTime    @default(now())
 
   @@index([workspaceId, createdAt])

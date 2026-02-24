@@ -5,7 +5,7 @@ import { getActiveWorkspace } from "@/lib/active-workspace";
 import Link from "next/link";
 import { computeDashboardAnalytics } from "@/lib/analytics";
 import { getCachedAnalytics } from "@/lib/analytics-cache";
-import { convertCurrency } from "@/lib/currency";
+
 import { getOrderCount } from "@/lib/billing";
 import { BILLING_PLANS } from "@/lib/constants";
 import { OrderUsageBar } from "@/components/dashboard/order-usage-bar";
@@ -71,39 +71,11 @@ export default async function DashboardPage() {
   const analytics = await getCachedAnalytics(
     workspace.id,
     async () => {
-      const data = await computeDashboardAnalytics(
+      return computeDashboardAnalytics(
         workspace.id,
         session.user!.id!,
         displayCurrency
       );
-
-      // Convert revenue values if display currency differs from event currency
-      const eventCurrency = data.revenue.purchaseValue.currency;
-      if (displayCurrency && displayCurrency !== eventCurrency) {
-        const rate = await convertCurrency(1, eventCurrency, displayCurrency);
-        data.revenue.addToCartValue = {
-          today: data.revenue.addToCartValue.today * rate,
-          yesterday: data.revenue.addToCartValue.yesterday * rate,
-          currency: displayCurrency,
-        };
-        data.revenue.checkoutValue = {
-          today: data.revenue.checkoutValue.today * rate,
-          yesterday: data.revenue.checkoutValue.yesterday * rate,
-          currency: displayCurrency,
-        };
-        data.revenue.purchaseValue = {
-          today: data.revenue.purchaseValue.today * rate,
-          yesterday: data.revenue.purchaseValue.yesterday * rate,
-          currency: displayCurrency,
-        };
-        data.campaigns = data.campaigns.map((c) => ({
-          ...c,
-          revenue: c.revenue * rate,
-        }));
-        data.currency = displayCurrency;
-      }
-
-      return data;
     },
     displayCurrency
   );
@@ -187,7 +159,7 @@ export default async function DashboardPage() {
       />
 
       {/* Revenue cards */}
-      <RevenueCards revenue={analytics.revenue} />
+      <RevenueCards revenue={analytics.revenue} webhookBreakdown={analytics.revenue.webhookBreakdown} currency={analytics.currency} />
 
       {/* Platform delivery table */}
       <PlatformDelivery destinationDelivery={analytics.destinationDelivery} />

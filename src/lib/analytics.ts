@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { Destination, EventName, EventStatus } from "@prisma/client";
 import { BILLING_PLANS } from "@/lib/constants";
 import { getOrderCount } from "@/lib/billing";
+import { getExchangeRate } from "@/lib/currency";
 import type {
   DashboardAnalytics,
   HealthMetrics,
@@ -111,11 +112,39 @@ async function queryHealthMetrics(
   };
 }
 
+/**
+ * Collect exchange rates for all unique currencies in a set of grouped results.
+ * Returns a Map from currency code → rate (relative to targetCurrency).
+ */
+async function collectExchangeRates(
+  groups: Array<{ currency: string | null }>,
+  targetCurrency: string
+): Promise<Map<string, number>> {
+  const currencies = new Set<string>();
+  for (const g of groups) {
+    if (g.currency && g.currency !== targetCurrency) currencies.add(g.currency);
+  }
+
+  const rates = new Map<string, number>();
+  rates.set(targetCurrency, 1);
+
+  if (currencies.size > 0) {
+    await Promise.all(
+      Array.from(currencies).map(async (c) => {
+        rates.set(c, await getExchangeRate(c, targetCurrency));
+      })
+    );
+  }
+
+  return rates;
+}
+
 async function queryRevenueMetrics(
   workspaceId: string,
   todayStart: Date,
   yesterdayStart: Date,
   now: Date,
+  displayCurrency: string,
   destination?: Destination | null
 ): Promise<RevenueMetrics> {
   const df = destFilter(destination);
@@ -127,9 +156,10 @@ async function queryRevenueMetrics(
 
   const revenueStatuses = { in: [EventStatus.SENT, EventStatus.PENDING, EventStatus.RETRYING] };
 
+  // Group by currency so mixed-currency events are converted before summing
   const queries = revenueEventTypes.flatMap((eventName) => [
-    // Today sum
-    db.eventLog.aggregate({
+    db.eventLog.groupBy({
+      by: ["currency"],
       where: {
         workspaceId,
         eventName,
@@ -139,8 +169,8 @@ async function queryRevenueMetrics(
       },
       _sum: { value: true },
     }),
-    // Yesterday sum
-    db.eventLog.aggregate({
+    db.eventLog.groupBy({
+      by: ["currency"],
       where: {
         workspaceId,
         eventName,
@@ -174,41 +204,81 @@ async function queryRevenueMetrics(
     }),
   ];
 
-  // Dominant currency query
-  const currencyQuery = db.eventLog.findFirst({
-    where: { workspaceId, currency: { not: null }, ...df },
-    orderBy: { createdAt: "desc" },
-    select: { currency: true },
+  // Webhook Purchase revenue grouped by payment gateway + currency
+  const webhookBreakdownQuery = db.eventLog.groupBy({
+    by: ["paymentGateway", "currency"],
+    where: {
+      workspaceId,
+      eventName: "Purchase",
+      source: "webhook",
+      status: { in: [EventStatus.SENT, EventStatus.PENDING, EventStatus.RETRYING] },
+      createdAt: { gte: todayStart, lte: now },
+      ...df,
+    },
+    _sum: { value: true },
   });
 
-  const [results, ordersToday, ordersYesterday, currencyEvent] =
+  const [results, ordersToday, ordersYesterday, webhookGroups] =
     await Promise.all([
       Promise.all(queries),
       orderQueries[0],
       orderQueries[1],
-      currencyQuery,
+      webhookBreakdownQuery,
     ]);
 
-  const currency = currencyEvent?.currency ?? "USD";
+  // Fetch exchange rates for all unique currencies → displayCurrency
+  const rates = await collectExchangeRates(
+    [...results.flat(), ...webhookGroups],
+    displayCurrency
+  );
+
+  function sumConverted(
+    groups: Array<{ currency: string | null; _sum: { value: number | null } }>
+  ): number {
+    return groups.reduce((sum, g) => {
+      const val = g._sum.value ?? 0;
+      if (val === 0) return sum;
+      const rate = rates.get(g.currency ?? displayCurrency) ?? 1;
+      return sum + val * rate;
+    }, 0);
+  }
+
+  // Aggregate webhook breakdown by gateway with currency conversion
+  const gatewayMap = new Map<string, number>();
+  for (const g of webhookGroups) {
+    if (!g.paymentGateway) continue;
+    const val = g._sum.value ?? 0;
+    if (val === 0) continue;
+    const rate = rates.get(g.currency ?? displayCurrency) ?? 1;
+    gatewayMap.set(
+      g.paymentGateway,
+      (gatewayMap.get(g.paymentGateway) ?? 0) + val * rate
+    );
+  }
+  const webhookBreakdown = Array.from(gatewayMap.entries())
+    .map(([gateway, value]) => ({ gateway, value }))
+    .filter((g) => g.value > 0)
+    .sort((a, b) => b.value - a.value);
 
   return {
     addToCartValue: {
-      today: results[0]._sum.value ?? 0,
-      yesterday: results[1]._sum.value ?? 0,
-      currency,
+      today: sumConverted(results[0]),
+      yesterday: sumConverted(results[1]),
+      currency: displayCurrency,
     },
     checkoutValue: {
-      today: results[2]._sum.value ?? 0,
-      yesterday: results[3]._sum.value ?? 0,
-      currency,
+      today: sumConverted(results[2]),
+      yesterday: sumConverted(results[3]),
+      currency: displayCurrency,
     },
     purchaseValue: {
-      today: results[4]._sum.value ?? 0,
-      yesterday: results[5]._sum.value ?? 0,
-      currency,
+      today: sumConverted(results[4]),
+      yesterday: sumConverted(results[5]),
+      currency: displayCurrency,
     },
     ordersToday,
     ordersYesterday,
+    webhookBreakdown,
   };
 }
 
@@ -333,6 +403,7 @@ async function queryConversionAccuracy(
 
 async function queryCampaignPerformance(
   workspaceId: string,
+  displayCurrency: string,
   destination?: Destination | null
 ): Promise<CampaignRow[]> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -341,8 +412,8 @@ async function queryCampaignPerformance(
   const filterDest =
     destination ?? (await getCanonicalDestination(workspaceId));
 
-  const campaigns = await db.eventLog.groupBy({
-    by: ["utmSource", "utmCampaign"],
+  const rows = await db.eventLog.groupBy({
+    by: ["utmSource", "utmCampaign", "currency"],
     where: {
       workspaceId,
       createdAt: { gte: thirtyDaysAgo },
@@ -351,16 +422,29 @@ async function queryCampaignPerformance(
     },
     _count: true,
     _sum: { value: true },
-    orderBy: { _sum: { value: "desc" } },
-    take: 30,
   });
 
-  return campaigns.map((c) => ({
-    utmSource: c.utmSource ?? "",
-    utmCampaign: c.utmCampaign ?? "",
-    events: c._count,
-    revenue: c._sum?.value ?? 0,
-  }));
+  const rates = await collectExchangeRates(rows, displayCurrency);
+
+  // Aggregate by (utmSource, utmCampaign) with currency conversion
+  const campMap = new Map<string, { utmSource: string; utmCampaign: string; events: number; revenue: number }>();
+  for (const c of rows) {
+    const key = `${c.utmSource}\0${c.utmCampaign}`;
+    const existing = campMap.get(key) ?? {
+      utmSource: c.utmSource ?? "",
+      utmCampaign: c.utmCampaign ?? "",
+      events: 0,
+      revenue: 0,
+    };
+    const rate = rates.get(c.currency ?? displayCurrency) ?? 1;
+    existing.events += c._count;
+    existing.revenue += (c._sum?.value ?? 0) * rate;
+    campMap.set(key, existing);
+  }
+
+  return Array.from(campMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 30);
 }
 
 async function queryDestinationDelivery(
@@ -440,14 +524,16 @@ export async function computeDashboardAnalytics(
     _count: true,
   });
 
+  const targetCurrency = displayCurrency || "USD";
+
   const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns, destinationDelivery, enabledDests] =
     await Promise.all([
       queryHealthMetrics(workspaceId, since24h, filterDest),
-      queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, filterDest),
+      queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, filterDest),
       queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, filterDest),
       queryBillingUsage(userId),
       queryConversionAccuracy(workspaceId, filterDest),
-      queryCampaignPerformance(workspaceId, filterDest),
+      queryCampaignPerformance(workspaceId, targetCurrency, filterDest),
       queryDestinationDelivery(workspaceId, since24h),
       enabledDestsQuery,
     ]);
@@ -455,8 +541,6 @@ export async function computeDashboardAnalytics(
   const planConfig =
     BILLING_PLANS[billing.plan as keyof typeof BILLING_PLANS];
   const retentionDays = planConfig?.eventLogRetentionDays ?? 7;
-
-  const currency = displayCurrency || revenue.purchaseValue.currency;
 
   return {
     health,
@@ -467,7 +551,7 @@ export async function computeDashboardAnalytics(
     conversionAccuracy,
     campaigns,
     destinationDelivery,
-    currency,
+    currency: targetCurrency,
     enabledDestinations: enabledDests.map((d) => d.destination),
   };
 }

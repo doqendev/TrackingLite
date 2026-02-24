@@ -73,6 +73,8 @@
     "checkout": "Checkout",
     "purchase": "Acquisto",
     "inclOffSite": "incl. fuori sito",
+    "revenueTrackedHint": "incl. PayPal e reindirizzamenti",
+    "revenueWebhookHint": "incl. {breakdown}",
     "conversionFunnel": "Funnel delle Conversioni (Oggi)",
     "vsYesterday": "vs ieri:",
     "overall": "complessivo",

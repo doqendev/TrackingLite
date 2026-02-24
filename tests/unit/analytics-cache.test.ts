@@ -32,6 +32,7 @@ const mockAnalytics: DashboardAnalytics = {
     purchaseValue: { today: 300, yesterday: 250, currency: "USD" },
     ordersToday: 10,
     ordersYesterday: 8,
+    webhookBreakdown: [],
   },
   eventBreakdown: {
     PageView: { today: 200, yesterday: 180 },

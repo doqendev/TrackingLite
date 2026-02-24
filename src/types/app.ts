@@ -41,6 +41,7 @@ export interface RevenueMetrics {
   purchaseValue: TimeComparison;
   ordersToday: number;
   ordersYesterday: number;
+  webhookBreakdown: { gateway: string; value: number }[];
 }
 
 export interface EventCount {

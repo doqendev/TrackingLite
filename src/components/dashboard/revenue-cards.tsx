@@ -14,6 +14,8 @@ import type { RevenueMetrics, TimeComparison } from "@/types/app";
 
 interface RevenueCardsProps {
   revenue: RevenueMetrics;
+  webhookBreakdown?: { gateway: string; value: number }[];
+  currency?: string;
 }
 
 function formatCurrency(amount: number, currency: string): string {
@@ -84,18 +86,24 @@ function DeltaIndicator({ today, yesterday }: { today: number; yesterday: number
 
 interface RevenueCardProps {
   label: string;
+  subtitle?: string;
   icon: React.ReactNode;
   data: TimeComparison;
 }
 
-function RevenueCard({ label, icon, data }: RevenueCardProps) {
+function RevenueCard({ label, subtitle, icon, data }: RevenueCardProps) {
   const t = useTranslations("common");
 
   return (
     <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.10]">
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">{label}</p>
+            {subtitle && (
+              <p className="text-[10px] text-muted-foreground/60">{subtitle}</p>
+            )}
+          </div>
           <span className="p-1.5 bg-brand-600/10 rounded-md">{icon}</span>
         </div>
         <p className="text-3xl font-bold text-foreground tabular-nums">
@@ -110,8 +118,35 @@ function RevenueCard({ label, icon, data }: RevenueCardProps) {
   );
 }
 
-export function RevenueCards({ revenue }: RevenueCardsProps) {
+const GATEWAY_NAMES: Record<string, string> = {
+  paypal: "PayPal",
+  shopify_payments: "Shopify Payments",
+  klarna: "Klarna",
+  afterpay: "Afterpay",
+  affirm: "Affirm",
+  stripe: "Stripe",
+  manual: "Manual",
+  cash: "Cash",
+  gift_card: "Gift Card",
+};
+
+function prettyGateway(raw: string): string {
+  return GATEWAY_NAMES[raw] ?? raw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function RevenueCards({ revenue, webhookBreakdown, currency }: RevenueCardsProps) {
   const t = useTranslations("dashboard");
+
+  // Build dynamic subtitle from webhook breakdown
+  let purchaseSubtitle: string | undefined;
+  if (webhookBreakdown && webhookBreakdown.length > 0) {
+    const cur = currency || revenue.purchaseValue.currency;
+    const top = webhookBreakdown.slice(0, 2);
+    const parts = top.map(
+      (g) => `${formatCurrency(g.value, cur)} ${prettyGateway(g.gateway)}`
+    );
+    purchaseSubtitle = t("revenueWebhookHint", { breakdown: parts.join(", ") });
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -127,6 +162,7 @@ export function RevenueCards({ revenue }: RevenueCardsProps) {
       />
       <RevenueCard
         label={t("revenueTracked")}
+        subtitle={purchaseSubtitle}
         icon={<DollarSign className="h-4 w-4 text-brand-500" />}
         data={revenue.purchaseValue}
       />

@@ -233,6 +233,7 @@ async function handleOrderPaid(
 
   // Filter out non-web orders (POS, draft, subscription, manual, bulk)
   // Use a denylist so unknown/new source types (including Shopify test notifications) pass through
+  const paymentGateway = orderData.gateway ? String(orderData.gateway) : null;
   const orderSource = orderData.source_name ? String(orderData.source_name).toLowerCase() : "web";
   const BLOCKED_SOURCES = new Set(["pos", "shopify_draft_order", "manual", "bulk", "subscription"]);
   if (BLOCKED_SOURCES.has(orderSource)) {
@@ -448,6 +449,7 @@ async function handleOrderPaid(
       numItems: numItems || null,
       orderId: orderId || null,
       source: "webhook",
+      paymentGateway,
       utmSource: sessionContext?.utmSource ?? null,
       utmMedium: sessionContext?.utmMedium ?? null,
       utmCampaign: sessionContext?.utmCampaign ?? null,

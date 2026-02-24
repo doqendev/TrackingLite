@@ -73,6 +73,8 @@
     "checkout": "Kasse",
     "purchase": "Kauf",
     "inclOffSite": "inkl. extern",
+    "revenueTrackedHint": "inkl. PayPal & Weiterleitungen",
+    "revenueWebhookHint": "inkl. {breakdown}",
     "conversionFunnel": "Konversions-Trichter (Heute)",
     "vsYesterday": "vs. gestern:",
     "overall": "gesamt",
