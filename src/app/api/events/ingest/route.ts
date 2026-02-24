@@ -16,6 +16,7 @@ import { checkRateLimit, checkPurchaseRateLimit } from "@/lib/rate-limit";
 import { checkOrderLimits } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
+import { storeSessionContext } from "@/lib/session-enrichment";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -162,6 +163,32 @@ export async function POST(request: NextRequest) {
     // Validate IP format and truncate to 45 chars (max IPv6 length)
     const clientIp = (request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown").slice(0, 45);
     const userAgent = request.headers.get("user-agent") || "";
+
+    // Store browser context for session enrichment (non-Purchase events with email)
+    if (
+      payload.eventName !== "Purchase" &&
+      payload.userData?.email &&
+      (payload.fbp || payload.fbc || payload.ttclid || payload.rdtCid ||
+       payload.epik || (clientIp && clientIp !== "unknown") || userAgent)
+    ) {
+      storeSessionContext(workspace.id, payload.userData.email, {
+        fbp: payload.fbp,
+        fbc: payload.fbc,
+        ttclid: payload.ttclid,
+        rdtCid: payload.rdtCid,
+        epik: payload.epik,
+        clientIp,
+        userAgent,
+        url: payload.url,
+        utmSource: payload.utmSource,
+        utmMedium: payload.utmMedium,
+        utmCampaign: payload.utmCampaign,
+        utmContent: payload.utmContent,
+        utmTerm: payload.utmTerm,
+        gclid: payload.gclid,
+        consent: payload.consent,
+      });
+    }
 
     // 10. Extract monetary fields from customData
     const extracted = extractCustomData(payload.customData);

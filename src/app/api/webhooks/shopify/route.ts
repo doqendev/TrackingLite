@@ -13,6 +13,7 @@ import {
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkOrderLimits } from "@/lib/billing";
 import { shouldSendToDestination } from "@/lib/consent";
+import { lookupSessionContext } from "@/lib/session-enrichment";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
@@ -150,17 +151,19 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Check order limits
-      const billing = await checkOrderLimits(workspace.userId, "Purchase");
-      if (!billing.allowed) {
-        wsLog.warn("Order limit reached", {
-          limit: billing.limit,
-          used: billing.used,
+      // Look up stored browser context for this customer
+      const sessionContext = email
+        ? await lookupSessionContext(workspace.id, email)
+        : null;
+
+      if (sessionContext) {
+        wsLog.info("Session enrichment found", {
+          fieldsEnriched: sessionContext.fieldsEnriched,
+          sessionAgeMs: Date.now() - sessionContext.oldestTimestamp,
         });
-        continue;
       }
 
-      // Build destination list
+      // Build destination list (before billing — don't charge for consent-blocked events)
       const destinations: Array<{
         destination: string;
         queue: Queue;
@@ -228,16 +231,27 @@ export async function POST(request: NextRequest) {
       }
 
       // Filter destinations by consent mode
-      // Webhook events have no browser consent signal, so:
-      // - LAX mode: allows by default (undefined !== false)
-      // - STRICT mode: blocks all (undefined !== true)
+      // Use session consent if available (enables STRICT mode webhook events when customer consented during browsing)
+      const customerConsent = sessionContext?.consent
+        ? { analytics: sessionContext.consent.analytics, marketing: sessionContext.consent.marketing }
+        : undefined;
       const consentFiltered = destinations.filter((dest) =>
-        shouldSendToDestination(workspace.consentMode, undefined, dest.destination)
+        shouldSendToDestination(workspace.consentMode, customerConsent, dest.destination)
       );
 
       if (consentFiltered.length === 0) {
         wsLog.info("All destinations blocked by consent mode", {
           consentMode: workspace.consentMode,
+        });
+        continue;
+      }
+
+      // Check order limits (after consent — don't charge for consent-blocked events)
+      const billing = await checkOrderLimits(workspace.userId, "Purchase");
+      if (!billing.allowed) {
+        wsLog.warn("Order limit reached", {
+          limit: billing.limit,
+          used: billing.used,
         });
         continue;
       }
@@ -282,14 +296,24 @@ export async function POST(request: NextRequest) {
             order_id: orderName || orderId,
           },
           hasUserData: !!(email || phone),
+          enrichment: sessionContext ? {
+            fields: sessionContext.fieldsEnriched,
+            ageMs: Date.now() - sessionContext.oldestTimestamp,
+          } : null,
         } as any, // eslint-disable-line
-        customerIp: null,
-        userAgent: null,
+        customerIp: sessionContext?.clientIp ?? null,
+        userAgent: sessionContext?.userAgent ?? null,
         value: totalPrice ?? null,
         currency: currency ?? null,
         numItems: numItems || null,
         orderId: orderName || orderId || null,
         source: "webhook",
+        utmSource: sessionContext?.utmSource ?? null,
+        utmMedium: sessionContext?.utmMedium ?? null,
+        utmCampaign: sessionContext?.utmCampaign ?? null,
+        utmContent: sessionContext?.utmContent ?? null,
+        utmTerm: sessionContext?.utmTerm ?? null,
+        gclid: sessionContext?.gclid ?? null,
       };
 
       const eventLogEntries = await Promise.all(
@@ -325,10 +349,10 @@ export async function POST(request: NextRequest) {
         eventName: "Purchase",
         eventId: webhookEventId,
         timestamp: Date.now(),
-        url: "",
+        url: sessionContext?.url ?? "",
         referrer: "",
-        fbp: null,
-        fbc: null,
+        fbp: sessionContext?.fbp ?? null,
+        fbc: sessionContext?.fbc ?? null,
         userData: {
           email: email || null,
           phone: phone || null,
@@ -354,8 +378,8 @@ export async function POST(request: NextRequest) {
             (li) => String(li.product_id || li.sku || "")
           ),
         },
-        clientIp: "",
-        userAgent: "",
+        clientIp: sessionContext?.clientIp ?? "",
+        userAgent: sessionContext?.userAgent ?? "",
       };
 
       // Queue jobs
@@ -376,7 +400,7 @@ export async function POST(request: NextRequest) {
               destination: dest.destination,
               requestId,
               eventLogId,
-              event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null },
+              event: { ...eventData, ttclid: sessionContext?.ttclid ?? null, gclid: sessionContext?.gclid ?? null, rdtCid: sessionContext?.rdtCid ?? null, epik: sessionContext?.epik ?? null },
             } satisfies DestinationEventJob);
           }
         })
