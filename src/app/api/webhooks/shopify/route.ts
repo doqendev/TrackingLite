@@ -16,9 +16,31 @@ import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkOrderLimits, decrementOrderCount } from "@/lib/billing";
 import { lookupSessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
+import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
+
+function redactPii(rawPayload: string): string {
+  try {
+    const data = JSON.parse(rawPayload);
+    // Redact customer PII fields from Shopify order payload
+    const piiFields = ["email", "phone", "first_name", "last_name", "name", "address1", "address2", "zip", "city", "province", "company"];
+    const redact = (obj: Record<string, unknown>) => {
+      for (const key of Object.keys(obj)) {
+        if (piiFields.includes(key) && typeof obj[key] === "string") {
+          obj[key] = "[REDACTED]";
+        } else if (typeof obj[key] === "object" && obj[key] !== null) {
+          redact(obj[key] as Record<string, unknown>);
+        }
+      }
+    };
+    redact(data);
+    return JSON.stringify(data);
+  } catch {
+    return "[UNPARSEABLE]";
+  }
+}
 
 async function writeToDLQ(
   topic: string,
@@ -33,7 +55,7 @@ async function writeToDLQ(
       data: {
         topic,
         shopDomain,
-        payload: rawBody ? rawBody.toString("utf-8") : "",
+        payload: rawBody ? redactPii(rawBody.toString("utf-8")) : "",
         headers: JSON.stringify(headers),
         error,
         requestId,
@@ -624,11 +646,26 @@ async function handleRefundCreated(
       orderBy: { createdAt: "desc" },
     });
 
-    // Only GA4 supports refunds (Meta CAPI has no standard refund event)
-    const destinations: Array<{ destination: string; queue: Queue; jobName: string }> = [];
+    // Derive supported refund destinations from DESTINATION_EVENT_MAP.
+    // Currently only GA4 has Refund support. If other destinations add support,
+    // update DESTINATION_EVENT_MAP and add their credential check below.
+    const REFUND_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string; hasCredentials: (ws: typeof workspace) => boolean }> = {
+      GA4: {
+        queue: getGA4Queue,
+        jobName: "send-ga4-event",
+        hasCredentials: (ws) => !!(ws.enableGA4 && ws.ga4MeasurementId && ws.ga4ApiSecretEncrypted),
+      },
+    };
 
-    if (workspace.enableGA4 && workspace.ga4MeasurementId && workspace.ga4ApiSecretEncrypted) {
-      destinations.push({ destination: "GA4", queue: getGA4Queue(), jobName: "send-ga4-event" });
+    const refundSupportedDests = (Object.keys(DESTINATION_EVENT_MAP) as Array<keyof typeof DESTINATION_EVENT_MAP>)
+      .filter((dest) => DESTINATION_EVENT_MAP[dest].Refund !== null);
+
+    const destinations: Array<{ destination: string; queue: Queue; jobName: string }> = [];
+    for (const dest of refundSupportedDests) {
+      const config = REFUND_QUEUE_MAP[dest];
+      if (config && config.hasCredentials(workspace)) {
+        destinations.push({ destination: dest, queue: config.queue(), jobName: config.jobName });
+      }
     }
 
     if (destinations.length === 0) continue;

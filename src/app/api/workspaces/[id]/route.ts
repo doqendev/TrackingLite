@@ -239,6 +239,20 @@ export async function PATCH(
       }
     }
 
+    // Require a verified Shopify domain before a webhook secret can be saved
+    if (updateData.shopifyWebhookSecretEncrypted !== undefined) {
+      const currentWorkspace = await db.workspace.findUnique({
+        where: { id },
+        select: { shopifyDomain: true },
+      });
+      if (!currentWorkspace?.shopifyDomain) {
+        return NextResponse.json(
+          { error: "Cannot save webhook secret without a verified Shopify domain. Please add your store URL first." },
+          { status: 400 }
+        );
+      }
+    }
+
     const updated = await db.workspace.update({
       where: { id },
       data: updateData,

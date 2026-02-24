@@ -329,11 +329,30 @@ export async function scheduleStaleRequeue(): Promise<void> {
   log.info("Repeatable stale-pending requeue job scheduled", { interval: "5min" });
 }
 
+async function cleanupDlq(): Promise<void> {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+    await db.webhookDeadLetter.deleteMany({
+      where: {
+        OR: [
+          { resolvedAt: { not: null }, createdAt: { lt: thirtyDaysAgo } },
+          { resolvedAt: null, createdAt: { lt: ninetyDaysAgo } },
+        ],
+      },
+    });
+  } catch (err) {
+    console.error(JSON.stringify({ level: "error", msg: "DLQ cleanup failed", error: err instanceof Error ? err.message : String(err) }));
+  }
+}
+
 export const staleRequeueWorker = new Worker(
   QUEUE_NAME,
   async () => {
     await requeueStalePending();
     await requeueFailedEvents();
+    await cleanupDlq();
   },
   {
     connection: getConnection() as never,
