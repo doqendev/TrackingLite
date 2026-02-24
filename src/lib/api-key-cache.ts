@@ -48,6 +48,8 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
       enablePinterest: true,
       pinterestAdAccountId: true,
       pinterestConversionTokenEncrypted: true,
+      // Shopify webhook
+      shopifyWebhookSecretEncrypted: true,
       // Event toggles and consent
       consentMode: true,
       enablePageView: true,
@@ -71,6 +73,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     klaviyoApiKeyEncrypted,
     redditAccessTokenEncrypted,
     pinterestConversionTokenEncrypted,
+    shopifyWebhookSecretEncrypted,
     ...rest
   } = workspace;
 
@@ -82,6 +85,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     hasKlaviyoCredentials: !!(workspace.enableKlaviyo && klaviyoApiKeyEncrypted),
     hasRedditCredentials: !!(workspace.enableReddit && redditAccessTokenEncrypted),
     hasPinterestCredentials: !!(workspace.enablePinterest && pinterestConversionTokenEncrypted),
+    hasShopifyWebhookSecret: !!shopifyWebhookSecretEncrypted,
   };
 
   await getSharedRedis().setex(cacheKey, CACHE_TTL, JSON.stringify(sanitized));

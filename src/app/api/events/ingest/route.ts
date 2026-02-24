@@ -135,6 +135,19 @@ export async function POST(request: NextRequest) {
     }
     const payload = IngestPayloadSchema.parse(body);
 
+    // 6b. Cross-source dedup: when Shopify webhook is active, skip snippet
+    // Purchase events. The webhook has the orderId and is strictly more reliable
+    // for purchases (catches PayPal, off-site payments). Without this, the same
+    // order gets tracked twice — once by the snippet (no orderId) and once by
+    // the webhook (with orderId) — and our dedup can't match them.
+    if (payload.eventName === "Purchase" && workspace.hasShopifyWebhookSecret) {
+      log.info("Skipping snippet Purchase — Shopify webhook active", { workspaceId: workspace.id, eventId: payload.eventId });
+      return NextResponse.json(
+        { success: true, eventId: payload.eventId, skipped: true, reason: "webhook_active" },
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
     // 7. Check event toggle
     const eventToggleMap: Record<string, boolean> = {
       PageView: workspace.enablePageView,
