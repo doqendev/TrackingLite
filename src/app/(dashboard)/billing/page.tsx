@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { AlertTriangle, CheckCircle, ShoppingCart } from "lucide-react";
+import { AlertTriangle, CheckCircle, Package } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
@@ -153,7 +153,7 @@ export default async function BillingPage({
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-3 mb-3">
-            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+            <Package className="h-5 w-5 text-muted-foreground" />
             <h3 className="text-sm font-semibold text-foreground">{t("monthlyOrderUsage")}</h3>
           </div>
           <div className="space-y-2">
@@ -206,7 +206,7 @@ export default async function BillingPage({
         <Alert className="border-brand-500/20 bg-brand-500/10">
           <AlertDescription>
             <div className="flex items-start gap-4">
-              <ShoppingCart className="h-5 w-5 text-brand-400 flex-shrink-0 mt-0.5" />
+              <Package className="h-5 w-5 text-brand-400 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-brand-400">{t("approachingLimit")}</p>
                 <p className="text-sm text-brand-400/80 mt-0.5">
