@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { SiMeta, SiTiktok, SiGoogleanalytics } from "react-icons/si";
 import { FaReddit, FaPinterest } from "react-icons/fa";
+import { SetupGuide } from "@/components/integrations/setup-guide";
 
 export interface IntegrationWorkspace {
   id: string;
@@ -347,7 +348,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "meta" ? "max-h-[600px]" : "max-h-0"
+            expandedCard === "meta" ? "max-h-[1200px]" : "max-h-0"
           }`}
         >
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
@@ -404,6 +405,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   {savingMeta ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
+              <SetupGuide platformKey="meta" />
             </div>
           </div>
         </div>
@@ -444,7 +446,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "tiktok" ? "max-h-[600px]" : "max-h-0"
+            expandedCard === "tiktok" ? "max-h-[1200px]" : "max-h-0"
           }`}
         >
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
@@ -489,6 +491,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   {savingTiktok ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
+              <SetupGuide platformKey="tiktok" />
             </div>
           </div>
         </div>
@@ -529,7 +532,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "reddit" ? "max-h-[600px]" : "max-h-0"
+            expandedCard === "reddit" ? "max-h-[1200px]" : "max-h-0"
           }`}
         >
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
@@ -574,6 +577,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   {savingReddit ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
+              <SetupGuide platformKey="reddit" />
             </div>
           </div>
         </div>
@@ -614,7 +618,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "pinterest" ? "max-h-[600px]" : "max-h-0"
+            expandedCard === "pinterest" ? "max-h-[1200px]" : "max-h-0"
           }`}
         >
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
@@ -659,6 +663,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   {savingPinterest ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
+              <SetupGuide platformKey="pinterest" />
             </div>
           </div>
         </div>
@@ -707,7 +712,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "ga4" ? "max-h-[600px]" : "max-h-0"
+            expandedCard === "ga4" ? "max-h-[1200px]" : "max-h-0"
           }`}
         >
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
@@ -752,6 +757,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   {savingGA4 ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
+              <SetupGuide platformKey="ga4" />
             </div>
           </div>
         </div>
@@ -792,7 +798,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expandedCard === "klaviyo" ? "max-h-[600px]" : "max-h-0"
+            expandedCard === "klaviyo" ? "max-h-[1200px]" : "max-h-0"
           }`}
         >
           <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
@@ -826,6 +832,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   {savingKlaviyo ? tc("saving") : t("saveCredentials")}
                 </Button>
               </div>
+              <SetupGuide platformKey="klaviyo" />
             </div>
           </div>
         </div>
