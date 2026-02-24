@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-02-23 (post production hardening - P0/P1/P2 audit fixes)
+Last updated: 2026-02-24 (post Shopify webhook integration + PayPal bug fixes)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test`) | 263/263 passing (14 files) |
+| Tests (`pnpm test`) | 291/291 passing (15 files) |
 | TypeScript | 0 source errors (2 pre-existing test file errors) |
 | ESLint | 0 warnings/errors |
 
@@ -54,6 +54,7 @@ Last updated: 2026-02-23 (post production hardening - P0/P1/P2 audit fixes)
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
 | `/api/health` | GET | - | Working | Smart liveness probe: DB + Redis ping with 3s timeout, always returns 200, reports ok/degraded |
 | `/api/status` | GET | Session | Working | Auth-gated deep health check: DB + Redis ping with 3s timeout, uptime |
+| `/api/webhooks/shopify` | POST | HMAC sig | Working | Shopify order webhook: orders/paid + refunds/create, HMAC verification, session enrichment, DLQ |
 
 ### Multi-Destination Event Pipeline
 
@@ -63,7 +64,7 @@ Track Clear supports 6 ad/analytics destinations with server-side event forwardi
 |-------------|-----------------|-------------|-----|
 | Meta CAPI | All 5 | Pixel ID + Access Token | Graph API v21.0 |
 | TikTok | All 5 | Pixel ID + Access Token | Events API v1.3 |
-| GA4 | All 5 | Measurement ID + API Secret | Measurement Protocol |
+| GA4 | All 5 + Refund | Measurement ID + API Secret | Measurement Protocol |
 | Klaviyo | ViewContent, AddToCart, InitiateCheckout, Purchase | API Key | Events API |
 | Reddit | All 5 | Account ID + Bearer Token | Conversions API v1 |
 | Pinterest | All 5 | Ad Account ID + Bearer Token | Conversions API v5 |
@@ -112,6 +113,11 @@ Each destination has:
 | `redis.ts` | Working | Shared Redis singleton (lazyConnect) used by all web app modules — eliminates connection sprawl |
 | `logger.ts` | Working | Structured JSON logger (level, msg, timestamp, context) with child loggers |
 | `env-validation.ts` | Working | Validates required env vars at startup, warns for optional ones |
+| `session-enrichment.ts` | Working | Redis-backed browser context store for webhook Purchase attribution (fbp, fbc, ttclid, rdtCid, epik) |
+| `shopify-webhook.ts` | Working | HMAC-SHA256 signature verification for Shopify webhooks |
+| `shopify-domain-resolver.ts` | Working | Resolves and validates Shopify store domains (myshopify.com normalization) |
+| `workspace-cache.ts` | Working | Redis-cached workspace lookup by shopifyDomain (used by webhook route) |
+| `guide-content.ts` | Working | Setup guide content for all 6 integration platforms + Shopify webhook |
 
 ### Workers (10 files in src/workers/)
 
@@ -127,7 +133,7 @@ All 6 destination workers have circuit breaker integration (5 consecutive failur
 | `reddit-event-processor.ts` | Working | Reddit worker: circuit breaker, decrypt Bearer token, normalize, send, update EventLog |
 | `pinterest-event-processor.ts` | Working | Pinterest worker: circuit breaker, decrypt Bearer token, normalize, send, update EventLog |
 | `alert-checker.ts` | Working | Hourly repeatable job: evaluates alerts, sends email notifications |
-| `stale-pending-requeue.ts` | Working | Every 5min: finds stale PENDING events, re-queues to destination queues |
+| `stale-pending-requeue.ts` | Working | Every 5min: re-queues stale PENDING events; hourly order count reconciliation; DLQ cleanup (30d resolved, 90d unresolved) |
 | `event-log-cleanup.ts` | Working | Hourly: deletes expired EventLogs per plan retention (7d Free/Starter, 30d Growth/Scale) |
 
 ### Dashboard Analytics Components
@@ -142,9 +148,9 @@ All 6 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (17 files, 308 tests)
+### Test Coverage (20 files, 336 tests)
 
-#### Unit Tests (13 files, 263 tests)
+#### Unit Tests (15 files, 291 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -157,10 +163,13 @@ All 6 destination workers have circuit breaker integration (5 consecutive failur
 | `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
 | `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
 | `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
-| `consent.test.ts` | 10 | STRICT/LAX mode combinations |
+| `consent.test.ts` | 28 | STRICT/LAX mode, webhook bypass, edge cases |
 | `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
+| `shopify-webhook.test.ts` | 6 | HMAC verification, replay protection, header extraction |
+| `shopify-domain-resolver.test.ts` | 28 | Domain resolution, validation, edge cases |
+| `extract-custom-data.test.ts` | 27 | Custom data extraction from event payloads |
 
 #### Integration Tests (5 files, 45 tests)
 
@@ -176,11 +185,11 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 
 ### Database Schema
 
-**9 models:** User, Account, Session, VerificationToken, PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog
+**10 models:** User, Account, Session, VerificationToken, PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog, WebhookDeadLetter
 
-**7 enums:** Platform, EventName, EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST)
+**7 enums:** Platform, EventName (5 events + Refund), EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST)
 
-**Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[workspaceId, status, createdAt]`, `[workspaceId, eventName, destination, createdAt]`, `[eventId]`, `[status, createdAt]`. AlertLog on `[userId, alertType, sentAt]`.
+**Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[workspaceId, status, createdAt]`, `[workspaceId, eventName, destination, createdAt]`, `[eventId]`, `[status, createdAt]`. AlertLog on `[userId, alertType, sentAt]`. WebhookDeadLetter on `[shopDomain, topic, createdAt]`, `[resolvedAt, createdAt]`.
 
 ---
 
@@ -289,6 +298,18 @@ None currently tracked.
 6. **Worker Memory Management** - `NODE_OPTIONS="--max-old-space-size=512"` added to Dockerfile.worker for bounded heap usage
 7. **Structured Logging** - All route handlers and workers use `createLogger()` for JSON-structured log output
 8. **Quality Principle** - Added to CLAUDE.md: "Never apply half measures" directive for all future development
+
+### Phase 10: Shopify Webhook Integration (2026-02-24)
+1. **Shopify Order Webhook** - `POST /api/webhooks/shopify` handles `orders/paid` and `refunds/create` topics. HMAC-SHA256 verification with encrypted webhook secret. Session enrichment bridges browser context (fbp, fbc, ttclid, rdtCid, epik) to webhook events.
+2. **Webhook UI Card** - Integrations page shows Shopify Webhook card with copyable webhook URL, signing secret input, and 3-step setup guide. Full i18n (6 languages, ~14 keys).
+3. **Refund Support** - `Refund` added to EventName enum. GA4 receives refund events. Refund amount stored on EventLog. Billing gives back order count on refund.
+4. **Dead-Letter Queue** - Postgres-backed WebhookDeadLetter table for failed webhook processing. PII redacted before storage. 30d/90d retention policy.
+5. **Webhook Rate Limiting** - Atomic Redis Lua script rate limiter (100 req/min per shop domain), placed after HMAC verification to prevent unauthenticated DoS.
+6. **Session Enrichment Store** - Redis hash per workspace+email bridges browser pixel context to server-side webhooks. 24h TTL with per-field staleness tracking.
+7. **PayPal Order Fix** - Added `paypal` to ALLOWED_SOURCES (PayPal orders were silently dropped by source filter).
+8. **Billing Order Fix** - Moved billing INCR in ingest route to after dedup/toggle/consent checks (prevented phantom billing where orders counted but no EventLog created).
+9. **Revenue Status Fix** - Revenue aggregation now includes PENDING/RETRYING events (not just SENT), so revenue appears immediately on ingest.
+10. **Production Hardening** - Encrypted webhook secret (AES-256-GCM), Stripe webhook returns 200 for permanent failures, JWT 7-day maxAge, PAST_DUE 7-day grace period, API key format validation, sanitizeForJs hardening, GDPR Redis session cleanup, order count reconciliation.
 
 ## Not Yet Implemented
 
