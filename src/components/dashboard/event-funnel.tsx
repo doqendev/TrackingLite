@@ -8,11 +8,11 @@ interface EventFunnelProps {
   eventBreakdown: EventBreakdown;
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  AddToCart: "AddToCart",
-  InitiateCheckout: "Checkout",
-  Purchase: "Purchase",
-};
+const EVENT_KEYS: Array<{ key: string; i18nKey: string; showOffSite?: boolean }> = [
+  { key: "AddToCart", i18nKey: "addToCart" },
+  { key: "InitiateCheckout", i18nKey: "checkout" },
+  { key: "Purchase", i18nKey: "purchase", showOffSite: true },
+];
 
 function getPercentChangeText(today: number, yesterday: number): string {
   if (yesterday === 0 && today === 0) return "\u2014";
@@ -36,12 +36,11 @@ function getPercentChangeColor(today: number, yesterday: number): string {
 export function EventFunnel({ eventBreakdown }: EventFunnelProps) {
   const t = useTranslations("dashboard");
 
-  const entries = (
-    Object.keys(EVENT_LABELS) as Array<keyof EventBreakdown>
-  ).map((key) => ({
-    name: EVENT_LABELS[key],
-    today: eventBreakdown[key].today,
-    yesterday: eventBreakdown[key].yesterday,
+  const entries = EVENT_KEYS.map(({ key, i18nKey, showOffSite }) => ({
+    name: t(i18nKey),
+    showOffSite: !!showOffSite,
+    today: eventBreakdown[key as keyof EventBreakdown].today,
+    yesterday: eventBreakdown[key as keyof EventBreakdown].yesterday,
   }));
 
   const maxCount = Math.max(...entries.map((e) => e.today), 1);
@@ -68,6 +67,11 @@ export function EventFunnel({ eventBreakdown }: EventFunnelProps) {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground w-24 flex-shrink-0">
                     {entry.name}
+                    {entry.showOffSite && (
+                      <span className="text-[10px] text-muted-foreground/60 ml-1">
+                        ({t("inclOffSite")})
+                      </span>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-foreground tabular-nums">
