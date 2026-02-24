@@ -323,7 +323,8 @@
     "domainVerified": "Shopify-Shop verifiziert: {shopifyDomain}",
     "domainTaken": "Dieser Shop ist bereits von einem anderen Konto registriert",
     "domainNotShopify": "Konnte nicht als Shopify-Shop verifiziert werden. Sie koennen trotzdem fortfahren.",
-    "domainError": "Shop konnte nicht verifiziert werden. Bitte versuchen Sie es erneut."
+    "domainError": "Shop konnte nicht verifiziert werden. Bitte versuchen Sie es erneut.",
+    "workspaceLimitReached": "Sie haben das Shop-Limit Ihres Plans erreicht. Upgraden Sie, um weitere Shops hinzuzufuegen."
   },
   "auth": {
     "signIn": "Anmelden",

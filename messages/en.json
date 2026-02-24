@@ -323,7 +323,8 @@
     "domainVerified": "Shopify store verified: {shopifyDomain}",
     "domainTaken": "This store is already registered by another account",
     "domainNotShopify": "Could not verify as a Shopify store. You can still continue.",
-    "domainError": "Could not verify store. Please try again."
+    "domainError": "Could not verify store. Please try again.",
+    "workspaceLimitReached": "You've reached the store limit for your plan. Upgrade to add more stores."
   },
   "auth": {
     "signIn": "Sign in",

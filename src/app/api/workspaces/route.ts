@@ -6,6 +6,7 @@ import { encrypt } from "@/lib/encryption";
 import { z } from "zod";
 import { createLogger } from "@/lib/logger";
 import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
+import { BILLING_PLANS } from "@/lib/constants";
 
 const log = createLogger({ component: "workspaces" });
 
@@ -54,6 +55,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Check workspace limit for user's plan
+    const [subscription, activeWorkspaceCount] = await Promise.all([
+      db.subscription.findUnique({ where: { userId: session.user.id }, select: { plan: true } }),
+      db.workspace.count({ where: { userId: session.user.id, isActive: true } }),
+    ]);
+    const plan = (subscription?.plan ?? "FREE") as keyof typeof BILLING_PLANS;
+    const maxWorkspaces = BILLING_PLANS[plan]?.maxWorkspaces ?? 1;
+    if (activeWorkspaceCount >= maxWorkspaces) {
+      return NextResponse.json(
+        { error: `Your ${BILLING_PLANS[plan].name} plan allows up to ${maxWorkspaces} store${maxWorkspaces === 1 ? "" : "s"}. Upgrade to add more.`, code: "WORKSPACE_LIMIT" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const data = CreateWorkspaceSchema.parse(body);
 

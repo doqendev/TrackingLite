@@ -10,8 +10,10 @@ export const BILLING_PLANS = {
     priceMonthly: 0,
     currency: "usd",
     ordersPerMonth: 50,
+    maxWorkspaces: 1,
     eventLogRetentionDays: 7,
     features: [
+      "1 store",
       "Up to 50 orders/month",
       "Unlimited non-purchase events",
       "5 event types",
@@ -23,8 +25,10 @@ export const BILLING_PLANS = {
     priceMonthly: 29,
     currency: "usd",
     ordersPerMonth: 500,
+    maxWorkspaces: 3,
     eventLogRetentionDays: 7,
     features: [
+      "Up to 3 stores",
       "Up to 500 orders/month",
       "Unlimited non-purchase events",
       "5 event types",
@@ -37,8 +41,10 @@ export const BILLING_PLANS = {
     priceMonthly: 49,
     currency: "usd",
     ordersPerMonth: 1000,
+    maxWorkspaces: 5,
     eventLogRetentionDays: 30,
     features: [
+      "Up to 5 stores",
       "Up to 1,000 orders/month",
       "Unlimited non-purchase events",
       "5 event types",
@@ -51,8 +57,10 @@ export const BILLING_PLANS = {
     priceMonthly: 99,
     currency: "usd",
     ordersPerMonth: 5000,
+    maxWorkspaces: Infinity,
     eventLogRetentionDays: 30,
     features: [
+      "Unlimited stores",
       "Up to 5,000 orders/month",
       "Unlimited non-purchase events",
       "5 event types",

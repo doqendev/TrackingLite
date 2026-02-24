@@ -323,7 +323,8 @@
     "domainVerified": "Tienda Shopify verificada: {shopifyDomain}",
     "domainTaken": "Esta tienda ya esta registrada por otra cuenta",
     "domainNotShopify": "No se pudo verificar como tienda Shopify. Puedes continuar de todos modos.",
-    "domainError": "No se pudo verificar la tienda. Intentalo de nuevo."
+    "domainError": "No se pudo verificar la tienda. Intentalo de nuevo.",
+    "workspaceLimitReached": "Has alcanzado el limite de tiendas de tu plan. Actualiza para agregar mas tiendas."
   },
   "auth": {
     "signIn": "Iniciar sesión",

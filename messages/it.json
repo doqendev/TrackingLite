@@ -323,7 +323,8 @@
     "domainVerified": "Negozio Shopify verificato: {shopifyDomain}",
     "domainTaken": "Questo negozio e gia registrato da un altro account",
     "domainNotShopify": "Non e stato possibile verificare come negozio Shopify. Puoi comunque continuare.",
-    "domainError": "Non e stato possibile verificare il negozio. Riprova."
+    "domainError": "Non e stato possibile verificare il negozio. Riprova.",
+    "workspaceLimitReached": "Hai raggiunto il limite di negozi del tuo piano. Aggiorna per aggiungere altri negozi."
   },
   "auth": {
     "signIn": "Accedi",

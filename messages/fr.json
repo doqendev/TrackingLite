@@ -323,7 +323,8 @@
     "domainVerified": "Magasin Shopify verifie : {shopifyDomain}",
     "domainTaken": "Ce magasin est deja enregistre par un autre compte",
     "domainNotShopify": "Impossible de verifier comme magasin Shopify. Vous pouvez quand meme continuer.",
-    "domainError": "Impossible de verifier le magasin. Veuillez reessayer."
+    "domainError": "Impossible de verifier le magasin. Veuillez reessayer.",
+    "workspaceLimitReached": "Vous avez atteint la limite de magasins de votre plan. Passez a un plan superieur pour en ajouter."
   },
   "auth": {
     "signIn": "Se connecter",
