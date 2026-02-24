@@ -127,12 +127,12 @@ describe("getHealthStatus", () => {
     expect(getHealthStatus(0, 50)).toBe("down");
   });
 
-  it("returns 'inactive' for 0 events", () => {
-    expect(getHealthStatus(0, 0)).toBe("inactive");
+  it("returns 'no_data' for 0 events", () => {
+    expect(getHealthStatus(0, 0)).toBe("no_data");
   });
 
-  it("returns 'inactive' for 0 events even with 100 rate", () => {
-    expect(getHealthStatus(100, 0)).toBe("inactive");
+  it("returns 'no_data' for 0 events even with 100 rate", () => {
+    expect(getHealthStatus(100, 0)).toBe("no_data");
   });
 });
 
@@ -204,7 +204,7 @@ describe("computeDashboardAnalytics", () => {
 
       const result = await computeDashboardAnalytics(WORKSPACE_ID, USER_ID);
 
-      expect(result.health.status).toBe("inactive");
+      expect(result.health.status).toBe("no_data");
       expect(result.health.successRate).toBe(0);
       expect(result.health.lastEventAt).toBeNull();
     });

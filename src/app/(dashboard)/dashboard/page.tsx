@@ -26,7 +26,7 @@ const HEALTH_CONFIG = {
   healthy: { dot: "bg-green-500", label: "Healthy", labelColor: "text-green-400" },
   degraded: { dot: "bg-amber-500", label: "Degraded", labelColor: "text-amber-400" },
   down: { dot: "bg-red-500", label: "Down", labelColor: "text-red-400" },
-  inactive: { dot: "bg-muted-foreground", label: "Inactive", labelColor: "text-muted-foreground" },
+  no_data: { dot: "bg-muted-foreground", label: "Awaiting events", labelColor: "text-muted-foreground" },
 } as const;
 
 export default async function DashboardPage() {

@@ -21,7 +21,7 @@ export interface WorkspaceWithStats {
 // --- Dashboard Analytics Types ---
 
 export interface HealthMetrics {
-  status: "healthy" | "degraded" | "down" | "inactive";
+  status: "healthy" | "degraded" | "down" | "no_data";
   successRate: number;
   totalEvents24h: number;
   sentEvents24h: number;

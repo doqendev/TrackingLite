@@ -26,7 +26,7 @@ function getHealthStatus(
   successRate: number,
   totalEvents: number
 ): HealthMetrics["status"] {
-  if (totalEvents === 0) return "inactive";
+  if (totalEvents === 0) return "no_data";
   if (successRate >= 95) return "healthy";
   if (successRate >= 80) return "degraded";
   return "down";
