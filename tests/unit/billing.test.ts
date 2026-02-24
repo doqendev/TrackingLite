@@ -13,6 +13,8 @@ vi.mock("ioredis", () => {
     this.incr = mockIncr;
     this.decr = mockDecr;
     this.expire = mockExpire;
+    this.set = vi.fn();
+    this.on = vi.fn();
     this.pipeline = () => ({
       incr: mockIncr,
       expire: mockExpire,

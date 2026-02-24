@@ -7,6 +7,7 @@ vi.mock("ioredis", () => {
   const MockRedis = vi.fn(function (this: Record<string, unknown>) {
     this.get = mockGet;
     this.setex = mockSetex;
+    this.on = vi.fn();
   });
   return { default: MockRedis };
 });
