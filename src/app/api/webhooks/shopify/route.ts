@@ -12,6 +12,7 @@ import {
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkOrderLimits } from "@/lib/billing";
+import { shouldSendToDestination } from "@/lib/consent";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
         enableKlaviyo: true,
         klaviyoApiKeyEncrypted: true,
         enablePurchase: true,
+        consentMode: true,
       },
     });
 
@@ -111,9 +113,18 @@ export async function POST(request: NextRequest) {
       0
     );
 
+    // Filter out non-web orders (POS, draft, subscription, manual, bulk)
+    const orderSource = orderData.source_name ? String(orderData.source_name) : "web";
+    const ALLOWED_SOURCES = new Set(["web", "mobile", "iphone", "android"]);
+    if (!ALLOWED_SOURCES.has(orderSource)) {
+      reqLog.info("Skipping non-web order", { orderSource, orderId: orderId || orderName });
+      return NextResponse.json({ ok: true });
+    }
+
     reqLog.info("Processing order", {
       shopDomain,
-      orderId: orderId || orderName,
+      orderId,
+      orderName,
       workspaceCount: matchingWorkspaces.length,
     });
 
@@ -216,22 +227,41 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // Filter destinations by consent mode
+      // Webhook events have no browser consent signal, so:
+      // - LAX mode: allows by default (undefined !== false)
+      // - STRICT mode: blocks all (undefined !== true)
+      const consentFiltered = destinations.filter((dest) =>
+        shouldSendToDestination(workspace.consentMode, undefined, dest.destination)
+      );
+
+      if (consentFiltered.length === 0) {
+        wsLog.info("All destinations blocked by consent mode", {
+          consentMode: workspace.consentMode,
+        });
+        continue;
+      }
+
       // Deterministic eventId for dedup
       const webhookEventId = `webhook-${orderId || orderName || crypto.randomUUID()}`;
 
-      // Check orderId dedup: if Purchase with this orderId already SENT, skip
-      if (orderId || orderName) {
+      // Check orderId dedup: if Purchase with this orderId already exists, skip
+      const dedupIds = [orderId, orderName].filter(Boolean) as string[];
+      if (dedupIds.length > 0) {
         const existing = await db.eventLog.findFirst({
           where: {
             workspaceId: workspace.id,
-            orderId: orderId || orderName,
+            orderId: { in: dedupIds },
             eventName: "Purchase",
-            status: "SENT",
+            status: { in: ["SENT", "PENDING", "RETRYING"] },
+            createdAt: { gte: new Date(Date.now() - 2 * 60 * 60 * 1000) }, // 2h window
           },
         });
         if (existing) {
           wsLog.info("Purchase already delivered via snippet, skipping", {
             orderId: orderId || orderName,
+            matchedOrderId: existing.orderId,
+            matchedStatus: existing.status,
           });
           continue;
         }
@@ -249,23 +279,21 @@ export async function POST(request: NextRequest) {
             value: totalPrice,
             currency,
             num_items: numItems,
-            order_id: orderId,
+            order_id: orderName || orderId,
           },
           hasUserData: !!(email || phone),
         } as any, // eslint-disable-line
-        customerIp:
-          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-          "unknown",
-        userAgent: "Shopify-Webhook",
+        customerIp: null,
+        userAgent: null,
         value: totalPrice ?? null,
         currency: currency ?? null,
         numItems: numItems || null,
-        orderId: orderId || orderName || null,
+        orderId: orderName || orderId || null,
         source: "webhook",
       };
 
       const eventLogEntries = await Promise.all(
-        destinations.map(async (dest) => {
+        consentFiltered.map(async (dest) => {
           try {
             return await db.eventLog.create({
               data: {
@@ -283,7 +311,7 @@ export async function POST(request: NextRequest) {
       const validEntries = eventLogEntries.filter(
         (e): e is NonNullable<typeof e> => e !== null
       );
-      const validDests = destinations.filter(
+      const validDests = consentFiltered.filter(
         (_, idx) => eventLogEntries[idx] !== null
       );
 
@@ -326,10 +354,8 @@ export async function POST(request: NextRequest) {
             (li) => String(li.product_id || li.sku || "")
           ),
         },
-        clientIp:
-          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-          "unknown",
-        userAgent: "Shopify-Webhook",
+        clientIp: "",
+        userAgent: "",
       };
 
       // Queue jobs
