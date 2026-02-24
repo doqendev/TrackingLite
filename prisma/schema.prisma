@@ -242,6 +242,23 @@ model AlertLog {
   @@index([userId, alertType, sentAt])
 }
 
+model WebhookDeadLetter {
+  id         String    @id @default(cuid())
+  topic      String
+  shopDomain String
+  payload    String    @db.Text
+  headers    String?   @db.Text
+  error      String    @db.Text
+  requestId  String?
+  createdAt  DateTime  @default(now())
+  retries    Int       @default(0)
+  resolvedAt DateTime?
+
+  @@index([shopDomain])
+  @@index([createdAt])
+  @@index([resolvedAt])
+}
+
 // ============================================================
 // ENUMS
 // ============================================================

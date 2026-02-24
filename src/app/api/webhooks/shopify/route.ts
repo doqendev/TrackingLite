@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { EventName } from "@prisma/client";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
 import { createLogger } from "@/lib/logger";
 import { db } from "@/lib/db";
 import { verifyShopifyWebhook } from "@/lib/shopify-webhook";
@@ -21,6 +19,35 @@ import { getSharedRedis } from "@/lib/redis";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
+
+async function writeToDLQ(
+  topic: string,
+  shopDomain: string,
+  rawBody: Buffer | null,
+  headers: Record<string, string>,
+  error: string,
+  requestId: string
+) {
+  try {
+    await db.webhookDeadLetter.create({
+      data: {
+        topic,
+        shopDomain,
+        payload: rawBody ? rawBody.toString("utf-8") : "",
+        headers: JSON.stringify(headers),
+        error,
+        requestId,
+      },
+    });
+  } catch (dlqErr) {
+    console.error(JSON.stringify({
+      level: "error",
+      msg: "Failed to write to DLQ",
+      requestId,
+      dlqError: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
+    }));
+  }
+}
 
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
@@ -82,26 +109,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Dead-letter: persist failed webhook for manual reprocessing
-    try {
-      const dlqDir = join(process.cwd(), ".dlq", "webhooks");
-      await mkdir(dlqDir, { recursive: true });
-      const filename = `${requestId}-${Date.now()}.json`;
-      await writeFile(
-        join(dlqDir, filename),
-        JSON.stringify({
-          requestId,
-          topic: request.headers.get("x-shopify-topic"),
-          shopDomain: request.headers.get("x-shopify-shop-domain"),
-          error: error instanceof Error ? error.message : String(error),
-          timestamp: new Date().toISOString(),
-          body: rawBody ? rawBody.toString("utf-8") : null,
-        }),
-        "utf-8"
-      );
-      reqLog.warn("Webhook saved to dead-letter queue", { filename });
-    } catch {
-      // DLQ write failed -- nothing more we can do
-    }
+    await writeToDLQ(
+      request.headers.get("x-shopify-topic") ?? "unknown",
+      request.headers.get("x-shopify-shop-domain") ?? "unknown",
+      rawBody ?? null,
+      {
+        "x-shopify-topic": request.headers.get("x-shopify-topic") ?? "",
+        "x-shopify-shop-domain": request.headers.get("x-shopify-shop-domain") ?? "",
+        "x-shopify-hmac-sha256": request.headers.get("x-shopify-hmac-sha256") ?? "",
+      },
+      error instanceof Error ? error.message : String(error),
+      requestId
+    );
+    reqLog.warn("Webhook saved to dead-letter queue");
 
     // Still return 200 to prevent Shopify from retrying (we log the error)
     return NextResponse.json({ ok: true });
