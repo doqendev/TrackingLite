@@ -231,8 +231,8 @@ export async function PATCH(
         updateData[ivField] = null;
         updateData[tagField] = null;
       } else {
-        // Encrypt and store
-        const { encrypted, iv, tag } = encrypt(value);
+        // Encrypt and store (trim whitespace from copy-paste)
+        const { encrypted, iv, tag } = encrypt(value.trim());
         updateData[encField] = encrypted;
         updateData[ivField] = iv;
         updateData[tagField] = tag;

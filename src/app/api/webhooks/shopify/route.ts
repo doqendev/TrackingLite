@@ -256,9 +256,17 @@ async function handleOrderPaid(
       workspace.shopifyWebhookSecretEncrypted!,
       workspace.shopifyWebhookSecretIv!,
       workspace.shopifyWebhookSecretTag!
-    );
+    ).trim();
     if (!verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
-      wsLog.warn("HMAC verification failed");
+      // Log diagnostic info (no secrets, just lengths and prefixes)
+      const computed = require("crypto").createHmac("sha256", webhookSecret).update(rawBody).digest("base64");
+      wsLog.warn("HMAC verification failed", {
+        secretLength: webhookSecret.length,
+        hmacHeaderLength: hmacHeader.length,
+        computedLength: computed.length,
+        hmacHeaderPrefix: hmacHeader.substring(0, 8),
+        computedPrefix: computed.substring(0, 8),
+      });
       continue;
     }
 
@@ -619,7 +627,7 @@ async function handleRefundCreated(
       workspace.shopifyWebhookSecretEncrypted!,
       workspace.shopifyWebhookSecretIv!,
       workspace.shopifyWebhookSecretTag!
-    );
+    ).trim();
     if (!verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
       wsLog.warn("HMAC verification failed for refund");
       continue;
