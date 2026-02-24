@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { getActiveWorkspace } from "@/lib/active-workspace";
 import Link from "next/link";
 import { computeDashboardAnalytics } from "@/lib/analytics";
 import { getCachedAnalytics } from "@/lib/analytics-cache";
@@ -32,8 +33,11 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const workspace = await db.workspace.findFirst({
-    where: { userId: session.user.id, isActive: true },
+  const activeWs = await getActiveWorkspace(session.user.id);
+  if (!activeWs) redirect("/onboarding");
+
+  const workspace = await db.workspace.findUnique({
+    where: { id: activeWs.id },
     select: {
       id: true,
       name: true,

@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { SidebarNav, SidebarFooter, MobileNav } from "@/components/dashboard/sidebar-nav";
+import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher";
+import { getActiveWorkspace, getAllWorkspaces } from "@/lib/active-workspace";
+import { BILLING_PLANS } from "@/lib/constants";
 
 export const metadata = {
   robots: { index: false, follow: false },
@@ -12,13 +15,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const workspace = await db.workspace.findFirst({
-    where: { userId: session.user.id, isActive: true },
-    select: { id: true, name: true },
-  });
+  const [activeWorkspace, workspaces, subscription] = await Promise.all([
+    getActiveWorkspace(session.user.id),
+    getAllWorkspaces(session.user.id),
+    db.subscription.findUnique({
+      where: { userId: session.user.id },
+      select: { plan: true },
+    }),
+  ]);
 
   const userEmail = session.user.email ?? "";
-  const workspaceName = workspace?.name ?? null;
+  const workspaceName = activeWorkspace?.name ?? null;
+  const plan = (subscription?.plan ?? "FREE") as keyof typeof BILLING_PLANS;
+  const maxWorkspaces = BILLING_PLANS[plan]?.maxWorkspaces ?? 1;
+  const canAddStore = workspaces.length < maxWorkspaces;
 
   return (
     <div className="flex h-screen bg-background">
@@ -29,6 +39,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="text-brand-500">Track</span>&thinsp;Clear
           </Link>
         </div>
+        {workspaces.length > 0 && activeWorkspace && (
+          <div className="px-3 pt-3">
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspace.id}
+              canAddStore={canAddStore}
+            />
+          </div>
+        )}
         <SidebarNav userEmail={userEmail} workspaceName={workspaceName} />
         <SidebarFooter userEmail={userEmail} workspaceName={workspaceName} />
       </aside>

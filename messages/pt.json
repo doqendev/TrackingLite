@@ -27,7 +27,10 @@
     "integrations": "Integrações",
     "settings": "Configurações",
     "billing": "Faturamento",
-    "logOut": "Sair"
+    "logOut": "Sair",
+    "switchStore": "Trocar Loja",
+    "addStore": "Adicionar Loja",
+    "upgradeToAdd": "Faça upgrade para adicionar mais lojas"
   },
   "dashboard": {
     "noDestinations": "Nenhum destino configurado",

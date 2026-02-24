@@ -27,7 +27,10 @@
     "integrations": "Integraciones",
     "settings": "Configuración",
     "billing": "Facturación",
-    "logOut": "Cerrar sesión"
+    "logOut": "Cerrar sesión",
+    "switchStore": "Cambiar Tienda",
+    "addStore": "Agregar Tienda",
+    "upgradeToAdd": "Actualiza tu plan para agregar mas tiendas"
   },
   "dashboard": {
     "noDestinations": "No hay destinos configurados",

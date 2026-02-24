@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { getActiveWorkspace } from "@/lib/active-workspace";
 import { EventName, EventStatus, Destination } from "@prisma/client";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,8 +71,11 @@ export default async function EventsPage({
   const filterEventName = params.eventName as EventName | undefined;
   const filterStatus = params.status as EventStatus | undefined;
 
-  const workspace = await db.workspace.findFirst({
-    where: { userId: session.user.id, isActive: true },
+  const activeWs = await getActiveWorkspace(session.user.id);
+  if (!activeWs) redirect("/onboarding");
+
+  const workspace = await db.workspace.findUnique({
+    where: { id: activeWs.id },
     select: { id: true, name: true },
   });
 

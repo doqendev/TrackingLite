@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { getActiveWorkspace } from "@/lib/active-workspace";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { AlertPreferences } from "@/components/settings/alert-preferences";
 
@@ -10,9 +11,12 @@ export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const activeWs = await getActiveWorkspace(session.user.id);
+  if (!activeWs) redirect("/onboarding");
+
   const [workspace, user] = await Promise.all([
-    db.workspace.findFirst({
-      where: { userId: session.user.id, isActive: true },
+    db.workspace.findUnique({
+      where: { id: activeWs.id },
       select: {
         id: true,
         name: true,

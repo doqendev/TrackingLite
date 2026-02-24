@@ -1,0 +1,50 @@
+import { cookies } from "next/headers";
+import { db } from "@/lib/db";
+
+const COOKIE_NAME = "activeWorkspaceId";
+
+export interface ActiveWorkspaceInfo {
+  id: string;
+  name: string;
+}
+
+/**
+ * Get the user's active workspace.
+ * Reads from cookie, validates ownership, falls back to first active workspace.
+ * Returns null if user has no workspaces.
+ */
+export async function getActiveWorkspace(
+  userId: string
+): Promise<ActiveWorkspaceInfo | null> {
+  const cookieStore = await cookies();
+  const savedId = cookieStore.get(COOKIE_NAME)?.value;
+
+  // If cookie is set, validate it belongs to this user and is active
+  if (savedId) {
+    const workspace = await db.workspace.findFirst({
+      where: { id: savedId, userId, isActive: true },
+      select: { id: true, name: true },
+    });
+    if (workspace) return workspace;
+  }
+
+  // Fall back to first active workspace
+  const first = await db.workspace.findFirst({
+    where: { userId, isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true },
+  });
+
+  return first ?? null;
+}
+
+/**
+ * Get all active workspaces for a user (for the switcher).
+ */
+export async function getAllWorkspaces(userId: string) {
+  return db.workspace.findMany({
+    where: { userId, isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, domain: true },
+  });
+}

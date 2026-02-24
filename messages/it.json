@@ -27,7 +27,10 @@
     "integrations": "Integrazioni",
     "settings": "Impostazioni",
     "billing": "Fatturazione",
-    "logOut": "Esci"
+    "logOut": "Esci",
+    "switchStore": "Cambia Negozio",
+    "addStore": "Aggiungi Negozio",
+    "upgradeToAdd": "Effettua l'upgrade per aggiungere altri negozi"
   },
   "dashboard": {
     "noDestinations": "Nessuna destinazione configurata",

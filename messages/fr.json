@@ -27,7 +27,10 @@
     "integrations": "Intégrations",
     "settings": "Paramètres",
     "billing": "Facturation",
-    "logOut": "Se déconnecter"
+    "logOut": "Se déconnecter",
+    "switchStore": "Changer de boutique",
+    "addStore": "Ajouter une boutique",
+    "upgradeToAdd": "Passez a un plan superieur pour ajouter d'autres boutiques"
   },
   "dashboard": {
     "noDestinations": "Aucune destination configurée",
