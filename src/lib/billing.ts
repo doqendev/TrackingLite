@@ -157,9 +157,9 @@ export async function decrementOrderCount(
   const redisKey = `orders:${userId}:${purchaseMonth}`;
   const r = getSharedRedis();
   try {
-    const current = parseInt((await r.get(redisKey)) ?? "0", 10);
-    if (current > 0) {
-      await r.decr(redisKey);
+    const newVal = await r.decr(redisKey);
+    if (newVal < 0) {
+      await r.set(redisKey, "0");
     }
   } catch {
     // Redis down — non-critical, usage count may be slightly high

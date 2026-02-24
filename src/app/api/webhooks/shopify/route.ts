@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { EventName } from "@prisma/client";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { createLogger } from "@/lib/logger";
@@ -39,11 +40,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing headers" }, { status: 400 });
     }
 
-    // Rate limit: 30 webhooks per minute per domain
+    // Rate limit: 30 webhooks per minute per domain (atomic Lua to avoid INCR/EXPIRE race)
     const rateLimitKey = `wh-rl:${shopDomain}`;
     const redis = getSharedRedis();
-    const whCount = await redis.incr(rateLimitKey);
-    if (whCount === 1) await redis.expire(rateLimitKey, 60);
+    const luaScript = `
+      local current = redis.call('INCR', KEYS[1])
+      if current == 1 then
+        redis.call('EXPIRE', KEYS[1], 60)
+      end
+      return current
+    `;
+    const whCount = (await redis.eval(luaScript, 1, rateLimitKey)) as number;
     if (whCount > 30) {
       reqLog.warn("Webhook rate limit exceeded", { shopDomain, count: whCount });
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
@@ -152,6 +159,10 @@ async function handleOrderPaid(
 
   const orderId = orderData.id ? String(orderData.id) : null;
   const orderName = orderData.name ? String(orderData.name) : null;
+
+  if (!orderId && !orderName) {
+    console.warn(JSON.stringify({ level: "warn", msg: "Webhook order missing both orderId and orderName", shopDomain }));
+  }
   const totalPrice = orderData.total_price
     ? Number(orderData.total_price)
     : undefined;
@@ -371,7 +382,7 @@ async function handleOrderPaid(
       value: totalPrice ?? null,
       currency: currency ?? null,
       numItems: numItems || null,
-      orderId: orderName || orderId || null,
+      orderId: orderId || null,
       source: "webhook",
       utmSource: sessionContext?.utmSource ?? null,
       utmMedium: sessionContext?.utmMedium ?? null,
@@ -379,6 +390,7 @@ async function handleOrderPaid(
       utmContent: sessionContext?.utmContent ?? null,
       utmTerm: sessionContext?.utmTerm ?? null,
       gclid: sessionContext?.gclid ?? null,
+      pageUrl: sessionContext?.url ?? null,
     };
 
     const eventLogEntries = await Promise.all(
@@ -578,12 +590,7 @@ async function handleRefundCreated(
 
     if (destinations.length === 0) continue;
 
-    // Consent filter
-    const consentFiltered = destinations.filter((dest) =>
-      shouldSendToDestination(workspace.consentMode, undefined, dest.destination)
-    );
-    if (consentFiltered.length === 0) continue;
-
+    // Refunds are server-side financial events -- no consent filtering
     const refundEventId = `refund-${refundId}`;
 
     const eventData = {
@@ -606,12 +613,12 @@ async function handleRefundCreated(
 
     // Create EventLog entries
     const eventLogEntries = await Promise.all(
-      consentFiltered.map(async (dest) => {
+      destinations.map(async (dest) => {
         try {
           return await db.eventLog.create({
             data: {
               workspaceId: workspace.id,
-              eventName: "Refund" as any,
+              eventName: "Refund" as EventName,
               eventId: refundEventId,
               status: "PENDING" as const,
               destination: dest.destination as any,
@@ -641,7 +648,7 @@ async function handleRefundCreated(
     );
 
     const validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
-    const validDests = consentFiltered.filter((_, idx) => eventLogEntries[idx] !== null);
+    const validDests = destinations.filter((_, idx) => eventLogEntries[idx] !== null);
 
     if (validEntries.length === 0) continue;
 
