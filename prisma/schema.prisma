@@ -181,6 +181,8 @@ model EventLog {
   ttclid         String?
   rdtCid         String?
   epik           String?
+  refundId       String?
+  refundAmount   Float?
   destination    Destination  @default(META)
   source         String?     @default("snippet")  // "snippet" | "webhook"
   createdAt      DateTime    @default(now())
@@ -194,6 +196,7 @@ model EventLog {
   @@index([status, createdAt])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, eventName, destination, createdAt])
+  @@index([workspaceId, refundId])
 }
 
 model Subscription {
@@ -256,6 +259,7 @@ enum EventName {
   AddToCart
   InitiateCheckout
   Purchase
+  Refund
 }
 
 enum EventStatus {

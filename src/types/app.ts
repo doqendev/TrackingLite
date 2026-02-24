@@ -54,6 +54,7 @@ export interface EventBreakdown {
   AddToCart: EventCount;
   InitiateCheckout: EventCount;
   Purchase: EventCount;
+  Refund: EventCount;
 }
 
 export interface BillingUsage {

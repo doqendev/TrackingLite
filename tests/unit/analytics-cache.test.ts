@@ -38,6 +38,7 @@ const mockAnalytics: DashboardAnalytics = {
     AddToCart: { today: 80, yesterday: 70 },
     InitiateCheckout: { today: 40, yesterday: 35 },
     Purchase: { today: 30, yesterday: 25 },
+    Refund: { today: 0, yesterday: 0 },
   },
   billing: {
     plan: "STARTER",

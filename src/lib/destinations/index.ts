@@ -14,6 +14,7 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "AddToCart",
     InitiateCheckout: "InitiateCheckout",
     Purchase: "Purchase",
+    Refund: "Refund",
   },
   TIKTOK: {
     PageView: "Pageview",
@@ -21,6 +22,7 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "AddToCart",
     InitiateCheckout: "InitiateCheckout",
     Purchase: "CompletePayment",
+    Refund: null,
   },
   GA4: {
     PageView: "page_view",
@@ -28,6 +30,7 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "add_to_cart",
     InitiateCheckout: "begin_checkout",
     Purchase: "purchase",
+    Refund: "refund",
   },
   KLAVIYO: {
     PageView: null, // skip - too noisy for email platform
@@ -35,6 +38,7 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "Added to Cart",
     InitiateCheckout: "Started Checkout",
     Purchase: "Placed Order",
+    Refund: null,
   },
   REDDIT: {
     PageView: "PageVisit",
@@ -42,6 +46,7 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "AddToCart",
     InitiateCheckout: null,
     Purchase: "Purchase",
+    Refund: null,
   },
   PINTEREST: {
     PageView: "page_visit",
@@ -49,5 +54,6 @@ export const DESTINATION_EVENT_MAP = {
     AddToCart: "add_to_cart",
     InitiateCheckout: "initiate_checkout",
     Purchase: "checkout",
+    Refund: null,
   },
 } as const;

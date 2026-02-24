@@ -77,7 +77,7 @@ export function normalizeToGA4Event(
   }
 
   // Purchase-specific
-  if (ga4EventName === "purchase") {
+  if (ga4EventName === "purchase" || ga4EventName === "refund") {
     const orderId = cd.orderId ?? cd.order_id;
     if (orderId != null) params.transaction_id = String(orderId);
   }

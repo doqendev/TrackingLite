@@ -19,6 +19,7 @@ const EVENT_NAMES: EventName[] = [
   "AddToCart",
   "InitiateCheckout",
   "Purchase",
+  "Refund",
 ];
 
 function getHealthStatus(

@@ -147,6 +147,26 @@ export async function incrementOrderCount(userId: string): Promise<void> {
 }
 
 /**
+ * Decrement the monthly order count when a refund is processed.
+ * Uses the purchase month (YYYY-MM) so cross-month refunds decrement correctly.
+ */
+export async function decrementOrderCount(
+  userId: string,
+  purchaseMonth: string
+): Promise<void> {
+  const redisKey = `orders:${userId}:${purchaseMonth}`;
+  const r = getSharedRedis();
+  try {
+    const current = parseInt((await r.get(redisKey)) ?? "0", 10);
+    if (current > 0) {
+      await r.decr(redisKey);
+    }
+  } catch {
+    // Redis down — non-critical, usage count may be slightly high
+  }
+}
+
+/**
  * Get current month's order count for a user.
  */
 export async function getOrderCount(userId: string): Promise<number> {
