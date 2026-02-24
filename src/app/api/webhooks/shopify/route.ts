@@ -232,9 +232,10 @@ async function handleOrderPaid(
   );
 
   // Filter out non-web orders (POS, draft, subscription, manual, bulk)
-  const orderSource = orderData.source_name ? String(orderData.source_name) : "web";
-  const ALLOWED_SOURCES = new Set(["web", "mobile", "iphone", "android", "paypal"]);
-  if (!ALLOWED_SOURCES.has(orderSource)) {
+  // Use a denylist so unknown/new source types (including Shopify test notifications) pass through
+  const orderSource = orderData.source_name ? String(orderData.source_name).toLowerCase() : "web";
+  const BLOCKED_SOURCES = new Set(["pos", "shopify_draft_order", "manual", "bulk", "subscription"]);
+  if (BLOCKED_SOURCES.has(orderSource)) {
     reqLog.info("Skipping non-web order", { orderSource, orderId: orderId || orderName });
     return NextResponse.json({ ok: true });
   }
