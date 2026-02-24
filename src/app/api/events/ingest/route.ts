@@ -133,23 +133,6 @@ export async function POST(request: NextRequest) {
     }
     const payload = IngestPayloadSchema.parse(body);
 
-    // 6. Check order limits (only Purchase events count; others are always free)
-    const billing = await checkOrderLimits(workspace.userId, payload.eventName);
-    if (!billing.allowed) {
-      return NextResponse.json(
-        { error: billing.reason || "Order limit reached", limit: billing.limit, used: billing.used },
-        { status: 402, headers: corsHeaders }
-      );
-    }
-
-    // 6b. Purchase-specific rate limit (prevents billing manipulation via fake events)
-    if (payload.eventName === "Purchase") {
-      const purchaseRL = await checkPurchaseRateLimit(workspace.id);
-      if (!purchaseRL.allowed) {
-        return NextResponse.json({ error: "Purchase rate limited" }, { status: 429, headers: corsHeaders });
-      }
-    }
-
     // 7. Check event toggle
     const eventToggleMap: Record<string, boolean> = {
       PageView: workspace.enablePageView,
@@ -307,7 +290,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 12. Create EventLog entries (only for conversions) and queue jobs for each destination
+    // 12. Check order limits (only Purchase events count; others are always free)
+    // Placed here so billing is only charged when the event will actually be processed
+    // (after dedup, toggle, destination, and consent checks have all passed).
+    const billing = await checkOrderLimits(workspace.userId, payload.eventName);
+    if (!billing.allowed) {
+      return NextResponse.json(
+        { error: billing.reason || "Order limit reached", limit: billing.limit, used: billing.used },
+        { status: 402, headers: corsHeaders }
+      );
+    }
+
+    // 12b. Purchase-specific rate limit (prevents billing manipulation via fake events)
+    if (payload.eventName === "Purchase") {
+      const purchaseRL = await checkPurchaseRateLimit(workspace.id);
+      if (!purchaseRL.allowed) {
+        return NextResponse.json({ error: "Purchase rate limited" }, { status: 429, headers: corsHeaders });
+      }
+    }
+
+    // 13. Create EventLog entries (only for conversions) and queue jobs for each destination
     const CONVERSION_EVENTS = new Set(["AddToCart", "InitiateCheckout", "Purchase"]);
     const isConversion = CONVERSION_EVENTS.has(payload.eventName);
 

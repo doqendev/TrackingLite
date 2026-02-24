@@ -125,13 +125,15 @@ async function queryRevenueMetrics(
     "Purchase",
   ];
 
+  const revenueStatuses = { in: [EventStatus.SENT, EventStatus.PENDING, EventStatus.RETRYING] };
+
   const queries = revenueEventTypes.flatMap((eventName) => [
     // Today sum
     db.eventLog.aggregate({
       where: {
         workspaceId,
         eventName,
-        status: EventStatus.SENT,
+        status: revenueStatuses,
         createdAt: { gte: todayStart, lte: now },
         ...df,
       },
@@ -142,7 +144,7 @@ async function queryRevenueMetrics(
       where: {
         workspaceId,
         eventName,
-        status: EventStatus.SENT,
+        status: revenueStatuses,
         createdAt: { gte: yesterdayStart, lt: todayStart },
         ...df,
       },
@@ -156,7 +158,7 @@ async function queryRevenueMetrics(
       where: {
         workspaceId,
         eventName: "Purchase",
-        status: EventStatus.SENT,
+        status: revenueStatuses,
         createdAt: { gte: todayStart, lte: now },
         ...df,
       },
@@ -165,7 +167,7 @@ async function queryRevenueMetrics(
       where: {
         workspaceId,
         eventName: "Purchase",
-        status: EventStatus.SENT,
+        status: revenueStatuses,
         createdAt: { gte: yesterdayStart, lt: todayStart },
         ...df,
       },
