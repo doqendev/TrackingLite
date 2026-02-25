@@ -35,35 +35,60 @@ export async function getExchangeRate(
     // Redis failure: continue to API
   }
 
-  // Fetch from frankfurter.app
+  // Try frankfurter.app first (ECB data, ~30 major currencies)
+  const rate = await fetchFrankfurter(from, to)
+    ?? await fetchOpenExchangeRates(from, to);
+
+  if (!rate || rate <= 0) return 0;
+
+  // Cache the rate
+  try {
+    await getSharedRedis().setex(cacheKey, EXCHANGE_RATE_TTL, rate.toString());
+  } catch {
+    // Redis failure: rate still usable
+  }
+
+  return rate;
+}
+
+/** ECB-based rates via frankfurter.app (~30 currencies, no key) */
+async function fetchFrankfurter(
+  from: string,
+  to: string
+): Promise<number | null> {
   try {
     const res = await fetch(
       `https://api.frankfurter.app/latest?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       { signal: AbortSignal.timeout(5000) }
     );
-
-    if (!res.ok) {
-      // API doesn't support this currency pair — exclude from totals
-      return 0;
-    }
+    if (!res.ok) return null;
 
     const data = await res.json();
     const rate = data?.rates?.[to];
-
-    if (typeof rate !== "number" || rate <= 0) {
-      return 0;
-    }
-
-    // Cache the rate
-    try {
-      await getSharedRedis().setex(cacheKey, EXCHANGE_RATE_TTL, rate.toString());
-    } catch {
-      // Redis failure: rate still usable
-    }
-
-    return rate;
+    return typeof rate === "number" && rate > 0 ? rate : null;
   } catch {
-    // API failure: exclude from totals rather than inflating with 1:1 rate
-    return 0;
+    return null;
+  }
+}
+
+/** Fallback: open.er-api.com (~170 currencies, no key) */
+async function fetchOpenExchangeRates(
+  from: string,
+  to: string
+): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://open.er-api.com/v6/latest/${encodeURIComponent(from)}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (data?.result !== "success") return null;
+
+    const rate = data?.rates?.[to];
+    return typeof rate === "number" && rate > 0 ? rate : null;
+  } catch {
+    return null;
   }
 }
