@@ -24,6 +24,6 @@ RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
-ENV NODE_OPTIONS="--max-old-space-size=384"
+ENV NODE_OPTIONS="--max-old-space-size=256"
 
 CMD ["sh", "-c", "pnpm prisma migrate deploy && exec node .next/standalone/server.js"]
