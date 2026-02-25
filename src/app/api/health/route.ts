@@ -28,12 +28,24 @@ export async function GET() {
 
   const overall = dbStatus === "connected" && redisStatus === "connected" ? "ok" : "degraded";
 
+  const mem = process.memoryUsage();
+  const memMB = {
+    rss: Math.round(mem.rss / 1024 / 1024),
+    heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+    heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+    external: Math.round(mem.external / 1024 / 1024),
+  };
+
+  // Log memory usage for diagnostics
+  console.log(`[health] mem rss=${memMB.rss}MB heap=${memMB.heapUsed}/${memMB.heapTotal}MB uptime=${Math.round(process.uptime())}s`);
+
   // ALWAYS return 200 — Railway restarts on non-200 health checks.
   // Use "status" field for monitoring tools to detect degradation.
   return NextResponse.json({
     status: overall,
     database: dbStatus,
     redis: redisStatus,
+    memory: memMB,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
