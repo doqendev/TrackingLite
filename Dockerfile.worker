@@ -20,7 +20,7 @@ COPY . .
 RUN pnpm prisma generate
 
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=512"
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 # PORT is injected by Railway for health checks
 
 CMD ["pnpm", "worker"]
