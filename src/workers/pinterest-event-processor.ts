@@ -130,7 +130,7 @@ export const pinterestWorker = new Worker<DestinationEventJob>(
   processPinterestEvent,
   {
     connection: connection as never,
-    concurrency: 3,
+    concurrency: 10,
     lockDuration: 60000,
   }
 );

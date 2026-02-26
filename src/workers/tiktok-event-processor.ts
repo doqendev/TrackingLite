@@ -143,7 +143,7 @@ export const tiktokWorker = new Worker<DestinationEventJob>(
   processTikTokEvent,
   {
     connection: connection as never,
-    concurrency: 3,
+    concurrency: 10,
     lockDuration: 60000,
   }
 );

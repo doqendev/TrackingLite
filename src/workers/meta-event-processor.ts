@@ -145,7 +145,7 @@ export const worker = new Worker<MetaEventJob>(
   processMetaEvent,
   {
     connection: connection as never,
-    concurrency: 3,
+    concurrency: 10,
     lockDuration: 60000,
   }
 );

@@ -131,7 +131,7 @@ export const klaviyoWorker = new Worker<DestinationEventJob>(
   processKlaviyoEvent,
   {
     connection: connection as never,
-    concurrency: 3,
+    concurrency: 10,
     lockDuration: 60000,
   }
 );
