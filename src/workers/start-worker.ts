@@ -33,6 +33,9 @@ try {
   process.exit(1);
 }
 
+process.env.PRISMA_CLIENT_ENGINE_TYPE ??= "binary";
+process.env.MSGPACKR_NATIVE_ACCELERATION_DISABLED ??= "true";
+
 import { worker as metaWorker } from "./meta-event-processor";
 import { redditWorker } from "./reddit-event-processor";
 import { pinterestWorker } from "./pinterest-event-processor";

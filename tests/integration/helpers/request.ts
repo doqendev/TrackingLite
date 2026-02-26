@@ -16,7 +16,7 @@ export function makeRequest(
     ? url
     : `http://localhost${url}`;
 
-  const init: RequestInit = { method };
+  const init: ConstructorParameters<typeof NextRequest>[1] = { method };
 
   if (body !== undefined) {
     init.body = JSON.stringify(body);

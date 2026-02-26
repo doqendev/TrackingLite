@@ -1,6 +1,6 @@
 # ---- Stage 1: Dependencies ----
-FROM node:20-alpine AS deps
-RUN apk add --no-cache openssl
+FROM node:20-bookworm-slim AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10
 WORKDIR /app
 
@@ -9,8 +9,8 @@ COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
 # ---- Stage 2: Production ----
-FROM node:20-alpine
-RUN apk add --no-cache openssl
+FROM node:20-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10
 WORKDIR /app
 
@@ -21,6 +21,7 @@ RUN pnpm prisma generate
 
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=512"
+ENV PRISMA_CLIENT_ENGINE_TYPE=binary
 ENV MSGPACKR_NATIVE_ACCELERATION_DISABLED=true
 # PORT is injected by Railway for health checks
 

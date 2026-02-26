@@ -7,6 +7,7 @@ import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTER
 
 const ALERT_QUEUE_NAME = "alert-checks";
 const ALERT_JOB_NAME = "run-alert-checks";
+const ENABLE_QUEUE_DEPTH_CHECK = process.env.ENABLE_QUEUE_DEPTH_CHECK === "true";
 
 const log = createLogger({ component: "alert-checker" });
 
@@ -92,35 +93,39 @@ async function runAlertChecks(): Promise<void> {
     }
   }
 
-  // Check queue depths for all destination queues
-  const QUEUE_DEPTH_THRESHOLD = 1000;
-  const destinationQueues = ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events"];
+  // Optional queue-depth monitoring (disabled by default in production for stability)
+  if (ENABLE_QUEUE_DEPTH_CHECK) {
+    const QUEUE_DEPTH_THRESHOLD = 1000;
+    const destinationQueues = ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events"];
 
-  for (const queueName of destinationQueues) {
-    let queue: Queue | undefined;
-    try {
-      queue = new Queue(queueName, { connection: getAlertConnection() as never });
-      const waiting = await queue.getWaitingCount();
-      const delayed = await queue.getDelayedCount();
-      const total = waiting + delayed;
+    for (const queueName of destinationQueues) {
+      let queue: Queue | undefined;
+      try {
+        queue = new Queue(queueName, { connection: getAlertConnection() as never });
+        const waiting = await queue.getWaitingCount();
+        const delayed = await queue.getDelayedCount();
+        const total = waiting + delayed;
 
-      if (total > QUEUE_DEPTH_THRESHOLD) {
-        log.warn("Queue depth exceeds threshold", {
+        if (total > QUEUE_DEPTH_THRESHOLD) {
+          log.warn("Queue depth exceeds threshold", {
+            queue: queueName,
+            waiting,
+            delayed,
+            total,
+            threshold: QUEUE_DEPTH_THRESHOLD,
+          });
+        }
+      } catch (err) {
+        log.error("Failed to check queue depth", {
           queue: queueName,
-          waiting,
-          delayed,
-          total,
-          threshold: QUEUE_DEPTH_THRESHOLD,
+          error: err,
         });
+      } finally {
+        await queue?.close().catch(() => {});
       }
-    } catch (err) {
-      log.error("Failed to check queue depth", {
-        queue: queueName,
-        error: err,
-      });
-    } finally {
-      await queue?.close().catch(() => {});
     }
+  } else {
+    log.info("Queue depth check skipped", { reason: "ENABLE_QUEUE_DEPTH_CHECK is false" });
   }
 
   log.info("Alert run complete", { totalSent });
