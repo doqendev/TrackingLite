@@ -1,5 +1,6 @@
-import { auth } from "@/lib/auth";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 // In-memory sliding window for auth rate limiting.
 // Middleware runs in Edge runtime where ioredis is not available.
@@ -32,7 +33,7 @@ function cleanupStaleEntries() {
   }
 }
 
-export default auth((req) => {
+export default async function middleware(req: NextRequest) {
   cleanupStaleEntries();
 
   // Rate limit the credentials login endpoint
@@ -48,20 +49,26 @@ export default auth((req) => {
     }
   }
 
-  const isLoggedIn = !!req.auth;
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+  const isLoggedIn = !!token;
   const isPublicRoute = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/api/events/ingest", "/api/stripe/webhook", "/api/health", "/privacy", "/terms"].some(
     (path) => req.nextUrl.pathname === path || req.nextUrl.pathname.startsWith("/api/auth")
   );
 
   // Also allow webhook endpoints
   if (req.nextUrl.pathname.startsWith("/api/webhooks/")) {
-    return;
+    return NextResponse.next();
   }
 
   if (!isLoggedIn && !isPublicRoute) {
-    return Response.redirect(new URL("/login", req.nextUrl));
+    return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
-});
+
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.svg).*)"],
