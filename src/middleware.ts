@@ -8,6 +8,7 @@ import { getToken } from "next-auth/jwt";
 const authAttempts = new Map<string, { count: number; resetAt: number }>();
 const AUTH_LIMIT = 5;
 const AUTH_WINDOW_MS = 60_000; // 1 minute
+const ENABLE_AUTH_RATE_LIMIT = process.env.ENABLE_AUTH_RATE_LIMIT === "true";
 
 function checkLoginRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -37,7 +38,11 @@ export default async function middleware(req: NextRequest) {
   cleanupStaleEntries();
 
   // Rate limit the credentials login endpoint
-  if (req.nextUrl.pathname === "/api/auth/callback/credentials" && req.method === "POST") {
+  if (
+    ENABLE_AUTH_RATE_LIMIT &&
+    req.nextUrl.pathname === "/api/auth/callback/credentials" &&
+    req.method === "POST"
+  ) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
       || req.headers.get("x-real-ip")
       || "unknown";
