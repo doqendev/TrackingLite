@@ -152,11 +152,15 @@ export async function checkOrderLimits(
 export async function incrementOrderCount(userId: string): Promise<void> {
   const monthKey = new Date().toISOString().slice(0, 7);
   const redisKey = `orders:${userId}:${monthKey}`;
-  const pipeline = getSharedRedis().pipeline();
-  pipeline.incr(redisKey);
-  // Set expiry to 35 days (covers month + buffer)
-  pipeline.expire(redisKey, 35 * 24 * 60 * 60);
-  await pipeline.exec();
+  try {
+    const pipeline = getSharedRedis().pipeline();
+    pipeline.incr(redisKey);
+    // Set expiry to 35 days (covers month + buffer)
+    pipeline.expire(redisKey, 35 * 24 * 60 * 60);
+    await pipeline.exec();
+  } catch {
+    log.error("Redis error incrementing order count", { userId });
+  }
 }
 
 /**
@@ -185,7 +189,12 @@ export async function decrementOrderCount(
 export async function getOrderCount(userId: string): Promise<number> {
   const monthKey = new Date().toISOString().slice(0, 7);
   const redisKey = `orders:${userId}:${monthKey}`;
-  return parseInt((await getSharedRedis().get(redisKey)) || "0", 10);
+  try {
+    return parseInt((await getSharedRedis().get(redisKey)) || "0", 10);
+  } catch {
+    log.error("Redis error getting order count, returning 0", { userId });
+    return 0;
+  }
 }
 
 /**

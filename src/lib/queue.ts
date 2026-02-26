@@ -10,6 +10,9 @@ function getConnection(): IORedis {
       maxRetriesPerRequest: null,
       lazyConnect: true,
     });
+    connection.on("error", (err) => {
+      console.error(JSON.stringify({ level: "error", component: "queue-redis", msg: err.message, timestamp: new Date().toISOString() }));
+    });
   }
   return connection;
 }
