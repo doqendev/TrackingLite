@@ -21,7 +21,7 @@ RUN pnpm prisma generate
 
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=512"
-ENV PRISMA_CLIENT_ENGINE_TYPE=binary
+ENV PRISMA_CLIENT_ENGINE_TYPE=library
 ENV MSGPACKR_NATIVE_ACCELERATION_DISABLED=true
 # PORT is injected by Railway for health checks
 
