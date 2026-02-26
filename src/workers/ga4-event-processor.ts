@@ -150,7 +150,7 @@ export const ga4Worker = new Worker<DestinationEventJob>(
   processGA4Event,
   {
     connection: connection as never,
-    concurrency: 5,
+    concurrency: 2,
     lockDuration: 60000,
   }
 );
