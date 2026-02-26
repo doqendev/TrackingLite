@@ -8,6 +8,7 @@ import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 import type { MetaEventJob } from "@/lib/queue";
 import type { SnippetEventPayload } from "@/types/events";
 
@@ -148,7 +149,9 @@ export const worker = new Worker<MetaEventJob>(
   {
     connection: connection as never,
     concurrency: 2,
-    lockDuration: 60000,
+    lockDuration: WORKER_LOCK_DURATION_MS,
+    stalledInterval: WORKER_STALLED_INTERVAL_MS,
+    maxStalledCount: WORKER_MAX_STALLED_COUNT,
   }
 );
 
@@ -174,6 +177,10 @@ worker.on("failed", (job, err) => {
 
 worker.on("error", (err) => {
   workerLog.error("Worker error", { error: err });
+});
+
+worker.on("stalled", (jobId) => {
+  workerLog.warn("Job stalled", { jobId });
 });
 
 export { processMetaEvent };

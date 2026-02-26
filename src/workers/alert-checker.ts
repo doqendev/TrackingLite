@@ -3,6 +3,7 @@ import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import { evaluateAlerts, shouldSendAlert, sendAndLogAlert } from "@/lib/alerts";
 import { createLogger } from "@/lib/logger";
+import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 
 const ALERT_QUEUE_NAME = "alert-checks";
 const ALERT_JOB_NAME = "run-alert-checks";
@@ -157,6 +158,9 @@ export const alertWorker = new Worker(
   {
     connection: getAlertConnection() as never,
     concurrency: 1,
+    lockDuration: WORKER_LOCK_DURATION_MS,
+    stalledInterval: WORKER_STALLED_INTERVAL_MS,
+    maxStalledCount: WORKER_MAX_STALLED_COUNT,
   }
 );
 
@@ -177,4 +181,8 @@ alertWorker.on("failed", (job, err) => {
 
 alertWorker.on("error", (err) => {
   log.error("Worker error", { error: err, queue: ALERT_QUEUE_NAME });
+});
+
+alertWorker.on("stalled", (jobId) => {
+  log.warn("Job stalled", { queue: ALERT_QUEUE_NAME, jobId });
 });

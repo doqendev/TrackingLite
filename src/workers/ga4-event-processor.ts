@@ -12,6 +12,7 @@ import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import { hashPii } from "@/lib/hash-pii";
 import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
@@ -153,7 +154,9 @@ export const ga4Worker = new Worker<DestinationEventJob>(
   {
     connection: connection as never,
     concurrency: 2,
-    lockDuration: 60000,
+    lockDuration: WORKER_LOCK_DURATION_MS,
+    stalledInterval: WORKER_STALLED_INTERVAL_MS,
+    maxStalledCount: WORKER_MAX_STALLED_COUNT,
   }
 );
 
@@ -179,6 +182,10 @@ ga4Worker.on("failed", (job, err) => {
 
 ga4Worker.on("error", (err) => {
   workerLog.error("Worker error", { error: err });
+});
+
+ga4Worker.on("stalled", (jobId) => {
+  workerLog.warn("Job stalled", { jobId });
 });
 
 export { processGA4Event };

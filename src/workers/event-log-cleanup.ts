@@ -3,6 +3,7 @@ import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import { BILLING_PLANS, BillingPlanKey } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
+import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 
 const QUEUE_NAME = "event-log-cleanup";
 const JOB_NAME = "run-event-log-cleanup";
@@ -149,6 +150,9 @@ export const cleanupWorker = new Worker(
   {
     connection: getConnection() as never,
     concurrency: 1,
+    lockDuration: WORKER_LOCK_DURATION_MS,
+    stalledInterval: WORKER_STALLED_INTERVAL_MS,
+    maxStalledCount: WORKER_MAX_STALLED_COUNT,
   }
 );
 
@@ -169,4 +173,8 @@ cleanupWorker.on("failed", (job, err) => {
 
 cleanupWorker.on("error", (err) => {
   log.error("Worker error", { error: err, queue: QUEUE_NAME });
+});
+
+cleanupWorker.on("stalled", (jobId) => {
+  log.warn("Job stalled", { queue: QUEUE_NAME, jobId });
 });

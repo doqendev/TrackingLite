@@ -11,6 +11,7 @@ import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 import type { DestinationEventJob } from "@/lib/queue";
 
 async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> {
@@ -130,7 +131,9 @@ export const redditWorker = new Worker<DestinationEventJob>(
   {
     connection: connection as never,
     concurrency: 2,
-    lockDuration: 60000,
+    lockDuration: WORKER_LOCK_DURATION_MS,
+    stalledInterval: WORKER_STALLED_INTERVAL_MS,
+    maxStalledCount: WORKER_MAX_STALLED_COUNT,
   }
 );
 
@@ -156,6 +159,10 @@ redditWorker.on("failed", (job, err) => {
 
 redditWorker.on("error", (err) => {
   workerLog.error("Worker error", { error: err });
+});
+
+redditWorker.on("stalled", (jobId) => {
+  workerLog.warn("Job stalled", { jobId });
 });
 
 export { processRedditEvent };

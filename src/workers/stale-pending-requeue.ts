@@ -12,6 +12,7 @@ import {
   getPinterestQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
+import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 
 const QUEUE_NAME = "stale-pending-requeue";
 const JOB_NAME = "requeue-stale-pending";
@@ -410,6 +411,9 @@ export const staleRequeueWorker = new Worker(
   {
     connection: getConnection() as never,
     concurrency: 1,
+    lockDuration: WORKER_LOCK_DURATION_MS,
+    stalledInterval: WORKER_STALLED_INTERVAL_MS,
+    maxStalledCount: WORKER_MAX_STALLED_COUNT,
   }
 );
 
@@ -430,4 +434,8 @@ staleRequeueWorker.on("failed", (job, err) => {
 
 staleRequeueWorker.on("error", (err) => {
   log.error("Worker error", { error: err, queue: QUEUE_NAME });
+});
+
+staleRequeueWorker.on("stalled", (jobId) => {
+  log.warn("Job stalled", { queue: QUEUE_NAME, jobId });
 });
