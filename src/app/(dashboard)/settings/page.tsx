@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getActiveWorkspace } from "@/lib/active-workspace";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { AlertPreferences } from "@/components/settings/alert-preferences";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -14,27 +15,41 @@ export default async function SettingsPage() {
   const activeWs = await getActiveWorkspace(session.user.id);
   if (!activeWs) redirect("/onboarding");
 
-  const [workspace, user] = await Promise.all([
-    db.workspace.findUnique({
-      where: { id: activeWs.id },
-      select: {
-        id: true,
-        name: true,
-        domain: true,
-        consentMode: true,
-        enablePageView: true,
-        enableViewContent: true,
-        enableAddToCart: true,
-        enableInitiateCheckout: true,
-        enablePurchase: true,
-        isActive: true,
-      },
-    }),
-    db.user.findUnique({
-      where: { id: session.user.id },
-      select: { displayCurrency: true, language: true },
-    }),
-  ]);
+  let workspace, user;
+  try {
+    [workspace, user] = await Promise.all([
+      db.workspace.findUnique({
+        where: { id: activeWs.id },
+        select: {
+          id: true,
+          name: true,
+          domain: true,
+          consentMode: true,
+          enablePageView: true,
+          enableViewContent: true,
+          enableAddToCart: true,
+          enableInitiateCheckout: true,
+          enablePurchase: true,
+          isActive: true,
+        },
+      }),
+      db.user.findUnique({
+        where: { id: session.user.id },
+        select: { displayCurrency: true, language: true },
+      }),
+    ]);
+  } catch (error) {
+    console.error("Settings page data fetch failed:", error);
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">Failed to load data. Please try refreshing the page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!workspace) redirect("/onboarding");
 

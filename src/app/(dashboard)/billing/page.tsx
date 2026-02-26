@@ -57,25 +57,39 @@ export default async function BillingPage({
     { q: t("faqRefunds"), a: t("faqRefundsAnswer") },
   ];
 
-  const subscription = await db.subscription.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      plan: true,
-      status: true,
-      currentPeriodEnd: true,
-      cancelAtPeriodEnd: true,
-      stripeCustomerId: true,
-      stripeSubscriptionId: true,
-    },
-  });
+  let subscription, plan, status, statusConfig, planConfig, orderCount, orderLimit, usagePercent;
+  try {
+    subscription = await db.subscription.findUnique({
+      where: { userId: session.user.id },
+      select: {
+        plan: true,
+        status: true,
+        currentPeriodEnd: true,
+        cancelAtPeriodEnd: true,
+        stripeCustomerId: true,
+        stripeSubscriptionId: true,
+      },
+    });
 
-  const plan = subscription?.plan ?? "FREE";
-  const status = subscription?.status ?? "ACTIVE";
-  const statusConfig = STATUS_LABELS[status];
-  const planConfig = BILLING_PLANS[plan as keyof typeof BILLING_PLANS];
-  const orderCount = await getOrderCount(session.user.id);
-  const orderLimit = planConfig?.ordersPerMonth ?? 50;
-  const usagePercent = Math.min(100, Math.round((orderCount / orderLimit) * 100));
+    plan = subscription?.plan ?? "FREE";
+    status = subscription?.status ?? "ACTIVE";
+    statusConfig = STATUS_LABELS[status];
+    planConfig = BILLING_PLANS[plan as keyof typeof BILLING_PLANS];
+    orderCount = await getOrderCount(session.user.id);
+    orderLimit = planConfig?.ordersPerMonth ?? 50;
+    usagePercent = Math.min(100, Math.round((orderCount / orderLimit) * 100));
+  } catch (error) {
+    console.error("Billing page data fetch failed:", error);
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">Failed to load data. Please try refreshing the page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

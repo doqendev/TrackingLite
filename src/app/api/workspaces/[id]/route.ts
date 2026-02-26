@@ -71,78 +71,83 @@ export async function GET(
 
   const { id } = await params;
 
-  const workspace = await db.workspace.findFirst({
-    where: { id, userId: session.user.id, isActive: true },
-    select: {
-      id: true,
-      name: true,
-      domain: true,
-      platform: true,
-      metaPixelId: true,
-      metaAccessTokenEncrypted: true,
-      metaTestEventCode: true,
-      enableMeta: true,
-      consentMode: true,
-      enablePageView: true,
-      enableViewContent: true,
-      enableAddToCart: true,
-      enableInitiateCheckout: true,
-      enablePurchase: true,
-      isActive: true,
-      eventsForwardedCount: true,
-      // TikTok
-      tiktokPixelId: true,
-      tiktokAccessTokenEncrypted: true,
-      enableTikTok: true,
-      // GA4
-      ga4MeasurementId: true,
-      ga4ApiSecretEncrypted: true,
-      enableGA4: true,
-      // Klaviyo
-      klaviyoApiKeyEncrypted: true,
-      enableKlaviyo: true,
-      // Reddit
-      redditAccountId: true,
-      redditAccessTokenEncrypted: true,
-      enableReddit: true,
-      // Pinterest
-      pinterestAdAccountId: true,
-      pinterestConversionTokenEncrypted: true,
-      enablePinterest: true,
-      // Shopify webhook
-      shopifyDomain: true,
-      shopifyWebhookSecretEncrypted: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  try {
+    const workspace = await db.workspace.findFirst({
+      where: { id, userId: session.user.id, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        platform: true,
+        metaPixelId: true,
+        metaAccessTokenEncrypted: true,
+        metaTestEventCode: true,
+        enableMeta: true,
+        consentMode: true,
+        enablePageView: true,
+        enableViewContent: true,
+        enableAddToCart: true,
+        enableInitiateCheckout: true,
+        enablePurchase: true,
+        isActive: true,
+        eventsForwardedCount: true,
+        // TikTok
+        tiktokPixelId: true,
+        tiktokAccessTokenEncrypted: true,
+        enableTikTok: true,
+        // GA4
+        ga4MeasurementId: true,
+        ga4ApiSecretEncrypted: true,
+        enableGA4: true,
+        // Klaviyo
+        klaviyoApiKeyEncrypted: true,
+        enableKlaviyo: true,
+        // Reddit
+        redditAccountId: true,
+        redditAccessTokenEncrypted: true,
+        enableReddit: true,
+        // Pinterest
+        pinterestAdAccountId: true,
+        pinterestConversionTokenEncrypted: true,
+        enablePinterest: true,
+        // Shopify webhook
+        shopifyDomain: true,
+        shopifyWebhookSecretEncrypted: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-  if (!workspace) {
-    return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+    if (!workspace) {
+      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+    }
+
+    // Replace encrypted fields with boolean flags
+    const {
+      metaAccessTokenEncrypted,
+      tiktokAccessTokenEncrypted,
+      ga4ApiSecretEncrypted,
+      klaviyoApiKeyEncrypted,
+      redditAccessTokenEncrypted,
+      pinterestConversionTokenEncrypted,
+      shopifyWebhookSecretEncrypted,
+      ...rest
+    } = workspace;
+
+    return NextResponse.json({
+      ...rest,
+      hasMetaAccessToken: metaAccessTokenEncrypted !== null,
+      hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
+      hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
+      hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
+      hasRedditAccessToken: redditAccessTokenEncrypted !== null,
+      hasPinterestConversionToken: pinterestConversionTokenEncrypted !== null,
+      hasShopifyWebhookSecret: shopifyWebhookSecretEncrypted !== null,
+    });
+  } catch (error) {
+    log.error("Workspace GET failed", { error: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  // Replace encrypted fields with boolean flags
-  const {
-    metaAccessTokenEncrypted,
-    tiktokAccessTokenEncrypted,
-    ga4ApiSecretEncrypted,
-    klaviyoApiKeyEncrypted,
-    redditAccessTokenEncrypted,
-    pinterestConversionTokenEncrypted,
-    shopifyWebhookSecretEncrypted,
-    ...rest
-  } = workspace;
-
-  return NextResponse.json({
-    ...rest,
-    hasMetaAccessToken: metaAccessTokenEncrypted !== null,
-    hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
-    hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
-    hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
-    hasRedditAccessToken: redditAccessTokenEncrypted !== null,
-    hasPinterestConversionToken: pinterestConversionTokenEncrypted !== null,
-    hasShopifyWebhookSecret: shopifyWebhookSecretEncrypted !== null,
-  });
 }
 
 export async function PATCH(
@@ -360,13 +365,18 @@ export async function DELETE(
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  await db.workspace.update({
-    where: { id },
-    data: { isActive: false },
-  });
+  try {
+    await db.workspace.update({
+      where: { id },
+      data: { isActive: false },
+    });
 
-  await invalidateApiKeyCache(workspace.apiKey).catch(() => {});
-  invalidateWorkspaceCache(id);
+    await invalidateApiKeyCache(workspace.apiKey).catch(() => {});
+    invalidateWorkspaceCache(id);
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    log.error("Workspace DELETE failed", { error: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

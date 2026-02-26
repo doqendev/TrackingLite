@@ -92,7 +92,7 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
       accessToken,
       [tiktokEvent]
     );
-    await recordSuccess("TIKTOK");
+    await recordSuccess("TIKTOK").catch(() => {});
 
     // Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -104,7 +104,7 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
 
     log.info("Job completed");
   } catch (error) {
-    await recordFailure("TIKTOK");
+    await recordFailure("TIKTOK").catch(() => {});
     const errorMessage =
       error instanceof TikTokApiError
         ? `TikTok ${error.statusCode}: ${error.message}`
@@ -143,10 +143,14 @@ export const tiktokWorker = new Worker<DestinationEventJob>(
   processTikTokEvent,
   {
     connection: connection as never,
-    concurrency: 15,
+    concurrency: 5,
     lockDuration: 60000,
   }
 );
+
+connection.on("error", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+});
 
 const workerLog = createLogger({ component: "tiktok-worker" });
 

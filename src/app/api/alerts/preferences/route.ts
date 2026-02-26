@@ -18,14 +18,19 @@ export async function GET(): Promise<NextResponse> {
 
   const userId = session.user.id;
 
-  // Return existing preference or create default
-  const pref = await db.alertPreference.upsert({
-    where: { userId },
-    create: { userId },
-    update: {},
-  });
+  try {
+    // Return existing preference or create default
+    const pref = await db.alertPreference.upsert({
+      where: { userId },
+      create: { userId },
+      update: {},
+    });
 
-  return NextResponse.json(pref);
+    return NextResponse.json(pref);
+  } catch (error) {
+    console.error("Alert preferences GET error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function PUT(req: NextRequest): Promise<NextResponse> {
@@ -51,11 +56,16 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const pref = await db.alertPreference.upsert({
-    where: { userId },
-    create: { userId, ...parsed.data },
-    update: parsed.data,
-  });
+  try {
+    const pref = await db.alertPreference.upsert({
+      where: { userId },
+      create: { userId, ...parsed.data },
+      update: parsed.data,
+    });
 
-  return NextResponse.json(pref);
+    return NextResponse.json(pref);
+  } catch (error) {
+    console.error("Alert preferences PUT error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

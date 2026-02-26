@@ -74,50 +74,64 @@ export default async function EventsPage({
   const activeWs = await getActiveWorkspace(session.user.id);
   if (!activeWs) redirect("/onboarding");
 
-  const workspace = await db.workspace.findUnique({
-    where: { id: activeWs.id },
-    select: { id: true, name: true },
-  });
+  let workspace, events, total, failedCount, totalPages;
+  try {
+    workspace = await db.workspace.findUnique({
+      where: { id: activeWs.id },
+      select: { id: true, name: true },
+    });
 
-  if (!workspace) redirect("/onboarding");
+    if (!workspace) redirect("/onboarding");
 
-  const where = {
-    workspaceId: workspace.id,
-    ...(filterEventName && EVENT_NAMES.includes(filterEventName as (typeof EVENT_NAMES)[number])
-      ? { eventName: filterEventName }
-      : {}),
-    ...(filterStatus && Object.values(EventStatus).includes(filterStatus as EventStatus)
-      ? { status: filterStatus as EventStatus }
-      : {}),
-  };
+    const where = {
+      workspaceId: workspace.id,
+      ...(filterEventName && EVENT_NAMES.includes(filterEventName as (typeof EVENT_NAMES)[number])
+        ? { eventName: filterEventName }
+        : {}),
+      ...(filterStatus && Object.values(EventStatus).includes(filterStatus as EventStatus)
+        ? { status: filterStatus as EventStatus }
+        : {}),
+    };
 
-  const [events, total, failedCount] = await Promise.all([
-    db.eventLog.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      select: {
-        id: true,
-        eventName: true,
-        eventId: true,
-        status: true,
-        destination: true,
-        pageUrl: true,
-        utmSource: true,
-        utmCampaign: true,
-        errorMessage: true,
-        retryCount: true,
-        value: true,
-        currency: true,
-        createdAt: true,
-      },
-    }),
-    db.eventLog.count({ where }),
-    db.eventLog.count({ where: { workspaceId: workspace.id, status: "FAILED" } }),
-  ]);
+    [events, total, failedCount] = await Promise.all([
+      db.eventLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+        select: {
+          id: true,
+          eventName: true,
+          eventId: true,
+          status: true,
+          destination: true,
+          pageUrl: true,
+          utmSource: true,
+          utmCampaign: true,
+          errorMessage: true,
+          retryCount: true,
+          value: true,
+          currency: true,
+          createdAt: true,
+        },
+      }),
+      db.eventLog.count({ where }),
+      db.eventLog.count({ where: { workspaceId: workspace.id, status: "FAILED" } }),
+    ]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  } catch (error) {
+    console.error("Events page data fetch failed:", error);
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">Failed to load data. Please try refreshing the page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Build query string helper
   function buildHref(overrides: Record<string, string | undefined>) {

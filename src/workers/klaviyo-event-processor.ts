@@ -80,7 +80,7 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
     }
 
     const response = await sendToKlaviyo(apiKey, klaviyoEvent);
-    await recordSuccess("KLAVIYO");
+    await recordSuccess("KLAVIYO").catch(() => {});
 
     // Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -92,7 +92,7 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
 
     log.info("Job completed");
   } catch (error) {
-    await recordFailure("KLAVIYO");
+    await recordFailure("KLAVIYO").catch(() => {});
     const errorMessage =
       error instanceof KlaviyoApiError
         ? `Klaviyo ${error.statusCode}: ${error.message}`
@@ -131,10 +131,14 @@ export const klaviyoWorker = new Worker<DestinationEventJob>(
   processKlaviyoEvent,
   {
     connection: connection as never,
-    concurrency: 15,
+    concurrency: 5,
     lockDuration: 60000,
   }
 );
+
+connection.on("error", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+});
 
 const workerLog = createLogger({ component: "klaviyo-worker" });
 

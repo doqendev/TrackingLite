@@ -5,7 +5,7 @@ import type { MetaEventJob } from "@/lib/queue";
 // Mock ioredis BEFORE anything imports it
 vi.mock("ioredis", () => {
   const MockRedis = vi.fn(function (this: Record<string, unknown>) {
-    // noop constructor
+    this.on = vi.fn().mockReturnThis();
   });
   return { default: MockRedis };
 });

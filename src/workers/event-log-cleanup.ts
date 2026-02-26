@@ -20,6 +20,9 @@ function getConnection(): IORedis {
         lazyConnect: true,
       }
     );
+    _connection.on("error", (err) => {
+      console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+    });
   }
   return _connection;
 }

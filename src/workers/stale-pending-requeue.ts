@@ -34,6 +34,9 @@ function getConnection(): IORedis {
       process.env.REDIS_URL ?? "redis://localhost:6379",
       { maxRetriesPerRequest: null, lazyConnect: true }
     );
+    _connection.on("error", (err) => {
+      console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+    });
   }
   return _connection;
 }

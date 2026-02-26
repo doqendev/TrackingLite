@@ -6,10 +6,14 @@ const CACHE_TTL = 300; // 5 minutes
 export async function lookupWorkspaceByApiKey(apiKey: string) {
   const cacheKey = `apikey:${apiKey}`;
 
-  // Try cache first
-  const cached = await getSharedRedis().get(cacheKey);
-  if (cached) {
-    return JSON.parse(cached);
+  // Try Redis cache first
+  try {
+    const cached = await getSharedRedis().get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch {
+    // Redis unavailable or corrupted data, fall through to DB
   }
 
   // DB lookup — fetch only non-sensitive fields needed by the ingest route.
@@ -88,11 +92,19 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     hasShopifyWebhookSecret: !!shopifyWebhookSecretEncrypted,
   };
 
-  await getSharedRedis().setex(cacheKey, CACHE_TTL, JSON.stringify(sanitized));
+  try {
+    await getSharedRedis().setex(cacheKey, CACHE_TTL, JSON.stringify(sanitized));
+  } catch {
+    // Best-effort cache write, ignore failures
+  }
 
   return sanitized;
 }
 
 export async function invalidateApiKeyCache(apiKey: string): Promise<void> {
-  await getSharedRedis().del(`apikey:${apiKey}`);
+  try {
+    await getSharedRedis().del(`apikey:${apiKey}`);
+  } catch {
+    // Best-effort cache invalidation
+  }
 }

@@ -509,6 +509,54 @@ async function queryBillingUsage(userId: string): Promise<BillingUsage> {
   };
 }
 
+async function safeQuery<T>(fn: () => Promise<T>, defaultValue: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    console.error("Analytics query failed:", error);
+    return defaultValue;
+  }
+}
+
+const DEFAULT_HEALTH: HealthMetrics = {
+  status: "no_data",
+  successRate: 0,
+  totalEvents24h: 0,
+  sentEvents24h: 0,
+  failedEvents24h: 0,
+  lastEventAt: null,
+};
+
+const DEFAULT_REVENUE: RevenueMetrics = {
+  addToCartValue: { today: 0, yesterday: 0, currency: "USD" },
+  checkoutValue: { today: 0, yesterday: 0, currency: "USD" },
+  purchaseValue: { today: 0, yesterday: 0, currency: "USD" },
+  ordersToday: 0,
+  ordersYesterday: 0,
+  webhookBreakdown: [],
+};
+
+const DEFAULT_EVENT_BREAKDOWN: EventBreakdown = {
+  PageView: { today: 0, yesterday: 0 },
+  ViewContent: { today: 0, yesterday: 0 },
+  AddToCart: { today: 0, yesterday: 0 },
+  InitiateCheckout: { today: 0, yesterday: 0 },
+  Purchase: { today: 0, yesterday: 0 },
+  Refund: { today: 0, yesterday: 0 },
+};
+
+const DEFAULT_BILLING: BillingUsage = {
+  plan: "FREE",
+  ordersUsed: 0,
+  ordersLimit: 50,
+  usagePercent: 0,
+};
+
+const DEFAULT_CONVERSION_ACCURACY: ConversionAccuracy = {
+  last7d: { total: 0, sent: 0, failed: 0, accuracy: 0 },
+  last30d: { total: 0, sent: 0, failed: 0, accuracy: 0 },
+};
+
 export async function computeDashboardAnalytics(
   workspaceId: string,
   userId: string,
@@ -517,26 +565,39 @@ export async function computeDashboardAnalytics(
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
   // Always use canonical destination to deduplicate multi-dest fan-out
-  const filterDest = await getCanonicalDestination(workspaceId);
+  const filterDest = await safeQuery(
+    () => getCanonicalDestination(workspaceId),
+    null
+  );
 
-  // Query enabled destinations for display
+  const targetCurrency = displayCurrency || "USD";
+
+  const defaultRevenue: RevenueMetrics = {
+    ...DEFAULT_REVENUE,
+    addToCartValue: { ...DEFAULT_REVENUE.addToCartValue, currency: targetCurrency },
+    checkoutValue: { ...DEFAULT_REVENUE.checkoutValue, currency: targetCurrency },
+    purchaseValue: { ...DEFAULT_REVENUE.purchaseValue, currency: targetCurrency },
+  };
+
+  // Start enabledDestsQuery before Promise.all to maintain execution order
   const enabledDestsQuery = db.eventLog.groupBy({
     by: ["destination"],
     where: { workspaceId },
     _count: true,
+  }).catch((error) => {
+    console.error("Analytics query failed:", error);
+    return [] as Array<{ destination: Destination; _count: number }>;
   });
-
-  const targetCurrency = displayCurrency || "USD";
 
   const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns, destinationDelivery, enabledDests] =
     await Promise.all([
-      queryHealthMetrics(workspaceId, since24h, filterDest),
-      queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, filterDest),
-      queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, filterDest),
-      queryBillingUsage(userId),
-      queryConversionAccuracy(workspaceId, filterDest),
-      queryCampaignPerformance(workspaceId, targetCurrency, filterDest),
-      queryDestinationDelivery(workspaceId, since24h),
+      safeQuery(() => queryHealthMetrics(workspaceId, since24h, filterDest), DEFAULT_HEALTH),
+      safeQuery(() => queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, filterDest), defaultRevenue),
+      safeQuery(() => queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, filterDest), DEFAULT_EVENT_BREAKDOWN),
+      safeQuery(() => queryBillingUsage(userId), DEFAULT_BILLING),
+      safeQuery(() => queryConversionAccuracy(workspaceId, filterDest), DEFAULT_CONVERSION_ACCURACY),
+      safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, filterDest), [] as CampaignRow[]),
+      safeQuery(() => queryDestinationDelivery(workspaceId, since24h), [] as DestinationDeliveryRow[]),
       enabledDestsQuery,
     ]);
 

@@ -74,7 +74,7 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
     }
 
     const response = await sendToReddit(accountId, accessToken, [redditEvent]);
-    await recordSuccess("REDDIT");
+    await recordSuccess("REDDIT").catch(() => {});
 
     if (eventLogId) {
       await db.eventLog.update({
@@ -85,7 +85,7 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
 
     log.info("Job completed");
   } catch (error) {
-    await recordFailure("REDDIT");
+    await recordFailure("REDDIT").catch(() => {});
     const errorMessage =
       error instanceof RedditApiError
         ? `Reddit ${error.statusCode}: ${error.message}`
@@ -127,10 +127,14 @@ export const redditWorker = new Worker<DestinationEventJob>(
   processRedditEvent,
   {
     connection: connection as never,
-    concurrency: 15,
+    concurrency: 5,
     lockDuration: 60000,
   }
 );
+
+connection.on("error", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+});
 
 const workerLog = createLogger({ component: "reddit-worker" });
 

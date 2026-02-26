@@ -24,10 +24,15 @@ export async function POST(
 
   const apiKey = generateApiKey();
 
-  await db.workspace.update({
-    where: { id },
-    data: { apiKey },
-  });
+  try {
+    await db.workspace.update({
+      where: { id },
+      data: { apiKey },
+    });
 
-  return NextResponse.json({ apiKey });
+    return NextResponse.json({ apiKey });
+  } catch (error) {
+    console.error("Rotate key error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

@@ -34,7 +34,13 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
   const parsed = preferencesSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -52,11 +58,16 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
-  const user = await db.user.update({
-    where: { id: session.user.id },
-    data,
-    select: { displayCurrency: true, language: true },
-  });
+  try {
+    const user = await db.user.update({
+      where: { id: session.user.id },
+      data,
+      select: { displayCurrency: true, language: true },
+    });
 
-  return NextResponse.json(user);
+    return NextResponse.json(user);
+  } catch (error) {
+    console.error("User preferences PATCH error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

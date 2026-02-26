@@ -99,7 +99,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       clientId,
       [ga4Event]
     );
-    await recordSuccess("GA4");
+    await recordSuccess("GA4").catch(() => {});
 
     // Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -111,7 +111,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
 
     log.info("Job completed");
   } catch (error) {
-    await recordFailure("GA4");
+    await recordFailure("GA4").catch(() => {});
     const errorMessage =
       error instanceof GA4ApiError
         ? `GA4 ${error.statusCode}: ${error.message}`
@@ -150,10 +150,14 @@ export const ga4Worker = new Worker<DestinationEventJob>(
   processGA4Event,
   {
     connection: connection as never,
-    concurrency: 15,
+    concurrency: 5,
     lockDuration: 60000,
   }
 );
+
+connection.on("error", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+});
 
 const workerLog = createLogger({ component: "ga4-worker" });
 

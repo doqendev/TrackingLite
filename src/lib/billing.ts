@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP } from "@/lib/constants";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { createLogger } from "@/lib/logger";
 import { getSharedRedis } from "@/lib/redis";
 
@@ -37,9 +37,15 @@ export async function checkOrderLimits(
     return { allowed: true };
   }
 
-  const subscription = await db.subscription.findUnique({
-    where: { userId },
-  });
+  let subscription;
+  try {
+    subscription = await db.subscription.findUnique({
+      where: { userId },
+    });
+  } catch (error) {
+    log.error("Failed to check subscription for order limits", { userId, error: error instanceof Error ? error.message : String(error) });
+    return { allowed: true, used: 0, limit: Infinity };
+  }
 
   // No subscription record = FREE plan
   const plan = subscription?.plan ?? "FREE";
@@ -210,8 +216,8 @@ async function autoUpgrade(userId: string, nextPlan: string): Promise<boolean> {
     if (!priceId) return false;
 
     // Update Stripe subscription to new price
-    const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
-    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+    const stripeSub = await getStripe().subscriptions.retrieve(sub.stripeSubscriptionId);
+    await getStripe().subscriptions.update(sub.stripeSubscriptionId, {
       items: [{
         id: stripeSub.items.data[0].id,
         price: priceId,

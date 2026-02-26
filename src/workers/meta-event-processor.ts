@@ -89,7 +89,7 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       [metaCapiEvent],
       testEventCode || undefined
     );
-    await recordSuccess("META");
+    await recordSuccess("META").catch(() => {});
 
     // 5. Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -104,7 +104,7 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
 
     log.info("Job completed");
   } catch (error) {
-    await recordFailure("META");
+    await recordFailure("META").catch(() => {});
     // Update EventLog to FAILED
     const errorMessage =
       error instanceof MetaCapiError
@@ -145,10 +145,14 @@ export const worker = new Worker<MetaEventJob>(
   processMetaEvent,
   {
     connection: connection as never,
-    concurrency: 15,
+    concurrency: 5,
     lockDuration: 60000,
   }
 );
+
+connection.on("error", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+});
 
 const workerLog = createLogger({ component: "meta-worker" });
 

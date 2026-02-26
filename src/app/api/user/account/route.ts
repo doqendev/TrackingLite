@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { createLogger } from "@/lib/logger";
 import { deleteWorkspaceSessions } from "@/lib/session-enrichment";
 
@@ -24,7 +24,7 @@ export async function DELETE() {
 
     if (subscription?.stripeSubscriptionId) {
       try {
-        await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+        await getStripe().subscriptions.cancel(subscription.stripeSubscriptionId);
         log.info("Stripe subscription cancelled", {
           userId,
           subscriptionId: subscription.stripeSubscriptionId

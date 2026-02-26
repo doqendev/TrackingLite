@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import Stripe from "stripe";
 import { getSharedRedis } from "@/lib/redis";
@@ -24,14 +24,23 @@ function stripeStatusToLocal(status: string): "ACTIVE" | "PAST_DUE" | "CANCELED"
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
-  const signature = request.headers.get("stripe-signature")!;
+  const signature = request.headers.get("stripe-signature");
+  if (!signature) {
+    return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
+  }
+
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    log.error("STRIPE_WEBHOOK_SECRET not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      webhookSecret
     );
   } catch (err) {
     log.error("Stripe webhook invalid signature", { error: err instanceof Error ? err.message : String(err) });
@@ -57,7 +66,7 @@ export async function POST(request: NextRequest) {
         const userId = session.metadata?.userId;
         if (!userId || !session.subscription) break;
 
-        const subscription = await stripe.subscriptions.retrieve(
+        const subscription = await getStripe().subscriptions.retrieve(
           session.subscription as string
         );
 

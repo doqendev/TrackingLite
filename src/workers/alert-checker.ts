@@ -20,6 +20,9 @@ function getAlertConnection(): IORedis {
         lazyConnect: true,
       }
     );
+    _alertConnection.on("error", (err) => {
+      console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+    });
   }
   return _alertConnection;
 }
@@ -93,8 +96,9 @@ async function runAlertChecks(): Promise<void> {
   const destinationQueues = ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events"];
 
   for (const queueName of destinationQueues) {
+    let queue: Queue | undefined;
     try {
-      const queue = new Queue(queueName, { connection: getAlertConnection() as never });
+      queue = new Queue(queueName, { connection: getAlertConnection() as never });
       const waiting = await queue.getWaitingCount();
       const delayed = await queue.getDelayedCount();
       const total = waiting + delayed;
@@ -108,13 +112,13 @@ async function runAlertChecks(): Promise<void> {
           threshold: QUEUE_DEPTH_THRESHOLD,
         });
       }
-
-      await queue.close();
     } catch (err) {
       log.error("Failed to check queue depth", {
         queue: queueName,
         error: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      await queue?.close().catch(() => {});
     }
   }
 

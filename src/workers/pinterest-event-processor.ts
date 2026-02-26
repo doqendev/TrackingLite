@@ -76,7 +76,7 @@ async function processPinterestEvent(job: Job<DestinationEventJob>): Promise<voi
     }
 
     const response = await sendToPinterest(adAccountId, conversionToken, [pinterestEvent]);
-    await recordSuccess("PINTEREST");
+    await recordSuccess("PINTEREST").catch(() => {});
 
     // Update EventLog to SENT (skip for fire-and-forget events)
     if (eventLogId) {
@@ -88,7 +88,7 @@ async function processPinterestEvent(job: Job<DestinationEventJob>): Promise<voi
 
     log.info("Job completed");
   } catch (error) {
-    await recordFailure("PINTEREST");
+    await recordFailure("PINTEREST").catch(() => {});
     const errorMessage =
       error instanceof PinterestApiError
         ? `Pinterest ${error.statusCode}: ${error.message}`
@@ -130,10 +130,14 @@ export const pinterestWorker = new Worker<DestinationEventJob>(
   processPinterestEvent,
   {
     connection: connection as never,
-    concurrency: 15,
+    concurrency: 5,
     lockDuration: 60000,
   }
 );
+
+connection.on("error", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+});
 
 const workerLog = createLogger({ component: "pinterest-worker" });
 

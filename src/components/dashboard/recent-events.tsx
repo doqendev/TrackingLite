@@ -45,23 +45,42 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
     RETRYING: { label: t("retrying"), className: "bg-orange-500/10 text-orange-400" },
   };
 
-  const events = await db.eventLog.findMany({
-    where: { workspaceId },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-    select: {
-      id: true,
-      eventName: true,
-      eventId: true,
-      status: true,
-      destination: true,
-      pageUrl: true,
-      errorMessage: true,
-      value: true,
-      currency: true,
-      createdAt: true,
-    },
-  });
+  type EventRow = {
+    id: string;
+    eventName: string;
+    eventId: string;
+    status: EventStatus;
+    destination: Destination;
+    pageUrl: string | null;
+    errorMessage: string | null;
+    value: number | null;
+    currency: string | null;
+    createdAt: Date;
+  };
+
+  let events: EventRow[];
+  try {
+    events = await db.eventLog.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        eventName: true,
+        eventId: true,
+        status: true,
+        destination: true,
+        pageUrl: true,
+        errorMessage: true,
+        value: true,
+        currency: true,
+        createdAt: true,
+      },
+    });
+  } catch (error) {
+    console.error("RecentEvents data fetch failed:", error);
+    events = [];
+  }
 
   if (events.length === 0) {
     return (

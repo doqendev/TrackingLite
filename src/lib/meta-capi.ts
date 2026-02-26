@@ -33,7 +33,7 @@ export async function sendToMetaCapi(
     signal: AbortSignal.timeout(30000),
   });
 
-  const result = await response.json();
+  const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
     throw new MetaCapiError(

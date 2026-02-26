@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getActiveWorkspace } from "@/lib/active-workspace";
 import { IntegrationsGrid } from "@/components/integrations/integrations-grid";
 import { getTranslations } from "next-intl/server";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -15,38 +16,52 @@ export default async function IntegrationsPage() {
   const activeWs = await getActiveWorkspace(session.user.id);
   if (!activeWs) redirect("/onboarding");
 
-  const workspace = await db.workspace.findUnique({
-    where: { id: activeWs.id },
-    select: {
-      id: true,
-      // Meta
-      metaPixelId: true,
-      metaTestEventCode: true,
-      metaAccessTokenEncrypted: true,
-      enableMeta: true,
-      // TikTok
-      tiktokPixelId: true,
-      tiktokAccessTokenEncrypted: true,
-      enableTikTok: true,
-      // GA4
-      ga4MeasurementId: true,
-      ga4ApiSecretEncrypted: true,
-      enableGA4: true,
-      // Klaviyo
-      klaviyoApiKeyEncrypted: true,
-      enableKlaviyo: true,
-      // Reddit
-      redditAccountId: true,
-      redditAccessTokenEncrypted: true,
-      enableReddit: true,
-      // Pinterest
-      pinterestAdAccountId: true,
-      pinterestConversionTokenEncrypted: true,
-      enablePinterest: true,
-      // Shopify Webhook
-      shopifyWebhookSecretEncrypted: true,
-    },
-  });
+  let workspace;
+  try {
+    workspace = await db.workspace.findUnique({
+      where: { id: activeWs.id },
+      select: {
+        id: true,
+        // Meta
+        metaPixelId: true,
+        metaTestEventCode: true,
+        metaAccessTokenEncrypted: true,
+        enableMeta: true,
+        // TikTok
+        tiktokPixelId: true,
+        tiktokAccessTokenEncrypted: true,
+        enableTikTok: true,
+        // GA4
+        ga4MeasurementId: true,
+        ga4ApiSecretEncrypted: true,
+        enableGA4: true,
+        // Klaviyo
+        klaviyoApiKeyEncrypted: true,
+        enableKlaviyo: true,
+        // Reddit
+        redditAccountId: true,
+        redditAccessTokenEncrypted: true,
+        enableReddit: true,
+        // Pinterest
+        pinterestAdAccountId: true,
+        pinterestConversionTokenEncrypted: true,
+        enablePinterest: true,
+        // Shopify Webhook
+        shopifyWebhookSecretEncrypted: true,
+      },
+    });
+  } catch (error) {
+    console.error("Integrations page data fetch failed:", error);
+    return (
+      <div className="p-6">
+        <Card className="w-full">
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">Failed to load data. Please try refreshing the page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!workspace) redirect("/onboarding");
 

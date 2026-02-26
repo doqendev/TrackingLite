@@ -60,7 +60,7 @@ log.info("Redis configured", { redisUrl: (process.env.REDIS_URL ?? "redis://loca
 log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
 
 // Minimal HTTP health check for Railway
-const healthPort = parseInt(process.env.WORKER_HEALTH_PORT || "8080", 10);
+const healthPort = parseInt(process.env.PORT || process.env.WORKER_HEALTH_PORT || "8080", 10);
 const healthServer = createServer((req, res) => {
   if (req.url === "/health" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });

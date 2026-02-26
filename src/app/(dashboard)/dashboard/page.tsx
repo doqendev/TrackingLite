@@ -17,6 +17,7 @@ import { ConversionAccuracy } from "@/components/dashboard/conversion-accuracy";
 import { CampaignPerformance } from "@/components/dashboard/campaign-performance";
 import { PlatformDelivery } from "@/components/dashboard/platform-delivery";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Settings, AlertTriangle } from "lucide-react";
 
@@ -36,70 +37,84 @@ export default async function DashboardPage() {
   const activeWs = await getActiveWorkspace(session.user.id);
   if (!activeWs) redirect("/onboarding");
 
-  const workspace = await db.workspace.findUnique({
-    where: { id: activeWs.id },
-    select: {
-      id: true,
-      name: true,
-      domain: true,
-      metaPixelId: true,
-      metaAccessTokenEncrypted: true,
-      enableMeta: true,
-      enableTikTok: true,
-      enableGA4: true,
-      enableKlaviyo: true,
-      enableReddit: true,
-      enablePinterest: true,
-    },
-  });
-
-  if (!workspace) {
-    redirect("/onboarding");
-  }
-
-  // Check which destinations have credentials configured
-  const hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-  const hasAnyDestination = hasMetaCredentials || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
-
-  // Get user's display currency
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { displayCurrency: true },
-  });
-  const displayCurrency = user?.displayCurrency ?? "USD";
-
-  const analytics = await getCachedAnalytics(
-    workspace.id,
-    async () => {
-      return computeDashboardAnalytics(
-        workspace.id,
-        session.user!.id!,
-        displayCurrency
-      );
-    },
-    displayCurrency
-  );
-
-  // Query billing data fresh (not from cache) so plan changes reflect immediately
-  const subscription = await db.subscription.findUnique({
-    where: { userId: session.user.id },
-    select: { plan: true },
-  });
-  const freshPlan = subscription?.plan ?? "FREE";
-  const freshPlanConfig = BILLING_PLANS[freshPlan as keyof typeof BILLING_PLANS];
-  const freshOrdersLimit = freshPlanConfig?.ordersPerMonth ?? 50;
-  let freshOrdersUsed: number;
+  let workspace, hasMetaCredentials, hasAnyDestination, analytics;
   try {
-    freshOrdersUsed = await getOrderCount(session.user.id);
-  } catch {
-    freshOrdersUsed = 0;
+    workspace = await db.workspace.findUnique({
+      where: { id: activeWs.id },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        metaPixelId: true,
+        metaAccessTokenEncrypted: true,
+        enableMeta: true,
+        enableTikTok: true,
+        enableGA4: true,
+        enableKlaviyo: true,
+        enableReddit: true,
+        enablePinterest: true,
+      },
+    });
+
+    if (!workspace) {
+      redirect("/onboarding");
+    }
+
+    // Check which destinations have credentials configured
+    hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
+    hasAnyDestination = hasMetaCredentials || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
+
+    // Get user's display currency
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { displayCurrency: true },
+    });
+    const displayCurrency = user?.displayCurrency ?? "USD";
+
+    analytics = await getCachedAnalytics(
+      workspace.id,
+      async () => {
+        return computeDashboardAnalytics(
+          workspace!.id,
+          session.user!.id!,
+          displayCurrency
+        );
+      },
+      displayCurrency
+    );
+
+    // Query billing data fresh (not from cache) so plan changes reflect immediately
+    const subscription = await db.subscription.findUnique({
+      where: { userId: session.user.id },
+      select: { plan: true },
+    });
+    const freshPlan = subscription?.plan ?? "FREE";
+    const freshPlanConfig = BILLING_PLANS[freshPlan as keyof typeof BILLING_PLANS];
+    const freshOrdersLimit = freshPlanConfig?.ordersPerMonth ?? 50;
+    let freshOrdersUsed: number;
+    try {
+      freshOrdersUsed = await getOrderCount(session.user.id);
+    } catch {
+      freshOrdersUsed = 0;
+    }
+    analytics.billing = {
+      plan: freshPlan,
+      ordersUsed: freshOrdersUsed,
+      ordersLimit: freshOrdersLimit,
+      usagePercent: Math.min(100, Math.round((freshOrdersUsed / freshOrdersLimit) * 100)),
+    };
+  } catch (error) {
+    console.error("Dashboard page data fetch failed:", error);
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">Failed to load data. Please try refreshing the page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
-  analytics.billing = {
-    plan: freshPlan,
-    ordersUsed: freshOrdersUsed,
-    ordersLimit: freshOrdersLimit,
-    usagePercent: Math.min(100, Math.round((freshOrdersUsed / freshOrdersLimit) * 100)),
-  };
 
   const healthConfig = HEALTH_CONFIG[analytics.health.status];
 

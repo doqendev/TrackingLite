@@ -24,28 +24,33 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const workspaces = await db.workspace.findMany({
-    where: { userId: session.user.id, isActive: true },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      domain: true,
-      platform: true,
-      metaPixelId: true,
-      consentMode: true,
-      enablePageView: true,
-      enableViewContent: true,
-      enableAddToCart: true,
-      enableInitiateCheckout: true,
-      enablePurchase: true,
-      isActive: true,
-      eventsForwardedCount: true,
-      createdAt: true,
-    },
-  });
+  try {
+    const workspaces = await db.workspace.findMany({
+      where: { userId: session.user.id, isActive: true },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        platform: true,
+        metaPixelId: true,
+        consentMode: true,
+        enablePageView: true,
+        enableViewContent: true,
+        enableAddToCart: true,
+        enableInitiateCheckout: true,
+        enablePurchase: true,
+        isActive: true,
+        eventsForwardedCount: true,
+        createdAt: true,
+      },
+    });
 
-  return NextResponse.json(workspaces);
+    return NextResponse.json(workspaces);
+  } catch (error) {
+    log.error("Workspace list failed", { error: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {

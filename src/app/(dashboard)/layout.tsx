@@ -15,20 +15,33 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const [activeWorkspace, workspaces, subscription] = await Promise.all([
-    getActiveWorkspace(session.user.id),
-    getAllWorkspaces(session.user.id),
-    db.subscription.findUnique({
-      where: { userId: session.user.id },
-      select: { plan: true },
-    }),
-  ]);
+  let activeWorkspace, workspaces, subscription;
+  try {
+    [activeWorkspace, workspaces, subscription] = await Promise.all([
+      getActiveWorkspace(session.user.id),
+      getAllWorkspaces(session.user.id),
+      db.subscription.findUnique({
+        where: { userId: session.user.id },
+        select: { plan: true },
+      }),
+    ]);
+  } catch (error) {
+    console.error("Dashboard layout data fetch failed:", error);
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <h2 className="text-xl font-semibold">Unable to load dashboard</h2>
+          <p className="text-muted-foreground">Please try refreshing the page.</p>
+        </div>
+      </div>
+    );
+  }
 
   const userEmail = session.user.email ?? "";
   const workspaceName = activeWorkspace?.name ?? null;
   const plan = (subscription?.plan ?? "FREE") as keyof typeof BILLING_PLANS;
   const maxWorkspaces = BILLING_PLANS[plan]?.maxWorkspaces ?? 1;
-  const canAddStore = workspaces.length < maxWorkspaces;
+  const canAddStore = (workspaces ?? []).length < maxWorkspaces;
 
   return (
     <div className="flex h-screen bg-background">
@@ -39,7 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="text-brand-500">Track</span>&thinsp;Clear
           </Link>
         </div>
-        {workspaces.length > 0 && activeWorkspace && (
+        {(workspaces ?? []).length > 0 && activeWorkspace && (
           <div className="px-3 pt-3">
             <WorkspaceSwitcher
               workspaces={workspaces}

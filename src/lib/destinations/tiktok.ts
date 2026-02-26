@@ -149,7 +149,7 @@ export async function sendToTikTok(
     signal: AbortSignal.timeout(30000),
   });
 
-  const result = await response.json();
+  const result = await response.json().catch(() => ({ code: -1, message: "Non-JSON response" }));
 
   if (!response.ok || result.code !== 0) {
     throw new TikTokApiError(
