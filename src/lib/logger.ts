@@ -24,7 +24,7 @@ function serializeError(error: Error, seen: WeakSet<object>): Record<string, unk
     if (key === "name" || key === "message" || key === "stack" || key === "cause") {
       continue;
     }
-    out[key] = normalizeValue((error as Record<string, unknown>)[key], seen);
+    out[key] = normalizeValue(Reflect.get(error, key), seen);
   }
 
   const withCause = error as Error & { cause?: unknown };
