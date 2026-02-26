@@ -15,6 +15,10 @@ import { validateEnv } from "@/lib/env-validation";
 try {
   validateEnv("worker");
 } catch (err) {
+  const serializedError = err instanceof Error
+    ? { name: err.name, message: err.message, stack: err.stack }
+    : { message: String(err) };
+
   // logger.ts uses only console.error/console.log internally, safe to inline here
   // before the dynamic imports below so Railway logs capture the failure reason
   process.stderr.write(
@@ -22,7 +26,7 @@ try {
       level: "error",
       component: "worker-startup",
       msg: "Worker startup failed: environment validation",
-      error: err instanceof Error ? err.message : String(err),
+      error: serializedError,
       timestamp: new Date().toISOString(),
     }) + "\n"
   );
@@ -44,13 +48,21 @@ import { createServer } from "http";
 const log = createLogger({ component: "worker-main" });
 
 process.on("uncaughtException", (err) => {
-  log.error("Uncaught exception", { error: err.message, stack: err.stack });
+  log.error("Uncaught exception", { error: err });
   Sentry.captureException(err);
 });
 
 process.on("unhandledRejection", (reason) => {
-  log.error("Unhandled rejection", { error: String(reason) });
+  log.error("Unhandled rejection", { reason });
   Sentry.captureException(reason);
+});
+
+process.on("beforeExit", (code) => {
+  log.warn("Worker process beforeExit", { code });
+});
+
+process.on("exit", (code) => {
+  log.warn("Worker process exit", { code });
 });
 
 const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorker, pinterestWorker, alertWorker, staleRequeueWorker, cleanupWorker];
@@ -87,17 +99,17 @@ setInterval(() => {
 
 // Schedule the hourly alert-check repeatable job
 scheduleAlertChecks().catch((err) => {
-  log.error("Failed to schedule alert checks", { error: err instanceof Error ? err.message : String(err) });
+  log.error("Failed to schedule alert checks", { error: err });
 });
 
 // Schedule the stale-pending requeue job (every 5 minutes)
 scheduleStaleRequeue().catch((err) => {
-  log.error("Failed to schedule stale requeue", { error: err instanceof Error ? err.message : String(err) });
+  log.error("Failed to schedule stale requeue", { error: err });
 });
 
 // Schedule the event-log cleanup job (hourly)
 scheduleEventLogCleanup().catch((err) => {
-  log.error("Failed to schedule event log cleanup", { error: err instanceof Error ? err.message : String(err) });
+  log.error("Failed to schedule event log cleanup", { error: err });
 });
 
 // Graceful shutdown
@@ -112,7 +124,7 @@ async function shutdown(signal: string) {
     await Promise.all(workers.map(w => w.close()));
     log.info("All workers stopped");
   } catch (err) {
-    log.error("Error during shutdown", { error: err instanceof Error ? err.message : String(err) });
+    log.error("Error during shutdown", { error: err });
   }
   clearTimeout(timeout);
   await Sentry.flush(2000).catch(() => null);

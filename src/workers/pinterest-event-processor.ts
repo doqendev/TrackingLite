@@ -110,7 +110,7 @@ async function processPinterestEvent(job: Job<DestinationEventJob>): Promise<voi
         .catch((dbErr) => {
           log.error("Failed to update EventLog", {
             eventLogId,
-            error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+            error: dbErr,
           });
         });
     }
@@ -119,6 +119,8 @@ async function processPinterestEvent(job: Job<DestinationEventJob>): Promise<voi
     throw error;
   }
 }
+
+const connectionLog = createLogger({ component: "pinterest-worker", channel: "redis" });
 
 const connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
   maxRetriesPerRequest: null,
@@ -136,7 +138,7 @@ export const pinterestWorker = new Worker<DestinationEventJob>(
 );
 
 connection.on("error", (err) => {
-  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+  connectionLog.error("Worker Redis connection error", { error: err });
 });
 
 const workerLog = createLogger({ component: "pinterest-worker" });
@@ -146,11 +148,17 @@ pinterestWorker.on("completed", (job) => {
 });
 
 pinterestWorker.on("failed", (job, err) => {
-  workerLog.error("Job failed", { jobId: job?.id, error: err.message });
+  workerLog.error("Job failed", {
+    jobId: job?.id,
+    jobName: job?.name,
+    attemptsMade: job?.attemptsMade,
+    attempts: job?.opts?.attempts,
+    error: err,
+  });
 });
 
 pinterestWorker.on("error", (err) => {
-  workerLog.error("Worker error", { error: err.message });
+  workerLog.error("Worker error", { error: err });
 });
 
 export { processPinterestEvent };

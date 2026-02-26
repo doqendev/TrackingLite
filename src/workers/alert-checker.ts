@@ -21,7 +21,7 @@ function getAlertConnection(): IORedis {
       }
     );
     _alertConnection.on("error", (err) => {
-      console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+      log.error("Worker Redis connection error", { error: err, queue: ALERT_QUEUE_NAME });
     });
   }
   return _alertConnection;
@@ -79,14 +79,14 @@ async function runAlertChecks(): Promise<void> {
           log.error("Failed to send alert", {
             alertType: alert.alertType,
             userId: user.id,
-            error: alertErr instanceof Error ? alertErr.message : String(alertErr),
+            error: alertErr,
           });
         }
       }
     } catch (userErr) {
       log.error("Failed to evaluate alerts for user", {
         userId: user.id,
-        error: userErr instanceof Error ? userErr.message : String(userErr),
+        error: userErr,
       });
     }
   }
@@ -115,7 +115,7 @@ async function runAlertChecks(): Promise<void> {
     } catch (err) {
       log.error("Failed to check queue depth", {
         queue: queueName,
-        error: err instanceof Error ? err.message : String(err),
+        error: err,
       });
     } finally {
       await queue?.close().catch(() => {});
@@ -164,10 +164,17 @@ alertWorker.on("completed", () => {
   log.info("Alert check job completed");
 });
 
-alertWorker.on("failed", (_job, err) => {
-  log.error("Alert check job failed", { error: err instanceof Error ? err.message : String(err) });
+alertWorker.on("failed", (job, err) => {
+  log.error("Alert check job failed", {
+    queue: ALERT_QUEUE_NAME,
+    jobId: job?.id,
+    jobName: job?.name,
+    attemptsMade: job?.attemptsMade,
+    attempts: job?.opts?.attempts,
+    error: err,
+  });
 });
 
 alertWorker.on("error", (err) => {
-  log.error("Worker error", { error: err.message });
+  log.error("Worker error", { error: err, queue: ALERT_QUEUE_NAME });
 });

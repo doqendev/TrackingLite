@@ -131,7 +131,7 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
           },
         })
         .catch((dbErr) => {
-          log.error("Failed to update EventLog", { eventLogId, error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
+          log.error("Failed to update EventLog", { eventLogId, error: dbErr });
         });
     }
 
@@ -139,6 +139,8 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
     throw error;
   }
 }
+
+const connectionLog = createLogger({ component: "ga4-worker", channel: "redis" });
 
 const connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
   maxRetriesPerRequest: null,
@@ -156,7 +158,7 @@ export const ga4Worker = new Worker<DestinationEventJob>(
 );
 
 connection.on("error", (err) => {
-  console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+  connectionLog.error("Worker Redis connection error", { error: err });
 });
 
 const workerLog = createLogger({ component: "ga4-worker" });
@@ -166,11 +168,17 @@ ga4Worker.on("completed", (job) => {
 });
 
 ga4Worker.on("failed", (job, err) => {
-  workerLog.error("Job failed", { jobId: job?.id, error: err.message });
+  workerLog.error("Job failed", {
+    jobId: job?.id,
+    jobName: job?.name,
+    attemptsMade: job?.attemptsMade,
+    attempts: job?.opts?.attempts,
+    error: err,
+  });
 });
 
 ga4Worker.on("error", (err) => {
-  workerLog.error("Worker error", { error: err.message });
+  workerLog.error("Worker error", { error: err });
 });
 
 export { processGA4Event };

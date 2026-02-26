@@ -35,7 +35,7 @@ function getConnection(): IORedis {
       { maxRetriesPerRequest: null, lazyConnect: true }
     );
     _connection.on("error", (err) => {
-      console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+      log.error("Worker Redis connection error", { error: err, queue: QUEUE_NAME });
     });
   }
   return _connection;
@@ -218,7 +218,7 @@ async function requeueEvents(
         });
         requeued++;
       } catch (err) {
-        log.error("Failed to requeue event", { eventId: event.id, error: err instanceof Error ? err.message : String(err) });
+        log.error("Failed to requeue event", { eventId: event.id, error: err });
         await db.eventLog.update({
           where: { id: event.id },
           data: { status: "FAILED", errorMessage: "Requeue failed" },
@@ -367,7 +367,7 @@ async function reconcileOrderCounts(): Promise<void> {
         log.info("Order count reconciled", { userId, redisCount, dbCount });
       }
     } catch (err) {
-      log.error("Order count reconciliation failed", { userId, error: err instanceof Error ? err.message : String(err) });
+      log.error("Order count reconciliation failed", { userId, error: err });
     }
   }
 }
@@ -386,7 +386,7 @@ async function cleanupDlq(): Promise<void> {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({ level: "error", msg: "DLQ cleanup failed", error: err instanceof Error ? err.message : String(err) }));
+    log.error("DLQ cleanup failed", { error: err });
   }
 }
 
@@ -417,10 +417,17 @@ staleRequeueWorker.on("completed", () => {
   // silent on completion unless there was work
 });
 
-staleRequeueWorker.on("failed", (_job, err) => {
-  log.error("Job failed", { error: err instanceof Error ? err.message : String(err) });
+staleRequeueWorker.on("failed", (job, err) => {
+  log.error("Job failed", {
+    queue: QUEUE_NAME,
+    jobId: job?.id,
+    jobName: job?.name,
+    attemptsMade: job?.attemptsMade,
+    attempts: job?.opts?.attempts,
+    error: err,
+  });
 });
 
 staleRequeueWorker.on("error", (err) => {
-  log.error("Worker error", { error: err.message });
+  log.error("Worker error", { error: err, queue: QUEUE_NAME });
 });

@@ -1,6 +1,9 @@
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import { QUEUE_CONFIG } from "./constants";
+import { createLogger } from "./logger";
+
+const redisLog = createLogger({ component: "queue-redis" });
 
 let connection: IORedis | null = null;
 
@@ -11,7 +14,7 @@ function getConnection(): IORedis {
       lazyConnect: true,
     });
     connection.on("error", (err) => {
-      console.error(JSON.stringify({ level: "error", component: "queue-redis", msg: err.message, timestamp: new Date().toISOString() }));
+      redisLog.error("Redis connection error", { error: err });
     });
   }
   return connection;

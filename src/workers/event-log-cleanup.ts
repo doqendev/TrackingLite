@@ -21,7 +21,7 @@ function getConnection(): IORedis {
       }
     );
     _connection.on("error", (err) => {
-      console.error(JSON.stringify({ level: "error", msg: "Worker Redis connection error", error: err.message }));
+      log.error("Worker Redis connection error", { error: err, queue: QUEUE_NAME });
     });
   }
   return _connection;
@@ -156,10 +156,17 @@ cleanupWorker.on("completed", () => {
   log.info("Event log cleanup job completed");
 });
 
-cleanupWorker.on("failed", (_job, err) => {
-  log.error("Event log cleanup job failed", { error: err instanceof Error ? err.message : String(err) });
+cleanupWorker.on("failed", (job, err) => {
+  log.error("Event log cleanup job failed", {
+    queue: QUEUE_NAME,
+    jobId: job?.id,
+    jobName: job?.name,
+    attemptsMade: job?.attemptsMade,
+    attempts: job?.opts?.attempts,
+    error: err,
+  });
 });
 
 cleanupWorker.on("error", (err) => {
-  log.error("Worker error", { error: err.message });
+  log.error("Worker error", { error: err, queue: QUEUE_NAME });
 });

@@ -1,4 +1,7 @@
 import IORedis from "ioredis";
+import { createLogger } from "./logger";
+
+const redisLog = createLogger({ component: "redis" });
 
 let redis: IORedis | null = null;
 
@@ -12,7 +15,7 @@ export function getSharedRedis(): IORedis {
       },
     });
     redis.on("error", (err) => {
-      console.error(JSON.stringify({ level: "error", component: "redis", msg: err.message, timestamp: new Date().toISOString() }));
+      redisLog.error("Redis connection error", { error: err });
     });
   }
   return redis;
