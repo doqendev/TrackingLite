@@ -49,9 +49,10 @@ export default async function middleware(req: NextRequest) {
     }
   }
 
+  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   const token = await getToken({
     req,
-    secret: process.env.NEXTAUTH_SECRET,
+    ...(authSecret ? { secret: authSecret } : {}),
   });
   const isLoggedIn = !!token;
   const isPublicRoute = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/api/events/ingest", "/api/stripe/webhook", "/api/health", "/privacy", "/terms"].some(

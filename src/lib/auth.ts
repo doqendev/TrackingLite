@@ -5,6 +5,8 @@ import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { db } from "./db";
 
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
 const providers: any[] = [
   Credentials({
     name: "credentials",
@@ -37,6 +39,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  secret: authSecret,
   session: {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days

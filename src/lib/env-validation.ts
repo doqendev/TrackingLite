@@ -3,17 +3,22 @@ import { createLogger } from "./logger";
 const log = createLogger({ component: "env-validation" });
 
 export function validateEnv(context: "web" | "worker" = "web") {
+  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
   // Core vars required by both web and worker
   const required: Record<string, string | undefined> = {
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   };
 
   const missing = Object.entries(required)
     .filter(([, v]) => !v)
     .map(([k]) => k);
+
+  if (!authSecret) {
+    missing.push("AUTH_SECRET or NEXTAUTH_SECRET");
+  }
 
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(", ")}`);

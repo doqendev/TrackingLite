@@ -56,14 +56,25 @@ export default function SignupPage() {
         redirect: false,
       });
 
-      if (result?.error) {
-        setError(t("accountCreatedSignInFailed"));
-        setLoading(false);
-      } else {
-        window.location.href = "/onboarding";
+      if (!result) {
+        setError(t("somethingWentWrong"));
+        return;
       }
+
+      if (result.error) {
+        setError(t("accountCreatedSignInFailed"));
+        return;
+      }
+
+      if (result.ok) {
+        window.location.href = "/onboarding";
+        return;
+      }
+
+      setError(t("somethingWentWrong"));
     } catch {
       setError(t("networkError"));
+    } finally {
       setLoading(false);
     }
   }

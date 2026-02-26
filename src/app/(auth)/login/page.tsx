@@ -20,24 +20,45 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+      if (!result) {
+        setError(t("somethingWentWrong"));
+        return;
+      }
 
-    if (result?.error) {
-      setError(t("invalidCredentials"));
+      if (result.error) {
+        setError(result.error === "CredentialsSignin" ? t("invalidCredentials") : t("somethingWentWrong"));
+        return;
+      }
+
+      if (result.ok) {
+        window.location.href = "/dashboard";
+        return;
+      }
+
+      setError(t("somethingWentWrong"));
+    } catch {
+      setError(t("networkError"));
+    } finally {
       setLoading(false);
-    } else {
-      window.location.href = "/dashboard";
     }
   }
 
   async function handleGoogleSignIn() {
+    setError("");
     setLoading(true);
-    await signIn("google", { callbackUrl: "/dashboard" });
+    try {
+      await signIn("google", { callbackUrl: "/dashboard" });
+    } catch {
+      setError(t("networkError"));
+      setLoading(false);
+    }
   }
 
   return (
