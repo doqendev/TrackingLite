@@ -127,7 +127,7 @@ export const redditWorker = new Worker<DestinationEventJob>(
   processRedditEvent,
   {
     connection: connection as never,
-    concurrency: 10,
+    concurrency: 3,
     lockDuration: 60000,
   }
 );

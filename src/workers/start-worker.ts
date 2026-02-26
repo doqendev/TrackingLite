@@ -74,6 +74,17 @@ healthServer.listen(healthPort, () => {
   log.info("Worker health check listening", { port: healthPort });
 });
 
+// Log memory usage every 5 minutes
+setInterval(() => {
+  const mem = process.memoryUsage();
+  log.info("Memory usage", {
+    rss: Math.round(mem.rss / 1024 / 1024),
+    heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+    heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+    external: Math.round(mem.external / 1024 / 1024),
+  });
+}, 5 * 60 * 1000);
+
 // Schedule the hourly alert-check repeatable job
 scheduleAlertChecks().catch((err) => {
   log.error("Failed to schedule alert checks", { error: err instanceof Error ? err.message : String(err) });

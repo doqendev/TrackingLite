@@ -20,6 +20,6 @@ COPY . .
 RUN pnpm prisma generate
 
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=256"
+ENV NODE_OPTIONS="--max-old-space-size=192"
 
 CMD ["pnpm", "worker"]
