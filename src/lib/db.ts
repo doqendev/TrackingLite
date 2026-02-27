@@ -9,7 +9,7 @@ export const db =
       db: {
         url: `${process.env.DATABASE_URL ?? ""}${
           (process.env.DATABASE_URL ?? "").includes("?") ? "&" : "?"
-        }connection_limit=${process.env.PRISMA_POOL_SIZE ?? "5"}&pool_timeout=5`,
+        }connection_limit=${process.env.PRISMA_POOL_SIZE ?? "5"}&pool_timeout=15`,
       },
     },
     log:

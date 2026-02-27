@@ -12,7 +12,13 @@ export const metadata = {
 };
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  let session;
+  try {
+    session = await auth();
+  } catch (error) {
+    process.stderr.write(`[LAYOUT] auth() threw: ${error instanceof Error ? error.message : String(error)}\n`);
+    redirect("/login");
+  }
   if (!session?.user?.id) redirect("/login");
 
   let activeWorkspace, workspaces, subscription;
@@ -26,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       }),
     ]);
   } catch (error) {
-    console.error("Dashboard layout data fetch failed:", error);
+    process.stderr.write(`[LAYOUT] Dashboard data fetch failed: ${error instanceof Error ? error.stack : String(error)}\n`);
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">

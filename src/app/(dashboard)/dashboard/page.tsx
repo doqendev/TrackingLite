@@ -104,7 +104,7 @@ export default async function DashboardPage() {
       usagePercent: Math.min(100, Math.round((freshOrdersUsed / freshOrdersLimit) * 100)),
     };
   } catch (error) {
-    console.error("Dashboard page data fetch failed:", error);
+    process.stderr.write(`[DASHBOARD] Data fetch failed: ${error instanceof Error ? error.stack : String(error)}\n`);
     return (
       <div className="p-6">
         <Card>

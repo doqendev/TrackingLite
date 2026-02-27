@@ -68,8 +68,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getLocale();
-  const messages = await getMessages();
+  let locale = "en";
+  let messages = {};
+  try {
+    locale = await getLocale();
+    messages = await getMessages();
+  } catch (error) {
+    process.stderr.write(`[ROOT_LAYOUT] i18n failed: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
 
   return (
     <html lang={locale} className="dark" suppressHydrationWarning>
