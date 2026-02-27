@@ -1,8 +1,7 @@
 [deploy]
-# Give the container plenty of time to start (prisma migrate + Next.js startup)
+# Prisma migrate takes ~30s + Next.js startup ~5s — need at least 60s, using 120s for safety
 healthcheckPath = "/api/health"
-healthcheckTimeout = 30
-# Wait up to 120s for the container to become healthy before giving up
+healthcheckTimeout = 120
 startCommand = "sh -c 'npx prisma migrate deploy 2>&1 || true; exec node .next/standalone/server.js'"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
