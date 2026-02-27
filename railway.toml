@@ -1,7 +1,0 @@
-[deploy]
-# Prisma migrate takes ~30s + Next.js startup ~5s — need at least 60s, using 120s for safety
-healthcheckPath = "/api/health"
-healthcheckTimeout = 120
-startCommand = "sh -c 'npx prisma migrate deploy 2>&1 || true; exec node .next/standalone/server.js'"
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
