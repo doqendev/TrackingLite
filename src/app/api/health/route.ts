@@ -2,6 +2,20 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSharedRedis } from "@/lib/redis";
 
+// Register crash handlers on first health check (runs in the actual server process)
+const g = globalThis as Record<string, unknown>;
+if (!g.__crashHandlers) {
+  g.__crashHandlers = true;
+  console.log(`[BOOT] Health route loaded pid=${process.pid} node=${process.version}`);
+  process.on("SIGTERM", () => console.log(`[SIGNAL] SIGTERM uptime=${Math.round(process.uptime())}s`));
+  process.on("uncaughtException", (err) => { console.log(`[FATAL] ${err.stack}`); process.exit(1); });
+  process.on("unhandledRejection", (r) => { console.log(`[FATAL] Unhandled: ${r instanceof Error ? r.stack : r}`); process.exit(1); });
+  setInterval(() => {
+    const m = process.memoryUsage();
+    console.log(`[MEM] rss=${Math.round(m.rss/1048576)}MB heap=${Math.round(m.heapUsed/1048576)}/${Math.round(m.heapTotal/1048576)}MB up=${Math.round(process.uptime())}s`);
+  }, 120_000).unref();
+}
+
 export async function GET() {
   let dbStatus: "connected" | "disconnected" = "connected";
   let redisStatus: "connected" | "disconnected" = "connected";
