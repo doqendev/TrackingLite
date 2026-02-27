@@ -47,7 +47,7 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv) {
     syncLog(`[BEFORE_EXIT] code=${code} — event loop drained, no active handles`);
   });
 
-  // SIGTERM: Railway sends this before SIGKILL. We MUST exit or Railway will SIGKILL after grace period.
+  // SIGTERM: Railway sends this before SIGKILL. Single handler here (instrumentation.ts defers to us).
   process.on("SIGTERM", () => {
     syncLog(`[SIGNAL] SIGTERM at ${new Date().toISOString()} uptime=${Math.round(process.uptime())}s — shutting down`);
     if (globalForPrisma.prisma) {
@@ -63,23 +63,18 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv) {
   });
 
   process.on("uncaughtException", (err) => {
-    syncLog(`[FATAL] Uncaught exception: ${err.stack ?? err.message}`);
-    setTimeout(() => process.exit(1), 200);
+    syncLog(`[ERROR] Uncaught exception: ${err.stack ?? err.message}`);
+    // Do NOT exit — let the process recover from transient errors
   });
 
   process.on("unhandledRejection", (reason) => {
-    syncLog(`[FATAL] Unhandled rejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
-    setTimeout(() => process.exit(1), 200);
+    syncLog(`[ERROR] Unhandled rejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
+    // Do NOT exit — let the process recover from transient errors
   });
 
   // Keep DB + Redis connections warm every 60s to prevent idle stale connections.
   // After idle periods, stale connections cause cascading failures on first request.
-  // This MUST be in db.ts (not a route handler) because Next.js lazy-loads route modules.
-  //
-  // CRITICAL: Also self-ping the HTTP health endpoint. Railway's proxy tracks HTTP
-  // activity and SIGKILL's containers it considers "idle" (~8-10 min with zero HTTP
-  // traffic). DB/Redis keepalives don't register as HTTP activity. The self-ping
-  // makes Railway's proxy see the container as active.
+  // HTTP self-ping handled by instrumentation.ts every 30s (keeps Railway proxy alive).
   setInterval(async () => {
     try {
       if (globalForPrisma.prisma) {
@@ -96,12 +91,7 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv) {
       const { getSharedRedis } = await import("./redis");
       await getSharedRedis().ping();
     } catch {}
-    // Self-ping health endpoint to keep Railway's proxy alive
-    try {
-      const port = process.env.PORT || "3000";
-      const http = require("http");
-      http.get(`http://localhost:${port}/api/health`, () => {}).on("error", () => {});
-    } catch {}
+    // Self-ping removed — instrumentation.ts handles it every 30s
     const m = process.memoryUsage();
     syncLog(`[KEEPALIVE] rss=${Math.round(m.rss/1048576)}MB heap=${Math.round(m.heapUsed/1048576)}/${Math.round(m.heapTotal/1048576)}MB up=${Math.round(process.uptime())}s`);
   }, 60_000).unref();
