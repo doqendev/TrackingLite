@@ -67,38 +67,41 @@ function setupDefaultMocks() {
     .mockResolvedValueOnce({ destination: "META" })               // getCanonicalDestination
     .mockResolvedValueOnce({ createdAt: new Date("2026-02-18T12:00:00Z") }); // lastEvent
 
-  // groupBy call order:
-  // 1. enabledDestsQuery (before Promise.all)
-  // 2-7. Revenue groupBy x6 (by currency, in queryRevenueMetrics)
-  // 8. webhookBreakdown (in queryRevenueMetrics)
-  // 9-10. Event breakdown today/yesterday (in queryEventBreakdown)
-  // 11. Campaigns (in queryCampaignPerformance)
-  // 12. Destination delivery (in queryDestinationDelivery)
+  // groupBy call order (sequential batches to stay within DB pool limits):
+  // Batch 1: health + eventBreakdown + destinationDelivery + enabledDests
+  //   1-2. Event breakdown today/yesterday (queryEventBreakdown)
+  //   3. Destination delivery (queryDestinationDelivery)
+  //   4. enabledDestsQuery
+  // Batch 2: revenue (queryRevenueMetrics)
+  //   5-10. Revenue groupBy x6 (by currency)
+  //   11. webhookBreakdown
+  // Batch 4: billing + campaigns
+  //   12. Campaigns (queryCampaignPerformance)
   mockGroupBy
-    .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // 1. enabledDestsQuery
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 4280.5 } }])   // 2. AddToCart today
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 3800.0 } }])   // 3. AddToCart yesterday
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 2150.0 } }])   // 4. Checkout today
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 2220.0 } }])   // 5. Checkout yesterday
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 1890.0 } }])   // 6. Purchase today
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 1750.0 } }])   // 7. Purchase yesterday
-    .mockResolvedValueOnce([])   // 8. webhookBreakdown
-    .mockResolvedValueOnce([     // 9. today event breakdown
+    .mockResolvedValueOnce([     // 1. today event breakdown
       { eventName: "PageView", _count: 1245 },
       { eventName: "ViewContent", _count: 834 },
       { eventName: "AddToCart", _count: 312 },
       { eventName: "InitiateCheckout", _count: 156 },
       { eventName: "Purchase", _count: 89 },
     ])
-    .mockResolvedValueOnce([     // 10. yesterday event breakdown
+    .mockResolvedValueOnce([     // 2. yesterday event breakdown
       { eventName: "PageView", _count: 1100 },
       { eventName: "ViewContent", _count: 780 },
       { eventName: "AddToCart", _count: 290 },
       { eventName: "InitiateCheckout", _count: 140 },
       { eventName: "Purchase", _count: 75 },
     ])
-    .mockResolvedValueOnce([])   // 11. campaigns
-    .mockResolvedValueOnce([{ destination: "META", status: "SENT", _count: 95 }, { destination: "META", status: "FAILED", _count: 5 }]);  // 12. destinationDelivery
+    .mockResolvedValueOnce([{ destination: "META", status: "SENT", _count: 95 }, { destination: "META", status: "FAILED", _count: 5 }])  // 3. destinationDelivery
+    .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // 4. enabledDestsQuery
+    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 4280.5 } }])   // 5. AddToCart today
+    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 3800.0 } }])   // 6. AddToCart yesterday
+    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 2150.0 } }])   // 7. Checkout today
+    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 2220.0 } }])   // 8. Checkout yesterday
+    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 1890.0 } }])   // 9. Purchase today
+    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 1750.0 } }])   // 10. Purchase yesterday
+    .mockResolvedValueOnce([])   // 11. webhookBreakdown
+    .mockResolvedValueOnce([]);  // 12. campaigns
 
   // Subscription
   mockFindUnique.mockResolvedValue({ plan: "STARTER" });
@@ -107,13 +110,22 @@ function setupDefaultMocks() {
   mockGetOrderCount.mockResolvedValue(23);
 }
 
-/** Sets up 12 empty groupBy mocks for tests where all data is empty/zero */
-function setupEmptyGroupByMocks(firstMock?: unknown[]) {
-  const chain = mockGroupBy.mockResolvedValueOnce(firstMock ?? []);
-  // 6 revenue groupBy + webhookBreakdown + 2 event breakdown + campaigns + destinationDelivery
-  for (let i = 0; i < 11; i++) {
-    chain.mockResolvedValueOnce([]);
-  }
+/** Sets up 12 empty groupBy mocks for tests where all data is empty/zero.
+ *  enabledDestsMock goes at position #4 (after eventBreakdown x2 + destinationDelivery). */
+function setupEmptyGroupByMocks(enabledDestsMock?: unknown[]) {
+  mockGroupBy
+    .mockResolvedValueOnce([])   // 1. event breakdown today
+    .mockResolvedValueOnce([])   // 2. event breakdown yesterday
+    .mockResolvedValueOnce([])   // 3. destination delivery
+    .mockResolvedValueOnce(enabledDestsMock ?? [])  // 4. enabledDestsQuery
+    .mockResolvedValueOnce([])   // 5. AddToCart today
+    .mockResolvedValueOnce([])   // 6. AddToCart yesterday
+    .mockResolvedValueOnce([])   // 7. Checkout today
+    .mockResolvedValueOnce([])   // 8. Checkout yesterday
+    .mockResolvedValueOnce([])   // 9. Purchase today
+    .mockResolvedValueOnce([])   // 10. Purchase yesterday
+    .mockResolvedValueOnce([])   // 11. webhookBreakdown
+    .mockResolvedValueOnce([]);  // 12. campaigns
 }
 
 describe("getHealthStatus", () => {
@@ -379,18 +391,18 @@ describe("computeDashboardAnalytics", () => {
 
       // Only PageView events today, nothing yesterday
       mockGroupBy
-        .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // enabledDestsQuery
-        .mockResolvedValueOnce([])   // AddToCart today
-        .mockResolvedValueOnce([])   // AddToCart yesterday
-        .mockResolvedValueOnce([])   // Checkout today
-        .mockResolvedValueOnce([])   // Checkout yesterday
-        .mockResolvedValueOnce([])   // Purchase today
-        .mockResolvedValueOnce([])   // Purchase yesterday
-        .mockResolvedValueOnce([])   // webhookBreakdown
-        .mockResolvedValueOnce([{ eventName: "PageView", _count: 5 }]) // today event breakdown
-        .mockResolvedValueOnce([])   // yesterday event breakdown
-        .mockResolvedValueOnce([])   // campaigns
-        .mockResolvedValueOnce([]);  // destinationDelivery
+        .mockResolvedValueOnce([{ eventName: "PageView", _count: 5 }]) // 1. today event breakdown
+        .mockResolvedValueOnce([])   // 2. yesterday event breakdown
+        .mockResolvedValueOnce([])   // 3. destination delivery
+        .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // 4. enabledDestsQuery
+        .mockResolvedValueOnce([])   // 5. AddToCart today
+        .mockResolvedValueOnce([])   // 6. AddToCart yesterday
+        .mockResolvedValueOnce([])   // 7. Checkout today
+        .mockResolvedValueOnce([])   // 8. Checkout yesterday
+        .mockResolvedValueOnce([])   // 9. Purchase today
+        .mockResolvedValueOnce([])   // 10. Purchase yesterday
+        .mockResolvedValueOnce([])   // 11. webhookBreakdown
+        .mockResolvedValueOnce([]);  // 12. campaigns
 
 
       mockFindUnique.mockResolvedValue(null);

@@ -218,13 +218,15 @@ async function queryRevenueMetrics(
     _sum: { value: true },
   });
 
-  const [results, ordersToday, ordersYesterday, webhookGroups] =
-    await Promise.all([
-      Promise.all(queries),
-      orderQueries[0],
-      orderQueries[1],
-      webhookBreakdownQuery,
-    ]);
+  // Split into two sub-batches to keep peak DB connections under 7
+  // Sub-batch A: 6 groupBy revenue queries
+  const results = await Promise.all(queries);
+  // Sub-batch B: 2 order counts + 1 webhook breakdown
+  const [ordersToday, ordersYesterday, webhookGroups] = await Promise.all([
+    orderQueries[0],
+    orderQueries[1],
+    webhookBreakdownQuery,
+  ]);
 
   // Fetch exchange rates for all unique currencies → displayCurrency
   const rates = await collectExchangeRates(
@@ -579,27 +581,44 @@ export async function computeDashboardAnalytics(
     purchaseValue: { ...DEFAULT_REVENUE.purchaseValue, currency: targetCurrency },
   };
 
-  // Start enabledDestsQuery before Promise.all to maintain execution order
-  const enabledDestsQuery = db.eventLog.groupBy({
-    by: ["destination"],
-    where: { workspaceId },
-    _count: true,
-  }).catch((error) => {
-    console.error("Analytics query failed:", error);
-    return [] as Array<{ destination: Destination; _count: number }>;
-  });
+  // Run queries in sequential batches to stay within DB connection pool limits.
+  // Pool size is 10; each batch keeps peak parallel connections under 8 to leave
+  // headroom for layout/auth queries sharing the same pool. This prevents
+  // connection pool exhaustion and OOM from 23+ queued queries.
 
-  const [health, revenue, eventBreakdown, billing, conversionAccuracy, campaigns, destinationDelivery, enabledDests] =
+  // Batch 1: Health + event breakdown + delivery + enabled dests (~8 peak connections)
+  const [health, eventBreakdown, destinationDelivery, enabledDests] =
     await Promise.all([
       safeQuery(() => queryHealthMetrics(workspaceId, since24h, filterDest), DEFAULT_HEALTH),
-      safeQuery(() => queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, filterDest), defaultRevenue),
       safeQuery(() => queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, filterDest), DEFAULT_EVENT_BREAKDOWN),
-      safeQuery(() => queryBillingUsage(userId), DEFAULT_BILLING),
-      safeQuery(() => queryConversionAccuracy(workspaceId, filterDest), DEFAULT_CONVERSION_ACCURACY),
-      safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, filterDest), [] as CampaignRow[]),
       safeQuery(() => queryDestinationDelivery(workspaceId, since24h), [] as DestinationDeliveryRow[]),
-      enabledDestsQuery,
+      db.eventLog.groupBy({
+        by: ["destination"],
+        where: { workspaceId },
+        _count: true,
+      }).catch((error) => {
+        console.error("Analytics query failed:", error);
+        return [] as Array<{ destination: Destination; _count: number }>;
+      }),
     ]);
+
+  // Batch 2: Revenue queries alone (~9 peak connections internally)
+  const revenue = await safeQuery(
+    () => queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, filterDest),
+    defaultRevenue
+  );
+
+  // Batch 3: Conversion accuracy alone (~6 peak connections internally)
+  const conversionAccuracy = await safeQuery(
+    () => queryConversionAccuracy(workspaceId, filterDest),
+    DEFAULT_CONVERSION_ACCURACY
+  );
+
+  // Batch 4: Lightweight remaining queries (~3 peak connections)
+  const [billing, campaigns] = await Promise.all([
+    safeQuery(() => queryBillingUsage(userId), DEFAULT_BILLING),
+    safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, filterDest), [] as CampaignRow[]),
+  ]);
 
   const planConfig =
     BILLING_PLANS[billing.plan as keyof typeof BILLING_PLANS];
