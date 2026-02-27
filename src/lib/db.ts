@@ -15,7 +15,24 @@ const globalForPrisma = globalThis as unknown as {
 if (!globalForPrisma.__diagRegistered) {
   globalForPrisma.__diagRegistered = true;
 
-  syncLog(`[DIAG] Process started pid=${process.pid} node=${process.version} uptime=${Math.round(process.uptime())}s`);
+  // Read container memory limit from cgroup (Railway/Docker)
+  let cgroupLimit = "unknown";
+  try {
+    const { readFileSync } = require("fs");
+    // cgroup v2
+    const raw = readFileSync("/sys/fs/cgroup/memory.max", "utf8").trim();
+    cgroupLimit = raw === "max" ? "unlimited" : `${Math.round(parseInt(raw) / 1048576)}MB`;
+  } catch {
+    try {
+      const { readFileSync } = require("fs");
+      // cgroup v1
+      const raw = readFileSync("/sys/fs/cgroup/memory/memory.limit_in_bytes", "utf8").trim();
+      const val = parseInt(raw);
+      cgroupLimit = val > 1e15 ? "unlimited" : `${Math.round(val / 1048576)}MB`;
+    } catch { /* not in container */ }
+  }
+
+  syncLog(`[DIAG] Process started pid=${process.pid} node=${process.version} uptime=${Math.round(process.uptime())}s cgroupMemLimit=${cgroupLimit}`);
 
   // Exit handler — fires on ANY exit (SIGTERM, normal, crash). Reveals exit code.
   // Code 0 = clean exit (event loop drained), 1 = crash, 143 = SIGTERM, null = SIGKILL (won't fire)
