@@ -23,5 +23,8 @@ export async function register() {
   };
 
   setTimeout(selfPing, 3_000).unref();
-  setInterval(selfPing, 30_000).unref();
+  // This interval is intentionally NOT .unref()'d — it keeps the Node.js event loop
+  // alive as a safety net. If the Next.js HTTP listener ever closes temporarily,
+  // this prevents the process from silently exiting (code 0 = Railway won't restart).
+  setInterval(selfPing, 30_000);
 }
