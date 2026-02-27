@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSharedRedis } from "@/lib/redis";
 
-// Crash handlers + keepalive are in db.ts (guaranteed to load, unlike lazy route modules)
+// MUST be dynamic — Next.js was caching health responses at build time (X-Nextjs-Cache: HIT)
+// which caused Railway to get stale "degraded" responses from dead containers
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   let dbStatus: "connected" | "disconnected" = "connected";
@@ -43,12 +45,17 @@ export async function GET() {
 
   // ALWAYS return 200 — Railway restarts on non-200 health checks.
   // Use "status" field for monitoring tools to detect degradation.
-  return NextResponse.json({
-    status: overall,
-    database: dbStatus,
-    redis: redisStatus,
-    memory: memMB,
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+  return NextResponse.json(
+    {
+      status: overall,
+      database: dbStatus,
+      redis: redisStatus,
+      memory: memMB,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    },
+    {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    }
+  );
 }
