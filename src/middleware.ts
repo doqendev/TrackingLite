@@ -55,8 +55,12 @@ export default async function middleware(req: NextRequest) {
   }
 
   const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const isSecure =
+    req.headers.get("x-forwarded-proto") === "https" ||
+    req.nextUrl.protocol === "https:";
   const token = await getToken({
     req,
+    secureCookie: isSecure,
     ...(authSecret ? { secret: authSecret } : {}),
   });
   const isLoggedIn = !!token;
