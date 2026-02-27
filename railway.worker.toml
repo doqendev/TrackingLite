@@ -1,0 +1,8 @@
+[build]
+watchPatterns = ["src/workers/**", "src/lib/**", "prisma/**", "package.json"]
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+drainingSeconds = 30
+overlapSeconds = 10
