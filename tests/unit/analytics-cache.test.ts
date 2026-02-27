@@ -110,7 +110,7 @@ describe("getCachedAnalytics", () => {
     expect(mockSetex).toHaveBeenCalledTimes(1);
     expect(mockSetex).toHaveBeenCalledWith(
       `analytics:${WORKSPACE_ID}:default`,
-      60,
+      300,
       expect.any(String)
     );
 

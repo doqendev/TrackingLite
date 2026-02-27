@@ -39,6 +39,9 @@ export default async function DashboardPage() {
 
   let workspace, hasMetaCredentials, hasAnyDestination, analytics;
   try {
+    // Sync log survives SIGKILL — helps correlate dashboard loads with crashes
+    process.stderr.write(`[DASHBOARD] Render started uid=${session.user.id} ws=${activeWs.id} at ${new Date().toISOString()}\n`);
+
     workspace = await db.workspace.findUnique({
       where: { id: activeWs.id },
       select: {
@@ -103,6 +106,8 @@ export default async function DashboardPage() {
       ordersLimit: freshOrdersLimit,
       usagePercent: Math.min(100, Math.round((freshOrdersUsed / freshOrdersLimit) * 100)),
     };
+
+    process.stderr.write(`[DASHBOARD] Render complete ws=${activeWs.id} at ${new Date().toISOString()}\n`);
   } catch (error) {
     process.stderr.write(`[DASHBOARD] Data fetch failed: ${error instanceof Error ? error.stack : String(error)}\n`);
     return (

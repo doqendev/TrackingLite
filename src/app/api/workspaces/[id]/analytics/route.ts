@@ -36,9 +36,12 @@ export async function GET(
   });
   const displayCurrency = user?.displayCurrency ?? "USD";
 
+  process.stderr.write(`[ANALYTICS] Request started ws=${workspace.id} at ${new Date().toISOString()}\n`);
+
   const analytics = await getCachedAnalytics(
     workspace.id,
     async () => {
+      process.stderr.write(`[ANALYTICS] Cache miss — computing ws=${workspace.id}\n`);
       const data = await computeDashboardAnalytics(
         workspace.id,
         session.user!.id!,

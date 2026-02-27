@@ -12,7 +12,9 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 // Register process diagnostics + keepalive once (guaranteed to run since db.ts is imported by every route)
-if (!globalForPrisma.__diagRegistered) {
+// Skip in test environments — vitest uses uncaughtException internally, and process.exit kills workers
+const isTestEnv = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+if (!globalForPrisma.__diagRegistered && !isTestEnv) {
   globalForPrisma.__diagRegistered = true;
 
   // Read container memory limit from cgroup (Railway/Docker)
@@ -73,8 +75,22 @@ if (!globalForPrisma.__diagRegistered) {
   // Keep DB + Redis connections warm every 60s to prevent idle stale connections.
   // After idle periods, stale connections cause cascading failures on first request.
   // This MUST be in db.ts (not a route handler) because Next.js lazy-loads route modules.
+  //
+  // CRITICAL: Warm up MULTIPLE pool connections in parallel, not just one.
+  // The dashboard fires 8+ concurrent queries. If only 1 connection is warm and the
+  // other 7 are stale, the burst of reconnections can crash the Prisma engine.
   setInterval(async () => {
-    try { if (globalForPrisma.prisma) await globalForPrisma.prisma.$queryRaw`SELECT 1`; } catch {}
+    try {
+      if (globalForPrisma.prisma) {
+        // Warm 4 connections in parallel (half the pool) to prevent cold-start storms
+        await Promise.all([
+          globalForPrisma.prisma.$queryRaw`SELECT 1`,
+          globalForPrisma.prisma.$queryRaw`SELECT 1`,
+          globalForPrisma.prisma.$queryRaw`SELECT 1`,
+          globalForPrisma.prisma.$queryRaw`SELECT 1`,
+        ]);
+      }
+    } catch {}
     try {
       const { getSharedRedis } = await import("./redis");
       await getSharedRedis().ping();
