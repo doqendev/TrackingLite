@@ -1,8 +1,6 @@
+// Sentry removed from web process to reduce memory footprint (~60-80 MB savings).
+// Error monitoring is still active in the worker via @sentry/node.
+// Re-enable when Railway service has >= 1 GB RAM.
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("../sentry.server.config");
-  }
-  if (process.env.NEXT_RUNTIME === "edge") {
-    await import("../sentry.edge.config");
-  }
+  // no-op
 }

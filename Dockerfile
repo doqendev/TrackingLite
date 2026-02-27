@@ -24,15 +24,9 @@ RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
-ENV NODE_OPTIONS="--max-old-space-size=384"
+ENV PRISMA_CLIENT_ENGINE_TYPE=library
+ENV NODE_OPTIONS="--max-old-space-size=448"
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "\
-  attempt=0; \
-  until pnpm prisma migrate deploy || [ $attempt -ge 5 ]; do \
-    attempt=$((attempt + 1)); \
-    echo \"Migration attempt $attempt failed, retrying in 3s...\"; \
-    sleep 3; \
-  done; \
-  exec node .next/standalone/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy 2>&1 || true; exec node .next/standalone/server.js"]
