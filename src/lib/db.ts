@@ -76,13 +76,14 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv) {
   // After idle periods, stale connections cause cascading failures on first request.
   // This MUST be in db.ts (not a route handler) because Next.js lazy-loads route modules.
   //
-  // CRITICAL: Warm up MULTIPLE pool connections in parallel, not just one.
-  // The dashboard fires 8+ concurrent queries. If only 1 connection is warm and the
-  // other 7 are stale, the burst of reconnections can crash the Prisma engine.
+  // CRITICAL: Also self-ping the HTTP health endpoint. Railway's proxy tracks HTTP
+  // activity and SIGKILL's containers it considers "idle" (~8-10 min with zero HTTP
+  // traffic). DB/Redis keepalives don't register as HTTP activity. The self-ping
+  // makes Railway's proxy see the container as active.
   setInterval(async () => {
     try {
       if (globalForPrisma.prisma) {
-        // Warm 4 connections in parallel (half the pool) to prevent cold-start storms
+        // Warm 4 connections in parallel (half the pool)
         await Promise.all([
           globalForPrisma.prisma.$queryRaw`SELECT 1`,
           globalForPrisma.prisma.$queryRaw`SELECT 1`,
@@ -94,6 +95,12 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv) {
     try {
       const { getSharedRedis } = await import("./redis");
       await getSharedRedis().ping();
+    } catch {}
+    // Self-ping health endpoint to keep Railway's proxy alive
+    try {
+      const port = process.env.PORT || "3000";
+      const http = require("http");
+      http.get(`http://localhost:${port}/api/health`, () => {}).on("error", () => {});
     } catch {}
     const m = process.memoryUsage();
     syncLog(`[KEEPALIVE] rss=${Math.round(m.rss/1048576)}MB heap=${Math.round(m.heapUsed/1048576)}/${Math.round(m.heapTotal/1048576)}MB up=${Math.round(process.uptime())}s`);
