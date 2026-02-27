@@ -25,7 +25,7 @@ ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
 ENV PRISMA_CLIENT_ENGINE_TYPE=library
-ENV NODE_OPTIONS="--max-old-space-size=448"
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 
 EXPOSE 3000
 
