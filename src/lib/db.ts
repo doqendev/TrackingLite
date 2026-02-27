@@ -17,12 +17,30 @@ if (!globalForPrisma.__diagRegistered) {
 
   syncLog(`[DIAG] Process started pid=${process.pid} node=${process.version} uptime=${Math.round(process.uptime())}s`);
 
+  // Exit handler — fires on ANY exit (SIGTERM, normal, crash). Reveals exit code.
+  // Code 0 = clean exit (event loop drained), 1 = crash, 143 = SIGTERM, null = SIGKILL (won't fire)
+  process.on("exit", (code) => {
+    syncLog(`[EXIT] code=${code} uptime=${Math.round(process.uptime())}s at ${new Date().toISOString()}`);
+  });
+
+  // beforeExit fires when event loop drains — if this fires, our .unref() intervals let Node exit
+  process.on("beforeExit", (code) => {
+    syncLog(`[BEFORE_EXIT] code=${code} — event loop drained, no active handles`);
+  });
+
+  // SIGTERM: Railway sends this before SIGKILL. We MUST exit or Railway will SIGKILL after grace period.
   process.on("SIGTERM", () => {
-    syncLog(`[SIGNAL] SIGTERM at ${new Date().toISOString()} uptime=${Math.round(process.uptime())}s`);
+    syncLog(`[SIGNAL] SIGTERM at ${new Date().toISOString()} uptime=${Math.round(process.uptime())}s — shutting down`);
+    if (globalForPrisma.prisma) {
+      globalForPrisma.prisma.$disconnect().catch(() => {}).finally(() => process.exit(0));
+    } else {
+      process.exit(0);
+    }
   });
 
   process.on("SIGINT", () => {
     syncLog(`[SIGNAL] SIGINT at ${new Date().toISOString()} uptime=${Math.round(process.uptime())}s`);
+    process.exit(0);
   });
 
   process.on("uncaughtException", (err) => {
