@@ -77,7 +77,7 @@ log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-e
 // Minimal HTTP health check for Railway
 const healthPort = parseInt(process.env.PORT || process.env.WORKER_HEALTH_PORT || "8080", 10);
 const healthServer = createServer((req, res) => {
-  if (req.url === "/health" && req.method === "GET") {
+  if ((req.url === "/health" || req.url === "/api/health") && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok", workers: workers.length, uptime: process.uptime() }));
   } else {
