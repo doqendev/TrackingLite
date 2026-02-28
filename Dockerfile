@@ -21,7 +21,7 @@ RUN pnpm prisma generate
 RUN pnpm next build
 RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && cp -r messages .next/standalone/messages && cp server.js .next/standalone/server-entry.js
 
-# Cache bust: 2026-02-28T15
+# Cache bust: 2026-02-28T16
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV AUTH_TRUST_HOST=true
