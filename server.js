@@ -4,6 +4,7 @@
 // This script ensures self-ping and signal handlers run immediately.
 
 const http = require("http");
+const https = require("https");
 const { writeSync } = require("fs");
 
 const syncLog = (msg) => {
@@ -11,17 +12,25 @@ const syncLog = (msg) => {
 };
 
 const port = process.env.PORT || "3000";
+const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
 
-syncLog(`[ENTRYPOINT] Starting server.js pid=${process.pid} port=${port} node=${process.version}`);
+syncLog(`[ENTRYPOINT] Starting server.js pid=${process.pid} port=${port} node=${process.version} publicDomain=${publicDomain || "none"}`);
 
-// Self-ping to keep Railway proxy alive and bootstrap Next.js route loading.
-// This interval is intentionally ref'd (no .unref()) — it keeps the Node.js event
-// loop alive as a safety net. If the Next.js HTTP listener ever closes, this prevents
-// the process from silently exiting (code 0 = Railway ON_FAILURE won't restart).
+// Self-ping via BOTH localhost (bootstrap Next.js) AND external domain (keep Railway proxy alive).
+// Railway's proxy only tracks external HTTP traffic — localhost pings stay inside the container
+// and don't prevent Railway from considering the container idle and SIGKILL'ing it.
+// This interval is intentionally ref'd (no .unref()) to keep the Node.js event loop alive.
 const selfPing = () => {
+  // Internal ping: bootstraps Next.js route loading + db.ts import
   try {
     http.get(`http://localhost:${port}/api/health`, () => {}).on("error", () => {});
   } catch {}
+  // External ping: registers as real traffic in Railway's proxy
+  if (publicDomain) {
+    try {
+      https.get(`https://${publicDomain}/api/health`, () => {}).on("error", () => {});
+    } catch {}
+  }
 };
 
 // First ping at 3s (give Next.js time to start), then every 30s
