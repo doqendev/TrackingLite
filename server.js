@@ -13,8 +13,9 @@ const syncLog = (msg) => {
 
 const port = process.env.PORT || "3000";
 const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+const commitSha = (process.env.RAILWAY_GIT_COMMIT_SHA || "local").slice(0, 7);
 
-syncLog(`[ENTRYPOINT] Starting server.js pid=${process.pid} port=${port} node=${process.version} publicDomain=${publicDomain || "none"}`);
+syncLog(`[ENTRYPOINT] pid=${process.pid} port=${port} node=${process.version} commit=${commitSha} domain=${publicDomain || "none"}`);
 
 // Self-ping via BOTH localhost (bootstrap Next.js) AND external domain (keep Railway proxy alive).
 // Railway's proxy only tracks external HTTP traffic — localhost pings stay inside the container
