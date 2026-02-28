@@ -53,6 +53,7 @@ export async function GET() {
       memory: memMB,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      commit: (process.env.RAILWAY_GIT_COMMIT_SHA || "local").slice(0, 7),
     },
     {
       headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
