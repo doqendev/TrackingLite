@@ -19,7 +19,7 @@ COPY . .
 
 RUN pnpm prisma generate
 RUN pnpm next build
-RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && cp -r messages .next/standalone/messages
+RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && cp -r messages .next/standalone/messages && cp server.js .next/standalone/server-entry.js
 
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
@@ -28,4 +28,4 @@ ENV NODE_OPTIONS="--max-old-space-size=1024"
 
 EXPOSE 3000
 
-CMD ["node", ".next/standalone/server.js"]
+CMD ["node", ".next/standalone/server-entry.js"]
