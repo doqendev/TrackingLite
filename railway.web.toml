@@ -1,5 +1,5 @@
 [build]
-watchPatterns = ["src/**", "messages/**", "prisma/**", "public/**", "next.config.mjs", "package.json"]
+watchPatterns = ["src/**", "messages/**", "prisma/**", "public/**", "next.config.mjs", "package.json", "server.js", "Dockerfile"]
 
 [deploy]
 preDeployCommand = "npx prisma migrate deploy"
