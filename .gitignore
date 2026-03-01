@@ -56,3 +56,5 @@ worker/
 # Misc
 *.pem
 .vercel
+
+.vercel

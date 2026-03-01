@@ -18,6 +18,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 RUN pnpm prisma generate
+ENV STANDALONE=true
 RUN pnpm next build
 RUN cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && cp -r messages .next/standalone/messages && cp server.js .next/standalone/server-entry.js
 

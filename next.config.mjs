@@ -4,7 +4,9 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // output: "standalone" is only needed for Railway (Docker). Vercel uses its own build output.
+  // For Railway builds, Dockerfile sets STANDALONE=true before `next build`.
+  ...(process.env.STANDALONE === "true" ? { output: "standalone" } : {}),
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",

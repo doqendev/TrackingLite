@@ -14,7 +14,8 @@ const globalForPrisma = globalThis as unknown as {
 // Register process diagnostics + keepalive once (guaranteed to run since db.ts is imported by every route)
 // Skip in test environments — vitest uses uncaughtException internally, and process.exit kills workers
 const isTestEnv = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
-if (!globalForPrisma.__diagRegistered && !isTestEnv) {
+const isVercel = !!process.env.VERCEL;
+if (!globalForPrisma.__diagRegistered && !isTestEnv && !isVercel) {
   globalForPrisma.__diagRegistered = true;
 
   // Read container memory limit from cgroup (Railway/Docker)
@@ -97,14 +98,21 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv) {
   }, 60_000).unref();
 }
 
+// On Vercel (serverless), connections go over Railway's public TCP proxy which is
+// less stable than the internal network. Use longer timeouts and connect_timeout
+// to handle intermittent proxy drops without failing requests.
+const baseUrl = process.env.DATABASE_URL ?? "";
+const sep = baseUrl.includes("?") ? "&" : "?";
+const poolSize = process.env.PRISMA_POOL_SIZE ?? (isVercel ? "5" : "10");
+const poolTimeout = isVercel ? "30" : "15";
+const connectTimeout = isVercel ? "30" : "10";
+
 export const db =
   globalForPrisma.prisma ||
   new PrismaClient({
     datasources: {
       db: {
-        url: `${process.env.DATABASE_URL ?? ""}${
-          (process.env.DATABASE_URL ?? "").includes("?") ? "&" : "?"
-        }connection_limit=${process.env.PRISMA_POOL_SIZE ?? "10"}&pool_timeout=15`,
+        url: `${baseUrl}${sep}connection_limit=${poolSize}&pool_timeout=${poolTimeout}&connect_timeout=${connectTimeout}`,
       },
     },
     log:

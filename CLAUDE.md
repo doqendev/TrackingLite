@@ -33,6 +33,7 @@ Small-to-mid Shopify stores running ads on Meta, TikTok, Reddit, Pinterest, and 
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
 - Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages
+- Hosting: web app on Vercel (serverless), workers on Railway, Postgres + Redis on Railway with public TCP proxies
 
 See `STATUS.md` for the full audit and remaining work.
 
@@ -64,8 +65,8 @@ See `STATUS.md` for the full audit and remaining work.
 5. Pastes snippet into Shopify Admin > Settings > Customer Events > Add Custom Pixel
 6. Snippet captures browser events via Shopify's `analytics.subscribe()` API
 7. Snippet sends event data + `event_id` to `/api/events/ingest` with `X-TL-API-Key` header
-8. Server validates, checks billing/rate limits/consent, creates EventLog, queues BullMQ job
-9. Worker decrypts token, hashes PII (SHA-256), normalizes phone (E.164), sends to Meta CAPI
+8. Vercel serverless function validates, checks billing/rate limits/consent, creates EventLog, queues BullMQ job
+9. Railway worker decrypts token, hashes PII (SHA-256), normalizes phone (E.164), sends to Meta CAPI
 10. EventLog updated to SENT/FAILED, dashboard shows status
 
 ### Event Pipeline Detail
@@ -278,8 +279,11 @@ pnpm dev
 # Run the BullMQ worker (separate terminal, required for event processing)
 pnpm worker
 
-# Build for production
+# Build for Vercel (default)
 pnpm build
+
+# Build for Railway standalone (Docker)
+pnpm build:railway
 
 # Run unit tests (239 tests, 13 files)
 pnpm test
@@ -395,6 +399,7 @@ Header: Content-Type: application/json
 - **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.
 - **Reddit click ID (rdtCid):** Snippet captures `rdt_cid` URL param and passes as `rdtCid`. Forwarded to Reddit Conversions API for attribution matching.
 - **Pinterest click ID (epik):** Snippet captures `epik` URL param and passes as `epik`. Pinterest Conversions API requires `value` as a string (not number) — normalizer handles the conversion.
+- **Vercel hosting:** Web app runs on Vercel (serverless). Workers stay on Railway. Redis and PostgreSQL on Railway with public TCP proxies for Vercel connectivity. Railway-specific code (keepalive, self-ping, cgroup reader, signal handlers) conditionally disabled via `process.env.VERCEL`.
 
 ## Style Rules
 
@@ -410,8 +415,9 @@ Header: Content-Type: application/json
 
 ## Known Issues
 
-See `STATUS.md` for the full list. Currently:
-1. **`pnpm build` hangs on Windows** --- pre-existing environment issue, not code-related
+See `STATUS.md` for the full list. Currently: none.
+
+Note: `pnpm build` previously hung on Windows but this is no longer an issue — the Vercel build command is `prisma generate && next build` (no standalone output). A `build:railway` script exists for Railway/Docker deployments that sets `STANDALONE=true` before building.
 
 All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII storage, forgot password) are fixed.
 

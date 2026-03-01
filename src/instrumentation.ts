@@ -1,4 +1,7 @@
 export async function register() {
+  // Skip on Vercel — self-ping and keepalive are meaningless on serverless
+  if (process.env.VERCEL) return;
+
   // Only run at runtime, not during build. Railway sets PORT at runtime only.
   if (!process.env.PORT) return;
 
