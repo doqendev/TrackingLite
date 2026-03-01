@@ -29,6 +29,8 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
   });
 
   try {
+    const startTime = Date.now();
+
     // 1. Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
     let pixelId: string;
     let decryptedToken: string;
@@ -108,7 +110,25 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       });
     }
 
-    log.info("Job completed");
+    log.info("Job completed", {
+      eventId: event.eventId,
+      durationMs: Date.now() - startTime,
+      hasEmail: !!(event.userData?.email),
+      hasPhone: !!(event.userData?.phone),
+      hasFbp: !!event.fbp,
+      hasFbc: !!event.fbc,
+      hasUrl: !!event.url,
+      hasValue: event.customData?.value !== undefined && event.customData?.value !== null,
+      currency: event.customData?.currency || null,
+    });
+
+    // Data quality warnings
+    if (event.eventName === "Purchase" && (event.customData?.value === undefined || event.customData?.value === null)) {
+      log.warn("Purchase event missing value/currency", { eventId: event.eventId });
+    }
+    if (!event.fbp && !event.fbc) {
+      log.warn("Event missing fbp/fbc - poor Meta match quality", { eventId: event.eventId });
+    }
   } catch (error) {
     await recordFailure("META").catch(() => {});
     // Update EventLog to FAILED
@@ -164,14 +184,8 @@ connection.on("error", (err) => {
   connectionLog.error("Worker Redis connection error", { error: err });
 });
 
-const workerLog = createLogger({ component: "meta-worker" });
-
-worker.on("completed", (job) => {
-  workerLog.info("Job completed", { jobId: job.id });
-});
-
 worker.on("failed", (job, err) => {
-  workerLog.error("Job failed", {
+  connectionLog.error("Job failed", {
     jobId: job?.id,
     jobName: job?.name,
     attemptsMade: job?.attemptsMade,
@@ -181,11 +195,11 @@ worker.on("failed", (job, err) => {
 });
 
 worker.on("error", (err) => {
-  workerLog.error("Worker error", { error: err });
+  connectionLog.error("Worker error", { error: err });
 });
 
 worker.on("stalled", (jobId) => {
-  workerLog.warn("Job stalled", { jobId });
+  connectionLog.warn("Job stalled", { jobId });
 });
 
 export { processMetaEvent };

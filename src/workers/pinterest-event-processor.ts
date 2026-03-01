@@ -31,6 +31,8 @@ async function processPinterestEvent(job: Job<DestinationEventJob>): Promise<voi
   });
 
   try {
+    const startTime = Date.now();
+
     const workspace = await getWorkspaceForDestination(workspaceId, "PINTEREST");
     if (!workspace || !workspace.isActive) {
       throw new Error(`Workspace ${workspaceId} not found or inactive`);
@@ -92,7 +94,20 @@ async function processPinterestEvent(job: Job<DestinationEventJob>): Promise<voi
       });
     }
 
-    log.info("Job completed");
+    log.info("Job completed", {
+      eventId: event.eventId,
+      durationMs: Date.now() - startTime,
+      hasEmail: !!(event.userData?.email),
+      hasPhone: !!(event.userData?.phone),
+      hasEpik: !!event.epik,
+      hasUrl: !!event.url,
+      hasValue: event.customData?.value !== undefined && event.customData?.value !== null,
+      currency: event.customData?.currency || null,
+    });
+
+    if (event.eventName === "Purchase" && (event.customData?.value === undefined || event.customData?.value === null)) {
+      log.warn("Purchase event missing value/currency", { eventId: event.eventId });
+    }
   } catch (error) {
     await recordFailure("PINTEREST").catch(() => {});
     const errorMessage =
@@ -149,14 +164,8 @@ connection.on("error", (err) => {
   connectionLog.error("Worker Redis connection error", { error: err });
 });
 
-const workerLog = createLogger({ component: "pinterest-worker" });
-
-pinterestWorker.on("completed", (job) => {
-  workerLog.info("Job completed", { jobId: job.id });
-});
-
 pinterestWorker.on("failed", (job, err) => {
-  workerLog.error("Job failed", {
+  connectionLog.error("Job failed", {
     jobId: job?.id,
     jobName: job?.name,
     attemptsMade: job?.attemptsMade,
@@ -166,11 +175,11 @@ pinterestWorker.on("failed", (job, err) => {
 });
 
 pinterestWorker.on("error", (err) => {
-  workerLog.error("Worker error", { error: err });
+  connectionLog.error("Worker error", { error: err });
 });
 
 pinterestWorker.on("stalled", (jobId) => {
-  workerLog.warn("Job stalled", { jobId });
+  connectionLog.warn("Job stalled", { jobId });
 });
 
 export { processPinterestEvent };

@@ -31,6 +31,8 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
   });
 
   try {
+    const startTime = Date.now();
+
     const workspace = await getWorkspaceForDestination(workspaceId, "REDDIT");
     if (!workspace || !workspace.isActive) {
       throw new Error(`Workspace ${workspaceId} not found or inactive`);
@@ -89,7 +91,20 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
       });
     }
 
-    log.info("Job completed");
+    log.info("Job completed", {
+      eventId: event.eventId,
+      durationMs: Date.now() - startTime,
+      hasEmail: !!(event.userData?.email),
+      hasPhone: !!(event.userData?.phone),
+      hasRdtCid: !!event.rdtCid,
+      hasUrl: !!event.url,
+      hasValue: event.customData?.value !== undefined && event.customData?.value !== null,
+      currency: event.customData?.currency || null,
+    });
+
+    if (event.eventName === "Purchase" && (event.customData?.value === undefined || event.customData?.value === null)) {
+      log.warn("Purchase event missing value/currency", { eventId: event.eventId });
+    }
   } catch (error) {
     await recordFailure("REDDIT").catch(() => {});
     const errorMessage =
@@ -146,14 +161,8 @@ connection.on("error", (err) => {
   connectionLog.error("Worker Redis connection error", { error: err });
 });
 
-const workerLog = createLogger({ component: "reddit-worker" });
-
-redditWorker.on("completed", (job) => {
-  workerLog.info("Job completed", { jobId: job.id });
-});
-
 redditWorker.on("failed", (job, err) => {
-  workerLog.error("Job failed", {
+  connectionLog.error("Job failed", {
     jobId: job?.id,
     jobName: job?.name,
     attemptsMade: job?.attemptsMade,
@@ -163,11 +172,11 @@ redditWorker.on("failed", (job, err) => {
 });
 
 redditWorker.on("error", (err) => {
-  workerLog.error("Worker error", { error: err });
+  connectionLog.error("Worker error", { error: err });
 });
 
 redditWorker.on("stalled", (jobId) => {
-  workerLog.warn("Job stalled", { jobId });
+  connectionLog.warn("Job stalled", { jobId });
 });
 
 export { processRedditEvent };

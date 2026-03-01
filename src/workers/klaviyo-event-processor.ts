@@ -31,6 +31,8 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
   });
 
   try {
+    const startTime = Date.now();
+
     // Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
     let apiKey: string;
 
@@ -96,7 +98,18 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
       });
     }
 
-    log.info("Job completed");
+    log.info("Job completed", {
+      eventId: event.eventId,
+      durationMs: Date.now() - startTime,
+      hasEmail: !!(event.userData?.email),
+      hasPhone: !!(event.userData?.phone),
+      hasValue: event.customData?.value !== undefined && event.customData?.value !== null,
+      currency: event.customData?.currency || null,
+    });
+
+    if (event.eventName === "Purchase" && (event.customData?.value === undefined || event.customData?.value === null)) {
+      log.warn("Purchase event missing value/currency", { eventId: event.eventId });
+    }
   } catch (error) {
     await recordFailure("KLAVIYO").catch(() => {});
     const errorMessage =
@@ -150,14 +163,8 @@ connection.on("error", (err) => {
   connectionLog.error("Worker Redis connection error", { error: err });
 });
 
-const workerLog = createLogger({ component: "klaviyo-worker" });
-
-klaviyoWorker.on("completed", (job) => {
-  workerLog.info("Job completed", { jobId: job.id });
-});
-
 klaviyoWorker.on("failed", (job, err) => {
-  workerLog.error("Job failed", {
+  connectionLog.error("Job failed", {
     jobId: job?.id,
     jobName: job?.name,
     attemptsMade: job?.attemptsMade,
@@ -167,11 +174,11 @@ klaviyoWorker.on("failed", (job, err) => {
 });
 
 klaviyoWorker.on("error", (err) => {
-  workerLog.error("Worker error", { error: err });
+  connectionLog.error("Worker error", { error: err });
 });
 
 klaviyoWorker.on("stalled", (jobId) => {
-  workerLog.warn("Job stalled", { jobId });
+  connectionLog.warn("Job stalled", { jobId });
 });
 
 export { processKlaviyoEvent };
