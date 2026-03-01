@@ -5,6 +5,9 @@ import { db } from "@/lib/db";
 function generateLoaderSnippet(pixelUrl: string): string {
   return `// Track Clear - Server-Side Event Tracking (auto-updating)
 (function(){
+  window.__tcAnalytics=analytics;
+  window.__tcBrowser=browser;
+  window.__tcInit=init;
   var s=document.createElement("script");
   s.src="${pixelUrl}";
   s.async=true;
