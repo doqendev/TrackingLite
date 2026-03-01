@@ -66,7 +66,7 @@ export default async function middleware(req: NextRequest) {
   const isLoggedIn = !!token;
   const isPublicRoute = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/api/events/ingest", "/api/stripe/webhook", "/api/health", "/privacy", "/terms"].some(
     (path) => req.nextUrl.pathname === path || req.nextUrl.pathname.startsWith("/api/auth")
-  );
+  ) || req.nextUrl.pathname.startsWith("/api/pixel/");
 
   // Also allow webhook endpoints
   if (req.nextUrl.pathname.startsWith("/api/webhooks/")) {
