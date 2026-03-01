@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
     recentFailures,
     stuckCount,
     oldestStuck,
+    purchaseAuditRaw,
   ] = await Promise.all([
     // Event coverage 30d — for lastSeen (_max createdAt) and 30d totals
     db.eventLog.groupBy({
@@ -202,6 +203,40 @@ export async function GET(request: NextRequest) {
       where: { workspaceId, status: "PENDING", createdAt: { lt: ago10m } },
       orderBy: { createdAt: "asc" },
       select: { createdAt: true },
+    }),
+
+    // Purchase event audit — last 10 Purchase events with full field detail
+    db.eventLog.findMany({
+      where: { workspaceId, eventName: "Purchase" },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        eventId: true,
+        destination: true,
+        status: true,
+        createdAt: true,
+        value: true,
+        currency: true,
+        numItems: true,
+        orderId: true,
+        fbp: true,
+        fbc: true,
+        pageUrl: true,
+        customerIp: true,
+        userAgent: true,
+        utmSource: true,
+        utmMedium: true,
+        utmCampaign: true,
+        utmContent: true,
+        utmTerm: true,
+        gclid: true,
+        ttclid: true,
+        rdtCid: true,
+        epik: true,
+        errorMessage: true,
+        retryCount: true,
+      },
     }),
   ]);
 
@@ -398,6 +433,77 @@ export async function GET(request: NextRequest) {
     oldest: oldestStuck?.createdAt?.toISOString() ?? null,
   };
 
+  // --- Purchase Audit ---
+  // Group by eventId so each purchase shows per-destination breakdown
+  const purchasesByEventId: Record<
+    string,
+    {
+      eventId: string;
+      createdAt: string;
+      destinations: Array<{
+        destination: string;
+        status: string;
+        errorMessage: string | null;
+        retryCount: number;
+      }>;
+      value: number | null;
+      currency: string | null;
+      orderId: string | null;
+      numItems: number | null;
+      fbp: string | null;
+      fbc: string | null;
+      pageUrl: string | null;
+      customerIp: string | null;
+      userAgent: string | null;
+      utmSource: string | null;
+      utmMedium: string | null;
+      utmCampaign: string | null;
+      utmContent: string | null;
+      utmTerm: string | null;
+      gclid: string | null;
+      ttclid: string | null;
+      rdtCid: string | null;
+      epik: string | null;
+    }
+  > = {};
+
+  for (const row of purchaseAuditRaw) {
+    const eid = row.eventId;
+    if (!purchasesByEventId[eid]) {
+      purchasesByEventId[eid] = {
+        eventId: eid,
+        createdAt: row.createdAt.toISOString(),
+        destinations: [],
+        value: row.value ? Number(row.value) : null,
+        currency: row.currency,
+        orderId: row.orderId,
+        numItems: row.numItems,
+        fbp: row.fbp,
+        fbc: row.fbc,
+        pageUrl: row.pageUrl,
+        customerIp: row.customerIp ? "***" : null, // redact PII
+        userAgent: row.userAgent ? row.userAgent.substring(0, 60) + "..." : null,
+        utmSource: row.utmSource,
+        utmMedium: row.utmMedium,
+        utmCampaign: row.utmCampaign,
+        utmContent: row.utmContent,
+        utmTerm: row.utmTerm,
+        gclid: row.gclid,
+        ttclid: row.ttclid,
+        rdtCid: row.rdtCid,
+        epik: row.epik,
+      };
+    }
+    purchasesByEventId[eid].destinations.push({
+      destination: row.destination as string,
+      status: row.status as string,
+      errorMessage: row.errorMessage,
+      retryCount: row.retryCount,
+    });
+  }
+
+  const purchaseAudit = Object.values(purchasesByEventId);
+
   return NextResponse.json({
     generatedAt: now.toISOString(),
     workspace: {
@@ -412,5 +518,6 @@ export async function GET(request: NextRequest) {
     funnel,
     recentFailures: recentFailuresMapped,
     stuckEvents,
+    purchaseAudit,
   });
 }

@@ -81,6 +81,37 @@ interface StuckEvents {
   oldest: string | null;
 }
 
+interface PurchaseAuditDestination {
+  destination: string;
+  status: string;
+  errorMessage: string | null;
+  retryCount: number;
+}
+
+interface PurchaseAuditEntry {
+  eventId: string;
+  createdAt: string;
+  destinations: PurchaseAuditDestination[];
+  value: number | null;
+  currency: string | null;
+  orderId: string | null;
+  numItems: number | null;
+  fbp: string | null;
+  fbc: string | null;
+  pageUrl: string | null;
+  customerIp: string | null;
+  userAgent: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmContent: string | null;
+  utmTerm: string | null;
+  gclid: string | null;
+  ttclid: string | null;
+  rdtCid: string | null;
+  epik: string | null;
+}
+
 interface DiagnosticsData {
   generatedAt: string;
   eventCoverage: EventCoverageRow[];
@@ -90,6 +121,7 @@ interface DiagnosticsData {
   funnel: FunnelStep[];
   recentFailures: RecentFailure[];
   stuckEvents: StuckEvents;
+  purchaseAudit: PurchaseAuditEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -635,6 +667,194 @@ function StuckEventsSection({ stuck }: { stuck: StuckEvents }) {
 }
 
 // ---------------------------------------------------------------------------
+// Section: Purchase Event Audit
+// ---------------------------------------------------------------------------
+
+function FieldPresenceDot({ value }: { value: unknown }) {
+  if (value === null || value === undefined || value === "") {
+    return <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" title="Missing" />;
+  }
+  return <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="Present" />;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    SENT: "bg-green-900/50 text-green-400 border-green-800",
+    FAILED: "bg-red-900/50 text-red-400 border-red-800",
+    PENDING: "bg-yellow-900/50 text-yellow-400 border-yellow-800",
+    RETRYING: "bg-orange-900/50 text-orange-400 border-orange-800",
+  };
+  return (
+    <Badge className={`${colors[status] ?? "bg-zinc-800 text-zinc-400 border-zinc-700"} text-xs`}>
+      {status}
+    </Badge>
+  );
+}
+
+function PurchaseAuditSection({ entries }: { entries: PurchaseAuditEntry[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  if (entries.length === 0) {
+    return (
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">
+            <SectionTitle>Purchase Event Audit (last 10)</SectionTitle>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-zinc-500 text-center py-6">No Purchase events recorded yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const dataFields: { key: keyof PurchaseAuditEntry; label: string; category: string }[] = [
+    { key: "value", label: "Value", category: "Transaction" },
+    { key: "currency", label: "Currency", category: "Transaction" },
+    { key: "orderId", label: "Order ID", category: "Transaction" },
+    { key: "numItems", label: "Num Items", category: "Transaction" },
+    { key: "fbp", label: "fbp (Meta)", category: "Browser IDs" },
+    { key: "fbc", label: "fbc (Meta)", category: "Browser IDs" },
+    { key: "ttclid", label: "ttclid (TikTok)", category: "Click IDs" },
+    { key: "rdtCid", label: "rdtCid (Reddit)", category: "Click IDs" },
+    { key: "epik", label: "epik (Pinterest)", category: "Click IDs" },
+    { key: "gclid", label: "gclid (Google)", category: "Click IDs" },
+    { key: "utmSource", label: "utm_source", category: "UTM" },
+    { key: "utmMedium", label: "utm_medium", category: "UTM" },
+    { key: "utmCampaign", label: "utm_campaign", category: "UTM" },
+    { key: "utmContent", label: "utm_content", category: "UTM" },
+    { key: "utmTerm", label: "utm_term", category: "UTM" },
+    { key: "pageUrl", label: "Page URL", category: "Context" },
+    { key: "customerIp", label: "Customer IP", category: "Context" },
+    { key: "userAgent", label: "User Agent", category: "Context" },
+  ];
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Purchase Event Audit (last 10)</SectionTitle>
+        </CardTitle>
+        <p className="text-xs text-zinc-500">
+          Shows exactly what data each Purchase event captured and which platforms received it. Click a row to expand.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y divide-zinc-800">
+          {entries.map((entry) => {
+            const isExpanded = expanded === entry.eventId;
+            const presentCount = dataFields.filter((f) => entry[f.key] !== null && entry[f.key] !== undefined).length;
+            const totalFields = dataFields.length;
+            const completeness = Math.round((presentCount / totalFields) * 100);
+            const allSent = entry.destinations.every((d) => d.status === "SENT");
+            const anyFailed = entry.destinations.some((d) => d.status === "FAILED");
+
+            return (
+              <div key={entry.eventId}>
+                {/* Summary row */}
+                <button
+                  onClick={() => setExpanded(isExpanded ? null : entry.eventId)}
+                  className="w-full px-4 py-3 flex items-center gap-4 hover:bg-zinc-800/50 transition-colors text-left"
+                >
+                  <span className="text-xs text-zinc-500 w-20 shrink-0">
+                    {timeAgo(entry.createdAt)}
+                  </span>
+                  <span className="font-mono text-xs text-zinc-400 truncate w-48 shrink-0" title={entry.eventId}>
+                    {entry.eventId.substring(0, 8)}...
+                  </span>
+                  <span className="text-xs text-zinc-300 w-24 shrink-0">
+                    {entry.value !== null ? `${entry.currency ?? "?"} ${entry.value.toFixed(2)}` : "no value"}
+                  </span>
+                  <span className="text-xs text-zinc-500 w-20 shrink-0">
+                    {entry.orderId ? `#${entry.orderId.substring(0, 8)}` : "no order"}
+                  </span>
+                  <div className="flex gap-1 shrink-0">
+                    {entry.destinations.map((d) => (
+                      <StatusBadge key={d.destination} status={d.status} />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto shrink-0">
+                    <span className={`text-xs font-mono ${completeness >= 80 ? "text-green-400" : completeness >= 50 ? "text-yellow-400" : "text-red-400"}`}>
+                      {presentCount}/{totalFields} fields
+                    </span>
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${
+                        allSent ? "bg-green-500" : anyFailed ? "bg-red-500" : "bg-yellow-500"
+                      }`}
+                    />
+                    <span className="text-zinc-600 text-xs">{isExpanded ? "▲" : "▼"}</span>
+                  </div>
+                </button>
+
+                {/* Expanded detail */}
+                {isExpanded && (
+                  <div className="px-4 pb-4 bg-zinc-950/50">
+                    {/* Destination breakdown */}
+                    <div className="mb-4">
+                      <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                        Destination Delivery
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {entry.destinations.map((d) => (
+                          <div
+                            key={d.destination}
+                            className="rounded border border-zinc-800 bg-zinc-900 px-3 py-2"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-semibold text-white">
+                                {destinationLabels[d.destination] ?? d.destination}
+                              </span>
+                              <StatusBadge status={d.status} />
+                            </div>
+                            {d.retryCount > 0 && (
+                              <p className="text-xs text-zinc-500">Retries: {d.retryCount}</p>
+                            )}
+                            {d.errorMessage && (
+                              <p className="text-xs text-red-400 mt-1 truncate" title={d.errorMessage}>
+                                {d.errorMessage}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Data fields grid */}
+                    <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                      Captured Data
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1">
+                      {dataFields.map((field) => {
+                        const val = entry[field.key];
+                        return (
+                          <div key={field.key} className="flex items-center gap-2 py-1">
+                            <FieldPresenceDot value={val} />
+                            <span className="text-xs text-zinc-500 w-28 shrink-0">{field.label}</span>
+                            <span
+                              className={`text-xs font-mono truncate ${
+                                val !== null && val !== undefined ? "text-zinc-300" : "text-zinc-700"
+                              }`}
+                              title={val !== null && val !== undefined ? String(val) : "missing"}
+                            >
+                              {val !== null && val !== undefined ? String(val) : "---"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -786,6 +1006,9 @@ export default function DiagnosticsPage() {
 
           {/* Recent Failures */}
           <RecentFailuresSection failures={data.recentFailures} />
+
+          {/* Purchase Event Audit */}
+          <PurchaseAuditSection entries={data.purchaseAudit} />
 
           {/* Footer note */}
           <p className="text-center text-xs text-zinc-700 pb-4">
