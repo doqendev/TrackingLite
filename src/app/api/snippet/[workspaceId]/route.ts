@@ -4,8 +4,12 @@ import { db } from "@/lib/db";
 
 function generateLoaderSnippet(pixelUrl: string): string {
   return `// Track Clear - Server-Side Event Tracking (auto-updating)
-(async function(){
-try{var r=await fetch("${pixelUrl}");if(!r.ok)throw new Error(r.status);var c=await r.text();new Function("analytics","browser","init",c)(analytics,browser,init)}catch(e){console.error("[TrackClear] Pixel load failed",e)}
+(function(){
+  var s=document.createElement("script");
+  s.src="${pixelUrl}";
+  s.async=true;
+  s.onerror=function(){console.error("[TrackClear] Pixel load failed")};
+  document.head.appendChild(s);
 })();`;
 }
 
