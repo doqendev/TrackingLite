@@ -27,6 +27,7 @@
     "integrations": "Integrations",
     "settings": "Settings",
     "billing": "Billing",
+    "diagnostics": "Diagnostics",
     "logOut": "Log out",
     "switchStore": "Switch Store",
     "addStore": "Add Store",

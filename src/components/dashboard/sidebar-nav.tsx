@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LayoutDashboard, ClipboardList, Plug, Settings, CreditCard, Menu, LogOut } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plug, Settings, CreditCard, Menu, LogOut, Activity } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/integrations", labelKey: "integrations" as const, icon: Plug },
   { href: "/settings", labelKey: "settings" as const, icon: Settings },
   { href: "/billing", labelKey: "billing" as const, icon: CreditCard },
+  { href: "/diagnostics", labelKey: "diagnostics" as const, icon: Activity },
 ];
 
 interface SidebarNavProps {

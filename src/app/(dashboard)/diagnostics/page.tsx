@@ -1,0 +1,780 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+// ---------------------------------------------------------------------------
+// Types — mirror exact API response shape from /api/diagnostics
+// ---------------------------------------------------------------------------
+
+interface EventCoverageRow {
+  eventName: string;
+  total24h: number;
+  total7d: number;
+  total30d: number;
+  successRate24h: number;
+  failedCount24h: number;
+  pendingCount24h: number;
+  lastSeen: string | null;
+}
+
+interface DestinationHealthRow {
+  destination: string;
+  enabled: boolean;
+  hasCredentials: boolean;
+  sent24h: number;
+  failed24h: number;
+  pending24h: number;
+  retrying24h: number;
+  total24h: number;
+  successRate24h: number;
+  lastSuccess: string | null;
+  lastFailure: string | null;
+}
+
+interface MatrixEntry {
+  eventName: string;
+  destination: string;
+  count: number;
+  sent: number;
+  failed: number;
+}
+
+interface DataQuality {
+  purchaseEvents7d: number;
+  purchasesWithValue: number;
+  purchasesWithCurrency: number;
+  purchasesWithOrderId: number;
+  totalEvents7d: number;
+  eventsWithUtmSource: number;
+  eventsWithGclid: number;
+}
+
+interface FunnelStep {
+  eventName: string;
+  count7d: number;
+  dropOffPercent: number | null;
+}
+
+interface RecentFailure {
+  id: string;
+  createdAt: string;
+  eventName: string;
+  destination: string;
+  status: string;
+  eventId: string;
+}
+
+interface StuckEvents {
+  count: number;
+  oldest: string | null;
+}
+
+interface DiagnosticsData {
+  generatedAt: string;
+  eventCoverage: EventCoverageRow[];
+  destinationHealth: DestinationHealthRow[];
+  eventDestinationMatrix: MatrixEntry[];
+  dataQuality: DataQuality;
+  funnel: FunnelStep[];
+  recentFailures: RecentFailure[];
+  stuckEvents: StuckEvents;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function timeAgo(isoString: string | null): string {
+  if (!isoString) return "Never";
+  const now = Date.now();
+  const diffMs = now - new Date(isoString).getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  if (diffSecs < 60) return `${diffSecs}s ago`;
+  const diffMins = Math.floor(diffSecs / 60);
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+function rateColor(rate: number | null): string {
+  if (rate === null) return "text-zinc-500";
+  if (rate >= 95) return "text-green-400";
+  if (rate >= 80) return "text-yellow-400";
+  return "text-red-400";
+}
+
+function pct(num: number, den: number): string {
+  if (den === 0) return "0%";
+  return `${Math.round((num / den) * 100)}%`;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 mb-3">
+      {children}
+    </h2>
+  );
+}
+
+function RateBadge({ rate }: { rate: number }) {
+  const color = rateColor(rate);
+  return <span className={`font-mono font-semibold ${color}`}>{rate.toFixed(0)}%</span>;
+}
+
+function EnabledBadge({ value }: { value: boolean }) {
+  return value ? (
+    <Badge className="bg-green-900/50 text-green-400 border-green-800 text-xs">Yes</Badge>
+  ) : (
+    <Badge className="bg-zinc-800 text-zinc-500 border-zinc-700 text-xs">No</Badge>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Event Coverage
+// ---------------------------------------------------------------------------
+
+const ALL_EVENTS = [
+  "PageView",
+  "ViewContent",
+  "AddToCart",
+  "InitiateCheckout",
+  "Purchase",
+] as const;
+
+function EventCoverageSection({ rows }: { rows: EventCoverageRow[] }) {
+  const rowMap = Object.fromEntries(rows.map((r) => [r.eventName, r]));
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Event Coverage</SectionTitle>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-zinc-800">
+              <TableHead className="text-zinc-400 text-xs">Event</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">24h</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">7d</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">30d</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">Success Rate</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">Failed</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">Pending</TableHead>
+              <TableHead className="text-zinc-400 text-xs">Last Seen</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ALL_EVENTS.map((name) => {
+              const row = rowMap[name];
+              const missing7d = !row || row.total7d === 0;
+              return (
+                <TableRow
+                  key={name}
+                  className={`border-zinc-800 ${missing7d ? "bg-red-950/20" : ""}`}
+                >
+                  <TableCell className="font-mono text-xs text-white">
+                    {name}
+                    {missing7d && (
+                      <span className="ml-2 text-red-400 text-xs">(missing)</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-zinc-300">
+                    {row?.total24h ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-zinc-300">
+                    {row?.total7d ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-zinc-300">
+                    {row?.total30d ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {row ? <RateBadge rate={row.successRate24h} /> : <span className="text-zinc-600">—</span>}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-red-400">
+                    {row?.failedCount24h ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-yellow-400">
+                    {row?.pendingCount24h ?? 0}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {row?.lastSeen ? (
+                      <span className="text-zinc-400">{timeAgo(row.lastSeen)}</span>
+                    ) : (
+                      <span className="text-red-400">Never</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Destination Health
+// ---------------------------------------------------------------------------
+
+const DESTINATIONS = ["META", "TIKTOK", "GA4", "KLAVIYO", "REDDIT", "PINTEREST"] as const;
+
+const destinationLabels: Record<string, string> = {
+  META: "Meta",
+  TIKTOK: "TikTok",
+  GA4: "GA4",
+  KLAVIYO: "Klaviyo",
+  REDDIT: "Reddit",
+  PINTEREST: "Pinterest",
+};
+
+function DestinationHealthSection({ rows }: { rows: DestinationHealthRow[] }) {
+  const rowMap = Object.fromEntries(rows.map((r) => [r.destination, r]));
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Destination Health</SectionTitle>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-zinc-800">
+              <TableHead className="text-zinc-400 text-xs">Destination</TableHead>
+              <TableHead className="text-zinc-400 text-xs">Enabled</TableHead>
+              <TableHead className="text-zinc-400 text-xs">Credentials</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">24h Sent</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">24h Failed</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">Pending</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">Retrying</TableHead>
+              <TableHead className="text-zinc-400 text-xs text-right">Success Rate</TableHead>
+              <TableHead className="text-zinc-400 text-xs">Last Success</TableHead>
+              <TableHead className="text-zinc-400 text-xs">Last Failure</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {DESTINATIONS.map((dest) => {
+              const row = rowMap[dest];
+              const warnNoCredentials = row?.enabled && !row?.hasCredentials;
+              return (
+                <TableRow
+                  key={dest}
+                  className={`border-zinc-800 ${warnNoCredentials ? "bg-yellow-950/20" : ""}`}
+                >
+                  <TableCell className="font-semibold text-xs text-white">
+                    {destinationLabels[dest]}
+                    {warnNoCredentials && (
+                      <span className="ml-2 text-yellow-400 text-xs">(no creds)</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <EnabledBadge value={row?.enabled ?? false} />
+                  </TableCell>
+                  <TableCell>
+                    <EnabledBadge value={row?.hasCredentials ?? false} />
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-zinc-300">
+                    {row?.sent24h ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-red-400">
+                    {row?.failed24h ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-yellow-400">
+                    {row?.pending24h ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-orange-400">
+                    {row?.retrying24h ?? 0}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {row ? (
+                      <RateBadge rate={row.successRate24h} />
+                    ) : (
+                      <span className="text-zinc-600">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-zinc-400">
+                    {row?.lastSuccess ? timeAgo(row.lastSuccess) : <span className="text-zinc-600">—</span>}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {row?.lastFailure ? (
+                      <span className="text-red-400">{timeAgo(row.lastFailure)}</span>
+                    ) : (
+                      <span className="text-zinc-600">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Event x Destination Matrix
+// ---------------------------------------------------------------------------
+
+function MatrixSection({
+  entries,
+  enabledDestinations,
+}: {
+  entries: MatrixEntry[];
+  enabledDestinations: Set<string>;
+}) {
+  // Build nested map: eventName -> destination -> {sent, total}
+  const matrixMap: Record<string, Record<string, { sent: number; total: number }>> = {};
+  for (const entry of entries) {
+    if (!matrixMap[entry.eventName]) matrixMap[entry.eventName] = {};
+    matrixMap[entry.eventName][entry.destination] = {
+      sent: entry.sent,
+      total: entry.count,
+    };
+  }
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Event x Destination Matrix (24h)</SectionTitle>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-zinc-800">
+              <TableHead className="text-zinc-400 text-xs">Event</TableHead>
+              {DESTINATIONS.map((dest) => (
+                <TableHead
+                  key={dest}
+                  className={`text-xs text-center ${
+                    enabledDestinations.has(dest) ? "text-zinc-400" : "text-zinc-700"
+                  }`}
+                >
+                  {destinationLabels[dest]}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ALL_EVENTS.map((event) => (
+              <TableRow key={event} className="border-zinc-800">
+                <TableCell className="font-mono text-xs text-white">{event}</TableCell>
+                {DESTINATIONS.map((dest) => {
+                  const cell = matrixMap[event]?.[dest];
+                  const isEnabled = enabledDestinations.has(dest);
+                  if (!isEnabled) {
+                    return (
+                      <TableCell key={dest} className="text-center text-xs text-zinc-700">
+                        —
+                      </TableCell>
+                    );
+                  }
+                  if (!cell || cell.total === 0) {
+                    return (
+                      <TableCell key={dest} className="text-center font-mono text-xs text-zinc-600">
+                        0/0
+                      </TableCell>
+                    );
+                  }
+                  const rate = cell.total > 0 ? (cell.sent / cell.total) * 100 : null;
+                  return (
+                    <TableCell
+                      key={dest}
+                      className={`text-center font-mono text-xs ${rateColor(rate)}`}
+                    >
+                      {cell.sent}/{cell.total}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Data Quality
+// ---------------------------------------------------------------------------
+
+function ProgressBar({ value, max }: { value: number; max: number }) {
+  const pctNum = max === 0 ? 0 : Math.min(100, Math.round((value / max) * 100));
+  const color =
+    pctNum >= 95 ? "bg-green-500" : pctNum >= 80 ? "bg-yellow-500" : "bg-red-500";
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 bg-zinc-800 rounded-full h-2">
+        <div
+          className={`h-2 rounded-full ${color} transition-all`}
+          style={{ width: `${pctNum}%` }}
+        />
+      </div>
+      <span className={`font-mono text-xs w-10 text-right ${rateColor(pctNum)}`}>
+        {pct(value, max)}
+      </span>
+    </div>
+  );
+}
+
+function DataQualitySection({ dq }: { dq: DataQuality }) {
+  const rows = [
+    { label: "Purchase value capture", value: dq.purchasesWithValue, max: dq.purchaseEvents7d },
+    { label: "Currency capture", value: dq.purchasesWithCurrency, max: dq.purchaseEvents7d },
+    { label: "Order ID capture", value: dq.purchasesWithOrderId, max: dq.purchaseEvents7d },
+    { label: "UTM attribution", value: dq.eventsWithUtmSource, max: dq.totalEvents7d },
+    { label: "Google Click ID", value: dq.eventsWithGclid, max: dq.totalEvents7d },
+  ];
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Data Quality (7d)</SectionTitle>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {rows.map(({ label, value, max }) => (
+            <div key={label}>
+              <div className="flex justify-between mb-1">
+                <span className="text-xs text-zinc-400">{label}</span>
+                <span className="text-xs text-zinc-500 font-mono">
+                  {value}/{max}
+                </span>
+              </div>
+              <ProgressBar value={value} max={max} />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Funnel Analysis
+// ---------------------------------------------------------------------------
+
+function FunnelSection({ funnel }: { funnel: FunnelStep[] }) {
+  const topCount = funnel[0]?.count7d ?? 0;
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Funnel Analysis (7d)</SectionTitle>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {funnel.map((step) => {
+            const widthPct =
+              topCount === 0 ? 0 : Math.round((step.count7d / topCount) * 100);
+
+            return (
+              <div key={step.eventName}>
+                <div className="flex justify-between mb-1">
+                  <span className="text-xs font-mono text-white">{step.eventName}</span>
+                  <div className="flex items-center gap-3">
+                    {step.dropOffPercent !== null && (
+                      <span className="text-xs text-zinc-500">
+                        -{step.dropOffPercent}% drop
+                      </span>
+                    )}
+                    <span className="text-xs font-mono text-zinc-400 w-24 text-right">
+                      {step.count7d.toLocaleString()} ({widthPct}%)
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-zinc-800 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${widthPct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Recent Failures
+// ---------------------------------------------------------------------------
+
+function RecentFailuresSection({ failures }: { failures: RecentFailure[] }) {
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Recent Failures (last 20)</SectionTitle>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {failures.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-green-400">
+            No failures — all clear
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-zinc-800">
+                <TableHead className="text-zinc-400 text-xs">Time</TableHead>
+                <TableHead className="text-zinc-400 text-xs">Event</TableHead>
+                <TableHead className="text-zinc-400 text-xs">Destination</TableHead>
+                <TableHead className="text-zinc-400 text-xs">Status</TableHead>
+                <TableHead className="text-zinc-400 text-xs font-mono">Event ID</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {failures.map((f) => (
+                <TableRow key={f.id} className="border-zinc-800">
+                  <TableCell className="text-xs text-zinc-400">
+                    {timeAgo(f.createdAt)}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-zinc-300">
+                    {f.eventName}
+                  </TableCell>
+                  <TableCell className="text-xs text-zinc-300">
+                    {destinationLabels[f.destination] ?? f.destination}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className="bg-red-900/50 text-red-400 border-red-800 text-xs">
+                      {f.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-zinc-500 truncate max-w-[180px]">
+                    {f.eventId}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Stuck Events
+// ---------------------------------------------------------------------------
+
+function StuckEventsSection({ stuck }: { stuck: StuckEvents }) {
+  if (stuck.count === 0) {
+    return (
+      <div className="rounded-lg border border-green-800 bg-green-950/30 px-4 py-3 text-sm text-green-400 flex items-center gap-2">
+        <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+        No stuck events — pipeline is flowing
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-400">
+      <div className="flex items-center gap-2 font-semibold">
+        <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+        {stuck.count} stuck event{stuck.count !== 1 ? "s" : ""} detected
+      </div>
+      {stuck.oldest && (
+        <div className="mt-1 text-xs text-red-500">
+          Oldest stuck since: {timeAgo(stuck.oldest)} ({new Date(stuck.oldest).toISOString()})
+        </div>
+      )}
+      <div className="mt-1 text-xs text-red-600">
+        Events in PENDING state older than 10 minutes that the stale-requeue worker may have missed.
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
+
+export default function DiagnosticsPage() {
+  const [data, setData] = useState<DiagnosticsData | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [secondsSince, setSecondsSince] = useState(0);
+
+  // Fetch workspaceId on mount
+  useEffect(() => {
+    fetch("/api/workspaces")
+      .then((r) => r.json())
+      .then((json: { id: string }[]) => {
+        if (Array.isArray(json) && json.length > 0) {
+          setWorkspaceId(json[0].id);
+        } else {
+          setError("No workspaces found.");
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        setError("Failed to load workspaces.");
+        setLoading(false);
+      });
+  }, []);
+
+  const fetchDiagnostics = useCallback(async () => {
+    if (!workspaceId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/diagnostics?workspaceId=${workspaceId}`);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`HTTP ${res.status}: ${body}`);
+      }
+      const json: DiagnosticsData = await res.json();
+      setData(json);
+      setLastUpdated(Date.now());
+      setSecondsSince(0);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [workspaceId]);
+
+  // Fetch when workspaceId becomes available
+  useEffect(() => {
+    if (workspaceId) {
+      fetchDiagnostics();
+    }
+  }, [workspaceId, fetchDiagnostics]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    if (!workspaceId) return;
+    const interval = setInterval(() => {
+      fetchDiagnostics();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [workspaceId, fetchDiagnostics]);
+
+  // "Last updated X seconds ago" ticker
+  useEffect(() => {
+    if (lastUpdated === null) return;
+    const ticker = setInterval(() => {
+      setSecondsSince(Math.floor((Date.now() - lastUpdated) / 1000));
+    }, 1000);
+    return () => clearInterval(ticker);
+  }, [lastUpdated]);
+
+  // Compute enabled destinations from health data
+  const enabledDestinations = new Set<string>(
+    (data?.destinationHealth ?? [])
+      .filter((r) => r.enabled)
+      .map((r) => r.destination)
+  );
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-white">Diagnostics</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Developer debugging view — not for end users
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          {lastUpdated !== null && (
+            <span className="text-xs text-zinc-500">
+              Last updated: {secondsSince}s ago
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-zinc-700 text-zinc-300 hover:text-white text-xs"
+            onClick={fetchDiagnostics}
+            disabled={loading || !workspaceId}
+          >
+            {loading ? "Loading..." : "Refresh"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-400 mb-6">
+          {error}
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {loading && !data && (
+        <div className="space-y-4">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="h-40 bg-zinc-900 border border-zinc-800 rounded-lg animate-pulse"
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Content */}
+      {data && (
+        <div className="space-y-6">
+          {/* Stuck Events Banner — always top */}
+          <StuckEventsSection stuck={data.stuckEvents} />
+
+          {/* Main sections */}
+          <EventCoverageSection rows={data.eventCoverage} />
+          <DestinationHealthSection rows={data.destinationHealth} />
+          <MatrixSection
+            entries={data.eventDestinationMatrix}
+            enabledDestinations={enabledDestinations}
+          />
+
+          {/* Two-column: Data Quality + Funnel */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DataQualitySection dq={data.dataQuality} />
+            <FunnelSection funnel={data.funnel} />
+          </div>
+
+          {/* Recent Failures */}
+          <RecentFailuresSection failures={data.recentFailures} />
+
+          {/* Footer note */}
+          <p className="text-center text-xs text-zinc-700 pb-4">
+            Auto-refreshes every 30 seconds &bull; Workspace ID: {workspaceId}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
