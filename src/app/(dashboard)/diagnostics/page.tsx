@@ -19,6 +19,7 @@ import {
 
 interface EventCoverageRow {
   eventName: string;
+  tracked: boolean; // false = fire-and-forget (sent to platforms but not stored in DB)
   total24h: number;
   total7d: number;
   total30d: number;
@@ -185,38 +186,44 @@ function EventCoverageSection({ rows }: { rows: EventCoverageRow[] }) {
           <TableBody>
             {ALL_EVENTS.map((name) => {
               const row = rowMap[name];
-              const missing7d = !row || row.total7d === 0;
+              const isFireAndForget = row && !row.tracked;
+              const missing7d = !isFireAndForget && (!row || row.total7d === 0);
               return (
                 <TableRow
                   key={name}
-                  className={`border-zinc-800 ${missing7d ? "bg-red-950/20" : ""}`}
+                  className={`border-zinc-800 ${missing7d ? "bg-red-950/20" : ""} ${isFireAndForget ? "opacity-60" : ""}`}
                 >
                   <TableCell className="font-mono text-xs text-white">
                     {name}
+                    {isFireAndForget && (
+                      <span className="ml-2 text-blue-400 text-xs">(fire-and-forget)</span>
+                    )}
                     {missing7d && (
                       <span className="ml-2 text-red-400 text-xs">(missing)</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-zinc-300">
-                    {row?.total24h ?? 0}
+                    {isFireAndForget ? <span className="text-zinc-600">n/a</span> : (row?.total24h ?? 0)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-zinc-300">
-                    {row?.total7d ?? 0}
+                    {isFireAndForget ? <span className="text-zinc-600">n/a</span> : (row?.total7d ?? 0)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-zinc-300">
-                    {row?.total30d ?? 0}
+                    {isFireAndForget ? <span className="text-zinc-600">n/a</span> : (row?.total30d ?? 0)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {row ? <RateBadge rate={row.successRate24h} /> : <span className="text-zinc-600">—</span>}
+                    {isFireAndForget ? <span className="text-zinc-600">n/a</span> : row ? <RateBadge rate={row.successRate24h} /> : <span className="text-zinc-600">—</span>}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-red-400">
-                    {row?.failedCount24h ?? 0}
+                    {isFireAndForget ? <span className="text-zinc-600">n/a</span> : (row?.failedCount24h ?? 0)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-yellow-400">
-                    {row?.pendingCount24h ?? 0}
+                    {isFireAndForget ? <span className="text-zinc-600">n/a</span> : (row?.pendingCount24h ?? 0)}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {row?.lastSeen ? (
+                    {isFireAndForget ? (
+                      <span className="text-blue-400">Sent via worker (not stored)</span>
+                    ) : row?.lastSeen ? (
                       <span className="text-zinc-400">{timeAgo(row.lastSeen)}</span>
                     ) : (
                       <span className="text-red-400">Never</span>
@@ -481,7 +488,10 @@ function DataQualitySection({ dq }: { dq: DataQuality }) {
 // ---------------------------------------------------------------------------
 
 function FunnelSection({ funnel }: { funnel: FunnelStep[] }) {
-  const topCount = funnel[0]?.count7d ?? 0;
+  const FIRE_AND_FORGET = new Set(["PageView", "ViewContent"]);
+  // Use first tracked event as the top for percentage calculation
+  const trackedSteps = funnel.filter((s) => !FIRE_AND_FORGET.has(s.eventName));
+  const topCount = trackedSteps[0]?.count7d ?? 0;
 
   return (
     <Card className="bg-zinc-900 border-zinc-800">
@@ -489,32 +499,40 @@ function FunnelSection({ funnel }: { funnel: FunnelStep[] }) {
         <CardTitle className="text-sm">
           <SectionTitle>Funnel Analysis (7d)</SectionTitle>
         </CardTitle>
+        <p className="text-xs text-zinc-500">PageView/ViewContent are fire-and-forget (not stored in DB). Funnel starts from AddToCart.</p>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
           {funnel.map((step) => {
-            const widthPct =
-              topCount === 0 ? 0 : Math.round((step.count7d / topCount) * 100);
+            const isFF = FIRE_AND_FORGET.has(step.eventName);
+            const widthPct = isFF
+              ? 0
+              : topCount === 0
+                ? 0
+                : Math.round((step.count7d / topCount) * 100);
 
             return (
-              <div key={step.eventName}>
+              <div key={step.eventName} className={isFF ? "opacity-40" : ""}>
                 <div className="flex justify-between mb-1">
-                  <span className="text-xs font-mono text-white">{step.eventName}</span>
+                  <span className="text-xs font-mono text-white">
+                    {step.eventName}
+                    {isFF && <span className="ml-2 text-blue-400">(not stored)</span>}
+                  </span>
                   <div className="flex items-center gap-3">
-                    {step.dropOffPercent !== null && (
+                    {!isFF && step.dropOffPercent !== null && (
                       <span className="text-xs text-zinc-500">
                         -{step.dropOffPercent}% drop
                       </span>
                     )}
                     <span className="text-xs font-mono text-zinc-400 w-24 text-right">
-                      {step.count7d.toLocaleString()} ({widthPct}%)
+                      {isFF ? "n/a" : `${step.count7d.toLocaleString()} (${widthPct}%)`}
                     </span>
                   </div>
                 </div>
                 <div className="bg-zinc-800 rounded-full h-2">
                   <div
-                    className="h-2 rounded-full bg-blue-500 transition-all"
-                    style={{ width: `${widthPct}%` }}
+                    className={`h-2 rounded-full transition-all ${isFF ? "bg-zinc-700" : "bg-blue-500"}`}
+                    style={{ width: isFF ? "100%" : `${widthPct}%` }}
                   />
                 </div>
               </div>

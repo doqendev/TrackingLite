@@ -10,6 +10,10 @@ const FUNNEL_ORDER = [
   "Purchase",
 ] as const;
 
+// PageView and ViewContent are fire-and-forget (no EventLog records).
+// They ARE sent to platforms but not stored in the database to save space.
+const FIRE_AND_FORGET_EVENTS = new Set(["PageView", "ViewContent"]);
+
 const ALL_DESTINATIONS = [
   "META",
   "TIKTOK",
@@ -234,6 +238,7 @@ export async function GET(request: NextRequest) {
   }
 
   const eventCoverage = FUNNEL_ORDER.map((eventName) => {
+    const isFireAndForget = FIRE_AND_FORGET_EVENTS.has(eventName);
     const e24 = map24h[eventName] ?? {};
     const e7 = map7d[eventName] ?? {};
     const e30 = map30d[eventName] ?? {};
@@ -249,6 +254,7 @@ export async function GET(request: NextRequest) {
 
     return {
       eventName,
+      tracked: !isFireAndForget, // false = fire-and-forget (sent to platforms but not stored in DB)
       total24h,
       total7d,
       total30d,
