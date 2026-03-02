@@ -205,7 +205,7 @@ export async function GET(request: NextRequest) {
       select: { createdAt: true },
     }),
 
-    // Purchase event audit — last 10 unique purchases (up to 60 rows to cover 6-destination fan-out)
+    // Purchase event audit — last 10 unique purchases (fetch extra rows for multi-destination fan-out)
     db.eventLog.findMany({
       where: { workspaceId, eventName: "Purchase" },
       orderBy: { createdAt: "desc" },
