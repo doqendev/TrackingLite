@@ -17,6 +17,7 @@ export interface SnippetEventPayload {
     state?: string;
     zip?: string;
     countryCode?: string;
+    customerId?: string;
   };
   consent?: {
     analyticsAllowed?: boolean;

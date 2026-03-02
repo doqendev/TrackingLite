@@ -18,6 +18,7 @@ export function normalizeToMetaCapiEvent(
         state: payload.userData.state,
         zip: payload.userData.zip,
         countryCode: payload.userData.countryCode,
+        customerId: payload.userData.customerId,
       })
     : {};
 

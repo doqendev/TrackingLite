@@ -560,6 +560,7 @@ async function handleOrderPaid(
         currency,
         num_items: numItems,
         order_id: orderId,
+        content_type: "product",
         content_ids: lineItems.map(
           (li) => String(li.product_id || li.sku || "")
         ),
