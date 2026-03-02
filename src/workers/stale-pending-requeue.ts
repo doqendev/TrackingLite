@@ -10,6 +10,7 @@ import {
   getKlaviyoQueue,
   getRedditQueue,
   getPinterestQueue,
+  getGoogleAdsQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
@@ -86,6 +87,7 @@ const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = 
   KLAVIYO: { queue: getKlaviyoQueue, jobName: "send-klaviyo-event" },
   REDDIT: { queue: getRedditQueue, jobName: "send-reddit-event" },
   PINTEREST: { queue: getPinterestQueue, jobName: "send-pinterest-event" },
+  GOOGLE_ADS: { queue: getGoogleAdsQueue, jobName: "send-google-ads-event" },
 };
 
 function checkWorkspaceHasDestinationCredentials(
@@ -105,6 +107,8 @@ function checkWorkspaceHasDestinationCredentials(
       return !!workspace.ga4ApiSecretEncrypted;
     case "KLAVIYO":
       return !!workspace.klaviyoApiKeyEncrypted;
+    case "GOOGLE_ADS":
+      return !!workspace.googleAdsConversionId;
     default:
       return false;
   }
@@ -142,6 +146,7 @@ async function requeueEvents(
         klaviyoApiKeyEncrypted: true,
         redditAccessTokenEncrypted: true,
         pinterestConversionTokenEncrypted: true,
+        googleAdsConversionId: true,
       },
     });
 

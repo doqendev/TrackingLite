@@ -15,6 +15,7 @@ const DESTINATION_CONFIG: Record<string, { label: string; dotColor: string }> = 
   KLAVIYO: { label: "Klaviyo", dotColor: "bg-green-500" },
   REDDIT: { label: "Reddit", dotColor: "bg-orange-500" },
   PINTEREST: { label: "Pinterest", dotColor: "bg-red-500" },
+  GOOGLE_ADS: { label: "Google Ads", dotColor: "bg-yellow-500" },
 };
 
 function getSuccessRateColor(rate: number): string {

@@ -52,6 +52,13 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
       enablePinterest: true,
       pinterestAdAccountId: true,
       pinterestConversionTokenEncrypted: true,
+      // Google Ads (no encryption -- public values)
+      enableGoogleAds: true,
+      googleAdsConversionId: true,
+      googleAdsLabelPurchase: true,
+      googleAdsLabelAddToCart: true,
+      googleAdsLabelInitiateCheckout: true,
+      googleAdsLabelViewContent: true,
       // Shopify webhook
       shopifyWebhookSecretEncrypted: true,
       // Event toggles and consent
@@ -89,6 +96,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     hasKlaviyoCredentials: !!(workspace.enableKlaviyo && klaviyoApiKeyEncrypted),
     hasRedditCredentials: !!(workspace.enableReddit && redditAccessTokenEncrypted),
     hasPinterestCredentials: !!(workspace.enablePinterest && pinterestConversionTokenEncrypted),
+    hasGoogleAdsCredentials: !!(workspace.enableGoogleAds && workspace.googleAdsConversionId),
     hasShopifyWebhookSecret: !!shopifyWebhookSecretEncrypted,
   };
 

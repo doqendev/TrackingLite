@@ -275,7 +275,7 @@ function EventCoverageSection({ rows }: { rows: EventCoverageRow[] }) {
 // Section: Destination Health
 // ---------------------------------------------------------------------------
 
-const DESTINATIONS = ["META", "TIKTOK", "GA4", "KLAVIYO", "REDDIT", "PINTEREST"] as const;
+const DESTINATIONS = ["META", "TIKTOK", "GA4", "KLAVIYO", "REDDIT", "PINTEREST", "GOOGLE_ADS"] as const;
 
 const destinationLabels: Record<string, string> = {
   META: "Meta",
@@ -284,6 +284,7 @@ const destinationLabels: Record<string, string> = {
   KLAVIYO: "Klaviyo",
   REDDIT: "Reddit",
   PINTEREST: "Pinterest",
+  GOOGLE_ADS: "Google Ads",
 };
 
 function DestinationHealthSection({ rows }: { rows: DestinationHealthRow[] }) {

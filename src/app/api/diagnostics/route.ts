@@ -21,6 +21,7 @@ const ALL_DESTINATIONS = [
   "KLAVIYO",
   "REDDIT",
   "PINTEREST",
+  "GOOGLE_ADS",
 ] as const;
 
 type Destination = (typeof ALL_DESTINATIONS)[number];
@@ -39,6 +40,8 @@ function hasCredentials(workspace: Record<string, unknown>, dest: Destination): 
       return !!(workspace.redditAccountId && workspace.redditAccessTokenEncrypted);
     case "PINTEREST":
       return !!(workspace.pinterestAdAccountId && workspace.pinterestConversionTokenEncrypted);
+    case "GOOGLE_ADS":
+      return !!(workspace.googleAdsConversionId);
   }
 }
 
@@ -56,6 +59,8 @@ function isEnabled(workspace: Record<string, unknown>, dest: Destination): boole
       return !!(workspace.enableReddit);
     case "PINTEREST":
       return !!(workspace.enablePinterest);
+    case "GOOGLE_ADS":
+      return !!(workspace.enableGoogleAds);
   }
 }
 
@@ -96,6 +101,8 @@ export async function GET(request: NextRequest) {
       redditAccessTokenEncrypted: true,
       pinterestAdAccountId: true,
       pinterestConversionTokenEncrypted: true,
+      enableGoogleAds: true,
+      googleAdsConversionId: true,
     },
   });
 

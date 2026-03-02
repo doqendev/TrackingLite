@@ -8,13 +8,13 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**Track Clear** is a standalone SaaS that enables Shopify merchants to send ecommerce events server-side to multiple ad platforms (Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest). Primary value: "Fix your tracking in 10 minutes."
+**Track Clear** is a standalone SaaS that enables Shopify merchants to send ecommerce events server-side to multiple ad platforms (Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads). Primary value: "Fix your tracking in 10 minutes."
 
 **This is NOT a Shopify embedded app.** It is a standalone web application with its own auth, dashboard, and billing. Shopify integration is via a JS snippet pasted into Shopify's Custom Pixel feature.
 
 ### Why It Exists
 
-Browser-only pixels lose 20-40% of conversion data to ad blockers. Track Clear captures events via a custom JS snippet, sends them to our server (`api.trackclear.io` --- not on any block list), and forwards server-to-server to up to 6 ad/analytics platforms, bypassing ad blockers entirely.
+Browser-only pixels lose 20-40% of conversion data to ad blockers. Track Clear captures events via a custom JS snippet, sends them to our server (`api.trackclear.io` --- not on any block list), and forwards server-to-server to up to 7 ad/analytics platforms, bypassing ad blockers entirely.
 
 ### Target Users
 
@@ -22,13 +22,13 @@ Small-to-mid Shopify stores running ads on Meta, TikTok, Reddit, Pinterest, and 
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 8 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 11 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 263/263 passing (14 test files)
+- Unit tests: 325/325 passing (16 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors
 - Lint: 0 warnings/errors
-- 6 destinations: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest
+- 7 destinations: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
 - Dashboard: per-destination tabs, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
@@ -81,7 +81,7 @@ JS Snippet (browser) --> POST /api/events/ingest (X-TL-API-Key header)
   |-- Check per-event toggle (enablePageView, etc.)
   |-- Check consent (STRICT/LAX mode)
   |-- Fan-out: Create one EventLog per enabled destination (status: PENDING)
-  |-- Queue BullMQ jobs per destination (meta-events, tiktok-events, ga4-events, klaviyo-events, reddit-events, pinterest-events)
+  |-- Queue BullMQ jobs per destination (meta-events, tiktok-events, ga4-events, klaviyo-events, reddit-events, pinterest-events, google-ads-events)
   |-- Return { success: true, eventId, destinations: [...] }
 
 Workers (separate process) --> Dequeue from per-destination queues
@@ -129,7 +129,7 @@ src/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
       dashboard/page.tsx              # Rich analytics with per-destination tabs: revenue (currency conversion), conversion accuracy, event funnel, delivery, campaign performance, recent events
       events/page.tsx                 # Event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
-      settings/page.tsx               # 6 destination cards (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest), event toggles, consent, snippet, alerts, language/currency selectors, danger zone
+      settings/page.tsx               # 7 destination cards (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads), event toggles, consent, snippet, alerts, language/currency selectors, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
         page.tsx                      # 3-step wizard: create workspace, install snippet, connect platforms
@@ -167,7 +167,7 @@ src/
       replay-button.tsx               # Retry failed events button (bulk + per-event)
       campaign-performance.tsx        # Top campaigns by revenue with per-platform tabs (30d)
     settings/
-      settings-form.tsx               # All settings: 6 destination cards + toggles + consent + snippet + language/currency selectors + danger zone
+      settings-form.tsx               # All settings: 7 destination cards + toggles + consent + snippet + language/currency selectors + danger zone
       alert-preferences.tsx           # Email alert notification toggles
     billing/
       plan-cards.tsx                  # Starter/Growth plan comparison + subscribe buttons
@@ -188,7 +188,7 @@ src/
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     currency.ts                       # Exchange rate fetcher (frankfurter.app API), Redis-cached 24h
-    queue.ts                          # Lazy BullMQ queues (6 destinations), MetaEventJob + DestinationEventJob interfaces
+    queue.ts                          # Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
     replay-rate-limit.ts              # Redis cooldown for event replay (5min per workspace)
     email.ts                          # Resend client for password reset, alert emails, and email verification
@@ -204,6 +204,7 @@ src/
       klaviyo.ts                      # Klaviyo normalizer + Events API client (raw email)
       reddit.ts                       # Reddit normalizer + Conversions API client (rdtCid click ID)
       pinterest.ts                    # Pinterest normalizer + Conversions API client (epik click ID, value as string)
+      google-ads.ts                   # Google Ads pixel endpoint normalizer + client (server-side GET, Enhanced Conversions, Gmail normalization)
   types/
     meta-capi.ts                      # MetaCapiEvent, MetaUserData, MetaCustomData, etc.
     events.ts                         # SnippetEventPayload
@@ -217,6 +218,7 @@ src/
     klaviyo-event-processor.ts        # BullMQ worker: circuit breaker, Klaviyo Events API
     reddit-event-processor.ts         # BullMQ worker: circuit breaker, Reddit Conversions API
     pinterest-event-processor.ts      # BullMQ worker: circuit breaker, Pinterest Conversions API
+    google-ads-event-processor.ts     # BullMQ worker: circuit breaker, Google Ads pixel endpoint
     alert-checker.ts                  # Hourly repeatable job: evaluate alerts, send emails
     stale-pending-requeue.ts          # Every 5min: re-queue stale PENDING events to destination queues
   i18n/
@@ -240,8 +242,9 @@ tests/
     rate-limit.test.ts                # 16 tests
     event-normalizer.test.ts          # 40 tests (all 5 event types + camelCase handling)
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
+    google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
 prisma/
-  schema.prisma                       # 6 models, 6 enums (see Data Model below)
+  schema.prisma                       # 10 models, 7 enums (see Data Model below)
 ```
 
 ### shadcn/ui Components (14 installed)
@@ -254,12 +257,12 @@ prisma/
 
 **Key relationships:**
 - User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
-- Workspace has many EventLogs, stores encrypted credentials for all 6 destinations (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest), includes per-destination enable toggles
+- Workspace has many EventLogs, stores encrypted credentials for all 7 destinations (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest), includes per-destination enable toggles
 - EventLog has a `destination` field (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 - EventLog stores UTM attribution data (utmSource, utmMedium, utmCampaign, utmContent, utmTerm, gclid)
 
-**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), EventName (5 events), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST)
+**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), EventName (5 events), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
 
 ## Development Commands
 
@@ -399,6 +402,7 @@ Header: Content-Type: application/json
 - **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.
 - **Reddit click ID (rdtCid):** Snippet captures `rdt_cid` URL param and passes as `rdtCid`. Forwarded to Reddit Conversions API for attribution matching.
 - **Pinterest click ID (epik):** Snippet captures `epik` URL param and passes as `epik`. Pinterest Conversions API requires `value` as a string (not number) — normalizer handles the conversion.
+- **Google Ads pixel endpoint:** Server-side GET to `googleadservices.com/pagead/conversion/{ID}/`. No OAuth or developer token needed — Conversion ID and Labels are public values stored plaintext (not encrypted). Supports 4 events (Purchase, AddToCart, InitiateCheckout, ViewContent). Enhanced Conversions via `em` parameter with SHA-256 hashed PII. Gmail-specific normalization strips dots and +suffix before hashing. Order deduplication via `oid` parameter matches browser gtag.js.
 - **Vercel hosting:** Web app runs on Vercel (serverless). Workers stay on Railway. Redis and PostgreSQL on Railway with public TCP proxies for Vercel connectivity. Railway-specific code (keepalive, self-ping, cgroup reader, signal handlers) conditionally disabled via `process.env.VERCEL`.
 
 ## Style Rules

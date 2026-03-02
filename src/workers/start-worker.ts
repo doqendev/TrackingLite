@@ -42,6 +42,7 @@ import { pinterestWorker } from "./pinterest-event-processor";
 import { tiktokWorker } from "./tiktok-event-processor";
 import { ga4Worker } from "./ga4-event-processor";
 import { klaviyoWorker } from "./klaviyo-event-processor";
+import { googleAdsWorker } from "./google-ads-event-processor";
 import { alertWorker, scheduleAlertChecks } from "./alert-checker";
 import { staleRequeueWorker, scheduleStaleRequeue } from "./stale-pending-requeue";
 import { cleanupWorker, scheduleEventLogCleanup } from "./event-log-cleanup";
@@ -68,11 +69,11 @@ process.on("exit", (code) => {
   log.warn("Worker process exit", { code });
 });
 
-const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorker, pinterestWorker, alertWorker, staleRequeueWorker, cleanupWorker];
+const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorker, pinterestWorker, googleAdsWorker, alertWorker, staleRequeueWorker, cleanupWorker];
 
 log.info("Starting event processors", { workerCount: workers.length, pid: process.pid });
 log.info("Redis configured", { redisUrl: (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/\/\/.*@/, "//***@") });
-log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
+log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events", "google-ads-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
 
 // Minimal HTTP health check for Railway
 const healthPort = parseInt(process.env.PORT || process.env.WORKER_HEALTH_PORT || "8080", 10);

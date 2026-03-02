@@ -23,6 +23,7 @@ const destinationLabels: Record<Destination, { label: string; className: string 
   KLAVIYO: { label: "Klaviyo", className: "text-emerald-400" },
   REDDIT: { label: "Reddit", className: "text-orange-400" },
   PINTEREST: { label: "Pinterest", className: "text-red-500" },
+  GOOGLE_ADS: { label: "Google Ads", className: "text-yellow-400" },
 };
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;

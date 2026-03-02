@@ -46,6 +46,13 @@ export default async function IntegrationsPage() {
         pinterestAdAccountId: true,
         pinterestConversionTokenEncrypted: true,
         enablePinterest: true,
+        // Google Ads
+        googleAdsConversionId: true,
+        googleAdsLabelPurchase: true,
+        googleAdsLabelAddToCart: true,
+        googleAdsLabelInitiateCheckout: true,
+        googleAdsLabelViewContent: true,
+        enableGoogleAds: true,
         // Shopify Webhook
         shopifyWebhookSecretEncrypted: true,
       },
@@ -91,6 +98,13 @@ export default async function IntegrationsPage() {
     pinterestAdAccountId: workspace.pinterestAdAccountId,
     hasPinterestConversionToken: !!workspace.pinterestConversionTokenEncrypted,
     enablePinterest: workspace.enablePinterest,
+    // Google Ads
+    googleAdsConversionId: workspace.googleAdsConversionId,
+    googleAdsLabelPurchase: workspace.googleAdsLabelPurchase,
+    googleAdsLabelAddToCart: workspace.googleAdsLabelAddToCart,
+    googleAdsLabelInitiateCheckout: workspace.googleAdsLabelInitiateCheckout,
+    googleAdsLabelViewContent: workspace.googleAdsLabelViewContent,
+    enableGoogleAds: workspace.enableGoogleAds,
     // Shopify Webhook
     hasShopifyWebhookSecret: !!workspace.shopifyWebhookSecretEncrypted,
   };

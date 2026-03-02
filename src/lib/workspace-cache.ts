@@ -73,6 +73,13 @@ export async function getWorkspaceForDestination(
       klaviyoApiKeyIv: true,
       klaviyoApiKeyTag: true,
     },
+    GOOGLE_ADS: {
+      googleAdsConversionId: true,
+      googleAdsLabelPurchase: true,
+      googleAdsLabelAddToCart: true,
+      googleAdsLabelInitiateCheckout: true,
+      googleAdsLabelViewContent: true,
+    },
   };
 
   const select = { ...baseSelect, ...(destSelects[destination] || {}) };

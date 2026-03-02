@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { ChevronDown, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
-import { SiMeta, SiTiktok, SiGoogleanalytics, SiShopify } from "react-icons/si";
+import { SiMeta, SiTiktok, SiGoogleanalytics, SiGoogleads, SiShopify } from "react-icons/si";
 import { FaReddit, FaPinterest } from "react-icons/fa";
 import { SetupGuide } from "@/components/integrations/setup-guide";
 
@@ -38,6 +38,13 @@ export interface IntegrationWorkspace {
   pinterestAdAccountId: string | null;
   hasPinterestConversionToken: boolean;
   enablePinterest: boolean;
+  // Google Ads
+  googleAdsConversionId: string | null;
+  googleAdsLabelPurchase: string | null;
+  googleAdsLabelAddToCart: string | null;
+  googleAdsLabelInitiateCheckout: string | null;
+  googleAdsLabelViewContent: string | null;
+  enableGoogleAds: boolean;
   // Shopify Webhook
   hasShopifyWebhookSecret: boolean;
 }
@@ -128,6 +135,15 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [pinterestEnabled, setPinterestEnabled] = useState(workspace.enablePinterest);
   const [savingPinterest, setSavingPinterest] = useState(false);
 
+  // Google Ads state
+  const [googleAdsConversionId, setGoogleAdsConversionId] = useState(workspace.googleAdsConversionId ?? "");
+  const [googleAdsLabelPurchase, setGoogleAdsLabelPurchase] = useState(workspace.googleAdsLabelPurchase ?? "");
+  const [googleAdsLabelAddToCart, setGoogleAdsLabelAddToCart] = useState(workspace.googleAdsLabelAddToCart ?? "");
+  const [googleAdsLabelInitiateCheckout, setGoogleAdsLabelInitiateCheckout] = useState(workspace.googleAdsLabelInitiateCheckout ?? "");
+  const [googleAdsLabelViewContent, setGoogleAdsLabelViewContent] = useState(workspace.googleAdsLabelViewContent ?? "");
+  const [googleAdsEnabled, setGoogleAdsEnabled] = useState(workspace.enableGoogleAds);
+  const [savingGoogleAds, setSavingGoogleAds] = useState(false);
+
   // Shopify Webhook state
   const [webhookSecret, setWebhookSecret] = useState("");
   const [savingWebhook, setSavingWebhook] = useState(false);
@@ -148,6 +164,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       klaviyo: "enableKlaviyo",
       reddit: "enableReddit",
       pinterest: "enablePinterest",
+      googleAds: "enableGoogleAds",
     };
     const field = fieldMap[platform];
     if (!field) return;
@@ -309,6 +326,32 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     }
   }
 
+  async function saveGoogleAds() {
+    setSavingGoogleAds(true);
+    try {
+      const body: Record<string, string | boolean | null> = {
+        googleAdsConversionId: googleAdsConversionId || null,
+        googleAdsLabelPurchase: googleAdsLabelPurchase || null,
+        googleAdsLabelAddToCart: googleAdsLabelAddToCart || null,
+        googleAdsLabelInitiateCheckout: googleAdsLabelInitiateCheckout || null,
+        googleAdsLabelViewContent: googleAdsLabelViewContent || null,
+        enableGoogleAds: googleAdsEnabled,
+      };
+
+      const res = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast.success(t("credentialsSaved", { platform: "Google Ads" }));
+    } catch {
+      toast.error(t("failedToSave", { platform: "Google Ads" }));
+    } finally {
+      setSavingGoogleAds(false);
+    }
+  }
+
   async function saveWebhookSecret() {
     setSavingWebhook(true);
     try {
@@ -347,6 +390,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const klaviyoConnected = workspace.hasKlaviyoApiKey;
   const redditConnected = workspace.hasRedditAccessToken;
   const pinterestConnected = workspace.hasPinterestConversionToken;
+  const googleAdsConnected = !!workspace.googleAdsConversionId;
 
   return (
     <div className="space-y-8">
@@ -802,6 +846,123 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                 </Button>
               </div>
               <SetupGuide platformKey="pinterest" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Google Ads */}
+      <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-yellow-500 overflow-hidden">
+        <div
+          className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+          onClick={() => toggleCard("googleAds")}
+        >
+          <div className="text-yellow-500 shrink-0">
+            <SiGoogleads className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-foreground text-sm">{t("googleAdsTitle")}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {t("googleAdsDesc")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <StatusBadge connected={googleAdsConnected} connectedLabel={t("connected")} notConnectedLabel={t("notConnected")} />
+            <Switch
+              checked={googleAdsEnabled}
+              onCheckedChange={(val) => {
+                setGoogleAdsEnabled(val);
+                handleToggle("googleAds", val, "Google Ads");
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="scale-90"
+            />
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                expandedCard === "googleAds" ? "rotate-180" : ""
+              }`}
+            />
+          </div>
+        </div>
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            expandedCard === "googleAds" ? "max-h-[1200px]" : "max-h-0"
+          }`}
+        >
+          <div className="space-y-4 p-6 pt-0 border-t border-white/[0.06]">
+            <div className="pt-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="google-ads-conversion-id" className="text-xs">
+                  {t("googleAdsConversionId")}
+                </Label>
+                <Input
+                  id="google-ads-conversion-id"
+                  value={googleAdsConversionId}
+                  onChange={(e) => setGoogleAdsConversionId(e.target.value)}
+                  placeholder={t("googleAdsConversionIdPlaceholder")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="google-ads-label-purchase" className="text-xs">
+                  {t("googleAdsLabelPurchase")}
+                </Label>
+                <Input
+                  id="google-ads-label-purchase"
+                  value={googleAdsLabelPurchase}
+                  onChange={(e) => setGoogleAdsLabelPurchase(e.target.value)}
+                  placeholder={t("googleAdsLabelPlaceholder")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="google-ads-label-add-to-cart" className="text-xs">
+                  {t("googleAdsLabelAddToCart")}
+                  {" "}
+                  <span className="text-muted-foreground">({t("optional")})</span>
+                </Label>
+                <Input
+                  id="google-ads-label-add-to-cart"
+                  value={googleAdsLabelAddToCart}
+                  onChange={(e) => setGoogleAdsLabelAddToCart(e.target.value)}
+                  placeholder={t("googleAdsLabelPlaceholder")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="google-ads-label-checkout" className="text-xs">
+                  {t("googleAdsLabelInitiateCheckout")}
+                  {" "}
+                  <span className="text-muted-foreground">({t("optional")})</span>
+                </Label>
+                <Input
+                  id="google-ads-label-checkout"
+                  value={googleAdsLabelInitiateCheckout}
+                  onChange={(e) => setGoogleAdsLabelInitiateCheckout(e.target.value)}
+                  placeholder={t("googleAdsLabelPlaceholder")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="google-ads-label-view-content" className="text-xs">
+                  {t("googleAdsLabelViewContent")}
+                  {" "}
+                  <span className="text-muted-foreground">({t("optional")})</span>
+                </Label>
+                <Input
+                  id="google-ads-label-view-content"
+                  value={googleAdsLabelViewContent}
+                  onChange={(e) => setGoogleAdsLabelViewContent(e.target.value)}
+                  placeholder={t("googleAdsLabelPlaceholder")}
+                />
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="brand"
+                  size="sm"
+                  onClick={saveGoogleAds}
+                  disabled={savingGoogleAds}
+                >
+                  {savingGoogleAds ? tc("saving") : t("saveCredentials")}
+                </Button>
+              </div>
+              <SetupGuide platformKey="googleAds" />
             </div>
           </div>
         </div>

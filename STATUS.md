@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-02-24 (post Shopify webhook integration + PayPal bug fixes)
+Last updated: 2026-03-02 (post Google Ads server-side conversion tracking)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test`) | 291/291 passing (15 files) |
+| Tests (`pnpm test`) | 325/325 passing (16 files) |
 | TypeScript | 0 source errors (2 pre-existing test file errors) |
 | ESLint | 0 warnings/errors |
 
@@ -26,7 +26,7 @@ Last updated: 2026-02-24 (post Shopify webhook integration + PayPal bug fixes)
 | `/terms` | Public | Working | Terms of service (billing, acceptable use, liability, termination) |
 | `/dashboard` | Protected | Working | Rich analytics with per-destination tabs, revenue cards (currency conversion), event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events. Full i18n (6 languages) |
 | `/events` | Protected | Working | Paginated event log with type/status filters, Source/Campaign columns, retry failed events |
-| `/settings` | Protected | Working | 6 destination credential cards, event toggles, consent mode, snippet, alert preferences, language selector, currency selector, danger zone |
+| `/settings` | Protected | Working | 7 destination credential cards, event toggles, consent mode, snippet, alert preferences, language selector, currency selector, danger zone |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
 | `/onboarding` | Protected | Working | 3-step wizard: create workspace, install snippet, connect platforms |
 
@@ -58,7 +58,7 @@ Last updated: 2026-02-24 (post Shopify webhook integration + PayPal bug fixes)
 
 ### Multi-Destination Event Pipeline
 
-Track Clear supports 6 ad/analytics destinations with server-side event forwarding:
+Track Clear supports 7 ad/analytics destinations with server-side event forwarding:
 
 | Destination | Events Supported | Auth Method | API |
 |-------------|-----------------|-------------|-----|
@@ -68,12 +68,13 @@ Track Clear supports 6 ad/analytics destinations with server-side event forwardi
 | Klaviyo | ViewContent, AddToCart, InitiateCheckout, Purchase | API Key | Events API |
 | Reddit | All 5 | Account ID + Bearer Token | Conversions API v1 |
 | Pinterest | All 5 | Ad Account ID + Bearer Token | Conversions API v5 |
+| Google Ads | ViewContent, AddToCart, InitiateCheckout, Purchase | Conversion ID + Labels (public) | Pixel Endpoint (server-side GET) |
 
 Each destination has:
 - Normalizer + API client in `src/lib/destinations/`
 - BullMQ worker in `src/workers/`
 - Dedicated queue with 3 retries (exponential backoff)
-- Encrypted credential storage (AES-256-GCM)
+- Encrypted credential storage (AES-256-GCM) -- except Google Ads (public values, plaintext)
 - Settings UI card with enable toggle
 
 ### Core Library Modules (26+ files in src/lib/)
@@ -90,10 +91,10 @@ Each destination has:
 | `api-key.ts` | Working | Generate `tl_` + 64 hex chars, format validation |
 | `stripe.ts` | Working | Stripe client (API version 2024-12-18.acacia), plan constants |
 | `billing.ts` | Working | Order limit checking, auto-upgrade, Redis counter. Lazy Redis |
-| `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (6 queues) |
+| `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (7 queues) |
 | `meta-capi.ts` | Working | POST to Meta Graph API, MetaCapiError with status/response |
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case |
-| `queue.ts` | Working | Lazy BullMQ queues (6 destinations), MetaEventJob + DestinationEventJob interfaces |
+| `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
 | `analytics-cache.ts` | Working | Redis caching wrapper for analytics (60s TTL, lazy connection, keyed by destination+currency) |
@@ -102,12 +103,13 @@ Each destination has:
 | `alerts.ts` | Working | Alert evaluation: tracking down, high error rate, order limit warnings |
 | `replay-rate-limit.ts` | Working | Redis cooldown for event replay (5min per workspace) |
 | `extract-custom-data.ts` | Working | Extract value/currency/numItems/orderId from customData |
-| `destinations/index.ts` | Working | DESTINATION_EVENT_MAP for all 6 platforms |
+| `destinations/index.ts` | Working | DESTINATION_EVENT_MAP for all 7 platforms |
 | `destinations/tiktok.ts` | Working | TikTok normalizer + API client |
 | `destinations/ga4.ts` | Working | GA4 Measurement Protocol normalizer + API client |
 | `destinations/klaviyo.ts` | Working | Klaviyo normalizer + API client (raw email, not hashed) |
 | `destinations/reddit.ts` | Working | Reddit Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII, rdt_cid click ID) |
 | `destinations/pinterest.ts` | Working | Pinterest Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII in arrays, epik click ID, value as string) |
+| `destinations/google-ads.ts` | Working | Google Ads pixel endpoint normalizer + client (server-side GET, Enhanced Conversions with SHA-256 PII, Gmail normalization, gclid attribution) |
 | `api-key-cache.ts` | Working | Redis-cached workspace lookup (used by ingest route) |
 | `circuit-breaker.ts` | Working | Redis-based circuit breaker for destination APIs (5 failures = 60s cooldown) |
 | `redis.ts` | Working | Shared Redis singleton (lazyConnect) used by all web app modules — eliminates connection sprawl |
@@ -117,21 +119,22 @@ Each destination has:
 | `shopify-webhook.ts` | Working | HMAC-SHA256 signature verification for Shopify webhooks |
 | `shopify-domain-resolver.ts` | Working | Resolves and validates Shopify store domains (myshopify.com normalization) |
 | `workspace-cache.ts` | Working | Redis-cached workspace lookup by shopifyDomain (used by webhook route) |
-| `guide-content.ts` | Working | Setup guide content for all 6 integration platforms + Shopify webhook |
+| `guide-content.ts` | Working | Setup guide content for all 7 integration platforms + Shopify webhook |
 
 ### Workers (10 files in src/workers/)
 
-All 6 destination workers have circuit breaker integration (5 consecutive failures = 60s cooldown).
+All 7 destination workers have circuit breaker integration (5 consecutive failures = 60s cooldown).
 
 | File | Status | What it does |
 |------|--------|-------------|
-| `start-worker.ts` | Working | Entry point, starts all 9 workers, graceful shutdown (30s timeout), Sentry error tracking |
+| `start-worker.ts` | Working | Entry point, starts all 10 workers, graceful shutdown (30s timeout), Sentry error tracking |
 | `meta-event-processor.ts` | Working | Meta CAPI worker: circuit breaker, decrypt, normalize, send, update EventLog |
 | `tiktok-event-processor.ts` | Working | TikTok worker: circuit breaker, decrypt, normalize, send, update EventLog |
 | `ga4-event-processor.ts` | Working | GA4 worker: circuit breaker, decrypt API secret, normalize, send, update EventLog |
 | `klaviyo-event-processor.ts` | Working | Klaviyo worker: circuit breaker, decrypt API key, normalize, send, update EventLog |
 | `reddit-event-processor.ts` | Working | Reddit worker: circuit breaker, decrypt Bearer token, normalize, send, update EventLog |
 | `pinterest-event-processor.ts` | Working | Pinterest worker: circuit breaker, decrypt Bearer token, normalize, send, update EventLog |
+| `google-ads-event-processor.ts` | Working | Google Ads worker: circuit breaker, normalize to pixel params, fire server-side GET, update EventLog |
 | `alert-checker.ts` | Working | Hourly repeatable job: evaluates alerts, sends email notifications |
 | `stale-pending-requeue.ts` | Working | Every 5min: re-queues stale PENDING events; hourly order count reconciliation; DLQ cleanup (30d resolved, 90d unresolved) |
 | `event-log-cleanup.ts` | Working | Hourly: deletes expired EventLogs per plan retention (7d Free/Starter, 30d Growth/Scale) |
@@ -148,9 +151,9 @@ All 6 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (20 files, 336 tests)
+### Test Coverage (21 files, 370 tests)
 
-#### Unit Tests (15 files, 291 tests)
+#### Unit Tests (16 files, 325 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -170,6 +173,7 @@ All 6 destination workers have circuit breaker integration (5 consecutive failur
 | `shopify-webhook.test.ts` | 6 | HMAC verification, replay protection, header extraction |
 | `shopify-domain-resolver.test.ts` | 28 | Domain resolution, validation, edge cases |
 | `extract-custom-data.test.ts` | 27 | Custom data extraction from event payloads |
+| `google-ads.test.ts` | 34 | Google Ads normalizer (email normalization, param building, all 4 events), pixel endpoint (URL construction, error handling) |
 
 #### Integration Tests (5 files, 45 tests)
 
@@ -187,7 +191,7 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 
 **10 models:** User, Account, Session, VerificationToken, PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog, WebhookDeadLetter
 
-**7 enums:** Platform, EventName (5 events + Refund), EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST)
+**7 enums:** Platform, EventName (5 events + Refund), EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
 
 **Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[workspaceId, status, createdAt]`, `[workspaceId, eventName, destination, createdAt]`, `[eventId]`, `[status, createdAt]`. AlertLog on `[userId, alertType, sentAt]`. WebhookDeadLetter on `[shopDomain, topic, createdAt]`, `[resolvedAt, createdAt]`.
 
@@ -310,6 +314,16 @@ None currently tracked.
 8. **Billing Order Fix** - Moved billing INCR in ingest route to after dedup/toggle/consent checks (prevented phantom billing where orders counted but no EventLog created).
 9. **Revenue Status Fix** - Revenue aggregation now includes PENDING/RETRYING events (not just SENT), so revenue appears immediately on ingest.
 10. **Production Hardening** - Encrypted webhook secret (AES-256-GCM), Stripe webhook returns 200 for permanent failures, JWT 7-day maxAge, PAST_DUE 7-day grace period, API key format validation, sanitizeForJs hardening, GDPR Redis session cleanup, order count reconciliation.
+
+### Phase 11: Google Ads Server-Side Conversion Tracking (2026-03-02)
+1. **Google Ads Pixel Endpoint** - New 7th destination using server-side GET requests to `googleadservices.com/pagead/conversion/`. No OAuth or developer token needed -- Conversion ID and Labels are public values (visible in page source of any gtag.js site).
+2. **4 Events Supported** - Purchase (primary conversion), AddToCart, InitiateCheckout, ViewContent (secondary/micro-conversions). PageView and Refund not supported by Google Ads.
+3. **Enhanced Conversions** - SHA-256 hashed PII sent via `em` parameter (email, phone, name, city, state, zip, country). Gmail-specific normalization strips dots and +suffix from local part before hashing.
+4. **gclid Attribution** - Google Click ID (already captured by snippet) forwarded for conversion attribution matching.
+5. **Order Deduplication** - `oid` parameter sends orderId, matching what browser gtag.js sends. Google deduplicates server + browser conversions automatically.
+6. **No Encryption Needed** - Unlike other destinations, Google Ads Conversion ID and Labels are public values stored in plaintext (not encrypted).
+7. **Full Pipeline Integration** - Worker, queue, ingest fan-out, webhook fan-out, stale requeue, diagnostics, settings UI card, onboarding, i18n (6 languages), setup guide.
+8. **Unit Tests** - 34 tests covering normalizeEmailForGoogle(), normalizeToGoogleAdsParams(), sendToGoogleAds(), and GoogleAdsApiError.
 
 ## Not Yet Implemented
 

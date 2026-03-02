@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Check, Copy, Loader2 } from "lucide-react";
-import { SiMeta, SiTiktok, SiGoogleanalytics } from "react-icons/si";
+import { SiMeta, SiTiktok, SiGoogleanalytics, SiGoogleads } from "react-icons/si";
 import { FaReddit, FaPinterest } from "react-icons/fa";
 import type { IconType } from "react-icons";
 
@@ -38,6 +38,7 @@ const PLATFORMS = [
   { key: "klaviyo", color: "bg-emerald-500/15", textColor: "text-emerald-400", borderColor: "border-emerald-500/30", label: "Klaviyo", descKey: "klaviyoDescription" as const, Icon: KlaviyoIcon },
   { key: "reddit", color: "bg-orange-500/15", textColor: "text-orange-400", borderColor: "border-orange-500/30", label: "Reddit", descKey: "redditDescription" as const, Icon: FaReddit },
   { key: "pinterest", color: "bg-red-500/15", textColor: "text-red-400", borderColor: "border-red-500/30", label: "Pinterest", descKey: "pinterestDescription" as const, Icon: FaPinterest },
+  { key: "googleAds", color: "bg-yellow-500/15", textColor: "text-yellow-400", borderColor: "border-yellow-500/30", label: "Google Ads", descKey: "googleAdsDescription" as const, Icon: SiGoogleads },
 ] as const;
 
 export default function OnboardingPage() {

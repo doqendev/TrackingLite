@@ -132,6 +132,14 @@ model Workspace {
   pinterestConversionTokenTag           String?
   enablePinterest                       Boolean   @default(false)
 
+  // Google Ads fields (no encryption needed -- Conversion ID and Labels are public values)
+  googleAdsConversionId               String?   // e.g. "1234567890" (the AW- number)
+  googleAdsLabelPurchase              String?   // e.g. "AbCdEfGhIjKl"
+  googleAdsLabelAddToCart             String?
+  googleAdsLabelInitiateCheckout      String?
+  googleAdsLabelViewContent           String?
+  enableGoogleAds                     Boolean   @default(false)
+
   // Shopify webhook fields
   shopifyWebhookSecretEncrypted String?   // AES-256-GCM encrypted
   shopifyWebhookSecretIv        String?   // IV for decryption
@@ -317,4 +325,5 @@ enum Destination {
   KLAVIYO
   REDDIT
   PINTEREST
+  GOOGLE_ADS
 }

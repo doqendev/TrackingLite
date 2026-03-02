@@ -43,6 +43,13 @@ const UpdateWorkspaceSchema = z.object({
   // Klaviyo
   klaviyoApiKey: z.string().optional().nullable(),
   enableKlaviyo: z.boolean().optional(),
+  // Google Ads (no encryption -- public values)
+  googleAdsConversionId: z.string().regex(/^\d+$/, "Conversion ID must be numeric").optional().nullable(),
+  googleAdsLabelPurchase: z.string().optional().nullable(),
+  googleAdsLabelAddToCart: z.string().optional().nullable(),
+  googleAdsLabelInitiateCheckout: z.string().optional().nullable(),
+  googleAdsLabelViewContent: z.string().optional().nullable(),
+  enableGoogleAds: z.boolean().optional(),
   // Shopify webhook
   shopifyWebhookSecret: z.string().optional().nullable(),
 });
@@ -110,6 +117,13 @@ export async function GET(
         pinterestAdAccountId: true,
         pinterestConversionTokenEncrypted: true,
         enablePinterest: true,
+        // Google Ads
+        googleAdsConversionId: true,
+        googleAdsLabelPurchase: true,
+        googleAdsLabelAddToCart: true,
+        googleAdsLabelInitiateCheckout: true,
+        googleAdsLabelViewContent: true,
+        enableGoogleAds: true,
         // Shopify webhook
         shopifyDomain: true,
         shopifyWebhookSecretEncrypted: true,
@@ -297,6 +311,13 @@ export async function PATCH(
         pinterestAdAccountId: true,
         pinterestConversionTokenEncrypted: true,
         enablePinterest: true,
+        // Google Ads
+        googleAdsConversionId: true,
+        googleAdsLabelPurchase: true,
+        googleAdsLabelAddToCart: true,
+        googleAdsLabelInitiateCheckout: true,
+        googleAdsLabelViewContent: true,
+        enableGoogleAds: true,
         // Shopify webhook
         shopifyDomain: true,
         shopifyWebhookSecretEncrypted: true,

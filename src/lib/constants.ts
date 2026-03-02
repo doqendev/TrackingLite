@@ -98,6 +98,7 @@ export const QUEUE_CONFIG = {
   KLAVIYO_QUEUE_NAME: "klaviyo-events",
   REDDIT_QUEUE_NAME: "reddit-events",
   PINTEREST_QUEUE_NAME: "pinterest-events",
+  GOOGLE_ADS_QUEUE_NAME: "google-ads-events",
   MAX_ATTEMPTS: 3,
   BACKOFF_DELAY_MS: 2000, // 2s, 4s, 8s exponential
 } as const;

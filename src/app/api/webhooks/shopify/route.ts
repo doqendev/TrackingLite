@@ -11,6 +11,7 @@ import {
   getKlaviyoQueue,
   getRedditQueue,
   getPinterestQueue,
+  getGoogleAdsQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkOrderLimits, decrementOrderCount } from "@/lib/billing";
@@ -184,6 +185,8 @@ async function handleOrderPaid(
       ga4ApiSecretEncrypted: true,
       enableKlaviyo: true,
       klaviyoApiKeyEncrypted: true,
+      enableGoogleAds: true,
+      googleAdsConversionId: true,
       enablePurchase: true,
       consentMode: true,
     },
@@ -405,6 +408,13 @@ async function handleOrderPaid(
         destination: "KLAVIYO",
         queue: getKlaviyoQueue(),
         jobName: "send-klaviyo-event",
+      });
+    }
+    if (workspace.enableGoogleAds && workspace.googleAdsConversionId) {
+      destinations.push({
+        destination: "GOOGLE_ADS",
+        queue: getGoogleAdsQueue(),
+        jobName: "send-google-ads-event",
       });
     }
 

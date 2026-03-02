@@ -56,4 +56,12 @@ export const DESTINATION_EVENT_MAP = {
     Purchase: "checkout",
     Refund: null,
   },
+  GOOGLE_ADS: {
+    PageView: null,
+    ViewContent: "view_content",
+    AddToCart: "add_to_cart",
+    InitiateCheckout: "begin_checkout",
+    Purchase: "purchase",
+    Refund: null,
+  },
 } as const;

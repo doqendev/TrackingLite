@@ -10,6 +10,7 @@ import {
   getKlaviyoQueue,
   getRedditQueue,
   getPinterestQueue,
+  getGoogleAdsQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { shouldSendToDestination } from "@/lib/consent";
@@ -104,8 +105,9 @@ export async function POST(request: NextRequest) {
     const hasKlaviyoCredentials = !!workspace.hasKlaviyoCredentials;
     const hasRedditCredentials = !!workspace.hasRedditCredentials;
     const hasPinterestCredentials = !!workspace.hasPinterestCredentials;
+    const hasGoogleAdsCredentials = !!workspace.hasGoogleAdsCredentials;
 
-    if (!hasMetaCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials && !hasRedditCredentials && !hasPinterestCredentials) {
+    if (!hasMetaCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials && !hasRedditCredentials && !hasPinterestCredentials && !hasGoogleAdsCredentials) {
       return NextResponse.json({ error: "No destination credentials configured" }, { status: 422, headers: corsHeaders });
     }
 
@@ -282,6 +284,15 @@ export async function POST(request: NextRequest) {
         destination: "PINTEREST",
         queue: getPinterestQueue(),
         jobName: "send-pinterest-event",
+      });
+    }
+
+    // Google Ads (no encryption -- Conversion ID and Labels are public)
+    if (hasGoogleAdsCredentials) {
+      destinations.push({
+        destination: "GOOGLE_ADS",
+        queue: getGoogleAdsQueue(),
+        jobName: "send-google-ads-event",
       });
     }
 

@@ -108,6 +108,19 @@ export function getPinterestQueue(): Queue {
   return _pinterestQueue;
 }
 
+// Google Ads queue
+let _googleAdsQueue: Queue | null = null;
+
+export function getGoogleAdsQueue(): Queue {
+  if (!_googleAdsQueue) {
+    _googleAdsQueue = new Queue(QUEUE_CONFIG.GOOGLE_ADS_QUEUE_NAME, {
+      connection: getConnection() as never,
+      defaultJobOptions,
+    });
+  }
+  return _googleAdsQueue;
+}
+
 export interface MetaEventJob {
   workspaceId: string;
   requestId?: string;
