@@ -231,6 +231,43 @@ async function handleOrderPaid(
     0
   );
 
+  // Extract browser context directly from Shopify order payload (fallback for session enrichment)
+  const landingSite = orderData.landing_site ? String(orderData.landing_site) : null;
+  const clientDetails = orderData.client_details as Record<string, unknown> | undefined;
+  const orderBrowserIp = (orderData.browser_ip as string) || (clientDetails?.browser_ip as string) || null;
+  const orderUserAgent = (clientDetails?.user_agent as string) || null;
+
+  // Parse UTM params from landing_site URL
+  let orderUtmSource: string | null = null;
+  let orderUtmMedium: string | null = null;
+  let orderUtmCampaign: string | null = null;
+  let orderUtmContent: string | null = null;
+  let orderUtmTerm: string | null = null;
+  let orderGclid: string | null = null;
+  let orderTtclid: string | null = null;
+  let orderRdtCid: string | null = null;
+  let orderEpik: string | null = null;
+  let orderFbc: string | null = null;
+  let orderPageUrl: string | null = landingSite;
+  if (landingSite) {
+    try {
+      // landing_site can be relative ("/products/foo?utm_source=facebook") or absolute
+      const url = new URL(landingSite, "https://placeholder.com");
+      orderUtmSource = url.searchParams.get("utm_source");
+      orderUtmMedium = url.searchParams.get("utm_medium");
+      orderUtmCampaign = url.searchParams.get("utm_campaign");
+      orderUtmContent = url.searchParams.get("utm_content");
+      orderUtmTerm = url.searchParams.get("utm_term");
+      orderGclid = url.searchParams.get("gclid");
+      orderTtclid = url.searchParams.get("ttclid");
+      orderRdtCid = url.searchParams.get("rdt_cid");
+      orderEpik = url.searchParams.get("epik");
+      orderFbc = url.searchParams.get("fbc");
+    } catch {
+      // Invalid URL, skip parsing
+    }
+  }
+
   // Filter out non-web orders (POS, draft, subscription, manual, bulk)
   // Use a denylist so unknown/new source types (including Shopify test notifications) pass through
   const paymentGateway = orderData.gateway ? String(orderData.gateway) : null;
@@ -442,26 +479,26 @@ async function handleOrderPaid(
           ageMs: Date.now() - sessionContext.oldestTimestamp,
         } : null,
       } as any, // eslint-disable-line
-      customerIp: sessionContext?.clientIp ?? null,
-      userAgent: sessionContext?.userAgent ?? null,
+      customerIp: sessionContext?.clientIp ?? orderBrowserIp,
+      userAgent: sessionContext?.userAgent ?? orderUserAgent,
       value: totalPrice ?? null,
       currency: currency ?? null,
       numItems: numItems || null,
       orderId: orderId || null,
       source: "webhook",
       paymentGateway,
-      utmSource: sessionContext?.utmSource ?? null,
-      utmMedium: sessionContext?.utmMedium ?? null,
-      utmCampaign: sessionContext?.utmCampaign ?? null,
-      utmContent: sessionContext?.utmContent ?? null,
-      utmTerm: sessionContext?.utmTerm ?? null,
-      gclid: sessionContext?.gclid ?? null,
-      pageUrl: sessionContext?.url ?? null,
+      utmSource: sessionContext?.utmSource ?? orderUtmSource,
+      utmMedium: sessionContext?.utmMedium ?? orderUtmMedium,
+      utmCampaign: sessionContext?.utmCampaign ?? orderUtmCampaign,
+      utmContent: sessionContext?.utmContent ?? orderUtmContent,
+      utmTerm: sessionContext?.utmTerm ?? orderUtmTerm,
+      gclid: sessionContext?.gclid ?? orderGclid,
+      pageUrl: sessionContext?.url ?? orderPageUrl,
       fbp: sessionContext?.fbp ?? null,
-      fbc: sessionContext?.fbc ?? null,
-      ttclid: sessionContext?.ttclid ?? null,
-      rdtCid: sessionContext?.rdtCid ?? null,
-      epik: sessionContext?.epik ?? null,
+      fbc: sessionContext?.fbc ?? orderFbc,
+      ttclid: sessionContext?.ttclid ?? orderTtclid,
+      rdtCid: sessionContext?.rdtCid ?? orderRdtCid,
+      epik: sessionContext?.epik ?? orderEpik,
     };
 
     const eventLogEntries = await Promise.all(
@@ -497,10 +534,10 @@ async function handleOrderPaid(
       eventName: "Purchase",
       eventId: webhookEventId,
       timestamp: Date.now(),
-      url: sessionContext?.url || `https://${shopDomain}`,
+      url: sessionContext?.url || orderPageUrl || `https://${shopDomain}`,
       referrer: "",
       fbp: sessionContext?.fbp ?? null,
-      fbc: sessionContext?.fbc ?? null,
+      fbc: sessionContext?.fbc ?? orderFbc ?? null,
       userData: {
         email: email || null,
         phone: phone || null,
@@ -527,8 +564,8 @@ async function handleOrderPaid(
           (li) => String(li.product_id || li.sku || "")
         ),
       },
-      clientIp: sessionContext?.clientIp ?? "",
-      userAgent: sessionContext?.userAgent ?? "",
+      clientIp: sessionContext?.clientIp ?? orderBrowserIp ?? "",
+      userAgent: sessionContext?.userAgent ?? orderUserAgent ?? "",
     };
 
     // Queue jobs
@@ -549,7 +586,7 @@ async function handleOrderPaid(
             destination: dest.destination,
             requestId,
             eventLogId,
-            event: { ...eventData, ttclid: sessionContext?.ttclid ?? null, gclid: sessionContext?.gclid ?? null, rdtCid: sessionContext?.rdtCid ?? null, epik: sessionContext?.epik ?? null, gaClientId: sessionContext?.gaClientId ?? null },
+            event: { ...eventData, ttclid: sessionContext?.ttclid ?? orderTtclid ?? null, gclid: sessionContext?.gclid ?? orderGclid ?? null, rdtCid: sessionContext?.rdtCid ?? orderRdtCid ?? null, epik: sessionContext?.epik ?? orderEpik ?? null, gaClientId: sessionContext?.gaClientId ?? null },
           } satisfies DestinationEventJob);
         }
       })
