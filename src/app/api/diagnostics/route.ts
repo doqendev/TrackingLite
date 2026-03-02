@@ -205,11 +205,11 @@ export async function GET(request: NextRequest) {
       select: { createdAt: true },
     }),
 
-    // Purchase event audit — last 10 Purchase events with full field detail
+    // Purchase event audit — last 10 unique purchases (up to 60 rows to cover 6-destination fan-out)
     db.eventLog.findMany({
       where: { workspaceId, eventName: "Purchase" },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: 60,
       select: {
         id: true,
         eventId: true,
@@ -469,6 +469,8 @@ export async function GET(request: NextRequest) {
 
   for (const row of purchaseAuditRaw) {
     const eid = row.eventId;
+    // Stop after 10 unique purchases
+    if (!purchasesByEventId[eid] && Object.keys(purchasesByEventId).length >= 10) continue;
     if (!purchasesByEventId[eid]) {
       purchasesByEventId[eid] = {
         eventId: eid,
