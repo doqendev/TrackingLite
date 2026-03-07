@@ -57,4 +57,12 @@ worker/
 *.pem
 .vercel
 
-.vercel
+# Design prototypes
+src/app/pixel-null/
+src/components/pixel-null/
+pixel-null-dashboard-preview.html
+*.pen
+tmp-*.js
+images/
+Screenshot_*.png
+Gemini_Generated_Image_*
