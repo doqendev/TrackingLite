@@ -54,6 +54,36 @@ export default async function middleware(req: NextRequest) {
     }
   }
 
+  // Short-circuit for public routes — skip expensive JWT verification
+  const pathname = req.nextUrl.pathname;
+  if (
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname.startsWith("/api/auth") ||
+    pathname === "/api/events/ingest" ||
+    pathname === "/api/stripe/webhook" ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/webhooks/") ||
+    pathname.startsWith("/api/pixel/") ||
+    pathname.startsWith("/api/s/") ||
+    // Marketing pages
+    pathname === "/meta-capi" ||
+    pathname === "/tiktok-tracking" ||
+    pathname === "/ga4-tracking" ||
+    pathname === "/klaviyo-tracking" ||
+    pathname === "/reddit-tracking" ||
+    pathname === "/pinterest-tracking" ||
+    pathname.startsWith("/vs/")
+  ) {
+    return NextResponse.next();
+  }
+
+  // Only verify auth for protected routes
   const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   const isSecure =
     req.headers.get("x-forwarded-proto") === "https" ||
@@ -63,17 +93,8 @@ export default async function middleware(req: NextRequest) {
     secureCookie: isSecure,
     ...(authSecret ? { secret: authSecret } : {}),
   });
-  const isLoggedIn = !!token;
-  const isPublicRoute = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/api/events/ingest", "/api/stripe/webhook", "/api/health", "/privacy", "/terms"].some(
-    (path) => req.nextUrl.pathname === path || req.nextUrl.pathname.startsWith("/api/auth")
-  ) || req.nextUrl.pathname.startsWith("/api/pixel/");
 
-  // Also allow webhook endpoints
-  if (req.nextUrl.pathname.startsWith("/api/webhooks/")) {
-    return NextResponse.next();
-  }
-
-  if (!isLoggedIn && !isPublicRoute) {
+  if (!token) {
     return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
 

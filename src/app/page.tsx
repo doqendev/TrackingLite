@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { IntegrationCard } from "@/components/landing/integration-card";
+import { LandingIntegrationsPreview } from "@/components/landing/landing-integrations-preview";
 import { ProblemCard } from "@/components/landing/problem-card";
 import { FeatureBlock } from "@/components/landing/feature-block";
 import { PipelineVisual } from "@/components/landing/pipeline-visual";
@@ -19,57 +19,6 @@ export const metadata: Metadata = {
     "Fix your tracking in 10 minutes. Bypass ad blockers with server-side event forwarding to Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, and Google Ads.",
 };
 
-const integrations = [
-  {
-    file: "CAPI.EXE",
-    platform: "META",
-    title: "Meta CAPI",
-    description:
-      "Send purchase data directly to Meta, even when ad blockers or iOS privacy block your pixel.",
-  },
-  {
-    file: "TT_EVENTS.SH",
-    platform: "TIKTOK",
-    title: "TikTok Events API",
-    description:
-      "Every sale and add-to-cart reaches TikTok's ad algorithm, so your campaigns optimize faster.",
-  },
-  {
-    file: "GA4_MP.JS",
-    platform: "GA4",
-    title: "GA4 Measurement Protocol",
-    description:
-      "Get complete Google Analytics data without relying on browser scripts that get blocked.",
-  },
-  {
-    file: "KL_FLOW.JS",
-    platform: "KLAVIYO",
-    title: "Klaviyo",
-    description:
-      "Trigger Klaviyo flows from real purchase events. Better segmentation, better email timing.",
-  },
-  {
-    file: "RED_PIXEL.LOG",
-    platform: "REDDIT",
-    title: "Reddit Conversions API",
-    description:
-      "Track which Reddit ads actually drive purchases, even when users browse with ad blockers.",
-  },
-  {
-    file: "PIN_TAG.DLL",
-    platform: "PINTEREST",
-    title: "Pinterest Conversions API",
-    description:
-      "Send checkout and purchase data to Pinterest so your promoted pins reach the right shoppers.",
-  },
-  {
-    file: "G_ADS.BAT",
-    platform: "GOOGLE_ADS",
-    title: "Google Ads",
-    description:
-      "Feed accurate conversion data to Google Ads for smarter bidding and better return on ad spend.",
-  },
-];
 
 const problems = [
   {
@@ -328,11 +277,7 @@ export default function HomePage() {
           </div>
         </ScrollReveal>
 
-        <div className="pn-integrations">
-          {integrations.map((item) => (
-            <IntegrationCard key={item.platform} {...item} />
-          ))}
-        </div>
+        <LandingIntegrationsPreview />
 
         {/* 8. Pricing */}
         <PricingSection />
