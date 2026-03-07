@@ -26,21 +26,23 @@ const config = {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			brand: {
-  				'50': '#f0f7ff',
-  				'100': '#e0effe',
-  				'200': '#bbdffc',
-  				'300': '#7cc3fa',
-  				'400': '#38a4f6',
-  				'500': '#0e87e9',
-  				'600': '#026bc7',
-  				'700': '#0255a1',
-  				'800': '#074985',
-  				'900': '#0c3e6f',
-  				'950': '#08274a'
+  				'50': '#ecfeff',
+  				'100': '#cffafe',
+  				'200': '#a5f3fc',
+  				'300': '#67e8f9',
+  				'400': '#22d3ee',
+  				'500': '#06b6d4',
+  				'600': '#0891b2',
+  				'700': '#0e7490',
+  				'800': '#155e75',
+  				'900': '#164e63',
+  				'950': '#083344'
   			},
   			cyan: {
+  				'300': '#67e8f9',
   				'400': '#22d3ee',
-  				'500': '#06b6d4'
+  				'500': '#06b6d4',
+  				'600': '#0891b2'
   			},
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
@@ -72,15 +74,30 @@ const config = {
   			}
   		},
   		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			'3xl': '0px',
+  			'2xl': '0px',
+  			xl: '0px',
+  			lg: '0px',
+  			md: '0px',
+  			sm: '0px',
+  			DEFAULT: '0px',
+  			full: '0px'
   		},
   		fontFamily: {
+  			mono: [
+  				'var(--font-mono)',
+  				'Space Mono',
+  				...fontFamily.mono
+  			],
+  			display: [
+  				'var(--font-display)',
+  				'Chakra Petch',
+  				...fontFamily.sans
+  			],
   			sans: [
-  				'var(--font-inter)',
-                    ...fontFamily.sans
-                ]
+  				'var(--font-mono)',
+  				...fontFamily.mono
+  			]
   		},
   		keyframes: {
   			'accordion-down': {

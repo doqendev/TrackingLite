@@ -87,9 +87,9 @@ export function EventFunnel({ eventBreakdown }: EventFunnelProps) {
                     </span>
                   </div>
                 </div>
-                <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                <div className="h-1.5 rounded-none bg-secondary overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-brand-500 transition-all duration-500"
+                    className="h-full rounded-none bg-brand-500 transition-all duration-500"
                     style={{ width: `${barWidth}%` }}
                   />
                 </div>

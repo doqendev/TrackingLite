@@ -84,12 +84,12 @@ export function OrderUsageBar({
           </div>
 
           <div
-            className={`h-2 rounded-full bg-secondary overflow-hidden ${
+            className={`h-2 rounded-none bg-secondary overflow-hidden ${
               usagePercent >= 80 ? "shadow-sm shadow-amber-500/20" : ""
             }`}
           >
             <div
-              className={`h-full rounded-full transition-all duration-700 ease-out ${barColor}`}
+              className={`h-full rounded-none transition-all duration-700 ease-out ${barColor}`}
               style={{ width: `${usagePercent}%` }}
             />
           </div>

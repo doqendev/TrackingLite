@@ -25,8 +25,8 @@ export default function VsElevarPage() {
       {/* Nav */}
       <header className="border-b border-white/[0.06]">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Link href="/" className="text-sm font-semibold tracking-tight text-foreground">
-            <span className="text-brand-500">Track</span>&thinsp;Clear
+          <Link href="/" className="flex items-center gap-2 font-mono text-sm font-bold tracking-widest text-foreground">
+            <img src="/logo.png" alt="" width={22} height={22} className="w-[22px] h-[22px]" /><span className="text-cyan-500">TRACK</span> {"// "}CLEAR
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="default" asChild>
@@ -47,7 +47,7 @@ export default function VsElevarPage() {
               <p className="text-xs font-medium uppercase tracking-widest text-brand-500/80">
                 Comparison
               </p>
-              <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tighter text-foreground sm:text-5xl">
+              <h1 className="font-display mt-4 text-4xl font-bold leading-tight tracking-wider text-foreground sm:text-5xl">
                 Track Clear vs Elevar
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted-foreground">
@@ -61,7 +61,7 @@ export default function VsElevarPage() {
         {/* Comparison Table */}
         <section className="border-b border-white/[0.06]">
           <div className="mx-auto max-w-4xl px-6 py-24 sm:py-28">
-            <h2 className="mb-12 text-center text-2xl font-bold tracking-tight text-foreground">
+            <h2 className="mb-12 text-center text-2xl font-bold tracking-wider text-foreground">
               Feature comparison
             </h2>
             <div className="overflow-hidden rounded-lg border border-white/[0.06]">
@@ -125,7 +125,7 @@ export default function VsElevarPage() {
         {/* Why Track Clear */}
         <section className="border-b border-white/[0.06]">
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
-            <h2 className="mb-12 text-center text-2xl font-bold tracking-tight text-foreground">
+            <h2 className="mb-12 text-center text-2xl font-bold tracking-wider text-foreground">
               Why merchants choose Track Clear
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -164,7 +164,7 @@ export default function VsElevarPage() {
         <section>
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
             <div className="mx-auto max-w-lg text-center">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              <h2 className="text-3xl font-bold tracking-wider text-foreground sm:text-4xl">
                 Try Track Clear free
               </h2>
               <p className="mt-4 text-sm text-muted-foreground">
@@ -184,8 +184,8 @@ export default function VsElevarPage() {
       {/* Footer */}
       <footer className="border-t border-white/[0.06]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8">
-          <span className="text-sm font-semibold tracking-tight text-foreground">
-            <span className="text-brand-500">Track</span>&thinsp;Clear
+          <span className="flex items-center gap-2 font-mono text-sm font-bold tracking-widest text-foreground">
+            <img src="/logo.png" alt="" width={22} height={22} className="w-[22px] h-[22px]" /><span className="text-cyan-500">TRACK</span> {"// "}CLEAR
           </span>
           <span className="text-xs text-muted-foreground/40">
             &copy; {new Date().getFullYear()} Track Clear

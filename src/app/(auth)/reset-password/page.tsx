@@ -30,7 +30,7 @@ function ResetPasswordForm() {
         </Alert>
         <Link
           href="/forgot-password"
-          className="block text-center text-sm font-medium text-brand-500 hover:text-brand-400"
+          className="block text-center text-sm font-medium text-cyan-500 hover:text-cyan-400"
         >
           {t("sendResetLink")}
         </Link>
@@ -81,7 +81,7 @@ function ResetPasswordForm() {
         </Alert>
         <Link
           href="/login"
-          className="block text-center text-sm font-medium text-brand-500 hover:text-brand-400"
+          className="block text-center text-sm font-medium text-cyan-500 hover:text-cyan-400"
         >
           {t("signIn")}
         </Link>
@@ -97,7 +97,7 @@ function ResetPasswordForm() {
         </Alert>
       )}
       <div>
-        <Label htmlFor="password" className="mb-1">{t("newPassword")}</Label>
+        <Label htmlFor="password" className="mb-1 text-xs tracking-wider uppercase text-muted-foreground">{t("newPassword")}</Label>
         <Input
           id="password"
           type="password"
@@ -110,7 +110,7 @@ function ResetPasswordForm() {
         />
       </div>
       <div>
-        <Label htmlFor="confirmPassword" className="mb-1">{t("confirmNewPassword")}</Label>
+        <Label htmlFor="confirmPassword" className="mb-1 text-xs tracking-wider uppercase text-muted-foreground">{t("confirmNewPassword")}</Label>
         <Input
           id="confirmPassword"
           type="password"
@@ -133,12 +133,15 @@ export default function ResetPasswordPage() {
   const tc = useTranslations("common");
 
   return (
-    <div className="rounded-2xl bg-card px-8 py-10 shadow-lg ring-1 ring-white/[0.06] glow-card border-t-2 border-brand-500/40">
+    <div className="scanlines bg-card border border-[hsl(240,26%,15%)] px-8 py-10 shadow-lg glow-card border-t-2 border-t-cyan-500/40">
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          <span className="text-brand-500">Track</span>&thinsp;Clear
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t("resetPassword")}</p>
+        <div className="mb-3 flex items-center justify-center gap-2">
+          <img src="/logo.png" alt="" width={24} height={24} className="w-6 h-6" />
+          <h1 className="font-display text-2xl font-bold tracking-wider uppercase text-foreground">
+            <span className="text-cyan-500">TRACK</span> {"// "}CLEAR
+          </h1>
+        </div>
+        <p className="mt-1 text-xs tracking-wider uppercase text-muted-foreground">{t("resetPassword")}</p>
       </div>
       <Suspense fallback={<p className="text-center text-sm text-muted-foreground">{tc("loading")}</p>}>
         <ResetPasswordForm />

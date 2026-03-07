@@ -85,7 +85,7 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
               <Button
                 variant={activeTab === "all" ? "brand" : "secondary"}
                 size="sm"
-                className="rounded-full"
+                className="rounded-none"
                 onClick={() => setActiveTab("all")}
               >
                 {t("allPlatforms")}
@@ -95,10 +95,10 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
                   key={source}
                   variant={activeTab === source ? "brand" : "secondary"}
                   size="sm"
-                  className="rounded-full"
+                  className="rounded-none"
                   onClick={() => setActiveTab(source)}
                 >
-                  <span className={`w-2 h-2 rounded-full mr-1.5 ${getSourceColor(source)}`} />
+                  <span className={`w-2 h-2 rounded-none mr-1.5 ${getSourceColor(source)}`} />
                   {source}
                 </Button>
               ))}
@@ -132,7 +132,7 @@ export function CampaignPerformance({ campaigns, currency }: CampaignPerformance
                           {activeTab === "all" && (
                             <TableCell className="whitespace-nowrap">
                               <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getSourceColor(campaign.utmSource)}`} />
+                                <span className={`w-2 h-2 rounded-none flex-shrink-0 ${getSourceColor(campaign.utmSource)}`} />
                                 <span className="text-sm text-foreground">
                                   {campaign.utmSource.length > 15
                                     ? campaign.utmSource.slice(0, 15) + "..."

@@ -156,10 +156,10 @@ export default function OnboardingPage() {
     <div className="fixed inset-0 z-50 bg-background overflow-y-auto flex flex-col items-center justify-start py-12 px-4">
       {/* Background effects */}
       <div className="pointer-events-none fixed inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
-      <div className="pointer-events-none fixed inset-0" style={{ background: 'radial-gradient(ellipse at center top, rgba(20,184,166,0.06) 0%, transparent 60%)' }} />
+      <div className="pointer-events-none fixed inset-0" style={{ background: 'radial-gradient(ellipse at center top, rgba(6,182,212,0.06) 0%, transparent 60%)' }} />
       {/* Logo */}
       <div className="mb-8 relative z-10">
-        <span className="text-2xl font-bold text-foreground tracking-tight"><span className="text-brand-500">Track</span>&thinsp;Clear</span>
+        <span className="flex items-center gap-2 text-2xl font-bold text-foreground tracking-wider font-display"><img src="/logo.png" alt="" width={24} height={24} className="w-6 h-6" /><span className="text-cyan-500">TRACK</span> {"// "}CLEAR</span>
       </div>
 
       {/* Progress indicator */}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Space_Mono, Chakra_Petch } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Analytics } from "@vercel/analytics/react";
@@ -7,9 +7,16 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const inter = Inter({
+const spaceMono = Space_Mono({
+  weight: ["400", "700"],
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-mono",
+});
+
+const chakraPetch = Chakra_Petch({
+  weight: ["400", "600", "700"],
+  subsets: ["latin"],
+  variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -81,7 +88,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} className="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${spaceMono.variable} ${chakraPetch.variable} font-mono antialiased`}>
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>

@@ -83,9 +83,9 @@ export function DeliveryStats({ health, eventBreakdown }: DeliveryStatsProps) {
               {health.successRate}%
             </p>
           </div>
-          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+          <div className="h-2 rounded-none bg-secondary overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${getSuccessBarColor(
+              className={`h-full rounded-none transition-all duration-500 ${getSuccessBarColor(
                 health.successRate
               )}`}
               style={{
@@ -99,7 +99,7 @@ export function DeliveryStats({ health, eventBreakdown }: DeliveryStatsProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="w-2 h-2 rounded-none bg-green-500" />
               <span className="text-muted-foreground">{t("delivered")}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -115,7 +115,7 @@ export function DeliveryStats({ health, eventBreakdown }: DeliveryStatsProps) {
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`w-2 h-2 rounded-none ${
                   health.failedEvents24h > 0 ? "bg-red-500" : "bg-muted-foreground"
                 }`}
               />

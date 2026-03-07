@@ -52,10 +52,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <aside className="hidden md:flex md:w-64 md:flex-col border-r border-white/[0.06] bg-gradient-to-b from-card/60 to-card/40 backdrop-blur-md">
-        <div className="flex h-14 items-center px-6 border-b border-white/[0.08]">
-          <Link href="/dashboard" className="text-lg font-semibold text-foreground tracking-tight">
-            <span className="text-brand-500">Track</span>&thinsp;Clear
+      <aside className="hidden md:flex md:w-64 md:flex-col border-r border-[hsl(240,26%,15%)] bg-card">
+        <div className="flex h-14 items-center gap-2.5 px-5 border-b border-[hsl(240,26%,15%)]">
+          <img src="/logo.png" alt="" width={22} height={22} className="w-[22px] h-[22px]" />
+          <Link href="/dashboard" className="font-display font-bold text-foreground tracking-widest text-sm">
+            <span className="text-cyan-500">TRACK</span> {"// "}CLEAR
           </Link>
         </div>
         {(workspaces ?? []).length > 0 && activeWorkspace && (
@@ -75,8 +76,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <MobileNav userEmail={userEmail} workspaceName={workspaceName} />
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto md:pt-0 pt-14">
-        <div className="p-6 max-w-7xl mx-auto">{children}</div>
+      <main className="flex-1 overflow-y-auto md:pt-0 pt-14 bg-grid-cyan">
+        <div className="p-6 md:px-10 max-w-7xl mx-auto">{children}</div>
       </main>
     </div>
   );

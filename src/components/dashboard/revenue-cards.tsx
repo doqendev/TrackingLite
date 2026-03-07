@@ -104,7 +104,7 @@ function RevenueCard({ label, subtitle, icon, data }: RevenueCardProps) {
               <p className="text-[10px] text-muted-foreground/60">{subtitle}</p>
             )}
           </div>
-          <span className="p-1.5 bg-brand-600/10 rounded-md">{icon}</span>
+          <span className="p-1.5 bg-brand-500/10">{icon}</span>
         </div>
         <p className="text-3xl font-bold text-foreground tabular-nums">
           {formatCurrency(data.today, data.currency)}

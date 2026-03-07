@@ -21,7 +21,7 @@ export default function TermsPage() {
 
         <article>
           <header className="mb-10 border-b border-border pb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Terms of Service</h1>
+            <h1 className="text-3xl font-bold tracking-wider text-foreground font-display">Terms of Service</h1>
             <p className="mt-2 text-sm text-muted-foreground">Last updated: February 21, 2026</p>
             <p className="mt-4 text-base text-muted-foreground leading-relaxed">
               These Terms of Service (&quot;Terms&quot;) govern your access to and use of the Track Clear service

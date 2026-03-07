@@ -56,9 +56,9 @@ export default function GA4TrackingPage() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link
             href="/"
-            className="text-sm font-semibold tracking-tight text-foreground"
+            className="flex items-center gap-2 font-mono text-sm font-bold tracking-widest text-foreground"
           >
-            <span className="text-brand-500">Track</span>&thinsp;Clear
+            <img src="/logo.png" alt="" width={22} height={22} className="w-[22px] h-[22px]" /><span className="text-cyan-500">TRACK</span> {"// "}CLEAR
           </Link>
 
           <div className="flex items-center gap-2">
@@ -97,14 +97,14 @@ export default function GA4TrackingPage() {
               className="pointer-events-none absolute inset-0"
               style={{
                 background:
-                  "radial-gradient(ellipse 110% 60% at 50% -5%, rgba(20,184,166,0.14) 0%, rgba(16,185,129,0.04) 40%, transparent 70%)",
+                  "radial-gradient(ellipse 110% 60% at 50% -5%, rgba(6,182,212,0.14) 0%, rgba(6,182,212,0.04) 40%, transparent 70%)",
               }}
             />
             <div
               className="pointer-events-none absolute inset-0"
               style={{
                 background:
-                  "radial-gradient(ellipse 60% 80% at 90% 30%, rgba(16,185,129,0.08) 0%, transparent 60%)",
+                  "radial-gradient(ellipse 60% 80% at 90% 30%, rgba(6,182,212,0.08) 0%, transparent 60%)",
               }}
             />
 
@@ -125,7 +125,7 @@ export default function GA4TrackingPage() {
                   GA4 Measurement Protocol integration
                 </div>
 
-                <h1 className="mb-6 text-5xl font-bold leading-[1.05] tracking-tighter text-foreground sm:text-6xl md:text-[4.25rem]">
+                <h1 className="font-display mb-6 text-5xl font-bold leading-[1.05] tracking-wider text-foreground sm:text-6xl md:text-[4.25rem]">
                   Server-side GA4 tracking
                   <br />
                   <span className="text-gradient">for Shopify</span>
@@ -142,7 +142,7 @@ export default function GA4TrackingPage() {
                     variant="brand"
                     size="lg"
                     asChild
-                    className="gap-2 rounded-lg border border-white/[0.15] px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:brightness-110"
+                    className="gap-2 rounded-lg border border-white/[0.15] px-6 py-3 text-lg font-medium tracking-wider transition-[filter] duration-150 hover:brightness-110"
                   >
                     <Link href="/signup">
                       Get Started Free
@@ -153,7 +153,7 @@ export default function GA4TrackingPage() {
                     variant="outline"
                     size="lg"
                     asChild
-                    className="rounded-lg border-white/[0.15] bg-transparent px-6 py-3 text-lg font-medium tracking-tight transition-[filter] duration-150 hover:bg-white/[0.04] hover:brightness-110"
+                    className="rounded-lg border-white/[0.15] bg-transparent px-6 py-3 text-lg font-medium tracking-wider transition-[filter] duration-150 hover:bg-white/[0.04] hover:brightness-110"
                   >
                     <Link href="#how-it-works">See how it works</Link>
                   </Button>
@@ -170,7 +170,7 @@ export default function GA4TrackingPage() {
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                 Why it matters
               </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              <h2 className="mt-3 text-2xl font-bold tracking-wider text-foreground sm:text-3xl">
                 Accurate GA4 data you can trust
               </h2>
               <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
@@ -233,7 +233,7 @@ export default function GA4TrackingPage() {
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                 How it works
               </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              <h2 className="mt-3 text-2xl font-bold tracking-wider text-foreground sm:text-3xl">
                 Set up in 4 steps
               </h2>
             </div>
@@ -296,7 +296,7 @@ export default function GA4TrackingPage() {
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
                 Events
               </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              <h2 className="mt-3 text-2xl font-bold tracking-wider text-foreground sm:text-3xl">
                 All 5 Shopify events forwarded to GA4
               </h2>
               <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
@@ -375,7 +375,7 @@ export default function GA4TrackingPage() {
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse at center, rgba(20,184,166,0.06) 0%, transparent 70%)",
+                "radial-gradient(ellipse at center, rgba(6,182,212,0.06) 0%, transparent 70%)",
             }}
           />
 
@@ -384,7 +384,7 @@ export default function GA4TrackingPage() {
               <p className="mb-3 text-xs font-medium uppercase tracking-widest text-brand-500/80">
                 Nothing blocked. Everything clear.
               </p>
-              <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              <h2 className="mb-4 text-3xl font-bold tracking-wider text-foreground sm:text-4xl">
                 Start tracking GA4 conversions today
               </h2>
               <p className="mb-8 text-sm text-muted-foreground">
@@ -414,9 +414,9 @@ export default function GA4TrackingPage() {
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <Link
               href="/"
-              className="text-sm font-semibold tracking-tight text-foreground"
+              className="flex items-center gap-2 font-mono text-sm font-bold tracking-widest text-foreground"
             >
-              <span className="text-brand-500">Track</span>&thinsp;Clear
+              <img src="/logo.png" alt="" width={22} height={22} className="w-[22px] h-[22px]" /><span className="text-cyan-500">TRACK</span> {"// "}CLEAR
             </Link>
             <div className="flex items-center gap-6 text-sm text-muted-foreground/50">
               <Link

@@ -32,26 +32,27 @@
   }
 
   .dark {
-    --background: 222 28% 4%;
-    --foreground: 210 20% 96%;
-    --card: 222 22% 7%;
-    --card-foreground: 210 20% 96%;
-    --popover: 222 22% 7%;
-    --popover-foreground: 210 20% 96%;
-    --primary: 210 20% 96%;
-    --primary-foreground: 222 28% 4%;
-    --secondary: 220 18% 10%;
-    --secondary-foreground: 210 15% 90%;
-    --muted: 220 16% 8%;
-    --muted-foreground: 215 12% 48%;
-    --accent: 220 18% 10%;
-    --accent-foreground: 210 15% 90%;
-    --destructive: 0 63% 50%;
+    --background: 240 25% 4%;
+    --foreground: 240 21% 89%;
+    --card: 240 20% 8%;
+    --card-foreground: 240 21% 89%;
+    --popover: 240 20% 8%;
+    --popover-foreground: 240 21% 89%;
+    --primary: 187 96% 42%;
+    --primary-foreground: 240 25% 4%;
+    --secondary: 240 20% 10%;
+    --secondary-foreground: 240 15% 85%;
+    --muted: 240 18% 9%;
+    --muted-foreground: 240 10% 37%;
+    --accent: 240 20% 10%;
+    --accent-foreground: 187 96% 42%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 14% 11%;
-    --input: 220 16% 14%;
-    --ring: 217 91% 60%;
-    --chart-1: 173 58% 39%;
+    --border: 240 26% 15%;
+    --input: 240 22% 13%;
+    --ring: 187 96% 42%;
+    --radius: 0px;
+    --chart-1: 187 96% 42%;
     --chart-2: 160 60% 45%;
     --chart-3: 43 74% 66%;
     --chart-4: 27 87% 67%;
@@ -70,33 +71,46 @@
     @apply bg-background text-foreground;
   }
   ::selection {
-    @apply bg-brand-500/20 text-foreground;
+    @apply bg-cyan-500/20 text-foreground;
   }
 }
 
 @layer utilities {
   /* Glow effects */
   .glow-brand {
-    box-shadow: 0 0 25px rgba(14, 135, 233, 0.2), 0 0 70px rgba(14, 135, 233, 0.08);
+    box-shadow: 0 0 25px rgba(6, 182, 212, 0.2), 0 0 70px rgba(6, 182, 212, 0.08);
   }
   .glow-brand-lg {
-    box-shadow: 0 0 35px rgba(14, 135, 233, 0.25), 0 0 90px rgba(14, 135, 233, 0.12);
+    box-shadow: 0 0 35px rgba(6, 182, 212, 0.25), 0 0 90px rgba(6, 182, 212, 0.12);
   }
   .glow-card {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 8px 32px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.06), 0 8px 32px rgba(0, 0, 0, 0.5);
   }
   .glow-card-hover {
-    box-shadow: 0 0 0 1px rgba(14, 135, 233, 0.2), 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 50px rgba(14, 135, 233, 0.06);
+    box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.2), 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 50px rgba(6, 182, 212, 0.08);
   }
 
   /* Gradient text */
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #7cc3fa 0%, #0e87e9 45%, #06b6d4 100%);
+    background-image: linear-gradient(135deg, #22d3ee 0%, #06b6d4 45%, #0891b2 100%);
   }
   .text-gradient-blue {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #bbdffc 0%, #38a4f6 50%, #026bc7 100%);
+    background-image: linear-gradient(135deg, #67e8f9 0%, #06b6d4 50%, #0e7490 100%);
+  }
+
+  /* Scan line overlay for cards */
+  .scanlines {
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(6,182,212,0.015) 3px, rgba(6,182,212,0.015) 4px);
+  }
+
+  /* Grid background */
+  .bg-grid-cyan {
+    background-image:
+      linear-gradient(rgba(6,182,212,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6,182,212,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 
   /* Grid patterns */
@@ -108,12 +122,12 @@
     background-size: 24px 24px;
   }
 
-  /* Railway-style spread shadows */
+  /* Spread shadows */
   .shadow-spread {
-    box-shadow: 0 0 30px hsla(220, 30%, 30%, 0.15);
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.08);
   }
   .shadow-spread-brand {
-    box-shadow: 0 0 40px rgba(59, 130, 246, 0.08), 0 0 80px rgba(6, 182, 212, 0.04);
+    box-shadow: 0 0 40px rgba(6, 182, 212, 0.1), 0 0 80px rgba(6, 182, 212, 0.04);
   }
 
   /* Animations */

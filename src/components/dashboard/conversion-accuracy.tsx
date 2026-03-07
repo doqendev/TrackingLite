@@ -39,10 +39,10 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm font-medium text-muted-foreground">{t("conversionAccuracy")}</p>
-          <div className="flex items-center gap-1 bg-secondary rounded-md p-0.5">
+          <div className="flex items-center gap-1 bg-secondary rounded-none p-0.5">
             <button
               onClick={() => setRange("7d")}
-              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium rounded-none transition-colors ${
                 range === "7d"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -52,7 +52,7 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
             </button>
             <button
               onClick={() => setRange("30d")}
-              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium rounded-none transition-colors ${
                 range === "30d"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -83,9 +83,9 @@ export function ConversionAccuracy({ conversionAccuracy }: ConversionAccuracyPro
             </div>
 
             {/* Progress bar */}
-            <div className="w-full h-1.5 bg-secondary rounded-full mt-3 mb-3">
+            <div className="w-full h-1.5 bg-secondary rounded-none mt-3 mb-3">
               <div
-                className={`h-1.5 rounded-full transition-all duration-500 ${barColor}`}
+                className={`h-1.5 rounded-none transition-all duration-500 ${barColor}`}
                 style={{ width: `${Math.min(100, data.accuracy)}%` }}
               />
             </div>

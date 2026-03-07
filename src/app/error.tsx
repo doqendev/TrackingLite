@@ -27,7 +27,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(20,184,166,0.06) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at center, rgba(6,182,212,0.06) 0%, transparent 60%)',
         }}
       />
 
@@ -38,8 +38,8 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
         </p>
 
         {/* Card */}
-        <div className="rounded-2xl bg-card px-8 py-10 shadow-lg ring-1 ring-white/[0.06] glow-card border-t-2 border-brand-500/40">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground mb-2">
+        <div className="bg-card px-8 py-10 shadow-lg ring-1 ring-white/[0.06] glow-card border-t-2 border-brand-500/40">
+          <h1 className="text-2xl font-bold tracking-wider text-foreground mb-2">
             Something went wrong
           </h1>
           <p className="text-sm text-muted-foreground mb-8">

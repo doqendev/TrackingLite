@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
         <article>
           <header className="mb-10 border-b border-border pb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Privacy Policy</h1>
+            <h1 className="text-3xl font-bold tracking-wider text-foreground font-display">Privacy Policy</h1>
             <p className="mt-2 text-sm text-muted-foreground">Last updated: February 21, 2026</p>
             <p className="mt-4 text-base text-muted-foreground leading-relaxed">
               Track Clear (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) operates the Track Clear service

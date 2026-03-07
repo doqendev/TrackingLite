@@ -10,12 +10,12 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/dashboard", labelKey: "dashboard" as const, icon: LayoutDashboard },
-  { href: "/events", labelKey: "events" as const, icon: ClipboardList },
-  { href: "/integrations", labelKey: "integrations" as const, icon: Plug },
-  { href: "/settings", labelKey: "settings" as const, icon: Settings },
-  { href: "/billing", labelKey: "billing" as const, icon: CreditCard },
-  { href: "/diagnostics", labelKey: "diagnostics" as const, icon: Activity },
+  { href: "/dashboard", labelKey: "dashboard" as const, icon: LayoutDashboard, code: "01" },
+  { href: "/events", labelKey: "events" as const, icon: ClipboardList, code: "02" },
+  { href: "/integrations", labelKey: "integrations" as const, icon: Plug, code: "03" },
+  { href: "/settings", labelKey: "settings" as const, icon: Settings, code: "04" },
+  { href: "/billing", labelKey: "billing" as const, icon: CreditCard, code: "05" },
+  { href: "/diagnostics", labelKey: "diagnostics" as const, icon: Activity, code: "06" },
 ];
 
 interface SidebarNavProps {
@@ -28,21 +28,22 @@ export function SidebarNav({ userEmail, workspaceName }: SidebarNavProps) {
   const t = useTranslations("nav");
 
   return (
-    <nav className="flex-1 p-3 space-y-0.5">
-      {navItems.map(({ href, labelKey, icon: Icon }) => {
+    <nav className="flex-1 py-4 space-y-0">
+      {navItems.map(({ href, labelKey, icon: Icon, code }) => {
         const isActive = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
             key={href}
             href={href}
-            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex items-center gap-3 px-5 py-2.5 text-xs tracking-wider uppercase transition-colors border-l-2 ${
               isActive
-                ? "bg-white/[0.06] text-foreground border border-white/[0.08] border-l-2 border-l-brand-500"
-                : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04] border border-transparent transition-colors duration-200"
+                ? "text-cyan-500 border-l-cyan-500 bg-cyan-500/[0.08]"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/[0.03] border-l-transparent"
             }`}
           >
-            <Icon className={`h-4 w-4 ${isActive ? "text-brand-500" : ""}`} />
-            {t(labelKey)}
+            <span className="text-[10px] text-muted-foreground w-4 font-mono">{code}</span>
+            <span>&gt; {t(labelKey).toUpperCase()}</span>
+            <span className={`ml-auto w-1.5 h-1.5 rounded-full ${isActive ? "bg-cyan-500 shadow-[0_0_8px_theme(colors.cyan.500)] animate-pulse" : "bg-muted-foreground/30"}`} />
           </Link>
         );
       })}
@@ -54,22 +55,21 @@ export function SidebarFooter({ userEmail, workspaceName }: SidebarNavProps) {
   const t = useTranslations("nav");
 
   return (
-    <div className="p-4 border-t border-white/[0.08] space-y-3">
+    <div className="px-5 py-4 border-t border-[hsl(240,26%,15%)] space-y-3">
       <div>
-        <p className="text-sm text-foreground/80 truncate font-medium">{userEmail}</p>
+        <p className="text-[10px] text-cyan-500 tracking-widest uppercase mb-1">OPERATOR</p>
+        <p className="text-xs text-foreground/80 truncate">{userEmail}</p>
         {workspaceName && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">{workspaceName}</p>
+          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{workspaceName}</p>
         )}
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start text-muted-foreground hover:text-foreground"
+      <button
+        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full py-1"
         onClick={() => signOut({ callbackUrl: "/login" })}
       >
-        <LogOut className="h-4 w-4 mr-2" />
-        {t("logOut")}
-      </Button>
+        <LogOut className="h-3.5 w-3.5" />
+        &gt; {t("logOut").toUpperCase()}
+      </button>
     </div>
   );
 }
@@ -80,54 +80,57 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="md:hidden fixed top-0 left-0 right-0 z-10 h-14 bg-background/80 backdrop-blur-md border-b border-white/[0.06] flex items-center justify-between px-4">
-      <Link href="/dashboard" className="text-lg font-bold text-foreground tracking-tight"><span className="text-brand-500">Track</span>&thinsp;Clear</Link>
+    <div className="md:hidden fixed top-0 left-0 right-0 z-10 h-14 bg-background/95 backdrop-blur-sm border-b border-[hsl(240,26%,15%)] flex items-center justify-between px-4">
+      <Link href="/dashboard" className="font-display font-bold text-foreground tracking-widest text-sm">
+        <span className="text-cyan-500">TRACK</span> {"// "}CLEAR
+      </Link>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" aria-label="Open navigation menu">
             <Menu className="h-5 w-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
-          <div className="flex h-16 items-center px-6 border-b border-white/[0.06]">
-            <span className="text-xl font-bold text-foreground tracking-tight"><span className="text-brand-500">Track</span>&thinsp;Clear</span>
+        <SheetContent side="left" className="w-64 p-0 bg-card border-r border-[hsl(240,26%,15%)]">
+          <div className="flex h-14 items-center px-5 border-b border-[hsl(240,26%,15%)]">
+            <span className="font-display font-bold text-foreground tracking-widest text-sm">
+              <span className="text-cyan-500">TRACK</span> {"// "}CLEAR
+            </span>
           </div>
-          <nav className="flex-1 p-4 space-y-1">
-            {navItems.map(({ href, labelKey, icon: Icon }) => {
+          <nav className="flex-1 py-4 space-y-0">
+            {navItems.map(({ href, labelKey, icon: Icon, code }) => {
               const isActive = pathname === href || pathname.startsWith(href + "/");
               return (
                 <Link
                   key={href}
                   href={href}
                   onClick={() => setOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  className={`flex items-center gap-3 px-5 py-2.5 text-xs tracking-wider uppercase transition-colors border-l-2 ${
                     isActive
-                      ? "bg-white/[0.06] text-foreground border border-white/[0.08] border-l-2 border-l-brand-500"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04] border border-transparent transition-colors duration-200"
+                      ? "text-cyan-500 border-l-cyan-500 bg-cyan-500/[0.08]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.03] border-l-transparent"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? "text-brand-500" : ""}`} />
-                  {t(labelKey)}
+                  <span className="text-[10px] text-muted-foreground w-4 font-mono">{code}</span>
+                  <span>&gt; {t(labelKey).toUpperCase()}</span>
+                  <span className={`ml-auto w-1.5 h-1.5 rounded-full ${isActive ? "bg-cyan-500 shadow-[0_0_8px_theme(colors.cyan.500)] animate-pulse" : "bg-muted-foreground/30"}`} />
                 </Link>
               );
             })}
           </nav>
-          <div className="p-4 border-t border-white/[0.08] space-y-3">
+          <div className="px-5 py-4 border-t border-[hsl(240,26%,15%)] space-y-3">
             <div>
-              <p className="text-sm text-foreground/80 truncate font-medium">{userEmail}</p>
+              <p className="text-xs text-foreground/80 truncate">{userEmail}</p>
               {workspaceName && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{workspaceName}</p>
+                <p className="text-[10px] text-muted-foreground truncate mt-0.5">{workspaceName}</p>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-muted-foreground hover:text-foreground"
+            <button
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full py-1"
               onClick={() => { signOut({ callbackUrl: "/login" }); setOpen(false); }}
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              {t("logOut")}
-            </Button>
+              <LogOut className="h-3.5 w-3.5" />
+              &gt; {t("logOut").toUpperCase()}
+            </button>
           </div>
         </SheetContent>
       </Sheet>

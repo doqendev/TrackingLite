@@ -100,32 +100,32 @@ export default function HomePage() {
       />
 
       {/* ───────────────────────── Navigation ───────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-brand-500/10 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link
             href="/"
-            className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground transition-opacity hover:opacity-80"
+            className="flex items-center gap-2 font-mono text-sm font-semibold tracking-widest text-foreground transition-opacity hover:opacity-80"
           >
-            <img src="/logo.png" alt="Track Clear" width={32} height={32} className="h-8 w-8" />
-            <span className="text-base font-bold tracking-tight">trackclear<span className="text-brand-500">.io</span></span>
+            <img src="/logo.png" alt="" width={24} height={24} className="w-6 h-6" />
+            <span className="text-base font-bold tracking-widest font-mono"><span className="text-cyan-500">TRACK</span> {"// "}CLEAR</span>
           </Link>
 
           <nav className="hidden items-center gap-8 sm:flex">
             <a
               href="#features"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
             >
               Features
             </a>
             <a
               href="#how-it-works"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
             >
               How it Works
             </a>
             <a
               href="#pricing"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
             >
               Pricing
             </a>
@@ -135,7 +135,7 @@ export default function HomePage() {
             <Button variant="ghost" size="default" asChild>
               <Link href="/login">Log in</Link>
             </Button>
-            <Button variant="brand" size="default" asChild className="rounded-lg px-5 shadow-lg shadow-brand-500/10">
+            <Button variant="brand" size="default" asChild className="px-5 shadow-lg shadow-brand-500/10">
               <Link href="/signup">Get Started</Link>
             </Button>
           </div>
@@ -155,7 +155,7 @@ export default function HomePage() {
           />
 
           {/* Dot grid */}
-          <div className="pointer-events-none absolute inset-0 opacity-25 bg-dot-white" />
+          <div className="pointer-events-none absolute inset-0 opacity-25 bg-grid-cyan" />
 
           {/* Vibrant atmospheric glows */}
           <div
@@ -191,10 +191,10 @@ export default function HomePage() {
 
           <div className="relative mx-auto max-w-6xl px-6 pb-16 pt-24 sm:pb-20 sm:pt-32">
             <div className="mx-auto max-w-4xl text-center animate-fade-in-up">
-              <Badge variant="outline" className="mb-8 rounded-full border-brand-500/20 bg-brand-500/5 px-4 py-1 text-xs font-semibold text-brand-400 backdrop-blur-md">
-                Server-side tracking made simple
+              <Badge variant="outline" className="mb-8 border-brand-500/20 bg-brand-500/5 px-4 py-1 text-xs font-bold uppercase tracking-widest text-brand-400 backdrop-blur-md font-mono">
+                &gt; server-side tracking made simple
               </Badge>
-              <h1 className="mb-6 text-5xl font-extrabold leading-[1.05] tracking-tight text-foreground sm:text-7xl md:text-[5rem]">
+              <h1 className="mb-6 font-display text-5xl font-extrabold leading-[1.05] tracking-wider text-foreground sm:text-7xl md:text-[5rem]">
                 Your ad pixels miss
                 <br />
                 20&ndash;40% of conversions.
@@ -202,8 +202,8 @@ export default function HomePage() {
                 <span className="text-gradient drop-shadow-sm">We catch them.</span>
               </h1>
 
-              <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-muted-foreground/90">
-                The most affordable server-side tracking for Shopify. Forward high-quality events to Meta, TikTok, GA4, Klaviyo, and more in 10 minutes.
+              <p className="mx-auto mb-10 max-w-xl font-mono text-base leading-relaxed text-muted-foreground/90">
+                <span className="text-brand-500/60">&gt; </span>The most affordable server-side tracking for Shopify. Forward high-quality events to Meta, TikTok, GA4, Klaviyo, and more in 10 minutes.
               </p>
 
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
@@ -211,7 +211,7 @@ export default function HomePage() {
                   variant="brand"
                   size="lg"
                   asChild
-                  className="h-14 gap-2 rounded-xl border border-white/[0.1] px-8 text-lg font-bold shadow-xl shadow-brand-500/20 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
+                  className="h-14 gap-2 border border-white/[0.1] px-8 text-lg font-bold shadow-xl shadow-brand-500/20 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
                 >
                   <Link href="/signup">
                     Get Started Free
@@ -222,7 +222,7 @@ export default function HomePage() {
                   variant="outline"
                   size="lg"
                   asChild
-                  className="h-14 rounded-xl border-white/[0.1] bg-white/[0.03] px-8 text-lg font-bold backdrop-blur-md transition-all hover:bg-white/[0.08] hover:brightness-110 active:scale-[0.98]"
+                  className="h-14 border-white/[0.1] bg-white/[0.03] px-8 text-lg font-bold backdrop-blur-md transition-all hover:bg-white/[0.08] hover:brightness-110 active:scale-[0.98]"
                 >
                   <Link href="#how-it-works">See how it works</Link>
                 </Button>
@@ -257,24 +257,24 @@ export default function HomePage() {
             {/* ── Product Visual ── */}
             <div className="relative mx-auto mt-20 max-w-5xl animate-fade-in-up-delay-2">
               <div
-                className="pointer-events-none absolute -inset-10 rounded-2xl opacity-60"
+                className="pointer-events-none absolute -inset-10 opacity-60"
                 style={{
                   background:
-                    "radial-gradient(ellipse at center, rgba(14,135,233,0.15) 0%, transparent 70%)",
+                    "radial-gradient(ellipse at center, rgba(6,182,212,0.15) 0%, transparent 70%)",
                 }}
               />
-              <div className="relative overflow-hidden rounded-2xl border border-white/[0.1] bg-white/[0.03] shadow-[0_0_100px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+              <div className="relative overflow-hidden border border-brand-500/20 bg-white/[0.03] shadow-[0_0_100px_rgba(0,0,0,0.5)] backdrop-blur-xl scanlines">
                 {/* Mock header bar */}
                 <div className="flex items-center gap-1 border-b border-white/[0.08] px-5 py-4">
                   <div className="flex items-center gap-1.5 mr-6">
-                    <div className="h-3 w-3 rounded-full bg-red-500/20" />
-                    <div className="h-3 w-3 rounded-full bg-yellow-500/20" />
-                    <div className="h-3 w-3 rounded-full bg-green-500/20" />
+                    <div className="h-3 w-3 bg-red-500/20" />
+                    <div className="h-3 w-3 bg-yellow-500/20" />
+                    <div className="h-3 w-3 bg-green-500/20" />
                   </div>
                   {["Dashboard", "Events", "Settings"].map((tab, i) => (
                     <span
                       key={tab}
-                      className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${
+                      className={`px-4 py-1.5 font-mono text-xs font-bold uppercase tracking-widest ${
                         i === 0
                           ? "bg-brand-500/10 text-brand-400"
                           : "text-muted-foreground/40"
@@ -288,32 +288,32 @@ export default function HomePage() {
                 {/* Pipeline visual */}
                 <div className="relative p-8">
                   <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-                    <div className="relative rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 transition-colors hover:border-white/[0.15]">
+                    <div className="relative border border-white/[0.08] bg-white/[0.03] p-6 transition-colors hover:border-white/[0.15]">
                       <Image src="/shopify.svg" alt="Shopify" width={24} height={24} className="absolute right-4 top-4 opacity-70" />
-                      <div className="mb-4 flex items-center gap-2 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <div className="mb-4 flex items-center gap-2 font-mono text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                        <span className="h-2 w-2 bg-emerald-400 animate-pulse" />
                         Live Snippet
                       </div>
-                      <div className="text-base font-bold text-foreground">Shopify Store</div>
-                      <div className="mt-1 text-sm text-muted-foreground/50">Collecting events...</div>
+                      <div className="font-display text-base font-bold text-foreground">Shopify Store</div>
+                      <div className="mt-1 font-mono text-xs text-muted-foreground/50">Collecting events...</div>
                     </div>
 
-                    <div className="relative rounded-xl border border-brand-500/30 bg-brand-500/[0.05] p-6 shadow-2xl shadow-brand-500/5 ring-1 ring-brand-500/20">
-                      <div className="mb-4 flex items-center gap-2 text-[10px] font-bold text-brand-400 uppercase tracking-wider">
-                        <span className="h-2 w-2 rounded-full bg-brand-400 animate-pulse" />
+                    <div className="relative border border-brand-500/30 bg-brand-500/[0.05] p-6 shadow-2xl shadow-brand-500/5 ring-1 ring-brand-500/20">
+                      <div className="mb-4 flex items-center gap-2 font-mono text-[10px] font-bold text-brand-400 uppercase tracking-widest">
+                        <span className="h-2 w-2 bg-brand-400 animate-pulse" />
                         Track Clear API
                       </div>
-                      <div className="text-base font-bold text-foreground">Server-Side Hub</div>
-                      <div className="mt-1 text-sm text-muted-foreground/50">142ms latency</div>
+                      <div className="font-display text-base font-bold text-foreground">Server-Side Hub</div>
+                      <div className="mt-1 font-mono text-xs text-muted-foreground/50">142ms latency</div>
                     </div>
 
-                    <div className="relative rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 transition-colors hover:border-white/[0.15]">
-                      <div className="mb-4 flex items-center gap-2 text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
-                        <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                    <div className="relative border border-white/[0.08] bg-white/[0.03] p-6 transition-colors hover:border-white/[0.15]">
+                      <div className="mb-4 flex items-center gap-2 font-mono text-[10px] font-bold text-cyan-400 uppercase tracking-widest">
+                        <span className="h-2 w-2 bg-cyan-400 animate-pulse" />
                         Connected
                       </div>
-                      <div className="text-base font-bold text-foreground">6 Destinations</div>
-                      <div className="mt-1 text-sm text-muted-foreground/50">Forwarding data...</div>
+                      <div className="font-display text-base font-bold text-foreground">6 Destinations</div>
+                      <div className="mt-1 font-mono text-xs text-muted-foreground/50">Forwarding data...</div>
                     </div>
                   </div>
                 </div>
@@ -336,10 +336,10 @@ export default function HomePage() {
               ].map((stat, i) => (
                 <ScrollReveal key={stat.label} delay={i * 100}>
                   <div className="text-center group">
-                    <div className="text-3xl font-extrabold tracking-tight text-brand-400 tabular-nums sm:text-4xl transition-transform group-hover:scale-110 duration-300">
+                    <div className="font-display text-3xl font-extrabold tracking-wider text-brand-400 tabular-nums sm:text-4xl transition-transform group-hover:scale-110 duration-300 glow-brand">
                       {stat.value}
                     </div>
-                    <div className="mt-2 text-xs font-bold uppercase tracking-widest text-muted-foreground/40">
+                    <div className="mt-2 font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground/40">
                       {stat.label}
                     </div>
                   </div>
@@ -351,14 +351,14 @@ export default function HomePage() {
 
         {/* ───────────────────────── Problem Section ───────────────────────── */}
         <section id="features" className="relative border-b border-white/[0.06] py-24 sm:py-32">
-          <div className="pointer-events-none absolute inset-0 bg-grid-white opacity-20" />
+          <div className="pointer-events-none absolute inset-0 bg-grid-cyan opacity-20" />
           <div className="relative mx-auto max-w-6xl px-6">
             <ScrollReveal>
               <div className="mb-16 text-center">
-                <Badge variant="outline" className="mb-4 rounded-full border-red-500/20 bg-red-500/5 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-red-400">
-                  The problem
+                <Badge variant="outline" className="mb-4 border-red-500/20 bg-red-500/5 px-4 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-400">
+                  &gt; The problem
                 </Badge>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
+                <h2 className="font-display text-3xl font-bold tracking-wider text-foreground sm:text-5xl">
                   Your pixel data is incomplete
                 </h2>
               </div>
@@ -367,13 +367,13 @@ export default function HomePage() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
               <ScrollReveal delay={0}>
                 <SpotlightCard glowColor="rgba(239, 68, 68, 0.1)">
-                  <h3 className="mb-3 text-lg font-bold text-foreground">
+                  <h3 className="mb-3 font-display text-lg font-bold tracking-wider text-foreground">
                     Ad blockers kill the pixel
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground/80">
                     ~30% of desktop users run ad blockers. Every one silently
                     drops requests to{" "}
-                    <code className="font-mono text-[11px] text-brand-400 bg-brand-500/5 px-1.5 py-0.5 rounded">
+                    <code className="font-mono text-[11px] text-brand-400 bg-brand-500/5 px-1.5 py-0.5">
                       connect.facebook.net
                     </code>{" "}
                     before your pixel fires.
@@ -383,7 +383,7 @@ export default function HomePage() {
 
               <ScrollReveal delay={150}>
                 <SpotlightCard glowColor="rgba(239, 68, 68, 0.1)">
-                  <h3 className="mb-3 text-lg font-bold text-foreground">
+                  <h3 className="mb-3 font-display text-lg font-bold tracking-wider text-foreground">
                     iOS 14+ breaks attribution
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground/80">
@@ -396,7 +396,7 @@ export default function HomePage() {
 
               <ScrollReveal delay={300}>
                 <SpotlightCard glowColor="rgba(239, 68, 68, 0.1)">
-                  <h3 className="mb-3 text-lg font-bold text-foreground">
+                  <h3 className="mb-3 font-display text-lg font-bold tracking-wider text-foreground">
                     Missing events waste ad spend
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground/80">
@@ -412,21 +412,21 @@ export default function HomePage() {
 
         {/* ───────────── Feature: Capture Everything (content LEFT, visual RIGHT) ───────────── */}
         <section className="relative border-b border-white/[0.06] overflow-hidden">
-          <div className="pointer-events-none absolute -right-20 top-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-brand-500/10 rounded-full blur-[120px]" />
+          <div className="pointer-events-none absolute -right-20 top-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-brand-500/10 blur-[120px]" />
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-32">
             <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2 lg:gap-24">
               {/* Left: Content */}
               <ScrollReveal direction="left">
               <div>
-                <Badge variant="outline" className="mb-4 rounded-full border-brand-500/20 bg-brand-500/5 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-400">
-                  Reliability
+                <Badge variant="outline" className="mb-4 border-brand-500/20 bg-brand-500/5 px-4 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-brand-400">
+                  &gt; Reliability
                 </Badge>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-wider text-foreground sm:text-4xl">
                   Capture every event, <span className="text-brand-400">every time</span>
                 </h2>
                 <p className="mt-6 text-base leading-relaxed text-muted-foreground">
                   Our JavaScript snippet hooks into Shopify&apos;s{" "}
-                  <code className="rounded bg-white/[0.04] px-2 py-1 font-mono text-xs text-brand-300">
+                  <code className="bg-white/[0.04] px-2 py-1 font-mono text-xs text-brand-300">
                     analytics.subscribe()
                   </code>{" "}
                   API inside their Custom Pixel sandbox. Every browser event is
@@ -442,10 +442,10 @@ export default function HomePage() {
                     "Works alongside your existing Meta browser pixel",
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500/10">
+                      <div className="flex h-5 w-5 items-center justify-center bg-brand-500/10">
                         <Check className="h-3 w-3 text-brand-400" />
                       </div>
-                      <span className="text-sm font-medium text-muted-foreground/90">
+                      <span className="font-mono text-sm font-medium text-muted-foreground/90">
                         {item}
                       </span>
                     </li>
@@ -457,14 +457,14 @@ export default function HomePage() {
               {/* Right: Event Pipeline Terminal */}
               <ScrollReveal direction="right">
               <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-brand-500 to-cyan-500 rounded-xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
-                <div className="relative overflow-hidden rounded-xl border border-white/[0.1] bg-black/40 backdrop-blur-xl">
+                <div className="absolute -inset-1 bg-gradient-to-r from-brand-500 to-cyan-500 blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
+                <div className="relative overflow-hidden border border-white/[0.1] bg-black/40 backdrop-blur-xl scanlines">
                   {/* Terminal chrome */}
                   <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3 bg-white/[0.02]">
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.1]" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.1]" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.1]" />
-                    <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/30">
+                    <div className="h-2.5 w-2.5 bg-white/[0.1]" />
+                    <div className="h-2.5 w-2.5 bg-white/[0.1]" />
+                    <div className="h-2.5 w-2.5 bg-white/[0.1]" />
+                    <span className="ml-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground/30">
                       trackclear pipeline
                     </span>
                   </div>
@@ -530,19 +530,19 @@ export default function HomePage() {
 
         {/* ───────────── Feature: Server-Side Forwarding (visual LEFT, content RIGHT) ───────────── */}
         <section id="how-it-works" className="relative border-b border-white/[0.06] overflow-hidden">
-          <div className="pointer-events-none absolute -left-20 top-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px]" />
+          <div className="pointer-events-none absolute -left-20 top-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-500/5 blur-[120px]" />
           <div className="mx-auto max-w-6xl px-6 py-24 sm:py-32">
             <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2 lg:gap-24">
               {/* Left: Code Snippet Visual */}
               <ScrollReveal direction="left">
               <div className="relative group lg:order-1">
-                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-brand-500 rounded-xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
-                <div className="relative overflow-hidden rounded-xl border border-white/[0.1] bg-black/40 backdrop-blur-xl">
+                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-brand-500 blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
+                <div className="relative overflow-hidden border border-white/[0.1] bg-black/40 backdrop-blur-xl scanlines">
                   <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3 bg-white/[0.02]">
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.1]" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.1]" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-white/[0.1]" />
-                    <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/30">
+                    <div className="h-2.5 w-2.5 bg-white/[0.1]" />
+                    <div className="h-2.5 w-2.5 bg-white/[0.1]" />
+                    <div className="h-2.5 w-2.5 bg-white/[0.1]" />
+                    <span className="ml-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground/30">
                       custom-pixel.js
                     </span>
                   </div>
@@ -588,10 +588,10 @@ export default function HomePage() {
               {/* Right: Content */}
               <ScrollReveal direction="right">
               <div className="lg:order-2">
-                <Badge variant="outline" className="mb-4 rounded-full border-cyan-500/20 bg-cyan-500/5 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-400">
-                  Integration
+                <Badge variant="outline" className="mb-4 border-cyan-500/20 bg-cyan-500/5 px-4 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+                  &gt; Integration
                 </Badge>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-wider text-foreground sm:text-4xl">
                   One snippet. <span className="text-cyan-400">Complete tracking.</span>
                 </h2>
                 <p className="mt-6 text-base leading-relaxed text-muted-foreground">
@@ -607,10 +607,10 @@ export default function HomePage() {
                     "Automatic dedup via shared event_id",
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/10">
+                      <div className="flex h-5 w-5 items-center justify-center bg-cyan-500/10">
                         <Check className="h-3 w-3 text-cyan-400" />
                       </div>
-                      <span className="text-sm font-medium text-muted-foreground/90">
+                      <span className="font-mono text-sm font-medium text-muted-foreground/90">
                         {item}
                       </span>
                     </li>
@@ -624,14 +624,14 @@ export default function HomePage() {
 
         {/* ───────────── Feature: Monitor & Dashboard (3 cards) ───────────── */}
         <section className="relative border-b border-white/[0.06] py-24 sm:py-32">
-          <div className="pointer-events-none absolute inset-0 bg-dot-white opacity-20" />
+          <div className="pointer-events-none absolute inset-0 bg-grid-cyan opacity-20" />
           <div className="relative mx-auto max-w-6xl px-6">
             <ScrollReveal>
               <div className="mb-16 text-center">
-                <Badge variant="outline" className="mb-4 rounded-full border-brand-500/20 bg-brand-500/5 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-400">
-                  Visibility
+                <Badge variant="outline" className="mb-4 border-brand-500/20 bg-brand-500/5 px-4 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-brand-400">
+                  &gt; Visibility
                 </Badge>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                <h2 className="font-display text-3xl font-bold tracking-wider text-foreground sm:text-4xl">
                   Complete tracking visibility
                 </h2>
                 <p className="mx-auto mt-4 max-w-lg text-base text-muted-foreground/80">
@@ -643,12 +643,12 @@ export default function HomePage() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
               <ScrollReveal delay={0}>
                 <SpotlightCard>
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-brand-500/10 text-brand-400">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center bg-brand-500/10 text-brand-400">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <h3 className="mb-3 text-lg font-bold text-foreground">
+                  <h3 className="mb-3 font-display text-lg font-bold tracking-wider text-foreground">
                     Revenue tracking
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground/80">
@@ -661,12 +661,12 @@ export default function HomePage() {
 
               <ScrollReveal delay={150}>
                 <SpotlightCard>
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center bg-cyan-500/10 text-cyan-400">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="mb-3 text-lg font-bold text-foreground">
+                  <h3 className="mb-3 font-display text-lg font-bold tracking-wider text-foreground">
                     Event funnel
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground/80">
@@ -678,12 +678,12 @@ export default function HomePage() {
 
               <ScrollReveal delay={300}>
                 <SpotlightCard>
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center bg-emerald-500/10 text-emerald-400">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
-                  <h3 className="mb-3 text-lg font-bold text-foreground">
+                  <h3 className="mb-3 font-display text-lg font-bold tracking-wider text-foreground">
                     Delivery health
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground/80">
@@ -698,18 +698,18 @@ export default function HomePage() {
 
         {/* ───────────── Animated Dashboard Showcase ───────────── */}
         <section className="relative border-b border-white/[0.06] py-24 sm:py-32 overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-grid-white opacity-10" />
+          <div className="pointer-events-none absolute inset-0 bg-grid-cyan opacity-10" />
           <div className="relative mx-auto max-w-6xl px-6">
             <ScrollReveal>
               <div className="mb-16 text-center">
-                <Badge variant="outline" className="mb-4 rounded-full border-brand-500/20 bg-brand-500/5 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-400">
-                  Dashboard
+                <Badge variant="outline" className="mb-4 border-brand-500/20 bg-brand-500/5 px-4 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-brand-400">
+                  &gt; Dashboard
                 </Badge>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
+                <h2 className="font-display text-3xl font-bold tracking-wider text-foreground sm:text-5xl">
                   Your tracking hub, <span className="text-brand-400">reimagined</span>
                 </h2>
                 <p className="mx-auto mt-4 max-w-lg text-base text-muted-foreground/80">
-                  Real-time revenue, funnels, and live event delivery in one beautiful interface.
+                  Real-time revenue, funnels, and live event delivery in one interface.
                 </p>
               </div>
             </ScrollReveal>
@@ -720,14 +720,14 @@ export default function HomePage() {
 
         {/* ───────────────────────── Pricing ───────────────────────── */}
         <section id="pricing" className="relative border-b border-white/[0.06] py-24 sm:py-32">
-          <div className="pointer-events-none absolute inset-0 bg-grid-white opacity-20" />
+          <div className="pointer-events-none absolute inset-0 bg-grid-cyan opacity-20" />
           <div className="relative mx-auto max-w-6xl px-6">
             <ScrollReveal>
               <div className="mb-14 text-center">
-                <Badge variant="outline" className="mb-4 rounded-full border-brand-500/20 bg-brand-500/5 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-400">
-                  Pricing
+                <Badge variant="outline" className="mb-4 border-brand-500/20 bg-brand-500/5 px-4 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-brand-400">
+                  &gt; Pricing
                 </Badge>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
+                <h2 className="font-display text-3xl font-bold tracking-wider text-foreground sm:text-5xl">
                   Scale your tracking, <span className="text-brand-400">not your costs</span>
                 </h2>
                 <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground/80">
@@ -736,16 +736,16 @@ export default function HomePage() {
 
                 {/* Pricing Toggle */}
                 <div className="mt-12 flex items-center justify-center gap-4">
-                  <span className={`text-sm font-bold transition-colors ${billingCycle === "monthly" ? "text-foreground" : "text-muted-foreground"}`}>Monthly</span>
+                  <span className={`font-mono text-xs font-bold uppercase tracking-widest transition-colors ${billingCycle === "monthly" ? "text-foreground" : "text-muted-foreground"}`}>Monthly</span>
                   <button
                     onClick={() => setBillingCycle(billingCycle === "monthly" ? "yearly" : "monthly")}
-                    className="relative h-7 w-12 rounded-full bg-white/[0.1] transition-colors hover:bg-white/[0.15]"
+                    className="relative h-7 w-12 bg-white/[0.1] transition-colors hover:bg-white/[0.15]"
                   >
-                    <div className={`absolute top-1 h-5 w-5 rounded-full bg-brand-500 transition-all ${billingCycle === "yearly" ? "left-6" : "left-1"}`} />
+                    <div className={`absolute top-1 h-5 w-5 bg-brand-500 transition-all ${billingCycle === "yearly" ? "left-6" : "left-1"}`} />
                   </button>
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold transition-colors ${billingCycle === "yearly" ? "text-foreground" : "text-muted-foreground"}`}>Yearly</span>
-                    <Badge className="rounded-full bg-brand-500/10 text-[10px] font-bold text-brand-400 ring-1 ring-brand-500/20">2 MONTHS FREE</Badge>
+                    <span className={`font-mono text-xs font-bold uppercase tracking-widest transition-colors ${billingCycle === "yearly" ? "text-foreground" : "text-muted-foreground"}`}>Yearly</span>
+                    <Badge className="bg-brand-500/10 font-mono text-[10px] font-bold text-brand-400 ring-1 ring-brand-500/20">2 MONTHS FREE</Badge>
                   </div>
                 </div>
               </div>
@@ -788,24 +788,24 @@ export default function HomePage() {
               ].map((plan, i) => (
                 <ScrollReveal key={plan.name} delay={i * 100}>
                   <div className={cn(
-                    "relative flex h-full flex-col rounded-2xl border p-8 transition-all duration-300 hover:scale-[1.02]",
-                    plan.highlight 
-                      ? "border-brand-500/30 bg-brand-500/[0.03] shadow-xl shadow-brand-500/10 ring-1 ring-brand-500/20" 
+                    "relative flex h-full flex-col border p-8 transition-all duration-300 hover:scale-[1.02]",
+                    plan.highlight
+                      ? "border-brand-500/30 bg-brand-500/[0.03] shadow-xl shadow-brand-500/10 ring-1 ring-brand-500/20"
                       : "border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15]"
                   )}>
                     {plan.highlight && (
-                      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-500 px-3 py-0.5 text-[10px] font-bold text-white shadow-lg shadow-brand-500/20">
+                      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 px-3 py-0.5 font-mono text-[10px] font-bold text-white shadow-lg shadow-brand-500/20">
                         MOST POPULAR
                       </Badge>
                     )}
-                    <div className="mb-1 text-xs font-bold uppercase tracking-widest text-muted-foreground/60">{plan.name}</div>
+                    <div className="mb-1 font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground/60">{plan.name}</div>
                     <div className="mb-6 flex items-baseline gap-1">
-                      <span className="text-4xl font-extrabold tracking-tight text-foreground">${plan.price}</span>
-                      <span className="text-sm font-medium text-muted-foreground/60">/mo</span>
+                      <span className="font-display text-4xl font-extrabold tracking-wider text-foreground">${plan.price}</span>
+                      <span className="font-mono text-sm font-medium text-muted-foreground/60">/mo</span>
                     </div>
                     <ul className="mb-8 flex-1 space-y-4">
                       {plan.features.map(feat => (
-                        <li key={feat} className="flex items-start gap-3 text-sm text-muted-foreground/80">
+                        <li key={feat} className="flex items-start gap-3 font-mono text-sm text-muted-foreground/80">
                           <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" />
                           {feat}
                         </li>
@@ -813,12 +813,12 @@ export default function HomePage() {
                     </ul>
                     <Button
                       variant={plan.highlight ? "brand" : "outline"}
-                      className={cn("w-full rounded-xl font-bold py-6 transition-all", !plan.highlight && "border-white/[0.1] bg-white/[0.03] hover:bg-white/[0.08]")}
+                      className={cn("w-full font-bold py-6 transition-all", !plan.highlight && "border-white/[0.1] bg-white/[0.03] hover:bg-white/[0.08]")}
                       asChild
                     >
                       <Link href="/signup">{plan.cta}</Link>
                     </Button>
-                    {plan.name === "Free" && <div className="mt-4 text-center text-[10px] font-medium text-muted-foreground/40">No credit card required</div>}
+                    {plan.name === "Free" && <div className="mt-4 text-center font-mono text-[10px] font-medium text-muted-foreground/40">No credit card required</div>}
                   </div>
                 </ScrollReveal>
               ))}
@@ -828,23 +828,23 @@ export default function HomePage() {
 
         {/* ───────────────────────── Final CTA ───────────────────────── */}
         <section className="relative overflow-hidden py-32 sm:py-48">
-          <div className="pointer-events-none absolute inset-0 bg-grid-white opacity-10" />
+          <div className="pointer-events-none absolute inset-0 bg-grid-cyan opacity-10" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-brand-500/5 to-transparent" />
-          
+
           <div className="relative mx-auto max-w-4xl px-6">
             <ScrollReveal>
               <div className="text-center">
-                <Badge variant="outline" className="mb-6 rounded-full border-brand-500/20 bg-brand-500/5 px-4 py-1 text-xs font-bold text-brand-400">
-                  Ready to fix your tracking?
+                <Badge variant="outline" className="mb-6 border-brand-500/20 bg-brand-500/5 px-4 py-1 font-mono text-xs font-bold uppercase tracking-widest text-brand-400">
+                  &gt; Ready to fix your tracking?
                 </Badge>
-                <h2 className="mb-6 text-4xl font-extrabold tracking-tight text-foreground sm:text-6xl">
+                <h2 className="mb-6 font-display text-4xl font-extrabold tracking-wider text-foreground sm:text-6xl">
                   Start tracking in <span className="text-gradient">10 minutes</span>
                 </h2>
-                <p className="mx-auto mb-10 max-w-xl text-lg text-muted-foreground/80 leading-relaxed">
+                <p className="mx-auto mb-10 max-w-xl font-mono text-base text-muted-foreground/80 leading-relaxed">
                   Join 200+ Shopify stores catching every conversion. Free forever up to 50 orders/mo. No credit card required.
                 </p>
                 <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-                  <Button variant="brand" size="lg" asChild className="h-14 gap-2 rounded-xl border border-white/[0.1] px-10 text-lg font-bold shadow-2xl shadow-brand-500/20 transition-all hover:scale-[1.05]">
+                  <Button variant="brand" size="lg" asChild className="h-14 gap-2 border border-white/[0.1] px-10 text-lg font-bold shadow-2xl shadow-brand-500/20 transition-all hover:scale-[1.05]">
                     <Link href="/signup">
                       Create your account
                       <ArrowRight className="h-5 w-5" />
@@ -954,13 +954,13 @@ export default function HomePage() {
 
           {/* Bottom bar */}
           <div className="mt-16 flex flex-col items-center justify-between gap-6 border-t border-white/[0.06] pt-8 sm:flex-row">
-            <span className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground">
-              <img src="/logo.png" alt="Track Clear" width={28} height={28} className="h-7 w-7" />
-              <span className="text-base font-bold tracking-tight transition-opacity hover:opacity-80">
-                trackclear<span className="text-brand-500">.io</span>
+            <span className="flex items-center gap-2 font-mono text-sm font-bold tracking-widest text-foreground">
+              <img src="/logo.png" alt="" width={24} height={24} className="w-6 h-6" />
+              <span className="text-base font-bold tracking-widest transition-opacity hover:opacity-80">
+                <span className="text-cyan-500">TRACK</span> {"// "}CLEAR
               </span>
             </span>
-            <span className="text-xs font-medium text-muted-foreground/40">
+            <span className="font-mono text-xs font-medium text-muted-foreground/40">
               &copy; {new Date().getFullYear()} Track Clear. All rights
               reserved.
             </span>

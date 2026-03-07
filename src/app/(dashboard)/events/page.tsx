@@ -171,7 +171,7 @@ export default async function EventsPage({
             <Button
               variant={!filterEventName ? "brand" : "secondary"}
               size="sm"
-              className="rounded-full"
+              className="rounded-none"
               asChild
             >
               <Link href={buildHref({ eventName: undefined, page: "1" })}>
@@ -183,7 +183,7 @@ export default async function EventsPage({
                 key={name}
                 variant={filterEventName === name ? "brand" : "secondary"}
                 size="sm"
-                className="rounded-full"
+                className="rounded-none"
                 asChild
               >
                 <Link href={buildHref({ eventName: name, page: "1" })}>
@@ -200,7 +200,7 @@ export default async function EventsPage({
             <Button
               variant={!filterStatus ? "brand" : "secondary"}
               size="sm"
-              className="rounded-full"
+              className="rounded-none"
               asChild
             >
               <Link href={buildHref({ status: undefined, page: "1" })}>
@@ -214,7 +214,7 @@ export default async function EventsPage({
                   key={s}
                   variant={filterStatus === s ? "brand" : "secondary"}
                   size="sm"
-                  className="rounded-full"
+                  className="rounded-none"
                   asChild
                 >
                   <Link href={buildHref({ status: s, page: "1" })}>
