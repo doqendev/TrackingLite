@@ -111,7 +111,9 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    await recordFailure("KLAVIYO").catch(() => {});
+    if (!(error instanceof CircuitOpenError)) {
+      await recordFailure("KLAVIYO").catch(() => {});
+    }
     const errorMessage =
       error instanceof KlaviyoApiError
         ? `Klaviyo ${error.statusCode}: ${error.message}`

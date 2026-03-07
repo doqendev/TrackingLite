@@ -131,7 +131,9 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    await recordFailure("GA4").catch(() => {});
+    if (!(error instanceof CircuitOpenError)) {
+      await recordFailure("GA4").catch(() => {});
+    }
     const errorMessage =
       error instanceof GA4ApiError
         ? `GA4 ${error.statusCode}: ${error.message}`

@@ -125,7 +125,9 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    await recordFailure("TIKTOK").catch(() => {});
+    if (!(error instanceof CircuitOpenError)) {
+      await recordFailure("TIKTOK").catch(() => {});
+    }
     const errorMessage =
       error instanceof TikTokApiError
         ? `TikTok ${error.statusCode}: ${error.message}`

@@ -130,7 +130,9 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       log.warn("Event missing fbp/fbc - poor Meta match quality", { eventId: event.eventId });
     }
   } catch (error) {
-    await recordFailure("META").catch(() => {});
+    if (!(error instanceof CircuitOpenError)) {
+      await recordFailure("META").catch(() => {});
+    }
     // Update EventLog to FAILED
     const errorMessage =
       error instanceof MetaCapiError

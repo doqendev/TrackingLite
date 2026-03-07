@@ -106,7 +106,9 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    await recordFailure("REDDIT").catch(() => {});
+    if (!(error instanceof CircuitOpenError)) {
+      await recordFailure("REDDIT").catch(() => {});
+    }
     const errorMessage =
       error instanceof RedditApiError
         ? `Reddit ${error.statusCode}: ${error.message}`

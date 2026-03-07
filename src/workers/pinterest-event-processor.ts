@@ -109,7 +109,9 @@ async function processPinterestEvent(job: Job<DestinationEventJob>): Promise<voi
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    await recordFailure("PINTEREST").catch(() => {});
+    if (!(error instanceof CircuitOpenError)) {
+      await recordFailure("PINTEREST").catch(() => {});
+    }
     const errorMessage =
       error instanceof PinterestApiError
         ? `Pinterest ${error.statusCode}: ${error.message}`

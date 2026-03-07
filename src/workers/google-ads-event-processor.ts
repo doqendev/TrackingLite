@@ -103,7 +103,9 @@ async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<voi
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    await recordFailure("GOOGLE_ADS").catch(() => {});
+    if (!(error instanceof CircuitOpenError)) {
+      await recordFailure("GOOGLE_ADS").catch(() => {});
+    }
     const errorMessage =
       error instanceof GoogleAdsApiError
         ? `Google Ads ${error.statusCode}: ${error.message}`
