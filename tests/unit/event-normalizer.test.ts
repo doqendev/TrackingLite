@@ -65,14 +65,15 @@ describe("normalizeToMetaCapiEvent", () => {
       expect(result.user_data.client_user_agent).toBeUndefined();
     });
 
-    it("includes fbp when provided", () => {
-      const result = normalizeToMetaCapiEvent(makePayload({ fbp: "fb.1.123.456" }), null, null);
-      expect(result.user_data.fbp).toBe("fb.1.123.456");
+    it("includes fbp when provided in valid format", () => {
+      const result = normalizeToMetaCapiEvent(makePayload({ fbp: "fb.1.1700000000000.1234567890" }), null, null);
+      expect(result.user_data.fbp).toBe("fb.1.1700000000000.1234567890");
     });
 
-    it("includes fbc when provided", () => {
-      const result = normalizeToMetaCapiEvent(makePayload({ fbc: "fb.1.123.abc" }), null, null);
-      expect(result.user_data.fbc).toBe("fb.1.123.abc");
+    it("includes fbc when provided in valid format", () => {
+      const fbcVal = `fb.1.${Date.now()}.AbCdEfGhIjKl`;
+      const result = normalizeToMetaCapiEvent(makePayload({ fbc: fbcVal }), null, null);
+      expect(result.user_data.fbc).toBe(fbcVal);
     });
 
     it("omits custom_data when no customData is provided", () => {
@@ -356,6 +357,86 @@ describe("normalizeToMetaCapiEvent", () => {
     it("preserves a short string event_id", () => {
       const result = normalizeToMetaCapiEvent(makePayload({ eventId: "short" }), null, null);
       expect(result.event_id).toBe("short");
+    });
+  });
+
+  describe("fbp/fbc validation", () => {
+    it("passes through valid fbp format", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbp: "fb.1.1700000000000.1234567890" }),
+        null,
+        null
+      );
+      expect(result.user_data.fbp).toBe("fb.1.1700000000000.1234567890");
+    });
+
+    it("strips invalid fbp format", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbp: "invalid-fbp-value" }),
+        null,
+        null
+      );
+      expect(result.user_data.fbp).toBeUndefined();
+    });
+
+    it("strips fbp with wrong prefix", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbp: "xx.1.1700000000000.1234567890" }),
+        null,
+        null
+      );
+      expect(result.user_data.fbp).toBeUndefined();
+    });
+
+    it("passes through valid fbc format", () => {
+      const fbc = `fb.1.${Date.now()}.AbCdEfGhIjKl`;
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbc }),
+        null,
+        null
+      );
+      expect(result.user_data.fbc).toBe(fbc);
+    });
+
+    it("strips fbc older than 90 days", () => {
+      const oldTs = Date.now() - 91 * 24 * 60 * 60 * 1000;
+      const fbc = `fb.1.${oldTs}.somefbclid`;
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbc }),
+        null,
+        null
+      );
+      expect(result.user_data.fbc).toBeUndefined();
+    });
+
+    it("passes fbc at 89 days (edge case)", () => {
+      const ts = Date.now() - 89 * 24 * 60 * 60 * 1000;
+      const fbc = `fb.1.${ts}.somefbclid`;
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbc }),
+        null,
+        null
+      );
+      expect(result.user_data.fbc).toBe(fbc);
+    });
+
+    it("strips invalid fbc format", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbc: "not-a-valid-fbc" }),
+        null,
+        null
+      );
+      expect(result.user_data.fbc).toBeUndefined();
+    });
+
+    it("handles null fbp and fbc gracefully", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({}),
+        null,
+        null
+      );
+      expect(result.user_data.fbp).toBeUndefined();
+      expect(result.user_data.fbc).toBeUndefined();
     });
   });
 

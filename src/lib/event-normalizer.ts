@@ -2,6 +2,23 @@ import { hashUserData } from "./hash-pii";
 import type { MetaCapiEvent } from "@/types/meta-capi";
 import type { SnippetEventPayload } from "@/types/events";
 
+const FBP_REGEX = /^fb\.1\.\d{13}\.\d{7,15}$/;
+const FBC_REGEX = /^fb\.1\.(\d{13})\..+$/;
+const FBC_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+function validateFbp(fbp: string | null | undefined): string | undefined {
+  if (!fbp) return undefined;
+  return FBP_REGEX.test(fbp) ? fbp : undefined;
+}
+
+function validateFbc(fbc: string | null | undefined): string | undefined {
+  if (!fbc) return undefined;
+  const match = fbc.match(FBC_REGEX);
+  if (!match) return undefined;
+  if (Date.now() - parseInt(match[1], 10) > FBC_MAX_AGE_MS) return undefined;
+  return fbc;
+}
+
 export function normalizeToMetaCapiEvent(
   payload: SnippetEventPayload,
   clientIp: string | null,
@@ -22,6 +39,9 @@ export function normalizeToMetaCapiEvent(
       })
     : {};
 
+  const validFbp = validateFbp(payload.fbp);
+  const validFbc = validateFbc(payload.fbc);
+
   return {
     event_name: payload.eventName,
     event_time: Math.floor(payload.timestamp / 1000), // Convert ms to seconds
@@ -32,8 +52,8 @@ export function normalizeToMetaCapiEvent(
       ...hashedUserData,
       ...(clientIp && { client_ip_address: clientIp }),
       ...(clientUserAgent && { client_user_agent: clientUserAgent }),
-      ...(payload.fbp && { fbp: payload.fbp }),
-      ...(payload.fbc && { fbc: payload.fbc }),
+      ...(validFbp && { fbp: validFbp }),
+      ...(validFbc && { fbc: validFbc }),
     },
     ...(payload.customData && Object.keys(payload.customData).length > 0 && {
       custom_data: normalizeCustomData(payload.customData),
