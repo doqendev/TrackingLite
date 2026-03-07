@@ -91,7 +91,7 @@ export default async function Image() {
               maxWidth: "700px",
             }}
           >
-            Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit & Pinterest. Bypass ad blockers.
+            Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest & Google Ads. Bypass ad blockers.
           </div>
 
           {/* Platform badges */}
@@ -102,7 +102,7 @@ export default async function Image() {
               marginTop: "40px",
             }}
           >
-            {["Meta", "TikTok", "GA4", "Klaviyo", "Reddit", "Pinterest"].map(
+            {["Meta", "TikTok", "GA4", "Klaviyo", "Reddit", "Pinterest", "Google Ads"].map(
               (platform) => (
                 <div
                   key={platform}

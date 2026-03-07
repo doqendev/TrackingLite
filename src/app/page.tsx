@@ -6,6 +6,11 @@ import { FeatureBlock } from "@/components/landing/feature-block";
 import { PipelineVisual } from "@/components/landing/pipeline-visual";
 import { LiveClock } from "@/components/landing/live-clock";
 import { PricingSection } from "@/components/landing/pricing-section";
+import { AnimatedEventFeed } from "@/components/landing/animated-event-feed";
+import { AnimatedDeliveryTable } from "@/components/landing/animated-delivery-table";
+import { AnimatedDashboardPreview } from "@/components/landing/animated-dashboard-preview";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
+import { CountUpStat } from "@/components/landing/count-up-stat";
 import "./landing.css";
 
 export const metadata: Metadata = {
@@ -123,7 +128,7 @@ export default function HomePage() {
                 "name": "Track Clear",
                 "applicationCategory": "BusinessApplication",
                 "operatingSystem": "Web",
-                "description": "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest.",
+                "description": "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, and Google Ads.",
                 "offers": [
                   {
                     "@type": "Offer",
@@ -215,36 +220,35 @@ export default function HomePage() {
 
         {/* 3. Social Proof */}
         <div className="pn-social-proof">
-          TRUSTED BY 200+ SHOPIFY STORES WORLDWIDE
+          SERVER-SIDE TRACKING FOR SHOPIFY STORES
         </div>
 
         {/* 4. Stats Strip */}
         <div className="pn-feature-strip">
           {stats.map((stat) => (
-            <div key={stat.label} className="pn-stat-box">
-              <div className="pn-stat-val">{stat.value}</div>
-              <div className="pn-stat-label">{stat.label}</div>
-            </div>
+            <CountUpStat key={stat.label} value={stat.value} label={stat.label} />
           ))}
         </div>
 
         {/* 5. Problem Section */}
-        <div className="pn-section-header">
-          <div>
-            <span className="pn-ref-label">
-              * TRACKING_ISSUES {"// "}YOUR_STORE
-            </span>
-            <h2 className="pn-section-title">Why Your Ads Underperform</h2>
+        <ScrollReveal>
+          <div className="pn-section-header">
+            <div>
+              <span className="pn-ref-label">
+                * TRACKING_ISSUES {"// "}YOUR_STORE
+              </span>
+              <h2 className="pn-section-title">Why Your Ads Underperform</h2>
+            </div>
+            <div
+              className="pn-dim"
+              style={{ fontSize: 12, textAlign: "right" }}
+            >
+              STATUS: FIXABLE
+              <br />
+              ISSUES: 03
+            </div>
           </div>
-          <div
-            className="pn-dim"
-            style={{ fontSize: 12, textAlign: "right" }}
-          >
-            STATUS: FIXABLE
-            <br />
-            ISSUES: 03
-          </div>
-        </div>
+        </ScrollReveal>
 
         <div className="pn-integrations">
           {problems.map((item) => (
@@ -253,14 +257,16 @@ export default function HomePage() {
         </div>
 
         {/* 6. Features */}
-        <div className="pn-section-header" id="features">
-          <div>
-            <span className="pn-ref-label">
-              * HOW_IT_WORKS {"// "}TRACK_CLEAR
-            </span>
-            <h2 className="pn-section-title">How It Works</h2>
+        <ScrollReveal>
+          <div className="pn-section-header" id="features">
+            <div>
+              <span className="pn-ref-label">
+                * HOW_IT_WORKS {"// "}TRACK_CLEAR
+              </span>
+              <h2 className="pn-section-title">How It Works</h2>
+            </div>
           </div>
-        </div>
+        </ScrollReveal>
 
         <FeatureBlock
           refCode="STEP_01 // CAPTURE"
@@ -272,18 +278,7 @@ export default function HomePage() {
             "Works even when ad blockers are active",
             "No double-counting -- smart deduplication built in",
           ]}
-          visual={
-            <div className="pn-terminal">
-              <div className="pn-terminal-header">{"// event_capture.log"}</div>
-              POST /api/events/ingest<br />
-              X-TL-API-Key: tl_****<br />
-              eventName: &quot;Purchase&quot;<br />
-              eventId: &quot;a1b2c3d4-...&quot;<br />
-              value: 127.50<br />
-              <br />
-              <span className="pn-accent">&gt; STATUS: FORWARDED_7x</span>
-            </div>
-          }
+          visual={<AnimatedEventFeed />}
         />
 
         <FeatureBlock
@@ -297,21 +292,7 @@ export default function HomePage() {
             "Automatic retries if a platform is temporarily down",
           ]}
           reverse
-          visual={
-            <div className="pn-terminal">
-              <div className="pn-terminal-header">{"// fan_out.log"}</div>
-              INGEST &gt; eventId: a1b2c3d4<br />
-              &gt; META ........... SENT<br />
-              &gt; TIKTOK ......... SENT<br />
-              &gt; GA4 ............ SENT<br />
-              &gt; KLAVIYO ........ SENT<br />
-              &gt; REDDIT ......... SENT<br />
-              &gt; PINTEREST ...... SENT<br />
-              &gt; GOOGLE_ADS ..... SENT<br />
-              <br />
-              <span className="pn-accent">&gt; 7/7 DELIVERED</span>
-            </div>
-          }
+          visual={<AnimatedDeliveryTable />}
         />
 
         <FeatureBlock
@@ -324,37 +305,28 @@ export default function HomePage() {
             "Revenue tracking in your preferred currency",
             "See which campaigns actually drive sales",
           ]}
-          visual={
-            <div className="pn-terminal">
-              <div className="pn-terminal-header">{"// dashboard_stats.log"}</div>
-              EVENTS_24H: 12,847<br />
-              DELIVERY_RATE: 99.7%<br />
-              REVENUE_30D: $48,291.00<br />
-              TOP_CAMPAIGN: &quot;summer_sale&quot;<br />
-              DESTINATIONS: 7/7 ONLINE<br />
-              <br />
-              <span className="pn-accent">&gt; ALL SYSTEMS NOMINAL</span>
-            </div>
-          }
+          visual={<AnimatedDashboardPreview />}
         />
 
         {/* 7. Connection Matrix */}
-        <div className="pn-section-header">
-          <div>
-            <span className="pn-ref-label">
-              * SYSTEM_INTEGRATIONS {"// "}API_V3
-            </span>
-            <h2 className="pn-section-title">Supported Platforms</h2>
+        <ScrollReveal>
+          <div className="pn-section-header">
+            <div>
+              <span className="pn-ref-label">
+                * SYSTEM_INTEGRATIONS {"// "}API_V3
+              </span>
+              <h2 className="pn-section-title">Supported Platforms</h2>
+            </div>
+            <div
+              className="pn-dim"
+              style={{ fontSize: 12, textAlign: "right" }}
+            >
+              STATUS: READY
+              <br />
+              PLATFORMS: 07
+            </div>
           </div>
-          <div
-            className="pn-dim"
-            style={{ fontSize: 12, textAlign: "right" }}
-          >
-            STATUS: READY
-            <br />
-            PLATFORMS: 07
-          </div>
-        </div>
+        </ScrollReveal>
 
         <div className="pn-integrations">
           {integrations.map((item) => (
@@ -366,26 +338,28 @@ export default function HomePage() {
         <PricingSection />
 
         {/* 9. Final CTA */}
-        <section className="pn-cta-section">
-          <div className="pn-crosshair pn-ch-tl" />
-          <div className="pn-crosshair pn-ch-br" />
+        <ScrollReveal>
+          <section className="pn-cta-section">
+            <div className="pn-crosshair pn-ch-tl" />
+            <div className="pn-crosshair pn-ch-br" />
 
-          <span className="pn-sys-code">
-            * READY {"// "}START_NOW
-          </span>
+            <span className="pn-sys-code">
+              * READY {"// "}START_NOW
+            </span>
 
-          <h2 className="pn-section-title" style={{ fontSize: "2.5rem", marginBottom: 16 }}>
-            Fix Your <span className="pn-accent">Ad Tracking</span>
-          </h2>
+            <h2 className="pn-section-title" style={{ fontSize: "2.5rem", marginBottom: 16 }}>
+              Fix Your <span className="pn-accent">Ad Tracking</span>
+            </h2>
 
-          <p className="pn-dim" style={{ marginBottom: 32 }}>
-            Free forever up to 50 orders/month. No credit card required. Set up in 10 minutes.
-          </p>
+            <p className="pn-dim" style={{ marginBottom: 32 }}>
+              Free forever up to 50 orders/month. No credit card required. Set up in 10 minutes.
+            </p>
 
-          <Link href="/signup" className="pn-btn">
-            Get Started Free
-          </Link>
-        </section>
+            <Link href="/signup" className="pn-btn">
+              Get Started Free
+            </Link>
+          </section>
+        </ScrollReveal>
 
         {/* 10. Footer */}
         <footer className="pn-footer">

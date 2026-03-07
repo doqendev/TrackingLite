@@ -639,6 +639,348 @@
   50% { opacity: 0.4; }
 }
 
+@keyframes pn-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pn-flow-down {
+  0% {
+    top: -4px;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% - 4px);
+    opacity: 0;
+  }
+}
+
+/* --- Scroll Reveal --- */
+.pn-reveal {
+  opacity: 0;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.pn-reveal--up {
+  transform: translateY(30px);
+}
+
+.pn-reveal--left {
+  transform: translateX(-30px);
+}
+
+.pn-reveal--right {
+  transform: translateX(30px);
+}
+
+.pn-reveal--visible {
+  opacity: 1;
+  transform: translateY(0) translateX(0);
+}
+
+/* --- Pipeline Flow Dots --- */
+.pn-pipeline-line--vertical {
+  width: 1px;
+  height: 32px;
+  background: var(--pn-accent);
+  opacity: 0.5;
+  position: relative;
+  overflow: hidden;
+}
+
+.pn-pipeline-flow-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: var(--pn-accent);
+  border-radius: 50%;
+  left: -1.5px;
+  box-shadow: 0 0 6px var(--pn-accent);
+}
+
+/* --- Mock Terminal (for animated visuals) --- */
+.pn-mock-terminal {
+  width: 100%;
+  max-width: 380px;
+  background: #0a0a0a;
+  border: 1px solid var(--pn-border);
+  font-family: var(--font-mono), 'Space Mono', monospace;
+  font-size: 0.7rem;
+  overflow: hidden;
+}
+
+.pn-mock-terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #111;
+  border-bottom: 1px solid var(--pn-border);
+}
+
+.pn-mock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pn-mock-dot--red { background: #ef4444; }
+.pn-mock-dot--yellow { background: #eab308; }
+.pn-mock-dot--green { background: #22c55e; }
+
+.pn-mock-terminal-title {
+  margin-left: 8px;
+  color: var(--pn-text-dim);
+  font-size: 0.6rem;
+}
+
+.pn-mock-terminal-body {
+  padding: 12px 16px;
+  min-height: 180px;
+}
+
+/* --- Animated Event Feed --- */
+.pn-event-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(51, 51, 51, 0.5);
+}
+
+.pn-event-row:last-child {
+  border-bottom: none;
+}
+
+.pn-event-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pn-event-method {
+  color: var(--pn-accent);
+  font-weight: 700;
+}
+
+.pn-event-name {
+  color: var(--pn-text-main);
+}
+
+.pn-event-id {
+  color: var(--pn-text-dim);
+  margin-left: auto;
+  font-size: 0.6rem;
+}
+
+.pn-event-row-bottom {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 0.6rem;
+}
+
+.pn-event-value {
+  color: var(--pn-text-dim);
+}
+
+.pn-event-status {
+  color: var(--pn-accent);
+}
+
+/* --- Animated Delivery Table --- */
+.pn-delivery-header {
+  color: var(--pn-text-dim);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--pn-border);
+}
+
+.pn-delivery-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  line-height: 1.6;
+}
+
+.pn-delivery-platform {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pn-text-main);
+  min-width: 100px;
+}
+
+.pn-delivery-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.pn-delivery-dots {
+  color: var(--pn-text-dim);
+  letter-spacing: 1px;
+  flex: 1;
+}
+
+.pn-delivery-status {
+  font-weight: 700;
+  transition: color 0.3s;
+  min-width: 40px;
+  text-align: right;
+}
+
+.pn-delivery-summary {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--pn-border);
+  color: var(--pn-accent);
+  font-weight: 700;
+  transition: opacity 0.3s;
+}
+
+/* --- Dashboard Preview --- */
+.pn-dashboard-preview {
+  width: 100%;
+  max-width: 380px;
+  background: #0a0a0a;
+  border: 1px solid var(--pn-border);
+  padding: 16px;
+  font-family: var(--font-mono), 'Space Mono', monospace;
+  font-size: 0.65rem;
+}
+
+.pn-preview-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pn-preview-card {
+  background: #111;
+  border: 1px solid var(--pn-border);
+  padding: 10px;
+}
+
+.pn-preview-card--accent {
+  border-color: var(--pn-accent);
+  background: rgba(6, 182, 212, 0.05);
+}
+
+.pn-preview-card-label {
+  color: var(--pn-text-dim);
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.pn-preview-card-value {
+  color: var(--pn-text-main);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: var(--font-display), 'Chakra Petch', sans-serif;
+}
+
+.pn-preview-card-delta {
+  font-size: 0.5rem;
+  margin-top: 2px;
+}
+
+.pn-preview-card-delta--up {
+  color: #22c55e;
+}
+
+.pn-preview-section {
+  border-top: 1px solid var(--pn-border);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+.pn-preview-section-title {
+  color: var(--pn-text-dim);
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+/* Funnel bars */
+.pn-preview-funnel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pn-preview-funnel-label {
+  color: var(--pn-text-dim);
+  min-width: 70px;
+  font-size: 0.55rem;
+}
+
+.pn-preview-funnel-bar-track {
+  flex: 1;
+  height: 6px;
+  background: #1a1a1a;
+}
+
+.pn-preview-funnel-bar {
+  height: 100%;
+  background: var(--pn-accent);
+}
+
+.pn-preview-funnel-count {
+  color: var(--pn-text-main);
+  min-width: 30px;
+  text-align: right;
+  font-size: 0.55rem;
+}
+
+/* Campaign rows */
+.pn-preview-campaign-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(51, 51, 51, 0.3);
+}
+
+.pn-preview-campaign-row:last-child {
+  border-bottom: none;
+}
+
+.pn-preview-campaign-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pn-preview-campaign-name {
+  color: var(--pn-text-dim);
+  flex: 1;
+  font-size: 0.55rem;
+}
+
+.pn-preview-campaign-revenue {
+  color: var(--pn-accent);
+  font-weight: 700;
+}
+
 
 /* --- Landing page responsive (original) --- */
 @media (max-width: 900px) {
@@ -714,5 +1056,19 @@
   .pn-footer {
     flex-direction: column;
     gap: 24px;
+  }
+
+  .pn-mock-terminal,
+  .pn-dashboard-preview {
+    max-width: 100%;
+  }
+
+  .pn-preview-cards {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .pn-preview-card-value {
+    font-size: 0.75rem;
   }
 }
