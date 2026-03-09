@@ -6,6 +6,7 @@ import { SidebarNav, SidebarFooter, MobileNav } from "@/components/dashboard/sid
 import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher";
 import { getActiveWorkspace, getAllWorkspaces } from "@/lib/active-workspace";
 import { BILLING_PLANS } from "@/lib/constants";
+import { isAdminUser } from "@/lib/admin";
 
 export const metadata = {
   robots: { index: false, follow: false },
@@ -48,6 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const plan = (subscription?.plan ?? "FREE") as keyof typeof BILLING_PLANS;
   const maxWorkspaces = BILLING_PLANS[plan]?.maxWorkspaces ?? 1;
   const canAddStore = (workspaces ?? []).length < maxWorkspaces;
+  const isAdmin = isAdminUser(userEmail);
 
   return (
     <div className="flex h-screen bg-background">
@@ -68,12 +70,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             />
           </div>
         )}
-        <SidebarNav userEmail={userEmail} workspaceName={workspaceName} />
+        <SidebarNav userEmail={userEmail} workspaceName={workspaceName} isAdmin={isAdmin} />
         <SidebarFooter userEmail={userEmail} workspaceName={workspaceName} />
       </aside>
 
       {/* Mobile header */}
-      <MobileNav userEmail={userEmail} workspaceName={workspaceName} />
+      <MobileNav userEmail={userEmail} workspaceName={workspaceName} isAdmin={isAdmin} />
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto md:pt-0 pt-14 bg-grid-cyan">

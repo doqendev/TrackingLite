@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LayoutDashboard, ClipboardList, Plug, Settings, CreditCard, Menu, LogOut, Activity } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plug, Settings, CreditCard, Menu, LogOut, Activity, Shield } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,15 +21,20 @@ const navItems = [
 interface SidebarNavProps {
   userEmail: string;
   workspaceName: string | null;
+  isAdmin?: boolean;
 }
 
-export function SidebarNav({ userEmail, workspaceName }: SidebarNavProps) {
+export function SidebarNav({ userEmail, workspaceName, isAdmin }: SidebarNavProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
 
+  const items = isAdmin
+    ? [...navItems, { href: "/admin", labelKey: "admin" as const, icon: Shield, code: "07" }]
+    : navItems;
+
   return (
     <nav className="flex-1 py-4 space-y-0">
-      {navItems.map(({ href, labelKey, icon: Icon, code }) => {
+      {items.map(({ href, labelKey, icon: Icon, code }) => {
         const isActive = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
@@ -74,10 +79,14 @@ export function SidebarFooter({ userEmail, workspaceName }: SidebarNavProps) {
   );
 }
 
-export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
+export function MobileNav({ userEmail, workspaceName, isAdmin }: SidebarNavProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
+
+  const items = isAdmin
+    ? [...navItems, { href: "/admin", labelKey: "admin" as const, icon: Shield, code: "07" }]
+    : navItems;
 
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 z-10 h-14 bg-background/95 backdrop-blur-sm border-b border-[hsl(240,26%,15%)] flex items-center justify-between px-4">
@@ -97,7 +106,7 @@ export function MobileNav({ userEmail, workspaceName }: SidebarNavProps) {
             </span>
           </div>
           <nav className="flex-1 py-4 space-y-0">
-            {navItems.map(({ href, labelKey, icon: Icon, code }) => {
+            {items.map(({ href, labelKey, icon: Icon, code }) => {
               const isActive = pathname === href || pathname.startsWith(href + "/");
               return (
                 <Link

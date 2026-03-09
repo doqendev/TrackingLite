@@ -28,6 +28,7 @@
     "settings": "Settings",
     "billing": "Billing",
     "diagnostics": "Diagnostics",
+    "admin": "Admin",
     "logOut": "Log out",
     "switchStore": "Switch Store",
     "addStore": "Add Store",

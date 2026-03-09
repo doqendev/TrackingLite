@@ -28,6 +28,7 @@
     "settings": "Configuración",
     "billing": "Facturación",
     "diagnostics": "Diagnostics",
+    "admin": "Admin",
     "logOut": "Cerrar sesión",
     "switchStore": "Cambiar Tienda",
     "addStore": "Agregar Tienda",
