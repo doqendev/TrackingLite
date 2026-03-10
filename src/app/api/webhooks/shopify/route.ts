@@ -213,14 +213,22 @@ async function handleOrderPaid(
     (orderData.email as string) ||
     (orderData.contact_email as string) ||
     undefined;
-  const phone = (orderData.phone as string) || undefined;
-
   const billingAddress = orderData.billing_address as
+    | Record<string, unknown>
+    | undefined;
+  const shippingAddress = orderData.shipping_address as
     | Record<string, unknown>
     | undefined;
   const customer = orderData.customer as
     | Record<string, unknown>
     | undefined;
+
+  const phone =
+    (orderData.phone as string) ||
+    (billingAddress?.phone as string) ||
+    (shippingAddress?.phone as string) ||
+    (customer?.phone as string) ||
+    undefined;
 
   const customerId = orderData.customer
     ? String((orderData.customer as Record<string, unknown>).id ?? "")

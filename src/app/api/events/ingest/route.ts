@@ -54,6 +54,7 @@ const IngestPayloadSchema = z.object({
     state: z.string().max(100).nullable().optional(),
     zip: z.string().max(20).nullable().optional(),
     countryCode: z.string().max(10).nullable().optional(),
+    customerId: z.string().max(100).nullable().optional(),
   }).optional().default({}),
   customData: z.record(z.unknown()).optional().default({}),
   onlyDestinations: z.array(z.string()).optional(),
