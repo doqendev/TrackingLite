@@ -58,6 +58,7 @@ const IngestPayloadSchema = z.object({
   }).optional().default({}),
   customData: z.record(z.unknown()).optional().default({}),
   onlyDestinations: z.array(z.string()).optional(),
+  excludeDestinations: z.array(z.string()).optional(),
 });
 
 // CORS headers for cross-origin snippet requests
@@ -305,9 +306,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Filter to specific destinations if requested (used by checkout_contact_info_submitted for Klaviyo-only)
-    const targetDestinations = payload.onlyDestinations
+    let targetDestinations = payload.onlyDestinations
       ? filteredDestinations.filter((d) => payload.onlyDestinations!.includes(d.destination))
       : filteredDestinations;
+
+    // Exclude specific destinations if requested (used by checkout_started to defer META enrichment)
+    if (payload.excludeDestinations) {
+      targetDestinations = targetDestinations.filter(
+        (d) => !payload.excludeDestinations!.includes(d.destination)
+      );
+    }
 
     // 11b. Filter destinations by per-destination consent
     const consentFilteredDestinations = targetDestinations.filter((dest) =>
