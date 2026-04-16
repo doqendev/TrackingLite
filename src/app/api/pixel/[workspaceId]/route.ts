@@ -26,6 +26,7 @@ var fbpVal=null;try{if(B){var _rfp=await B.cookie.get("_fbp");fbpVal=vp(_rfp)}}c
 var fbcVal=null;try{if(B){var _rfc=await B.cookie.get("_fbc");fbcVal=vf(_rfc)}}catch(e){}
 var _sc=null;try{if(B&&B.sessionStorage){var _sr=await B.sessionStorage.getItem("_tc");if(_sr)_sc=JSON.parse(_sr)}}catch(e){}
 if(_sc){utm.s=utm.s||_sc.us||null;utm.m=utm.m||_sc.um||null;utm.c=utm.c||_sc.uc||null;utm.n=utm.n||_sc.un||null;utm.t=utm.t||_sc.ut||null;cid.tt=cid.tt||_sc.tt||null;cid.rd=cid.rd||_sc.rd||null;cid.ep=cid.ep||_sc.ep||null;cid.gl=cid.gl||_sc.gl||null;fbpVal=fbpVal||vp(_sc.fp)||null;fbcVal=fbcVal||vf(_sc.fc)||null}
+if(!fbpVal||!fbcVal||!cid.gl||!cid.tt){try{var _ca=(I.data&&I.data.cart&&I.data.cart.attributes)||[];for(var _ci=0;_ci<_ca.length;_ci++){if(_ca[_ci].key==="_fbp"&&!fbpVal)fbpVal=vp(_ca[_ci].value);if(_ca[_ci].key==="_fbc"&&!fbcVal)fbcVal=vf(_ca[_ci].value);if(_ca[_ci].key==="_gclid"&&!cid.gl)cid.gl=_ca[_ci].value;if(_ca[_ci].key==="_ttclid"&&!cid.tt)cid.tt=_ca[_ci].value}}catch(e){}}
 if(!fbpVal){fbpVal="fb.1."+Date.now()+"."+Math.floor(1000000000+Math.random()*9000000000);try{if(B)await B.cookie.set("_fbp",fbpVal)}catch(e){}}
 if(cid.fb){var _ef=xf(fbcVal);if(!fbcVal||_ef!==cid.fb){fbcVal="fb.1."+Date.now()+"."+cid.fb;try{if(B)await B.cookie.set("_fbc",fbcVal)}catch(e){}}}
 try{if(B&&B.sessionStorage){await B.sessionStorage.setItem("_tc",JSON.stringify({us:utm.s,um:utm.m,uc:utm.c,un:utm.n,ut:utm.t,tt:cid.tt,rd:cid.rd,ep:cid.ep,gl:cid.gl,fp:fbpVal,fc:fbcVal}))}}catch(e){}
