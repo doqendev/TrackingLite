@@ -14,6 +14,8 @@ import { SetupGuide } from "@/components/integrations/setup-guide";
 
 export interface IntegrationWorkspace {
   id: string;
+  productMode: string | null;
+  installType: string | null;
   // Meta
   metaPixelId: string | null;
   metaTestEventCode: string | null;
@@ -391,6 +393,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const redditConnected = workspace.hasRedditAccessToken;
   const pinterestConnected = workspace.hasPinterestConversionToken;
   const googleAdsConnected = !!workspace.googleAdsConversionId;
+  const showLegacyDestinations = workspace.productMode !== "SHOPIFY_META_TIKTOK_V1";
 
   return (
     <div className="space-y-8">
@@ -679,6 +682,8 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         </div>
       </div>
 
+      {showLegacyDestinations && (
+      <>
       {/* Reddit */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-orange-500 overflow-hidden">
         <div
@@ -967,10 +972,14 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           </div>
         </div>
       </div>
+      </>
+      )}
 
         </div>
       </div>
 
+      {showLegacyDestinations && (
+      <>
       {/* Analytics & Automation */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("analyticsAutomation")}</h2>
@@ -1139,6 +1148,8 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
 
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

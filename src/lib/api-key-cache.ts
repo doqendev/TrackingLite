@@ -28,6 +28,8 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
       id: true,
       userId: true,
       isActive: true,
+      productMode: true,
+      installType: true,
       // Meta
       metaPixelId: true,
       metaTestEventCode: true,

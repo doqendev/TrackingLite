@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ReplayButton } from "@/components/dashboard/replay-button";
 import { getTranslations } from "next-intl/server";
+import { getAllowedDestinationsForWorkspace } from "@/lib/workspace-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -79,13 +80,15 @@ export default async function EventsPage({
   try {
     workspace = await db.workspace.findUnique({
       where: { id: activeWs.id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, productMode: true, installType: true },
     });
 
     if (!workspace) redirect("/onboarding");
+    const allowedDestinations = getAllowedDestinationsForWorkspace(workspace);
 
     const where = {
       workspaceId: workspace.id,
+      destination: { in: [...allowedDestinations] },
       ...(filterEventName && EVENT_NAMES.includes(filterEventName as (typeof EVENT_NAMES)[number])
         ? { eventName: filterEventName }
         : {}),

@@ -12,6 +12,7 @@ import {
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkReplayCooldown } from "@/lib/replay-rate-limit";
 import { createLogger } from "@/lib/logger";
+import { getAllowedDestinationsForWorkspace } from "@/lib/workspace-mode";
 import type { Queue } from "bullmq";
 
 const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = {
@@ -66,6 +67,8 @@ export async function POST(
     where: { id, userId: session.user.id },
     select: {
       id: true,
+      productMode: true,
+      installType: true,
       enableMeta: true,
       metaAccessTokenEncrypted: true,
       tiktokAccessTokenEncrypted: true,
@@ -99,6 +102,7 @@ export async function POST(
   const where: Record<string, unknown> = {
     workspaceId: workspace.id,
     status: "FAILED",
+    destination: { in: [...getAllowedDestinationsForWorkspace(workspace)] },
   };
 
   if (eventIds && Array.isArray(eventIds) && eventIds.length > 0) {

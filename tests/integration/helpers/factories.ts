@@ -30,6 +30,8 @@ interface CreateWorkspaceOptions {
   metaPixelId?: string | null;
   metaAccessToken?: string | null;
   metaTestEventCode?: string | null;
+  productMode?: "SHOPIFY_META_TIKTOK_V1" | "LEGACY_ALL_DESTINATIONS" | null;
+  installType?: "SHOPIFY_CUSTOM_PIXEL" | "HEADLESS_CUSTOM" | null;
   consentMode?: "STRICT" | "LAX";
   isActive?: boolean;
   enablePageView?: boolean;
@@ -84,6 +86,8 @@ export async function createWorkspace(
       userId,
       name,
       apiKey,
+      productMode: options.productMode,
+      installType: options.installType,
       metaPixelId,
       metaTestEventCode,
       consentMode,

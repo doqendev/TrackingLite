@@ -22,6 +22,7 @@ import { storeSessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
 import { getClientIpFromHeaders, getClientUserAgentFromHeaders, resolveFbc } from "@/lib/tracking-context";
 import { buildEventLogPayload } from "@/lib/event-log-payload";
+import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -320,6 +321,8 @@ export async function POST(request: NextRequest) {
         (d) => !payload.excludeDestinations!.includes(d.destination)
       );
     }
+
+    targetDestinations = filterDestinationsForWorkspace(workspace, targetDestinations);
 
     // 11b. Filter destinations by per-destination consent
     const consentFilteredDestinations = targetDestinations.filter((dest) =>

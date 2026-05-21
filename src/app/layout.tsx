@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     template: "%s | Track Clear",
   },
   description:
-    "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest. Bypass ad blockers. Setup in 10 minutes.",
+    "Server-side purchase tracking for Shopify. Forward conversions to Meta and TikTok with webhook-backed reliability.",
   keywords: [
     "shopify server side tracking",
     "meta conversions api",
@@ -33,7 +33,6 @@ export const metadata: Metadata = {
     "server side tracking shopify",
     "facebook pixel alternative",
     "tiktok tracking shopify",
-    "ga4 server side",
     "shopify conversion tracking",
     "ios 14 tracking fix",
     "ad blocker bypass tracking",
@@ -49,7 +48,7 @@ export const metadata: Metadata = {
     siteName: "Track Clear",
     title: "Track Clear - Server-Side Tracking for Shopify",
     description:
-      "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, and Pinterest. Bypass ad blockers.",
+      "Server-side purchase tracking for Shopify. Forward conversions to Meta and TikTok with webhook-backed reliability.",
     images: [
       {
         url: "/og-image.png",
@@ -63,7 +62,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Track Clear - Server-Side Tracking for Shopify",
     description:
-      "Server-side event tracking for Shopify. Forward conversions to 6 ad platforms. Bypass ad blockers.",
+      "Server-side purchase tracking for Shopify. Forward conversions to Meta and TikTok.",
     images: ["/og-image.png"],
   },
   robots: {

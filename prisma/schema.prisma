@@ -90,6 +90,8 @@ model Workspace {
   name                      String          // e.g., "My Shopify Store"
   domain                    String?         // e.g., "mystore.myshopify.com" (optional, for display)
   platform                  Platform        @default(SHOPIFY)
+  productMode               WorkspaceProductMode?
+  installType               WorkspaceInstallType?
   apiKey                    String          @unique // Unique API key for this workspace (used in JS snippet)
   metaPixelId               String?         // Meta Pixel ID
   metaAccessTokenEncrypted  String?         // AES-256-GCM encrypted
@@ -280,6 +282,16 @@ enum Platform {
   WOOCOMMERCE
   BIGCOMMERCE
   CUSTOM
+}
+
+enum WorkspaceProductMode {
+  SHOPIFY_META_TIKTOK_V1
+  LEGACY_ALL_DESTINATIONS
+}
+
+enum WorkspaceInstallType {
+  SHOPIFY_CUSTOM_PIXEL
+  HEADLESS_CUSTOM
 }
 
 enum EventName {

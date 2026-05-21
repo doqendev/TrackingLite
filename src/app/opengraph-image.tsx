@@ -91,7 +91,7 @@ export default async function Image() {
               maxWidth: "700px",
             }}
           >
-            Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest & Google Ads. Bypass ad blockers.
+            Webhook-backed Shopify purchase tracking for Meta and TikTok.
           </div>
 
           {/* Platform badges */}
@@ -102,7 +102,7 @@ export default async function Image() {
               marginTop: "40px",
             }}
           >
-            {["Meta", "TikTok", "GA4", "Klaviyo", "Reddit", "Pinterest", "Google Ads"].map(
+            {["Meta", "TikTok", "Shopify Webhook"].map(
               (platform) => (
                 <div
                   key={platform}

@@ -9,6 +9,7 @@ import { getTranslations } from "next-intl/server";
 
 interface RecentEventsProps {
   workspaceId: string;
+  allowedDestinations?: readonly Destination[];
 }
 
 function formatRelativeTime(date: Date): string {
@@ -35,7 +36,7 @@ const destinationLabels: Record<Destination, { label: string; className: string 
   GOOGLE_ADS: { label: "Google Ads", className: "text-yellow-400" },
 };
 
-export async function RecentEvents({ workspaceId }: RecentEventsProps) {
+export async function RecentEvents({ workspaceId, allowedDestinations }: RecentEventsProps) {
   const t = await getTranslations("dashboard");
   const tc = await getTranslations("common");
 
@@ -62,7 +63,10 @@ export async function RecentEvents({ workspaceId }: RecentEventsProps) {
   let events: EventRow[];
   try {
     events = await db.eventLog.findMany({
-      where: { workspaceId },
+      where: {
+        workspaceId,
+        ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: 10,
       select: {

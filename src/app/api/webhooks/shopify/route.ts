@@ -24,6 +24,7 @@ import {
   buildOrderAttribution,
   extractLandingSiteAttribution,
 } from "@/lib/shopify-webhook-attribution";
+import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
@@ -173,6 +174,8 @@ async function handleOrderPaid(
     select: {
       id: true,
       userId: true,
+      productMode: true,
+      installType: true,
       shopifyWebhookSecretEncrypted: true,
       shopifyWebhookSecretIv: true,
       shopifyWebhookSecretTag: true,
@@ -409,7 +412,9 @@ async function handleOrderPaid(
       });
     }
 
-    if (destinations.length === 0) {
+    const modeFilteredDestinations = filterDestinationsForWorkspace(workspace, destinations);
+
+    if (modeFilteredDestinations.length === 0) {
       wsLog.info("No destinations configured");
       continue;
     }
@@ -506,7 +511,7 @@ async function handleOrderPaid(
     };
 
     const eventLogEntries = await Promise.all(
-      destinations.map(async (dest) => {
+      modeFilteredDestinations.map(async (dest) => {
         try {
           return await db.eventLog.create({
             data: {
@@ -524,7 +529,7 @@ async function handleOrderPaid(
     const validEntries = eventLogEntries.filter(
       (e): e is NonNullable<typeof e> => e !== null
     );
-    const validDests = destinations.filter(
+    const validDests = modeFilteredDestinations.filter(
       (_, idx) => eventLogEntries[idx] !== null
     );
 
@@ -663,6 +668,8 @@ async function handleRefundCreated(
     select: {
       id: true,
       userId: true,
+      productMode: true,
+      installType: true,
       shopifyWebhookSecretEncrypted: true,
       shopifyWebhookSecretIv: true,
       shopifyWebhookSecretTag: true,
@@ -751,7 +758,9 @@ async function handleRefundCreated(
       }
     }
 
-    if (destinations.length === 0) continue;
+    const modeFilteredDestinations = filterDestinationsForWorkspace(workspace, destinations);
+
+    if (modeFilteredDestinations.length === 0) continue;
 
     // Refunds are server-side financial events -- no consent filtering
     const refundEventId = `refund-${refundId}`;
@@ -776,7 +785,7 @@ async function handleRefundCreated(
 
     // Create EventLog entries
     const eventLogEntries = await Promise.all(
-      destinations.map(async (dest) => {
+      modeFilteredDestinations.map(async (dest) => {
         try {
           return await db.eventLog.create({
             data: {
@@ -811,7 +820,7 @@ async function handleRefundCreated(
     );
 
     const validEntries = eventLogEntries.filter((e): e is NonNullable<typeof e> => e !== null);
-    const validDests = destinations.filter((_, idx) => eventLogEntries[idx] !== null);
+    const validDests = modeFilteredDestinations.filter((_, idx) => eventLogEntries[idx] !== null);
 
     if (validEntries.length === 0) continue;
 

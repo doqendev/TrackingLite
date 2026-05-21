@@ -5,6 +5,7 @@ import { getActiveWorkspace } from "@/lib/active-workspace";
 import Link from "next/link";
 import { computeDashboardAnalytics } from "@/lib/analytics";
 import { getCachedAnalytics } from "@/lib/analytics-cache";
+import { getAllowedDestinationsForWorkspace } from "@/lib/workspace-mode";
 
 import { getOrderCount } from "@/lib/billing";
 import { BILLING_PLANS } from "@/lib/constants";
@@ -37,7 +38,7 @@ export default async function DashboardPage() {
   const activeWs = await getActiveWorkspace(session.user.id);
   if (!activeWs) redirect("/onboarding");
 
-  let workspace, hasMetaCredentials, hasAnyDestination, analytics;
+  let workspace, hasMetaCredentials, hasAnyDestination, analytics, isShopifyV1 = false;
   try {
     // Sync log survives SIGKILL — helps correlate dashboard loads with crashes
     process.stderr.write(`[DASHBOARD] Render started uid=${session.user.id} ws=${activeWs.id} at ${new Date().toISOString()}\n`);
@@ -48,6 +49,8 @@ export default async function DashboardPage() {
         id: true,
         name: true,
         domain: true,
+        productMode: true,
+        installType: true,
         metaPixelId: true,
         metaAccessTokenEncrypted: true,
         enableMeta: true,
@@ -63,9 +66,15 @@ export default async function DashboardPage() {
       redirect("/onboarding");
     }
 
-    // Check which destinations have credentials configured
+    // Check which destinations are visible for this product mode.
+    const allowedDestinations = getAllowedDestinationsForWorkspace(workspace);
+    isShopifyV1 = allowedDestinations.length === 2 &&
+      allowedDestinations.includes("META") &&
+      allowedDestinations.includes("TIKTOK");
     hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
-    hasAnyDestination = hasMetaCredentials || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
+    hasAnyDestination = isShopifyV1
+      ? hasMetaCredentials || workspace.enableTikTok
+      : hasMetaCredentials || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
 
     // Get user's display currency
     const user = await db.user.findUnique({
@@ -80,7 +89,8 @@ export default async function DashboardPage() {
         return computeDashboardAnalytics(
           workspace!.id,
           session.user!.id!,
-          displayCurrency
+          displayCurrency,
+          allowedDestinations
         );
       },
       displayCurrency
@@ -160,7 +170,9 @@ export default async function DashboardPage() {
           <AlertDescription className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-amber-400">No destinations configured</p>
             <p className="text-sm text-amber-400/80 mt-0.5">
-              Connect at least one platform (Meta, TikTok, GA4, Klaviyo, Reddit, or Pinterest) to start forwarding events.
+              {isShopifyV1
+                ? "Connect Meta or TikTok to start forwarding events."
+                : "Connect at least one platform (Meta, TikTok, GA4, Klaviyo, Reddit, or Pinterest) to start forwarding events."}
             </p>
           </AlertDescription>
           <Button variant="outline" size="sm" className="border-amber-500/20 text-amber-400 hover:bg-amber-500/10 flex-shrink-0" asChild>
@@ -200,7 +212,10 @@ export default async function DashboardPage() {
       <CampaignPerformance campaigns={analytics.campaigns} currency={analytics.currency} />
 
       {/* Recent events */}
-      <RecentEvents workspaceId={workspace.id} />
+      <RecentEvents
+        workspaceId={workspace.id}
+        allowedDestinations={getAllowedDestinationsForWorkspace(workspace)}
+      />
     </div>
   );
 }

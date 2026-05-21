@@ -16,7 +16,7 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "Track Clear - Server-Side Tracking for Shopify",
   description:
-    "Fix your tracking in 10 minutes. Bypass ad blockers with server-side event forwarding to Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, and Google Ads.",
+    "Recover and monitor Shopify purchase tracking for Meta and TikTok with server-side events and webhook-backed purchases.",
 };
 
 
@@ -45,7 +45,7 @@ const problems = [
 ];
 
 const stats = [
-  { value: "7", label: "Ad Platforms" },
+  { value: "2", label: "Ad Platforms" },
   { value: "99.7%", label: "Delivery Rate" },
   { value: "$0", label: "To Start" },
   { value: "10min", label: "Setup" },
@@ -77,7 +77,7 @@ export default function HomePage() {
                 "name": "Track Clear",
                 "applicationCategory": "BusinessApplication",
                 "operatingSystem": "Web",
-                "description": "Server-side event tracking for Shopify. Forward conversions to Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, and Google Ads.",
+                "description": "Server-side purchase tracking for Shopify. Forward conversions to Meta and TikTok with webhook-backed reliability.",
                 "offers": [
                   {
                     "@type": "Offer",
@@ -150,9 +150,9 @@ export default function HomePage() {
 
             <div className="pn-hero-sub">
               <p>
-                Ad blockers hide your real sales from Meta, TikTok, and Google.
-                Track Clear sends every purchase directly from your store to all
-                7 ad platforms -- so your ads finally know what&apos;s working.
+                Ad blockers hide your real sales from Meta and TikTok.
+                Track Clear uses Shopify webhooks and server-side events so your
+                purchase tracking stays reliable.
               </p>
             </div>
 
@@ -233,10 +233,10 @@ export default function HomePage() {
         <FeatureBlock
           refCode="STEP_02 // CONNECT"
           title="One Setup,"
-          titleAccent="All Your Ad Platforms"
-          description="Connect once and your sales data flows to every ad platform you use. Meta, TikTok, Google -- all getting the same accurate data at the same time."
+          titleAccent="Meta + TikTok"
+          description="Connect Shopify once and your purchase data flows to the two ad platforms most stores rely on first: Meta and TikTok."
           bullets={[
-            "Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads",
+            "Meta Conversions API and TikTok Events API",
             "Your credentials are encrypted and stored securely",
             "Automatic retries if a platform is temporarily down",
           ]}
@@ -264,7 +264,7 @@ export default function HomePage() {
               <span className="pn-ref-label">
                 * SYSTEM_INTEGRATIONS {"// "}API_V3
               </span>
-              <h2 className="pn-section-title">Supported Platforms</h2>
+              <h2 className="pn-section-title">V1 Platforms</h2>
             </div>
             <div
               className="pn-dim"
@@ -272,7 +272,7 @@ export default function HomePage() {
             >
               STATUS: READY
               <br />
-              PLATFORMS: 07
+              PLATFORMS: 02
             </div>
           </div>
         </ScrollReveal>

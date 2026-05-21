@@ -7,6 +7,10 @@ import { z } from "zod";
 import { createLogger } from "@/lib/logger";
 import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
 import { BILLING_PLANS } from "@/lib/constants";
+import {
+  DEFAULT_NEW_WORKSPACE_INSTALL_TYPE,
+  DEFAULT_NEW_WORKSPACE_PRODUCT_MODE,
+} from "@/lib/workspace-mode";
 
 const log = createLogger({ component: "workspaces" });
 
@@ -33,6 +37,8 @@ export async function GET() {
         name: true,
         domain: true,
         platform: true,
+        productMode: true,
+        installType: true,
         metaPixelId: true,
         consentMode: true,
         enablePageView: true,
@@ -116,6 +122,8 @@ export async function POST(request: NextRequest) {
         name: data.name,
         domain: data.domain || null,
         shopifyDomain,
+        productMode: DEFAULT_NEW_WORKSPACE_PRODUCT_MODE,
+        installType: DEFAULT_NEW_WORKSPACE_INSTALL_TYPE,
         apiKey,
         metaPixelId: data.metaPixelId || null,
         metaTestEventCode: data.metaTestEventCode || null,

@@ -2,16 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { SiMeta, SiTiktok, SiGoogleanalytics, SiGoogleads } from "react-icons/si";
-import { FaReddit, FaPinterest } from "react-icons/fa";
-
-function KlaviyoIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 152 152" className={className || "h-5 w-5"} fill="currentColor">
-      <path d="M148.76,124.01H3.24V26.63H148.76l-30.55,48.69,30.55,48.69Z" />
-    </svg>
-  );
-}
+import { SiMeta, SiTiktok } from "react-icons/si";
 
 const platforms = [
   {
@@ -40,75 +31,6 @@ const platforms = [
     fields: [
       { label: "Pixel ID", value: "CP4R2ORC77U..." },
       { label: "Access Token", value: "act.2xR...wQ", masked: true },
-    ],
-  },
-  {
-    key: "ga4",
-    name: "GA4 Measurement Protocol",
-    desc: "Google Analytics server-side tracking",
-    Icon: SiGoogleanalytics,
-    border: "border-l-amber-500",
-    text: "text-amber-500",
-    connected: true,
-    enabled: true,
-    fields: [
-      { label: "Measurement ID", value: "G-AB12CD34EF" },
-      { label: "API Secret", value: "xYz...789", masked: true },
-    ],
-  },
-  {
-    key: "klaviyo",
-    name: "Klaviyo",
-    desc: "Email flows from purchase events",
-    Icon: KlaviyoIcon,
-    border: "border-l-green-500",
-    text: "text-green-500",
-    connected: true,
-    enabled: true,
-    fields: [
-      { label: "API Key", value: "pk_abc...xyz", masked: true },
-    ],
-  },
-  {
-    key: "reddit",
-    name: "Reddit Conversions API",
-    desc: "Track which Reddit ads drive purchases",
-    Icon: FaReddit,
-    border: "border-l-orange-500",
-    text: "text-orange-500",
-    connected: false,
-    enabled: false,
-    fields: [
-      { label: "Account ID", value: "" },
-      { label: "Access Token", value: "", masked: true },
-    ],
-  },
-  {
-    key: "pinterest",
-    name: "Pinterest Conversions API",
-    desc: "Send checkout data to Pinterest",
-    Icon: FaPinterest,
-    border: "border-l-red-500",
-    text: "text-red-500",
-    connected: false,
-    enabled: false,
-    fields: [
-      { label: "Ad Account ID", value: "" },
-      { label: "Conversion Token", value: "", masked: true },
-    ],
-  },
-  {
-    key: "googleAds",
-    name: "Google Ads",
-    desc: "Server-side conversion tracking",
-    Icon: SiGoogleads,
-    border: "border-l-yellow-500",
-    text: "text-yellow-500",
-    connected: true,
-    enabled: true,
-    fields: [
-      { label: "Conversion ID", value: "AW-123456789" },
-      { label: "Purchase Label", value: "abcDEF123" },
     ],
   },
 ];

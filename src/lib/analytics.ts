@@ -49,10 +49,14 @@ function getTimeWindows() {
  * enabled destinations, filtering by any single one gives correct unique counts.
  */
 async function getCanonicalDestination(
-  workspaceId: string
+  workspaceId: string,
+  allowedDestinations?: readonly Destination[]
 ): Promise<Destination | null> {
   const first = await db.eventLog.findFirst({
-    where: { workspaceId },
+    where: {
+      workspaceId,
+      ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+    },
     select: { destination: true },
     orderBy: { createdAt: "asc" },
   });
@@ -408,13 +412,14 @@ async function queryConversionAccuracy(
 async function queryCampaignPerformance(
   workspaceId: string,
   displayCurrency: string,
-  destination?: Destination | null
+  destination?: Destination | null,
+  allowedDestinations?: readonly Destination[]
 ): Promise<CampaignRow[]> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   // Use provided destination or find canonical to avoid duplicate counting
   const filterDest =
-    destination ?? (await getCanonicalDestination(workspaceId));
+    destination ?? (await getCanonicalDestination(workspaceId, allowedDestinations));
 
   const rows = await db.eventLog.groupBy({
     by: ["utmSource", "utmCampaign", "currency"],
@@ -453,11 +458,16 @@ async function queryCampaignPerformance(
 
 async function queryDestinationDelivery(
   workspaceId: string,
-  since24h: Date
+  since24h: Date,
+  allowedDestinations?: readonly Destination[]
 ): Promise<DestinationDeliveryRow[]> {
   const groups = await db.eventLog.groupBy({
     by: ["destination", "status"],
-    where: { workspaceId, createdAt: { gte: since24h } },
+    where: {
+      workspaceId,
+      createdAt: { gte: since24h },
+      ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+    },
     _count: true,
   });
 
@@ -562,13 +572,14 @@ const DEFAULT_CONVERSION_ACCURACY: ConversionAccuracy = {
 export async function computeDashboardAnalytics(
   workspaceId: string,
   userId: string,
-  displayCurrency?: string
+  displayCurrency?: string,
+  allowedDestinations?: readonly Destination[]
 ): Promise<DashboardAnalytics> {
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
   // Always use canonical destination to deduplicate multi-dest fan-out
   const filterDest = await safeQuery(
-    () => getCanonicalDestination(workspaceId),
+    () => getCanonicalDestination(workspaceId, allowedDestinations),
     null
   );
 
@@ -591,10 +602,13 @@ export async function computeDashboardAnalytics(
     await Promise.all([
       safeQuery(() => queryHealthMetrics(workspaceId, since24h, filterDest), DEFAULT_HEALTH),
       safeQuery(() => queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, filterDest), DEFAULT_EVENT_BREAKDOWN),
-      safeQuery(() => queryDestinationDelivery(workspaceId, since24h), [] as DestinationDeliveryRow[]),
+      safeQuery(() => queryDestinationDelivery(workspaceId, since24h, allowedDestinations), [] as DestinationDeliveryRow[]),
       db.eventLog.groupBy({
         by: ["destination"],
-        where: { workspaceId },
+        where: {
+          workspaceId,
+          ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+        },
         _count: true,
       }).catch((error) => {
         console.error("Analytics query failed:", error);
@@ -617,7 +631,7 @@ export async function computeDashboardAnalytics(
   // Batch 4: Lightweight remaining queries (~3 peak connections)
   const [billing, campaigns] = await Promise.all([
     safeQuery(() => queryBillingUsage(userId), DEFAULT_BILLING),
-    safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, filterDest), [] as CampaignRow[]),
+    safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, filterDest, allowedDestinations), [] as CampaignRow[]),
   ]);
 
   const planConfig =

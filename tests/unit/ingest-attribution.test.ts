@@ -168,4 +168,111 @@ describe("ingest attribution handling", () => {
       })
     );
   });
+
+  it("filters hidden destinations for Shopify Meta TikTok V1 workspaces", async () => {
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_v1",
+      userId: "user_123",
+      isActive: true,
+      productMode: "SHOPIFY_META_TIKTOK_V1",
+      installType: "SHOPIFY_CUSTOM_PIXEL",
+      consentMode: "LAX",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: true,
+      hasTikTokCredentials: true,
+      hasGA4Credentials: true,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: true,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: true,
+      hasShopifyWebhookSecret: false,
+    });
+
+    const response = await postIngest(
+      makeRequest(
+        {
+          eventName: "AddToCart",
+          eventId: "evt_v1",
+          timestamp: Date.now(),
+          consent: { analyticsAllowed: true, marketingAllowed: true },
+          customData: { value: 10, currency: "USD" },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.destinations).toEqual(["META", "TIKTOK"]);
+    expect(mockQueueAdd).toHaveBeenCalledTimes(2);
+    expect(mockQueueAdd).toHaveBeenNthCalledWith(
+      1,
+      "send-meta-event",
+      expect.any(Object)
+    );
+    expect(mockQueueAdd).toHaveBeenNthCalledWith(
+      2,
+      "send-tiktok-event",
+      expect.any(Object)
+    );
+    expect(mockEventLogCreate).toHaveBeenCalledTimes(2);
+    expect(
+      mockEventLogCreate.mock.calls.map((call) => call[0].data.destination)
+    ).toEqual(["META", "TIKTOK"]);
+  });
+
+  it("preserves onlyDestinations for null-mode legacy workspaces", async () => {
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_legacy",
+      userId: "user_123",
+      isActive: true,
+      productMode: null,
+      installType: null,
+      consentMode: "LAX",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: true,
+      hasTikTokCredentials: false,
+      hasGA4Credentials: true,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: false,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: false,
+      hasShopifyWebhookSecret: false,
+    });
+
+    const response = await postIngest(
+      makeRequest(
+        {
+          eventName: "AddToCart",
+          eventId: "evt_legacy",
+          timestamp: Date.now(),
+          onlyDestinations: ["GA4"],
+          consent: { analyticsAllowed: true, marketingAllowed: true },
+          customData: { value: 10, currency: "USD" },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.destinations).toEqual(["GA4"]);
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "send-ga4-event",
+      expect.objectContaining({ destination: "GA4" })
+    );
+    expect(mockEventLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ destination: "GA4" }),
+      })
+    );
+  });
 });

@@ -22,6 +22,8 @@ export default async function IntegrationsPage() {
       where: { id: activeWs.id },
       select: {
         id: true,
+        productMode: true,
+        installType: true,
         // Meta
         metaPixelId: true,
         metaTestEventCode: true,
@@ -74,6 +76,8 @@ export default async function IntegrationsPage() {
 
   const workspaceForClient = {
     id: workspace.id,
+    productMode: workspace.productMode,
+    installType: workspace.installType,
     // Meta
     metaPixelId: workspace.metaPixelId,
     metaTestEventCode: workspace.metaTestEventCode,

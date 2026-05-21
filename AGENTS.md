@@ -18,18 +18,19 @@ Browser-only pixels lose 20-40% of conversion data to ad blockers. Track Clear c
 
 ### Target Users
 
-Small-to-mid Shopify stores running ads on Meta, TikTok, Reddit, Pinterest, and more. Free plan (50 orders/mo), paid plans $29-$99/mo via Stripe.
+Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom workspaces can still use the broader multi-destination stack. Free plan (50 orders/mo), paid plans $29-$99/mo via Stripe.
 
 ## Current State
 
 **Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 12 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 359/359 passing (21 test files)
+- Unit tests: 364/364 passing (22 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports one pre-existing test top-level-await config issue)
 - Lint: passes with pre-existing `<img>` optimization warnings
-- 7 destinations: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
-- Dashboard: per-destination tabs, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
+- 7 destination codepaths retained for legacy/custom workspaces: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
+- Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, Shopify webhook, Meta CAPI, TikTok Events API, tracking health
+- Dashboard: mode-aware destination visibility, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
 - Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages, server-proxy attribution hardening
@@ -73,7 +74,7 @@ See `STATUS.md` for the full audit and remaining work.
 
 ```
 JS Snippet (browser) --> POST /api/events/ingest (X-TL-API-Key header)
-  |-- Validate API key (workspace lookup with all destination fields)
+  |-- Validate API key (workspace lookup with product mode + destination flags)
   |-- Check which destinations are enabled + have credentials
   |-- Check order limits (only for Purchase events, Redis monthly counter)
   |-- Check rate limit (100 req/sec/workspace)
@@ -83,6 +84,7 @@ JS Snippet (browser) --> POST /api/events/ingest (X-TL-API-Key header)
   |-- Check per-event toggle (enablePageView, etc.)
   |-- Check consent (STRICT/LAX mode)
   |-- Fan-out: Create one EventLog per enabled destination (status: PENDING)
+  |-- For Shopify Meta+TikTok V1 workspaces, filter fan-out to META/TIKTOK only
   |-- Queue BullMQ jobs per destination (meta-events, tiktok-events, ga4-events, klaviyo-events, reddit-events, pinterest-events, google-ads-events)
   |-- Return { success: true, eventId, destinations: [...] }
 
@@ -128,9 +130,11 @@ src/
       reset-password/page.tsx         # Token-based password reset with confirmation
     (dashboard)/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
-      dashboard/page.tsx              # Rich analytics with per-destination tabs: revenue (currency conversion), conversion accuracy, event funnel, delivery, campaign performance, recent events
-      events/page.tsx                 # Event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
-      settings/page.tsx               # 7 destination cards (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads), event toggles, consent, snippet, alerts, language/currency selectors, danger zone
+      dashboard/page.tsx              # Mode-aware analytics: revenue (currency conversion), conversion accuracy, event funnel, delivery, campaign performance, recent events
+      tracking-health/page.tsx        # Operational tracking health for pixel, webhook, Meta/TikTok, Purchase, dedup, attribution, errors
+      events/page.tsx                 # Mode-aware event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
+      integrations/page.tsx           # Mode-aware destination setup; V1 shows Shopify webhook, Meta, TikTok; legacy shows all destination cards
+      settings/page.tsx               # Event toggles, consent, snippet, alerts, language/currency selectors, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
         page.tsx                      # 3-step wizard: create workspace, install snippet, connect platforms
@@ -170,7 +174,7 @@ src/
       replay-button.tsx               # Retry failed events button (bulk + per-event)
       campaign-performance.tsx        # Top campaigns by revenue with per-platform tabs (30d)
     settings/
-      settings-form.tsx               # All settings: 7 destination cards + toggles + consent + snippet + language/currency selectors + danger zone
+      settings-form.tsx               # Workspace settings: event toggles, consent, snippet, language/currency selectors, danger zone
       alert-preferences.tsx           # Email alert notification toggles
     billing/
       plan-cards.tsx                  # Starter/Growth plan comparison + subscribe buttons
@@ -189,6 +193,8 @@ src/
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case and bounded Meta cookie validation)
     event-log-payload.ts              # Sanitized EventLog payload builder (customData + flags, no raw userData)
+    workspace-mode.ts                 # Product mode/install type fallback + destination allowlist helpers
+    tracking-health.ts                # Operational health checks for Shopify V1 readiness
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
@@ -248,11 +254,12 @@ tests/
     rate-limit.test.ts                # 16 tests
     event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
     event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
+    workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
     pixel-route.test.ts               # 3 tests (webhook-aware Purchase fbq suppression in generated pixel scripts)
 prisma/
-  schema.prisma                       # 10 models, 7 enums (see Data Model below)
+  schema.prisma                       # 11 models, 9 enums (see Data Model below)
 ```
 
 ### shadcn/ui Components (14 installed)
@@ -265,12 +272,12 @@ prisma/
 
 **Key relationships:**
 - User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
-- Workspace has many EventLogs, stores encrypted credentials for all 7 destinations (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest), includes per-destination enable toggles
+- Workspace has many EventLogs, stores nullable `productMode`/`installType`, stores encrypted credentials for all 7 destination codepaths (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest), includes per-destination enable toggles
 - EventLog has a `destination` field (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 - EventLog stores UTM attribution data (utmSource, utmMedium, utmCampaign, utmContent, utmTerm, gclid)
 
-**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), EventName (5 events), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
+**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), WorkspaceProductMode (SHOPIFY_META_TIKTOK_V1/LEGACY_ALL_DESTINATIONS), WorkspaceInstallType (SHOPIFY_CUSTOM_PIXEL/HEADLESS_CUSTOM), EventName (6 events including Refund), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
 
 ## Development Commands
 
@@ -296,7 +303,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (359 tests, 21 files)
+# Run unit tests (364 tests, 22 files)
 pnpm test
 
 # Run a single test file
@@ -401,6 +408,7 @@ Header: Content-Type: application/json
 - **Token encryption:** Meta access tokens encrypted at rest using AES-256-GCM.
 - **Workspace model:** Each merchant has a workspace with a unique API key (unlimited per user, shared order pool).
 - **Multi-destination fan-out:** Ingest route creates one EventLog + one BullMQ job per enabled destination. Each destination has its own queue, worker, normalizer, and API client.
+- **Product-mode rollout:** `Workspace.productMode` and `Workspace.installType` are nullable for safe migration. Runtime fallback treats missing values as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; new workspaces are created as `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`. V1 workspaces are allowlisted to Meta/TikTok in UI, ingest, webhook, replay, analytics, and event views. `LEGACY_WORKSPACE_IDS` can force legacy behavior as an emergency bypass.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard "All" view deduplicates by filtering to a canonical destination (first enabled). Per-destination tabs show filtered stats. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.
@@ -413,6 +421,7 @@ Header: Content-Type: application/json
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
 - **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery.
+- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: pixel activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, and recent errors.
 - **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, and `contents`.
 - **Webhook Purchase browser guard:** If a workspace has a Shopify webhook secret configured, TrackClear generated pixel scripts do not fire browser `fbq("track", "Purchase")`; they still send the TrackClear Purchase to ingest so session context can enrich the webhook Purchase.
 - **Stale pending requeue:** BullMQ repeatable job every 5 minutes finds PENDING events older than 5 minutes and re-queues them to the appropriate destination queue, preventing events from getting stuck after Redis restarts.

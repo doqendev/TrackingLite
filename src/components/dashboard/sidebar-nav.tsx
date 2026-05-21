@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LayoutDashboard, ClipboardList, Plug, Settings, CreditCard, Menu, LogOut, Activity, Shield } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Plug, Settings, CreditCard, Menu, LogOut, Activity, Shield, HeartPulse } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -13,9 +13,10 @@ const navItems = [
   { href: "/dashboard", labelKey: "dashboard" as const, icon: LayoutDashboard, code: "01" },
   { href: "/events", labelKey: "events" as const, icon: ClipboardList, code: "02" },
   { href: "/integrations", labelKey: "integrations" as const, icon: Plug, code: "03" },
-  { href: "/settings", labelKey: "settings" as const, icon: Settings, code: "04" },
-  { href: "/billing", labelKey: "billing" as const, icon: CreditCard, code: "05" },
-  { href: "/diagnostics", labelKey: "diagnostics" as const, icon: Activity, code: "06" },
+  { href: "/tracking-health", labelKey: "trackingHealth" as const, icon: HeartPulse, code: "04" },
+  { href: "/settings", labelKey: "settings" as const, icon: Settings, code: "05" },
+  { href: "/billing", labelKey: "billing" as const, icon: CreditCard, code: "06" },
+  { href: "/diagnostics", labelKey: "diagnostics" as const, icon: Activity, code: "07" },
 ];
 
 interface SidebarNavProps {
@@ -29,7 +30,7 @@ export function SidebarNav({ userEmail, workspaceName, isAdmin }: SidebarNavProp
   const t = useTranslations("nav");
 
   const items = isAdmin
-    ? [...navItems, { href: "/admin", labelKey: "admin" as const, icon: Shield, code: "07" }]
+    ? [...navItems, { href: "/admin", labelKey: "admin" as const, icon: Shield, code: "08" }]
     : navItems;
 
   return (
@@ -85,7 +86,7 @@ export function MobileNav({ userEmail, workspaceName, isAdmin }: SidebarNavProps
   const [open, setOpen] = useState(false);
 
   const items = isAdmin
-    ? [...navItems, { href: "/admin", labelKey: "admin" as const, icon: Shield, code: "07" }]
+    ? [...navItems, { href: "/admin", labelKey: "admin" as const, icon: Shield, code: "08" }]
     : navItems;
 
   return (
