@@ -7,7 +7,7 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 346/346 passing (19 files) |
+| Tests (`pnpm test -- --run`) | 353/353 passing (20 files) |
 | TypeScript | 0 source errors (`pnpm exec tsc --noEmit` still reports the pre-existing top-level-await config issue in `tests/unit/meta-event-processor.test.ts`) |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 
@@ -30,7 +30,7 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
 | `/onboarding` | Protected | Working | 3-step wizard: create workspace, install snippet, connect platforms |
 
-### API Routes (18 endpoints)
+### API Routes (core endpoints)
 
 | Endpoint | Methods | Auth | Status | Notes |
 |----------|---------|------|--------|-------|
@@ -49,6 +49,8 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | `/api/user/account` | DELETE | Session | Working | GDPR account deletion (cancels Stripe, cascades all data) |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
 | `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid) |
+| `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with bounded `_fbp` validation and webhook-aware Purchase `fbq` guard |
+| `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with bounded `_fbp` validation and webhook-aware Purchase `fbq` guard |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
@@ -93,7 +95,7 @@ Each destination has:
 | `billing.ts` | Working | Order limit checking, auto-upgrade, Redis counter. Lazy Redis |
 | `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (7 queues) |
 | `meta-capi.ts` | Working | POST to Meta Graph API, MetaCapiError with status/response |
-| `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case |
+| `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case, bounded Meta cookie validation |
 | `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
@@ -121,7 +123,7 @@ Each destination has:
 | `workspace-cache.ts` | Working | Redis-cached workspace lookup by shopifyDomain (used by webhook route) |
 | `guide-content.ts` | Working | Setup guide content for all 7 integration platforms + Shopify webhook |
 | `tracking-context.ts` | Working | Shared helper for server-proxy client IP/UA extraction and fbclid -> fbc synthesis |
-| `shopify-webhook-attribution.ts` | Working | Extracts Shopify order/cart attributes, builds Purchase attribution, and shapes line-item content IDs/contents |
+| `shopify-webhook-attribution.ts` | Working | Extracts Shopify order/cart/landing-site attribution, builds Purchase attribution, and shapes line-item content IDs/contents |
 
 ### Workers (10 files in src/workers/)
 
@@ -153,32 +155,32 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (24 files, 391 tests)
+### Test Coverage (25 files, 398 tests)
 
-#### Unit Tests (19 files, 346 tests)
+#### Unit Tests (20 files, 353 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
-| `event-normalizer.test.ts` | 40 | All 5 event types, field mapping, camelCase/snake_case |
-| `extract-custom-data.test.ts` | 27 | Custom data extraction from event payloads |
-| `hash-pii.test.ts` | 25 | SHA-256 hashing, all PII fields, edge cases |
-| `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
-| `meta-capi.test.ts` | 21 | URL construction, request body, error handling |
-| `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
-| `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
-| `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
-| `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
-| `consent.test.ts` | 28 | STRICT/LAX mode, webhook bypass, edge cases |
-| `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
-| `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
-| `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
-| `shopify-webhook.test.ts` | 6 | HMAC verification, replay protection, header extraction |
 | `shopify-domain-resolver.test.ts` | 28 | Domain resolution, validation, edge cases |
-| `extract-custom-data.test.ts` | 27 | Custom data extraction from event payloads |
-| `google-ads.test.ts` | 34 | Google Ads normalizer (email normalization, param building, all 4 events), pixel endpoint (URL construction, error handling) |
 | `tracking-context.test.ts` | 6 | fbclid-derived fbc synthesis and server-proxy client IP/UA header precedence |
-| `shopify-webhook-attribution.test.ts` | 6 | Shopify order attribute extraction, fbc synthesis, variant-first content IDs, Purchase contents |
+| `extract-custom-data.test.ts` | 27 | Custom data extraction from event payloads |
+| `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
+| `meta-capi.test.ts` | 21 | URL construction, request body, error handling |
+| `hash-pii.test.ts` | 24 | SHA-256 hashing, all PII fields, edge cases |
+| `pixel-route.test.ts` | 3 | Generated pixel scripts: bounded fbp validation and webhook-aware Purchase fbq guard |
+| `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
+| `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
+| `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
+| `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
+| `google-ads.test.ts` | 34 | Google Ads normalizer (email normalization, param building, all 4 events), pixel endpoint (URL construction, error handling) |
+| `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
+| `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
+| `consent.test.ts` | 28 | STRICT/LAX mode, webhook bypass, edge cases |
 | `ingest-attribution.test.ts` | 1 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, queue job, and session enrichment |
+| `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
+| `shopify-webhook-attribution.test.ts` | 7 | Shopify order/landing attribution extraction, fbc synthesis, variant-first content IDs, Purchase contents |
+| `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
+| `shopify-webhook.test.ts` | 6 | HMAC verification, replay protection, header extraction |
 
 #### Integration Tests (5 files, 45 tests)
 
@@ -333,10 +335,12 @@ None currently tracked.
 ### Phase 12: Mizoke/TrackClear Attribution Hardening (2026-05-21)
 1. **fbclid -> fbc Synthesis** - Ingest now accepts `fbclid`, `gbraid`, and `wbraid`; when `fbc` is missing but `fbclid` exists, TrackClear builds `fb.1.<timestamp_ms>.<fbclid>` and stores/passes the resolved `fbc`.
 2. **Server Proxy IP/UA Pass-Through** - Ingest now prefers server-only `X-TL-Client-IP` and `X-TL-Client-UA` headers over generic proxy headers, without adding those headers to the browser CORS allow-list.
-3. **Webhook Purchase Enrichment** - Shopify `orders/paid` webhook now extracts cart/order attributes such as `_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, and `utm_*` before falling back to session enrichment or landing-site query params.
-4. **Richer Purchase Payloads** - Webhook Purchases now include variant-first `content_ids`, `content_type: "product"`, and `contents` with quantity and item price where Shopify provides them.
-5. **Session Enrichment Before Webhook Skip** - Snippet Purchase events for webhook-enabled workspaces now store browser context before returning `webhook_active`, so later Shopify webhooks can recover checkout attribution.
-6. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order attribute extraction, line-item payload shape, and ingest propagation.
+3. **Bounded _fbp Robustness** - Meta `_fbp` validation now accepts `fb.1.<timestamp_ms>.<random>` values with 7-20 numeric random digits in the server normalizer and generated pixel scripts.
+4. **Webhook Purchase Enrichment** - Shopify `orders/paid` webhook now extracts cart/order attributes such as `_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, and `utm_*` before falling back to session enrichment or landing-site query params. Landing-site `fbclid` is synthesized into `fbc` only after stronger order/session/landing `fbc` values are absent.
+5. **Richer Purchase Payloads** - Webhook Purchases now include variant-first `content_ids`, `content_type: "product"`, and `contents` with quantity and item price where Shopify provides them.
+6. **Session Enrichment Before Webhook Skip** - Snippet Purchase events for webhook-enabled workspaces now store browser context before returning `webhook_active`, so later Shopify webhooks can recover checkout attribution.
+7. **Webhook Purchase Dedup Guard** - For workspaces with a Shopify webhook secret configured, generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts suppress browser `fbq("track", "Purchase")` while still sending TrackClear Purchase context to ingest.
+8. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, and generated pixel Purchase guards.
 
 ## Not Yet Implemented
 

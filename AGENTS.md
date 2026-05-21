@@ -22,9 +22,9 @@ Small-to-mid Shopify stores running ads on Meta, TikTok, Reddit, Pinterest, and 
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 11 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 12 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 346/346 passing (19 test files)
+- Unit tests: 353/353 passing (20 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports one pre-existing test top-level-await config issue)
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -106,10 +106,9 @@ Stale Pending Requeue (every 5 minutes)
 
 ### Deduplication Strategy
 
-- JS snippet generates `event_id` via `crypto.randomUUID()`
-- If merchant also has Meta's browser pixel, snippet fires `fbq()` with same `event_id`
-- Server sends to Meta CAPI with that `event_id`
-- Meta deduplicates browser pixel event + server CAPI event by matching `event_id`
+- JS snippet/pixel events generate `event_id` via `crypto.randomUUID()`.
+- For normal snippet events, the TrackClear pixel fires `fbq()` with the same `event_id` that the server sends to Meta CAPI, so Meta can deduplicate browser + server events.
+- For Shopify webhook Purchase workspaces, the generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts still send TrackClear Purchase context to ingest, but they suppress browser `fbq("track", "Purchase")`. The webhook sends the server-side Purchase with deterministic `webhook-${orderId}` to avoid browser/server Purchase ID mismatches.
 
 ## Project Structure
 
@@ -152,6 +151,8 @@ src/
       user/preferences/route.ts      # PATCH: update display currency and language
       user/account/route.ts          # DELETE: GDPR account deletion (cancels Stripe, cascades all data)
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid)
+      pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (webhook-aware Purchase fbq guard)
+      s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same webhook-aware Purchase fbq guard)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
       stripe/webhook/route.ts         # POST: handle Stripe webhooks (5 event types)
@@ -186,11 +187,11 @@ src/
     billing.ts                        # checkOrderLimits + incrementOrderCount + autoUpgrade (Redis, Stripe)
     constants.ts                      # BILLING_PLANS (order-based), AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG, META_API_*
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
-    event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case)
+    event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case and bounded Meta cookie validation)
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
-    shopify-webhook-attribution.ts    # Shopify order/cart attribution extraction + webhook Purchase content helpers
+    shopify-webhook-attribution.ts    # Shopify order/cart/landing-site attribution extraction + webhook Purchase content helpers
     currency.ts                       # Exchange rate fetcher (frankfurter.app API), Redis-cached 24h
     queue.ts                          # Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
@@ -244,9 +245,10 @@ tests/
     consent.test.ts                   # 10 tests
     meta-capi.test.ts                 # 21 tests
     rate-limit.test.ts                # 16 tests
-    event-normalizer.test.ts          # 40 tests (all 5 event types + camelCase handling)
+    event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
+    pixel-route.test.ts               # 3 tests (webhook-aware Purchase fbq suppression in generated pixel scripts)
 prisma/
   schema.prisma                       # 10 models, 7 enums (see Data Model below)
 ```
@@ -292,7 +294,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (346 tests, 19 files)
+# Run unit tests (353 tests, 20 files)
 pnpm test
 
 # Run a single test file
@@ -407,8 +409,9 @@ Header: Content-Type: application/json
 - **Email alerts:** Hourly BullMQ repeatable job evaluates tracking health, error rates, and order limits. 24h cooldown per alert type per user.
 - **UTM attribution:** Snippet captures UTM params + gclid + rdtCid + epik once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
-- **Meta fbc recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved.
-- **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`) before falling back to Redis session enrichment or landing-site params. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, and `contents`.
+- **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
+- **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, and `contents`.
+- **Webhook Purchase browser guard:** If a workspace has a Shopify webhook secret configured, TrackClear generated pixel scripts do not fire browser `fbq("track", "Purchase")`; they still send the TrackClear Purchase to ingest so session context can enrich the webhook Purchase.
 - **Stale pending requeue:** BullMQ repeatable job every 5 minutes finds PENDING events older than 5 minutes and re-queues them to the appropriate destination queue, preventing events from getting stuck after Redis restarts.
 - **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.
 - **Reddit click ID (rdtCid):** Snippet captures `rdt_cid` URL param and passes as `rdtCid`. Forwarded to Reddit Conversions API for attribution matching.
@@ -424,7 +427,6 @@ Header: Content-Type: application/json
 
 - Shopify OAuth, Shopify session tokens, `@shopify/shopify-app-remix`
 - Shopify Polaris components
-- Shopify webhooks
 - Shopify Web Pixel Extension (we use Custom Pixel JS snippet instead)
 - Custom events beyond the 5 standard ones
 

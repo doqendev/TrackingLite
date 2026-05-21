@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-function generateTrackingScript(apiKey: string, pixelId: string | null, ingestUrl: string): string {
+function generateTrackingScript(
+  apiKey: string,
+  pixelId: string | null,
+  ingestUrl: string,
+  hasShopifyWebhook: boolean
+): string {
   return `(function(){
 var ctx=window.__tl||{},a=ctx.analytics||analytics;
 var K="${apiKey}",E="${ingestUrl}";
+var H=${hasShopifyWebhook ? "true" : "false"};
 ${pixelId ? `var P="${pixelId}";` : ""}
 function gc(n){try{var m=document.cookie.match(new RegExp("(^| )"+n+"=([^;]+)"));return m?m[2]:null}catch(e){return null}}
 function gp(n){try{var u=new URL(location.href);return u.searchParams.get(n)}catch(e){return null}}
-function vp(v){if(!v)return null;return/^fb\\.1\\.\\d{13}\\.\\d{7,15}$/.test(v)?v:null}
+function vp(v){if(!v)return null;return/^fb\\.1\\.\\d{13}\\.\\d{7,20}$/.test(v)?v:null}
 function vf(v){if(!v)return null;var m=v.match(/^fb\\.1\\.(\\d{13})\\..+$/);if(!m)return null;if(Date.now()-parseInt(m[1],10)>7776000000)return null;return v}
 function xf(v){if(!v)return null;var p=v.lastIndexOf(".");return p>0?v.substring(p+1):null}
 var fbpVal=vp(gc("_fbp"));if(!fbpVal){fbpVal="fb.1."+Date.now()+"."+Math.floor(1000000000+Math.random()*9000000000);try{document.cookie="_fbp="+fbpVal+";max-age=7776000;path=/;SameSite=Lax"}catch(e){}}
@@ -19,7 +25,7 @@ a.subscribe("page_viewed",function(e){var id=crypto.randomUUID();se("PageView",i
 a.subscribe("product_viewed",function(e){var id=crypto.randomUUID(),v=e.data.productVariant||{},cd={contentIds:v.id?[String(v.id)]:[],contentType:"product",contentName:v.title||"",contentCategory:(v.product&&v.product.type)||"",value:v.price?parseFloat(v.price.amount):0,currency:v.price?v.price.currencyCode:"USD"};se("ViewContent",id,cd,{});if(typeof fbq==="function")fbq("track","ViewContent",{content_ids:cd.contentIds,content_type:cd.contentType,content_name:cd.contentName,value:cd.value,currency:cd.currency},{eventID:id})});
 a.subscribe("product_added_to_cart",function(e){var id=crypto.randomUUID(),cl=e.data.cartLine||{},m=cl.merchandise||{},t=(cl.cost||{}).totalAmount||{},cd={contentIds:m.id?[String(m.id)]:[],contentType:"product",value:t.amount?parseFloat(t.amount):0,currency:t.currencyCode||"USD",numItems:cl.quantity||1};se("AddToCart",id,cd,{});if(typeof fbq==="function")fbq("track","AddToCart",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems},{eventID:id})});
 a.subscribe("checkout_started",function(e){var id=crypto.randomUUID(),co=e.data.checkout||{},tp=co.totalPrice||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:(co.lineItems||[]).map(function(l){return l.variant?String(l.variant.id):""}).filter(Boolean),contentType:"product",numItems:(co.lineItems||[]).length};se("InitiateCheckout",id,cd,eu(co));if(typeof fbq==="function")fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems},{eventID:id})});
-a.subscribe("checkout_completed",function(e){var id=crypto.randomUUID(),co=e.data.checkout||{},tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return l.variant?String(l.variant.id):""}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:l.variant?String(l.variant.id):"",quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:co.order?co.order.name:null};se("Purchase",id,cd,eu(co));if(typeof fbq==="function")fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id})});
+a.subscribe("checkout_completed",function(e){var id=crypto.randomUUID(),co=e.data.checkout||{},tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return l.variant?String(l.variant.id):""}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:l.variant?String(l.variant.id):"",quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:co.order?co.order.name:null};se("Purchase",id,cd,eu(co));if(!H&&typeof fbq==="function")fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id})});
 })();`;
 }
 
@@ -32,7 +38,7 @@ export async function GET(
 
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, isActive: true },
-    select: { apiKey: true, metaPixelId: true },
+    select: { apiKey: true, metaPixelId: true, shopifyWebhookSecretEncrypted: true },
   });
 
   if (!workspace) {
@@ -46,7 +52,12 @@ export async function GET(
     process.env.NEXT_PUBLIC_INGEST_URL ||
     "https://api.trackclear.io/api/events/ingest";
 
-  const script = generateTrackingScript(workspace.apiKey, workspace.metaPixelId, ingestUrl);
+  const script = generateTrackingScript(
+    workspace.apiKey,
+    workspace.metaPixelId,
+    ingestUrl,
+    !!workspace.shopifyWebhookSecretEncrypted
+  );
 
   return new NextResponse(script, {
     status: 200,

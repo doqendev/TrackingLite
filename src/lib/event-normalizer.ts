@@ -2,7 +2,7 @@ import { hashUserData } from "./hash-pii";
 import type { MetaCapiEvent } from "@/types/meta-capi";
 import type { SnippetEventPayload } from "@/types/events";
 
-const FBP_REGEX = /^fb\.1\.\d{13}\.\d{7,15}$/;
+const FBP_REGEX = /^fb\.1\.\d{13}\.\d{7,20}$/;
 const FBC_REGEX = /^fb\.1\.(\d{13})\..+$/;
 const FBC_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 

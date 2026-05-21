@@ -370,6 +370,27 @@ describe("normalizeToMetaCapiEvent", () => {
       expect(result.user_data.fbp).toBe("fb.1.1700000000000.1234567890");
     });
 
+    it("passes through valid 15-digit fbp random value", () => {
+      const fbp = "fb.1.1700000000000.123456789012345";
+      const result = normalizeToMetaCapiEvent(makePayload({ fbp }), null, null);
+      expect(result.user_data.fbp).toBe(fbp);
+    });
+
+    it("passes through valid 20-digit fbp random value", () => {
+      const fbp = "fb.1.1700000000000.12345678901234567890";
+      const result = normalizeToMetaCapiEvent(makePayload({ fbp }), null, null);
+      expect(result.user_data.fbp).toBe(fbp);
+    });
+
+    it("strips fbp random values longer than 20 digits", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ fbp: "fb.1.1700000000000.123456789012345678901" }),
+        null,
+        null
+      );
+      expect(result.user_data.fbp).toBeUndefined();
+    });
+
     it("strips invalid fbp format", () => {
       const result = normalizeToMetaCapiEvent(
         makePayload({ fbp: "invalid-fbp-value" }),

@@ -4,6 +4,7 @@ import {
   buildLineItemContents,
   buildOrderAttribution,
   canonicalShopifyLineItemId,
+  extractLandingSiteAttribution,
   extractOrderAttributes,
 } from "@/lib/shopify-webhook-attribution";
 
@@ -59,6 +60,22 @@ describe("shopify-webhook-attribution", () => {
     );
 
     expect(attribution.fbc).toBe("fb.1.1700000000000.EXPLICIT");
+  });
+
+  it("extracts landing_site fbclid and synthesizes fbc from it", () => {
+    const attribution = extractLandingSiteAttribution(
+      "/products/custom-sign?fbclid=LANDING_CLICK&utm_source=meta&utm_campaign=launch&gclid=GCLID123&ttclid=TT123&rdt_cid=RDT123&epik=EPIK123",
+      1700000000000
+    );
+
+    expect(attribution.fbclid).toBe("LANDING_CLICK");
+    expect(attribution.fbcFromFbclid).toBe("fb.1.1700000000000.LANDING_CLICK");
+    expect(attribution.utmSource).toBe("meta");
+    expect(attribution.utmCampaign).toBe("launch");
+    expect(attribution.gclid).toBe("GCLID123");
+    expect(attribution.ttclid).toBe("TT123");
+    expect(attribution.rdtCid).toBe("RDT123");
+    expect(attribution.epik).toBe("EPIK123");
   });
 
   it("prefers variant IDs for webhook Purchase content IDs", () => {

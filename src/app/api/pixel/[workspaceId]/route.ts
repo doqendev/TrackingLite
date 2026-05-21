@@ -5,17 +5,23 @@ function sanitizeForJs(value: string): string {
   return value.replace(/[\\'"<>&`\n\r\0]/g, "");
 }
 
-function generatePixelCode(apiKey: string, pixelId: string | null, ingestUrl: string): string {
+function generatePixelCode(
+  apiKey: string,
+  pixelId: string | null,
+  ingestUrl: string,
+  hasShopifyWebhook: boolean
+): string {
   return `// Track Clear v2 - Server-Side Event Tracking
 (async function(){
 var A=window.__tcAnalytics,B=window.__tcBrowser,I=window.__tcInit;
 if(!A){console.error("[TrackClear] Missing analytics global");return}
 var K="${sanitizeForJs(apiKey)}",E="${sanitizeForJs(ingestUrl)}";
+var H=${hasShopifyWebhook ? "true" : "false"};
 ${pixelId ? `var P="${sanitizeForJs(pixelId)}";` : ""}
 function gc(n){try{var m=document.cookie.match(new RegExp("(^| )"+n+"=([^;]+)"));return m?m[2]:null}catch(e){return null}}
 var pageUrl="",pageRef="";try{var loc=I.context.document.location;pageUrl=loc.href||"";pageRef=I.context.document.referrer||""}catch(e){try{pageUrl=location.href;pageRef=document.referrer}catch(e2){}}
 function gp(n){try{var u=new URL(pageUrl);return u.searchParams.get(n)}catch(e){return null}}
-function vp(v){if(!v)return null;return/^fb\\.1\\.\\d{13}\\.\\d{7,15}$/.test(v)?v:null}
+function vp(v){if(!v)return null;return/^fb\\.1\\.\\d{13}\\.\\d{7,20}$/.test(v)?v:null}
 function vf(v){if(!v)return null;var m=v.match(/^fb\\.1\\.(\\d{13})\\..+$/);if(!m)return null;if(Date.now()-parseInt(m[1],10)>7776000000)return null;return v}
 function xf(v){if(!v)return null;var p=v.lastIndexOf(".");return p>0?v.substring(p+1):null}
 var utm={s:gp("utm_source"),m:gp("utm_medium"),c:gp("utm_campaign"),n:gp("utm_content"),t:gp("utm_term")};
@@ -41,7 +47,7 @@ A.subscribe("product_added_to_cart",function(e){var id=crypto.randomUUID(),cl=e.
 A.subscribe("checkout_started",function(e){var id=crypto.randomUUID();_ciId=id;var co=e.data.checkout||{},tp=co.totalPrice||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:(co.lineItems||[]).map(function(l){return l.variant?String(l.variant.id):""}).filter(Boolean),contentType:"product",numItems:(co.lineItems||[]).length};se("InitiateCheckout",id,cd,eu(co),null,["META","KLAVIYO"]);if(typeof fbq==="function")fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems},{eventID:id})});
 A.subscribe("checkout_contact_info_submitted",function(e){var co=e.data.checkout||{},ud=eu(co);su=mu(su||{},ud);if(ud.email||ud.phone){var tp=co.totalPrice||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:(co.lineItems||[]).map(function(l){return l.variant?String(l.variant.id):""}).filter(Boolean),contentType:"product",numItems:(co.lineItems||[]).length};se("InitiateCheckout",_ciId||crypto.randomUUID(),cd,ud,["META"]);var id=crypto.randomUUID();se("InitiateCheckout",id,cd,ud,["KLAVIYO"])}});
 A.subscribe("checkout_address_info_submitted",function(e){var co=e.data.checkout||{},ud=eu(co);su=mu(su||{},ud)});
-A.subscribe("checkout_completed",function(e){var id=crypto.randomUUID(),co=e.data.checkout||{},tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return l.variant?String(l.variant.id):""}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:l.variant?String(l.variant.id):"",quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:co.order?co.order.name:null};var pud=eu(co);se("Purchase",id,cd,{email:pud.email||((su)&&su.email)||null,phone:pud.phone||((su)&&su.phone)||null,firstName:pud.firstName||((su)&&su.firstName)||null,lastName:pud.lastName||((su)&&su.lastName)||null,city:pud.city||((su)&&su.city)||null,state:pud.state||((su)&&su.state)||null,zip:pud.zip||((su)&&su.zip)||null,countryCode:pud.countryCode||((su)&&su.countryCode)||null});if(typeof fbq==="function")fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id})});
+A.subscribe("checkout_completed",function(e){var id=crypto.randomUUID(),co=e.data.checkout||{},tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return l.variant?String(l.variant.id):""}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:l.variant?String(l.variant.id):"",quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:co.order?co.order.name:null};var pud=eu(co);se("Purchase",id,cd,{email:pud.email||((su)&&su.email)||null,phone:pud.phone||((su)&&su.phone)||null,firstName:pud.firstName||((su)&&su.firstName)||null,lastName:pud.lastName||((su)&&su.lastName)||null,city:pud.city||((su)&&su.city)||null,state:pud.state||((su)&&su.state)||null,zip:pud.zip||((su)&&su.zip)||null,countryCode:pud.countryCode||((su)&&su.countryCode)||null});if(!H&&typeof fbq==="function")fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id})});
 })();`;
 }
 
@@ -63,7 +69,7 @@ export async function GET(
 
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, isActive: true },
-    select: { apiKey: true, metaPixelId: true },
+    select: { apiKey: true, metaPixelId: true, shopifyWebhookSecretEncrypted: true },
   });
 
   if (!workspace) {
@@ -77,7 +83,12 @@ export async function GET(
     process.env.NEXT_PUBLIC_INGEST_URL ||
     "https://api.trackclear.io/api/events/ingest";
 
-  const js = generatePixelCode(workspace.apiKey, workspace.metaPixelId, ingestUrl);
+  const js = generatePixelCode(
+    workspace.apiKey,
+    workspace.metaPixelId,
+    ingestUrl,
+    !!workspace.shopifyWebhookSecretEncrypted
+  );
 
   return new Response(js, {
     status: 200,

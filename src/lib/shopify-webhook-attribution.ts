@@ -19,6 +19,11 @@ export interface OrderAttribution {
   utmTerm: string | null;
 }
 
+export interface LandingSiteAttribution extends OrderAttribution {
+  fbcFromFbclid: string | null;
+  pageUrl: string | null;
+}
+
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -112,6 +117,57 @@ export function buildOrderAttribution(
     utmContent: readOrderAttribute(attrs, ["_utm_content", "utm_content"]),
     utmTerm: readOrderAttribute(attrs, ["_utm_term", "utm_term"]),
   };
+}
+
+export function extractLandingSiteAttribution(
+  landingSite: string | null | undefined,
+  now = Date.now()
+): LandingSiteAttribution {
+  const empty: LandingSiteAttribution = {
+    fbp: null,
+    fbc: null,
+    fbclid: null,
+    fbcFromFbclid: null,
+    gclid: null,
+    gbraid: null,
+    wbraid: null,
+    ttclid: null,
+    rdtCid: null,
+    epik: null,
+    utmSource: null,
+    utmMedium: null,
+    utmCampaign: null,
+    utmContent: null,
+    utmTerm: null,
+    pageUrl: landingSite || null,
+  };
+
+  if (!landingSite) return empty;
+
+  try {
+    const url = new URL(landingSite, "https://placeholder.com");
+    const fbclid = url.searchParams.get("fbclid");
+
+    return {
+      ...empty,
+      fbc: url.searchParams.get("fbc"),
+      fbclid,
+      fbcFromFbclid: synthesizeFbcFromFbclid(fbclid, now),
+      gclid: url.searchParams.get("gclid"),
+      gbraid: url.searchParams.get("gbraid"),
+      wbraid: url.searchParams.get("wbraid"),
+      ttclid: url.searchParams.get("ttclid"),
+      rdtCid: url.searchParams.get("rdt_cid"),
+      epik: url.searchParams.get("epik"),
+      utmSource: url.searchParams.get("utm_source"),
+      utmMedium: url.searchParams.get("utm_medium"),
+      utmCampaign: url.searchParams.get("utm_campaign"),
+      utmContent: url.searchParams.get("utm_content"),
+      utmTerm: url.searchParams.get("utm_term"),
+    };
+  } catch {
+    return empty;
+  }
 }
 
 function getNestedValue(source: UnknownRecord, path: string): unknown {
