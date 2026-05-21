@@ -132,6 +132,9 @@ export interface MetaEventJob {
     referrer: string;
     fbp?: string | null;
     fbc?: string | null;
+    fbclid?: string | null;
+    gbraid?: string | null;
+    wbraid?: string | null;
     userData: Record<string, unknown>;
     customData: Record<string, unknown>;
     clientIp: string;
@@ -153,6 +156,9 @@ export interface DestinationEventJob {
     referrer: string;
     fbp?: string | null;
     fbc?: string | null;
+    fbclid?: string | null;
+    gbraid?: string | null;
+    wbraid?: string | null;
     ttclid?: string | null;
     gclid?: string | null;
     rdtCid?: string | null;

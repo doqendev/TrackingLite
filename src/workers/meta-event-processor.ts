@@ -73,6 +73,9 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       referrer: event.referrer,
       fbp: event.fbp,
       fbc: event.fbc,
+      fbclid: event.fbclid,
+      gbraid: event.gbraid,
+      wbraid: event.wbraid,
       userData: event.userData as SnippetEventPayload["userData"],
       customData: event.customData,
     };

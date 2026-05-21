@@ -20,6 +20,7 @@ import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import { storeSessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
+import { getClientIpFromHeaders, getClientUserAgentFromHeaders, resolveFbc } from "@/lib/tracking-context";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -31,6 +32,9 @@ const IngestPayloadSchema = z.object({
   referrer: z.string().optional().default(""),
   fbp: z.string().nullable().optional(),
   fbc: z.string().nullable().optional(),
+  fbclid: z.string().max(2048).nullable().optional(),
+  gbraid: z.string().max(2048).nullable().optional(),
+  wbraid: z.string().max(2048).nullable().optional(),
   ttclid: z.string().nullable().optional(),
   utmSource: z.string().nullable().optional(),
   utmMedium: z.string().nullable().optional(),
@@ -138,19 +142,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400, headers: corsHeaders });
     }
     const payload = IngestPayloadSchema.parse(body);
-
-    // 6b. Cross-source dedup: when Shopify webhook is active, skip snippet
-    // Purchase events. The webhook has the orderId and is strictly more reliable
-    // for purchases (catches PayPal, off-site payments). Without this, the same
-    // order gets tracked twice — once by the snippet (no orderId) and once by
-    // the webhook (with orderId) — and our dedup can't match them.
-    if (payload.eventName === "Purchase" && workspace.hasShopifyWebhookSecret) {
-      log.info("Skipping snippet Purchase — Shopify webhook active", { workspaceId: workspace.id, eventId: payload.eventId });
-      return NextResponse.json(
-        { success: true, eventId: payload.eventId, skipped: true, reason: "webhook_active" },
-        { status: 200, headers: corsHeaders }
-      );
-    }
+    const resolvedFbc = resolveFbc(payload.fbc, payload.fbclid);
 
     // 7. Check event toggle
     const eventToggleMap: Record<string, boolean> = {
@@ -166,21 +158,21 @@ export async function POST(request: NextRequest) {
 
     // 8. Consent is now checked per-destination after building the destinations list (step 11b)
 
-    // 9. Extract IP and User-Agent from request
-    // Validate IP format and truncate to 45 chars (max IPv6 length)
-    const clientIp = (request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown").slice(0, 45);
-    const userAgent = request.headers.get("user-agent") || "";
+    // 9. Extract IP and User-Agent from request. Server-side storefront
+    // proxies can pass the real shopper values through X-TL-Client-* headers.
+    const clientIp = getClientIpFromHeaders(request.headers);
+    const userAgent = getClientUserAgentFromHeaders(request.headers);
 
     // Store browser context for session enrichment (all events with email, including Purchase)
     if (
       payload.userData?.email &&
       workspace.id &&
-      (payload.fbp || payload.fbc || payload.ttclid || payload.rdtCid ||
+      (payload.fbp || resolvedFbc || payload.ttclid || payload.rdtCid ||
        payload.epik || payload.gaClientId || (clientIp && clientIp !== "unknown") || userAgent)
     ) {
       storeSessionContext(workspace.id, payload.userData.email, {
         fbp: payload.fbp,
-        fbc: payload.fbc,
+        fbc: resolvedFbc,
         ttclid: payload.ttclid,
         rdtCid: payload.rdtCid,
         epik: payload.epik,
@@ -196,6 +188,17 @@ export async function POST(request: NextRequest) {
         gclid: payload.gclid,
         consent: payload.consent,
       });
+    }
+
+    // 9b. Cross-source dedup: when Shopify webhook is active, skip snippet
+    // Purchase events after session enrichment so the later webhook Purchase can
+    // recover browser attribution collected during checkout.
+    if (payload.eventName === "Purchase" && workspace.hasShopifyWebhookSecret) {
+      log.info("Skipping snippet Purchase — Shopify webhook active", { workspaceId: workspace.id, eventId: payload.eventId });
+      return NextResponse.json(
+        { success: true, eventId: payload.eventId, skipped: true, reason: "webhook_active" },
+        { status: 200, headers: corsHeaders }
+      );
     }
 
     // 10. Extract monetary fields from customData
@@ -365,11 +368,16 @@ export async function POST(request: NextRequest) {
         eventName: payload.eventName,
         customData: payload.customData,
         userData: payload.userData || {},
+        clickIds: {
+          fbclid: payload.fbclid || null,
+          gbraid: payload.gbraid || null,
+          wbraid: payload.wbraid || null,
+        },
       } as any,
       customerIp: clientIp,
       userAgent,
       fbp: payload.fbp || null,
-      fbc: payload.fbc || null,
+      fbc: resolvedFbc || null,
       pageUrl: payload.url || null,
       value: extracted.value,
       currency: extracted.currency,
@@ -440,7 +448,10 @@ export async function POST(request: NextRequest) {
               url: payload.url,
               referrer: payload.referrer,
               fbp: payload.fbp,
-              fbc: payload.fbc,
+              fbc: resolvedFbc,
+              fbclid: payload.fbclid || null,
+              gbraid: payload.gbraid || null,
+              wbraid: payload.wbraid || null,
               userData: payload.userData,
               customData: payload.customData,
               clientIp,
@@ -461,7 +472,10 @@ export async function POST(request: NextRequest) {
               url: payload.url,
               referrer: payload.referrer,
               fbp: payload.fbp,
-              fbc: payload.fbc,
+              fbc: resolvedFbc,
+              fbclid: payload.fbclid || null,
+              gbraid: payload.gbraid || null,
+              wbraid: payload.wbraid || null,
               ttclid: payload.ttclid,
               gclid: payload.gclid || null,
               rdtCid: payload.rdtCid || null,

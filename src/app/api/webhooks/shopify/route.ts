@@ -18,6 +18,11 @@ import { checkOrderLimits, decrementOrderCount } from "@/lib/billing";
 import { lookupSessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
+import {
+  buildLineItemContentIds,
+  buildLineItemContents,
+  buildOrderAttribution,
+} from "@/lib/shopify-webhook-attribution";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
@@ -241,6 +246,9 @@ async function handleOrderPaid(
       sum + (Number(item.quantity) || 0),
     0
   );
+  const orderAttribution = buildOrderAttribution(orderData);
+  const contentIds = buildLineItemContentIds(lineItems);
+  const contents = buildLineItemContents(lineItems);
 
   // Extract browser context directly from Shopify order payload (fallback for session enrichment)
   const landingSite = orderData.landing_site ? String(orderData.landing_site) : null;
@@ -490,6 +498,9 @@ async function handleOrderPaid(
           currency,
           num_items: numItems,
           order_id: orderName || orderId,
+          content_type: "product",
+          content_ids: contentIds,
+          contents,
         },
         hasUserData: !!(email || phone),
         enrichment: sessionContext ? {
@@ -505,18 +516,18 @@ async function handleOrderPaid(
       orderId: orderId || null,
       source: "webhook",
       paymentGateway,
-      utmSource: sessionContext?.utmSource ?? orderUtmSource,
-      utmMedium: sessionContext?.utmMedium ?? orderUtmMedium,
-      utmCampaign: sessionContext?.utmCampaign ?? orderUtmCampaign,
-      utmContent: sessionContext?.utmContent ?? orderUtmContent,
-      utmTerm: sessionContext?.utmTerm ?? orderUtmTerm,
-      gclid: sessionContext?.gclid ?? orderGclid,
+      utmSource: orderAttribution.utmSource ?? sessionContext?.utmSource ?? orderUtmSource,
+      utmMedium: orderAttribution.utmMedium ?? sessionContext?.utmMedium ?? orderUtmMedium,
+      utmCampaign: orderAttribution.utmCampaign ?? sessionContext?.utmCampaign ?? orderUtmCampaign,
+      utmContent: orderAttribution.utmContent ?? sessionContext?.utmContent ?? orderUtmContent,
+      utmTerm: orderAttribution.utmTerm ?? sessionContext?.utmTerm ?? orderUtmTerm,
+      gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? orderGclid,
       pageUrl: sessionContext?.url ?? orderPageUrl,
-      fbp: sessionContext?.fbp ?? null,
-      fbc: sessionContext?.fbc ?? orderFbc,
-      ttclid: sessionContext?.ttclid ?? orderTtclid,
-      rdtCid: sessionContext?.rdtCid ?? orderRdtCid,
-      epik: sessionContext?.epik ?? orderEpik,
+      fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
+      fbc: orderAttribution.fbc ?? sessionContext?.fbc ?? orderFbc,
+      ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? orderTtclid,
+      rdtCid: orderAttribution.rdtCid ?? sessionContext?.rdtCid ?? orderRdtCid,
+      epik: orderAttribution.epik ?? sessionContext?.epik ?? orderEpik,
     };
 
     const eventLogEntries = await Promise.all(
@@ -554,8 +565,11 @@ async function handleOrderPaid(
       timestamp: Date.now(),
       url: sessionContext?.url || orderPageUrl || `https://${shopDomain}`,
       referrer: "",
-      fbp: sessionContext?.fbp ?? null,
-      fbc: sessionContext?.fbc ?? orderFbc ?? null,
+      fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
+      fbc: orderAttribution.fbc ?? sessionContext?.fbc ?? orderFbc ?? null,
+      fbclid: orderAttribution.fbclid ?? null,
+      gbraid: orderAttribution.gbraid ?? null,
+      wbraid: orderAttribution.wbraid ?? null,
       userData: {
         email: email || null,
         phone: phone || null,
@@ -577,11 +591,10 @@ async function handleOrderPaid(
         value: totalPrice,
         currency,
         num_items: numItems,
-        order_id: orderId,
+        order_id: orderName || orderId,
         content_type: "product",
-        content_ids: lineItems.map(
-          (li) => String(li.product_id || li.sku || "")
-        ),
+        content_ids: contentIds,
+        contents,
       },
       clientIp: sessionContext?.clientIp ?? orderBrowserIp ?? "",
       userAgent: sessionContext?.userAgent ?? orderUserAgent ?? "",
@@ -605,7 +618,17 @@ async function handleOrderPaid(
             destination: dest.destination,
             requestId,
             eventLogId,
-            event: { ...eventData, ttclid: sessionContext?.ttclid ?? orderTtclid ?? null, gclid: sessionContext?.gclid ?? orderGclid ?? null, rdtCid: sessionContext?.rdtCid ?? orderRdtCid ?? null, epik: sessionContext?.epik ?? orderEpik ?? null, gaClientId: sessionContext?.gaClientId ?? null },
+            event: {
+              ...eventData,
+              fbclid: orderAttribution.fbclid ?? null,
+              gbraid: orderAttribution.gbraid ?? null,
+              wbraid: orderAttribution.wbraid ?? null,
+              ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? orderTtclid ?? null,
+              gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? orderGclid ?? null,
+              rdtCid: orderAttribution.rdtCid ?? sessionContext?.rdtCid ?? orderRdtCid ?? null,
+              epik: orderAttribution.epik ?? sessionContext?.epik ?? orderEpik ?? null,
+              gaClientId: sessionContext?.gaClientId ?? null,
+            },
           } satisfies DestinationEventJob);
         }
       })

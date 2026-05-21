@@ -6,6 +6,9 @@ export interface SnippetEventPayload {
   referrer?: string;
   fbp?: string | null;
   fbc?: string | null;
+  fbclid?: string | null;
+  gbraid?: string | null;
+  wbraid?: string | null;
   userAgent?: string;
   customData?: Record<string, unknown>;
   userData?: {
@@ -32,5 +35,7 @@ export interface SnippetEventPayload {
   utmContent?: string | null;
   utmTerm?: string | null;
   gclid?: string | null;
+  gaClientId?: string | null;
   onlyDestinations?: string[];
+  excludeDestinations?: string[];
 }
