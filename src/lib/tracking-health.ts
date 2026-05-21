@@ -68,7 +68,7 @@ export async function getTrackingHealth(
   }
 
   const [
-    lastBrowserEvent,
+    lastSnippetEvent,
     lastWebhookPurchase,
     lastMetaEvent,
     lastTikTokEvent,
@@ -181,13 +181,13 @@ export async function getTrackingHealth(
 
   const checks: TrackingHealthCheck[] = [
     {
-      key: "pixel",
-      label: "Pixel installed",
-      severity: lastBrowserEvent ? "ok" : "warning",
-      detail: lastBrowserEvent
-        ? `Browser event received ${formatAge(lastBrowserEvent.createdAt)}.`
-        : "No stored browser conversion event in the last 24h.",
-      timestamp: lastBrowserEvent?.createdAt ?? null,
+      key: "snippet_activity",
+      label: "Recent snippet event",
+      severity: lastSnippetEvent ? "ok" : "warning",
+      detail: lastSnippetEvent
+        ? `Snippet event received ${formatAge(lastSnippetEvent.createdAt)}.`
+        : "No stored snippet event in the last 24h. This is an activity check, not a pixel-install heartbeat.",
+      timestamp: lastSnippetEvent?.createdAt ?? null,
     },
     {
       key: "webhook",

@@ -18,7 +18,15 @@ describe("workspace-mode", () => {
     expect(resolveWorkspaceProductMode(workspace)).toBe("LEGACY_ALL_DESTINATIONS");
     expect(resolveWorkspaceInstallType(workspace)).toBe("HEADLESS_CUSTOM");
     expect(isLegacyWorkspace(workspace)).toBe(true);
-    expect(getAllowedDestinationsForWorkspace(workspace)).toContain("GOOGLE_ADS");
+    expect(getAllowedDestinationsForWorkspace(workspace)).toEqual([
+      "META",
+      "TIKTOK",
+      "GA4",
+      "KLAVIYO",
+      "REDDIT",
+      "PINTEREST",
+      "GOOGLE_ADS",
+    ]);
   });
 
   it("limits Shopify V1 workspaces to Meta and TikTok", () => {

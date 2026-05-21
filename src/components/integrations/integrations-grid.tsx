@@ -14,8 +14,8 @@ import { SetupGuide } from "@/components/integrations/setup-guide";
 
 export interface IntegrationWorkspace {
   id: string;
-  productMode: string | null;
-  installType: string | null;
+  productMode: "SHOPIFY_META_TIKTOK_V1" | "LEGACY_ALL_DESTINATIONS";
+  installType: "SHOPIFY_CUSTOM_PIXEL" | "HEADLESS_CUSTOM";
   // Meta
   metaPixelId: string | null;
   metaTestEventCode: string | null;

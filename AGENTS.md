@@ -24,7 +24,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 **Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 12 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 364/364 passing (22 test files)
+- Unit tests: 367/367 passing (24 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports one pre-existing test top-level-await config issue)
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -131,7 +131,7 @@ src/
     (dashboard)/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
       dashboard/page.tsx              # Mode-aware analytics: revenue (currency conversion), conversion accuracy, event funnel, delivery, campaign performance, recent events
-      tracking-health/page.tsx        # Operational tracking health for pixel, webhook, Meta/TikTok, Purchase, dedup, attribution, errors
+      tracking-health/page.tsx        # Operational tracking health for recent snippet activity, webhook, Meta/TikTok, Purchase, dedup, attribution, errors
       events/page.tsx                 # Mode-aware event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
       integrations/page.tsx           # Mode-aware destination setup; V1 shows Shopify webhook, Meta, TikTok; legacy shows all destination cards
       settings/page.tsx               # Event toggles, consent, snippet, alerts, language/currency selectors, danger zone
@@ -147,10 +147,10 @@ src/
       auth/verify-email/route.ts      # GET: token-based email verification, sets emailVerified
       events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS, X-TL-Client IP/UA, fbclid->fbc)
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
-      workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD
+      workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD; product mode/install type are read-only to client PATCH requests
       workspaces/[id]/rotate-key/route.ts  # POST: rotate API key
       workspaces/[id]/analytics/route.ts   # GET: dashboard analytics (cached 60s)
-      workspaces/[id]/replay/route.ts # POST: re-queue failed events (500 max, 5min cooldown)
+      workspaces/[id]/replay/route.ts # POST: re-queue failed events (500 max, 5min cooldown, privacy-preserving replay)
       alerts/preferences/route.ts     # GET/PUT: alert notification preferences
       user/preferences/route.ts      # PATCH: update display currency and language
       user/account/route.ts          # DELETE: GDPR account deletion (cancels Stripe, cascades all data)
@@ -255,6 +255,8 @@ tests/
     event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
     event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
+    workspace-route-mode.test.ts      # 1 test (public PATCH cannot mutate product mode/install type)
+    shopify-webhook-route-mode.test.ts # 2 tests (Shopify webhook V1 allowlist + legacy env bypass)
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
     pixel-route.test.ts               # 3 tests (webhook-aware Purchase fbq suppression in generated pixel scripts)
@@ -288,8 +290,11 @@ docker compose up -d
 # Install dependencies
 pnpm install
 
-# Push schema to DB (no migration files)
-pnpm prisma db push
+# Apply local database migrations
+pnpm prisma migrate dev
+
+# Apply committed migrations in production/CI
+pnpm prisma migrate deploy
 
 # Run development server (port 3000)
 pnpm dev
@@ -303,7 +308,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (364 tests, 22 files)
+# Run unit tests (367 tests, 24 files)
 pnpm test
 
 # Run a single test file
@@ -333,6 +338,7 @@ All documented in `.env.example`. Critical ones:
 - `STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`, `STRIPE_SCALE_PRICE_ID` - Stripe product prices
 - `NEXT_PUBLIC_INGEST_URL` - **Required for local dev** (defaults to production URL if unset)
 - `NEXT_PUBLIC_APP_URL` - Base URL for Stripe redirect callbacks
+- `LEGACY_WORKSPACE_IDS` - comma-separated emergency bypass list; matching workspace IDs always resolve to legacy/headless mode
 
 ## API Reference
 
@@ -354,9 +360,9 @@ All documented in `.env.example`. Critical ones:
 | Route | Method | Purpose |
 |-------|--------|---------|
 | `GET/POST /api/workspaces` | GET, POST | List/create workspaces |
-| `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD |
+| `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD; product mode/install type are read-only to client PATCH requests |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
-| `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown) |
+| `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown, privacy-preserving after EventLog sanitization) |
 | `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics with destination filter + currency conversion |
 | `PATCH /api/user/preferences` | PATCH | Update user display currency and language |
 | `DELETE /api/user/account` | DELETE | GDPR account deletion (cancels Stripe, cascades all data) |
@@ -408,7 +414,7 @@ Header: Content-Type: application/json
 - **Token encryption:** Meta access tokens encrypted at rest using AES-256-GCM.
 - **Workspace model:** Each merchant has a workspace with a unique API key (unlimited per user, shared order pool).
 - **Multi-destination fan-out:** Ingest route creates one EventLog + one BullMQ job per enabled destination. Each destination has its own queue, worker, normalizer, and API client.
-- **Product-mode rollout:** `Workspace.productMode` and `Workspace.installType` are nullable for safe migration. Runtime fallback treats missing values as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; new workspaces are created as `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`. V1 workspaces are allowlisted to Meta/TikTok in UI, ingest, webhook, replay, analytics, and event views. `LEGACY_WORKSPACE_IDS` can force legacy behavior as an emergency bypass.
+- **Product-mode rollout:** `Workspace.productMode` and `Workspace.installType` are nullable for safe migration. Runtime fallback treats missing values as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; new workspaces are created as `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`. V1 workspaces are allowlisted to Meta/TikTok in UI, ingest, webhook, replay, analytics, and event views. Public workspace PATCH requests cannot mutate product mode/install type. `LEGACY_WORKSPACE_IDS` can force legacy behavior as an emergency bypass.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard "All" view deduplicates by filtering to a canonical destination (first enabled). Per-destination tabs show filtered stats. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.
@@ -420,8 +426,8 @@ Header: Content-Type: application/json
 - **UTM attribution:** Snippet captures UTM params + gclid + rdtCid + epik once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
-- **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery.
-- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: pixel activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, and recent errors.
+- **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery. Replay is privacy-preserving: sanitized rows replay attribution columns and customData, but raw PII is not reconstructed after it has been removed.
+- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, and recent errors. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
 - **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, and `contents`.
 - **Webhook Purchase browser guard:** If a workspace has a Shopify webhook secret configured, TrackClear generated pixel scripts do not fire browser `fbq("track", "Purchase")`; they still send the TrackClear Purchase to ingest so session context can enrich the webhook Purchase.
 - **Stale pending requeue:** BullMQ repeatable job every 5 minutes finds PENDING events older than 5 minutes and re-queues them to the appropriate destination queue, preventing events from getting stuck after Redis restarts.

@@ -143,8 +143,12 @@ export async function POST(
     return NextResponse.json({ replayed: 0, message: "No failed events found" });
   }
 
-  // 6. Re-queue each event to the correct destination queue and reset status to PENDING
-  //    Workers look up credentials from DB themselves; we only pass workspaceId + event data
+  // 6. Re-queue each event to the correct destination queue and reset status to PENDING.
+  //    EventLog payloads are intentionally sanitized for privacy. Replay preserves
+  //    event metadata, attribution columns, and sanitized customData, but it does not
+  //    reconstruct raw email/phone/name/address after those values have been removed.
+  //    Older failed rows that still contain payload.userData can replay that data.
+  //    Workers look up credentials from DB themselves; we only pass workspaceId + event data.
   let replayed = 0;
 
   for (const event of failedEvents) {

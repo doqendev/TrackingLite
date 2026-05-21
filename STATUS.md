@@ -7,7 +7,7 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 364/364 passing (22 files) |
+| Tests (`pnpm test -- --run`) | 367/367 passing (24 files) |
 | TypeScript | 0 source errors (`pnpm exec tsc --noEmit` still reports the pre-existing top-level-await config issue in `tests/unit/meta-event-processor.test.ts`) |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 
@@ -25,7 +25,7 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | `/privacy` | Public | Working | Privacy policy (accurate: IP/UA stored, PII hashing, data retention, GDPR rights) |
 | `/terms` | Public | Working | Terms of service (billing, acceptable use, liability, termination) |
 | `/dashboard` | Protected | Working | Mode-aware analytics with revenue cards (currency conversion), event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events. Full i18n (6 languages) |
-| `/tracking-health` | Protected | Working | Operational status for pixel activity, Shopify webhook, Meta/TikTok connection, Purchase, dedup, attribution, recent errors |
+| `/tracking-health` | Protected | Working | Operational status for recent snippet activity, Shopify webhook, Meta/TikTok connection, Purchase, dedup, attribution, recent errors |
 | `/events` | Protected | Working | Mode-aware paginated event log with type/status filters, Source/Campaign columns, retry failed events |
 | `/settings` | Protected | Working | Event toggles, consent mode, snippet, alert preferences, language selector, currency selector, danger zone |
 | `/integrations` | Protected | Working | Mode-aware setup: V1 shows Shopify webhook + Meta/TikTok, legacy/custom workspaces show all destination cards |
@@ -43,9 +43,9 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | `/api/auth/verify-email` | GET | - | Working | Token-based email verification, sets emailVerified on User |
 | `/api/events/ingest` | POST, OPTIONS | API Key | Working | Multi-destination fan-out pipeline with CORS, X-Request-ID header, server-proxy shopper IP/UA headers, fbclid-derived fbc |
 | `/api/workspaces` | GET, POST | Session | Working | Unlimited workspaces, encrypts credentials |
-| `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, all destinations |
+| `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, destination credentials, product mode/install type read-only from public PATCH |
 | `/api/workspaces/[id]/rotate-key` | POST | Session | Working | Generates new API key |
-| `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown) — all destinations supported |
+| `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown), all destinations supported; sanitized rows replay without reconstructing raw PII |
 | `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics (60s Redis cache, destination filter, currency conversion) |
 | `/api/user/preferences` | PATCH | Session | Working | Update user display currency and language |
 | `/api/user/account` | DELETE | Session | Working | GDPR account deletion (cancels Stripe, cascades all data) |
@@ -100,7 +100,7 @@ Each destination has:
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case, bounded Meta cookie validation |
 | `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, and clickIdFlags instead of raw shopper userData |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
-| `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness |
+| `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness; snippet activity is activity-based, not a heartbeat |
 | `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
@@ -160,9 +160,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (27 files, 409 tests)
+### Test Coverage (29 files, 412 tests)
 
-#### Unit Tests (22 files, 364 tests)
+#### Unit Tests (24 files, 367 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -175,7 +175,8 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `pixel-route.test.ts` | 3 | Generated pixel scripts: bounded fbp validation and webhook-aware Purchase fbq guard |
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
-| `workspace-mode.test.ts` | 3 | Null-mode legacy fallback, Shopify V1 Meta/TikTok allowlist, env bypass |
+| `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
+| `workspace-route-mode.test.ts` | 1 | Public workspace PATCH cannot switch normal workspaces to legacy/headless |
 | `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
 | `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
 | `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
@@ -188,6 +189,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `shopify-webhook-attribution.test.ts` | 11 | Shopify order/landing attribution extraction, absolute landing URL normalization, fbc synthesis, variant-first content IDs, Purchase contents |
 | `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
 | `shopify-webhook.test.ts` | 6 | HMAC verification, replay protection, header extraction |
+| `shopify-webhook-route-mode.test.ts` | 2 | Shopify webhook fan-out filters V1 to Meta/TikTok and preserves legacy env-bypass behavior |
 
 #### Integration Tests (5 files, 45 tests)
 
@@ -238,7 +240,7 @@ None currently tracked.
 ## Feature Expansion History
 
 ### Phase 1: Quick Wins (2026-02-19)
-1. **Event Replay** - Retry failed events from events page (bulk or per-event, 5min cooldown)
+1. **Event Replay** - Retry failed events from events page (bulk or per-event, 5min cooldown). Replay is privacy-preserving after EventLog sanitization and does not reconstruct removed raw PII.
 3. **Conversion Accuracy** - Purchase delivery accuracy dashboard (7d/30d)
 4. **Password Reset** - Working password reset via Resend email service
 
@@ -347,13 +349,14 @@ None currently tracked.
 5. **Richer Purchase Payloads** - Webhook Purchases now include variant-first `content_ids`, `content_type: "product"`, and `contents` with quantity and item price where Shopify provides them.
 6. **Session Enrichment Before Webhook Skip** - Snippet Purchase events for webhook-enabled workspaces now store browser context before returning `webhook_active`, so later Shopify webhooks can recover checkout attribution.
 7. **Webhook Purchase Dedup Guard** - For workspaces with a Shopify webhook secret configured, generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts suppress browser `fbq("track", "Purchase")` while still sending TrackClear Purchase context to ingest.
-8. **EventLog Payload Privacy** - Snippet-created EventLog rows now store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw email, phone, name, address, or customer ID. Queue jobs still receive transient raw userData for Meta/TikTok delivery.
-9. **Shopify Meta+TikTok V1 Product Mode** - Added nullable `Workspace.productMode` and `installType`, defaulted new workspaces to `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`, and treated null/existing workspaces as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`.
+8. **EventLog Payload Privacy** - Snippet-created EventLog rows now store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw email, phone, name, address, or customer ID. Queue jobs still receive transient raw userData for Meta/TikTok delivery. Replay keeps sanitized custom data and attribution columns but does not reconstruct removed raw PII.
+9. **Shopify Meta+TikTok V1 Product Mode** - Added nullable `Workspace.productMode` and `installType`, defaulted new workspaces to `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`, treated null/existing workspaces as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`, and committed an idempotent Prisma migration for the schema change.
 10. **Mode-Aware Destination Allowlist** - V1 workspaces are limited to Meta/TikTok in integrations UI, onboarding, ingest, Shopify webhooks, replay, dashboard analytics, and events. Legacy/custom workspaces keep all configured destination behavior including `onlyDestinations` and `excludeDestinations`.
-11. **Tracking Health Page** - Added `/tracking-health` for V1 readiness: pixel activity, webhook active/Purchase received, Meta/TikTok connection, dedup status, attribution context, and recent errors.
-12. **V1 Product Copy** - Public landing/pricing/OpenGraph copy now describes Shopify purchase tracking for Meta + TikTok and no longer advertises hidden 7-platform or annual-pricing claims for new users.
-13. **Production Legacy Protection** - Production schema was pushed additively, and Mizoke workspace `cmo1hd1x600045r6d9elaw3tg` was explicitly marked `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; null existing workspaces still resolve to legacy/custom.
-14. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, generated pixel Purchase guards, EventLog payload sanitization, workspace-mode fallback, V1 allowlisting, and legacy destination preservation.
+11. **Product Mode Guardrails** - Public workspace PATCH requests reject `productMode` and `installType`, server-rendered UI resolves mode through the same helper as backend fan-out, and `LEGACY_WORKSPACE_IDS` remains available as an emergency bypass.
+12. **Tracking Health Page** - Added `/tracking-health` for V1 readiness: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connection, dedup status, attribution context, and recent errors. The snippet check is intentionally named as event activity, not a pixel-install heartbeat.
+13. **V1 Product Copy** - Public landing/pricing/OpenGraph copy now describes Shopify purchase tracking for Meta + TikTok and no longer advertises hidden 7-platform, annual-pricing, or unproven delivery-rate claims for new users.
+14. **Production Legacy Protection** - Production migration `20260521_add_workspace_product_mode` was applied, `LEGACY_WORKSPACE_IDS` was set in Vercel Production, and Mizoke workspace `cmo1hd1x600045r6d9elaw3tg` was explicitly marked `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; null existing workspaces still resolve to legacy/custom.
+15. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, generated pixel Purchase guards, EventLog payload sanitization, workspace-mode fallback, V1 allowlisting, Shopify webhook fan-out filtering, public PATCH mode immutability, and legacy destination preservation.
 
 ## Not Yet Implemented
 

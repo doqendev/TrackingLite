@@ -5,6 +5,10 @@ import { getActiveWorkspace } from "@/lib/active-workspace";
 import { IntegrationsGrid } from "@/components/integrations/integrations-grid";
 import { getTranslations } from "next-intl/server";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  resolveWorkspaceInstallType,
+  resolveWorkspaceProductMode,
+} from "@/lib/workspace-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -76,8 +80,8 @@ export default async function IntegrationsPage() {
 
   const workspaceForClient = {
     id: workspace.id,
-    productMode: workspace.productMode,
-    installType: workspace.installType,
+    productMode: resolveWorkspaceProductMode(workspace),
+    installType: resolveWorkspaceInstallType(workspace),
     // Meta
     metaPixelId: workspace.metaPixelId,
     metaTestEventCode: workspace.metaTestEventCode,

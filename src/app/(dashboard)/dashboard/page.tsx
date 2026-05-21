@@ -55,6 +55,8 @@ export default async function DashboardPage() {
         metaAccessTokenEncrypted: true,
         enableMeta: true,
         enableTikTok: true,
+        tiktokPixelId: true,
+        tiktokAccessTokenEncrypted: true,
         enableGA4: true,
         enableKlaviyo: true,
         enableReddit: true,
@@ -72,9 +74,10 @@ export default async function DashboardPage() {
       allowedDestinations.includes("META") &&
       allowedDestinations.includes("TIKTOK");
     hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
+    const hasTikTokCredentials = !!(workspace.enableTikTok && workspace.tiktokPixelId && workspace.tiktokAccessTokenEncrypted);
     hasAnyDestination = isShopifyV1
-      ? hasMetaCredentials || workspace.enableTikTok
-      : hasMetaCredentials || workspace.enableTikTok || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
+      ? hasMetaCredentials || hasTikTokCredentials
+      : hasMetaCredentials || hasTikTokCredentials || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
 
     // Get user's display currency
     const user = await db.user.findUnique({

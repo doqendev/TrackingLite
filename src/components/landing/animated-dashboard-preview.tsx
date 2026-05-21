@@ -29,19 +29,18 @@ const FUNNEL = [
 
 const CAMPAIGNS = [
   { source: "facebook", name: "summer_sale_2026", events: 1247, revenue: 18420 },
-  { source: "google", name: "brand_search_q1", events: 893, revenue: 12890 },
+  { source: "facebook", name: "retargeting_q1", events: 893, revenue: 12890 },
   { source: "tiktok", name: "viral_product_v2", events: 456, revenue: 8750 },
 ];
 
 const SOURCE_COLORS: Record<string, string> = {
   facebook: "#3b82f6",
-  google: "#f59e0b",
   tiktok: "#ec4899",
 };
 
 export function AnimatedDashboardPreview() {
   const revenue = useCountUp(48291);
-  const deliveryRate = useCountUp(997, 1500);
+  const deliveryRate = useCountUp(24, 1500);
   const events24h = useCountUp(12847, 1800);
   const [barsVisible, setBarsVisible] = useState(false);
 
@@ -60,9 +59,9 @@ export function AnimatedDashboardPreview() {
           <div className="pn-preview-card-delta pn-preview-card-delta--up">+12%</div>
         </div>
         <div className="pn-preview-card">
-          <div className="pn-preview-card-label">DELIVERY</div>
-          <div className="pn-preview-card-value">{(deliveryRate / 10).toFixed(1)}%</div>
-          <div className="pn-preview-card-delta pn-preview-card-delta--up">+0.2%</div>
+          <div className="pn-preview-card-label">HEALTH</div>
+          <div className="pn-preview-card-value">{deliveryRate}/7</div>
+          <div className="pn-preview-card-delta pn-preview-card-delta--up">MONITORED</div>
         </div>
         <div className="pn-preview-card pn-preview-card--accent">
           <div className="pn-preview-card-label">REVENUE 30D</div>

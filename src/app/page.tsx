@@ -46,7 +46,7 @@ const problems = [
 
 const stats = [
   { value: "2", label: "Ad Platforms" },
-  { value: "99.7%", label: "Delivery Rate" },
+  { value: "24/7", label: "Health Monitor" },
   { value: "$0", label: "To Start" },
   { value: "10min", label: "Setup" },
 ];

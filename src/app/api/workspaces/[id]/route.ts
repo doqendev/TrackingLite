@@ -7,19 +7,13 @@ import { invalidateWorkspaceCache } from "@/lib/workspace-cache";
 import { z } from "zod";
 import { createLogger } from "@/lib/logger";
 import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
-import {
-  DEFAULT_NEW_WORKSPACE_INSTALL_TYPE,
-  DEFAULT_NEW_WORKSPACE_PRODUCT_MODE,
-  isLegacyWorkspace,
-} from "@/lib/workspace-mode";
+import { isLegacyWorkspace } from "@/lib/workspace-mode";
 
 const log = createLogger({ component: "workspaces-id" });
 
 const UpdateWorkspaceSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   domain: z.string().optional().nullable(),
-  productMode: z.enum(["SHOPIFY_META_TIKTOK_V1", "LEGACY_ALL_DESTINATIONS"]).optional(),
-  installType: z.enum(["SHOPIFY_CUSTOM_PIXEL", "HEADLESS_CUSTOM"]).optional(),
   metaPixelId: z.string().regex(/^\d+$/, "Pixel ID must be numeric").optional().nullable(),
   metaAccessToken: z.string().optional().nullable(),
   metaTestEventCode: z.string().optional().nullable(),
@@ -214,16 +208,26 @@ export async function PATCH(
 
   try {
     const body = await request.json();
+
+    if (
+      body &&
+      typeof body === "object" &&
+      ("productMode" in body || "installType" in body)
+    ) {
+      return NextResponse.json(
+        { error: "Workspace product mode is managed internally and cannot be changed from this endpoint." },
+        { status: 400 }
+      );
+    }
+
     const data = UpdateWorkspaceSchema.parse(body);
-    const nextMode = data.productMode ?? workspace.productMode ?? null;
-    const nextInstallType = data.installType ?? workspace.installType ?? null;
-    const nextWorkspaceMode = {
+    const workspaceMode = {
       id: workspace.id,
-      productMode: nextMode,
-      installType: nextInstallType,
+      productMode: workspace.productMode,
+      installType: workspace.installType,
     };
 
-    if (!isLegacyWorkspace(nextWorkspaceMode)) {
+    if (!isLegacyWorkspace(workspaceMode)) {
       const blockedField = Object.keys(data).find((key) =>
         LEGACY_DESTINATION_UPDATE_FIELDS.has(key)
       );
@@ -233,10 +237,6 @@ export async function PATCH(
           { status: 400 }
         );
       }
-    }
-
-    if (data.productMode === DEFAULT_NEW_WORKSPACE_PRODUCT_MODE && !data.installType) {
-      data.installType = DEFAULT_NEW_WORKSPACE_INSTALL_TYPE;
     }
 
     // Re-resolve shopifyDomain if domain is being updated
