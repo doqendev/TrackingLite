@@ -139,9 +139,22 @@ describe("ingest attribution handling", () => {
           fbc: expectedFbc,
           customerIp: "203.0.113.8",
           userAgent: "RealBrowser/1.0",
+          payload: expect.objectContaining({
+            eventName: "AddToCart",
+            customData: { value: 29.99, currency: "EUR" },
+            userDataFlags: expect.objectContaining({ hasEmail: true }),
+            clickIdFlags: expect.objectContaining({
+              hasFbclid: true,
+              hasFbc: true,
+              hasFbp: true,
+            }),
+          }),
         }),
       })
     );
+    const eventLogPayload = mockEventLogCreate.mock.calls[0][0].data.payload;
+    expect(eventLogPayload).not.toHaveProperty("userData");
+    expect(JSON.stringify(eventLogPayload)).not.toContain("buyer@example.com");
     expect(mockQueueAdd).toHaveBeenCalledWith(
       "send-meta-event",
       expect.objectContaining({
@@ -150,6 +163,7 @@ describe("ingest attribution handling", () => {
           clientIp: "203.0.113.8",
           userAgent: "RealBrowser/1.0",
           fbclid: "CLICK123",
+          userData: { email: "buyer@example.com" },
         }),
       })
     );

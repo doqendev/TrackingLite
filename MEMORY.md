@@ -10,6 +10,8 @@
 - Webhook Purchase custom data now includes `content_type: "product"`, variant-first `content_ids`, and `contents` with quantity and item price when Shopify provides them.
 - Snippet Purchase events for webhook-enabled workspaces now store session enrichment before returning `webhook_active`, so checkout context can still enrich the later webhook Purchase.
 - Generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts suppress browser `fbq("track", "Purchase")` when a Shopify webhook secret is configured, while still sending TrackClear Purchase context to ingest.
-- Added tests: `tracking-context.test.ts`, `shopify-webhook-attribution.test.ts`, `ingest-attribution.test.ts`, `pixel-route.test.ts`, plus expanded `event-normalizer.test.ts` coverage.
-- Validation: targeted attribution/normalizer/webhook tests passed 67/67; `pnpm test -- --run` passed 357/357 unit tests; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully.
+- Snippet-created EventLog rows now store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`; queue jobs still receive transient raw userData for destination delivery.
+- Added tests: `tracking-context.test.ts`, `shopify-webhook-attribution.test.ts`, `ingest-attribution.test.ts`, `pixel-route.test.ts`, `event-log-payload.test.ts`, plus expanded `event-normalizer.test.ts` coverage.
+- Validation: targeted EventLog payload/ingest/Meta tests passed 58/58; targeted attribution/normalizer/webhook tests passed 67/67; `pnpm test -- --run` passed 359/359 unit tests; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully.
 - Remaining assumption: Meta catalog canonical product ID format is still not confirmed. Webhook Purchases now prefer Shopify `variant_id`, then fall back to `product_id`, then `sku` to match the browser-event variant-ID direction without deleting fallbacks.
+- Product-mode rollout note: do not simplify normal-store UI or backend destination filtering until the live headless workspace has been identified and explicitly classified as legacy/custom.

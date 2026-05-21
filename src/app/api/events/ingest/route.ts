@@ -21,6 +21,7 @@ import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import { storeSessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
 import { getClientIpFromHeaders, getClientUserAgentFromHeaders, resolveFbc } from "@/lib/tracking-context";
+import { buildEventLogPayload } from "@/lib/event-log-payload";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -364,16 +365,20 @@ export async function POST(request: NextRequest) {
       eventName: payload.eventName as any,
       eventId: payload.eventId,
       status: "PENDING" as const,
-      payload: {
+      payload: buildEventLogPayload({
         eventName: payload.eventName,
         customData: payload.customData,
-        userData: payload.userData || {},
-        clickIds: {
-          fbclid: payload.fbclid || null,
-          gbraid: payload.gbraid || null,
-          wbraid: payload.wbraid || null,
-        },
-      } as any,
+        userData: payload.userData,
+        fbp: payload.fbp,
+        fbc: resolvedFbc,
+        fbclid: payload.fbclid,
+        gbraid: payload.gbraid,
+        wbraid: payload.wbraid,
+        ttclid: payload.ttclid,
+        rdtCid: payload.rdtCid,
+        epik: payload.epik,
+        gclid: payload.gclid,
+      }) as any,
       customerIp: clientIp,
       userAgent,
       fbp: payload.fbp || null,

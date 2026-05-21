@@ -24,7 +24,7 @@ Small-to-mid Shopify stores running ads on Meta, TikTok, Reddit, Pinterest, and 
 
 **Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 12 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 357/357 passing (20 test files)
+- Unit tests: 359/359 passing (21 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports one pre-existing test top-level-await config issue)
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -188,6 +188,7 @@ src/
     constants.ts                      # BILLING_PLANS (order-based), AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG, META_API_*
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case and bounded Meta cookie validation)
+    event-log-payload.ts              # Sanitized EventLog payload builder (customData + flags, no raw userData)
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
@@ -238,7 +239,7 @@ messages/
   it.json                             # Italian translations
 tests/
   unit/
-    hash-pii.test.ts                  # 25 tests
+    hash-pii.test.ts                  # 24 tests
     phone-normalizer.test.ts          # 16 tests
     encryption.test.ts                # 12 tests
     api-key.test.ts                   # 12 tests
@@ -246,6 +247,7 @@ tests/
     meta-capi.test.ts                 # 21 tests
     rate-limit.test.ts                # 16 tests
     event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
+    event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
     pixel-route.test.ts               # 3 tests (webhook-aware Purchase fbq suppression in generated pixel scripts)
@@ -294,7 +296,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (357 tests, 20 files)
+# Run unit tests (359 tests, 21 files)
 pnpm test
 
 # Run a single test file
@@ -410,6 +412,7 @@ Header: Content-Type: application/json
 - **UTM attribution:** Snippet captures UTM params + gclid + rdtCid + epik once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
+- **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery.
 - **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, and `contents`.
 - **Webhook Purchase browser guard:** If a workspace has a Shopify webhook secret configured, TrackClear generated pixel scripts do not fire browser `fbq("track", "Purchase")`; they still send the TrackClear Purchase to ingest so session context can enrich the webhook Purchase.
 - **Stale pending requeue:** BullMQ repeatable job every 5 minutes finds PENDING events older than 5 minutes and re-queues them to the appropriate destination queue, preventing events from getting stuck after Redis restarts.

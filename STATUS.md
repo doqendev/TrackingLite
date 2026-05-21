@@ -7,7 +7,7 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 357/357 passing (20 files) |
+| Tests (`pnpm test -- --run`) | 359/359 passing (21 files) |
 | TypeScript | 0 source errors (`pnpm exec tsc --noEmit` still reports the pre-existing top-level-await config issue in `tests/unit/meta-event-processor.test.ts`) |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 
@@ -96,6 +96,7 @@ Each destination has:
 | `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (7 queues) |
 | `meta-capi.ts` | Working | POST to Meta Graph API, MetaCapiError with status/response |
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case, bounded Meta cookie validation |
+| `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, and clickIdFlags instead of raw shopper userData |
 | `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
@@ -155,9 +156,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (25 files, 402 tests)
+### Test Coverage (26 files, 404 tests)
 
-#### Unit Tests (20 files, 357 tests)
+#### Unit Tests (21 files, 359 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -169,6 +170,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `hash-pii.test.ts` | 24 | SHA-256 hashing, all PII fields, edge cases |
 | `pixel-route.test.ts` | 3 | Generated pixel scripts: bounded fbp validation and webhook-aware Purchase fbq guard |
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
+| `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
 | `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
 | `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
 | `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
@@ -176,7 +178,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
 | `consent.test.ts` | 28 | STRICT/LAX mode, webhook bypass, edge cases |
-| `ingest-attribution.test.ts` | 1 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, queue job, and session enrichment |
+| `ingest-attribution.test.ts` | 1 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, and session enrichment |
 | `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
 | `shopify-webhook-attribution.test.ts` | 11 | Shopify order/landing attribution extraction, absolute landing URL normalization, fbc synthesis, variant-first content IDs, Purchase contents |
 | `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
@@ -340,7 +342,8 @@ None currently tracked.
 5. **Richer Purchase Payloads** - Webhook Purchases now include variant-first `content_ids`, `content_type: "product"`, and `contents` with quantity and item price where Shopify provides them.
 6. **Session Enrichment Before Webhook Skip** - Snippet Purchase events for webhook-enabled workspaces now store browser context before returning `webhook_active`, so later Shopify webhooks can recover checkout attribution.
 7. **Webhook Purchase Dedup Guard** - For workspaces with a Shopify webhook secret configured, generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts suppress browser `fbq("track", "Purchase")` while still sending TrackClear Purchase context to ingest.
-8. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, and generated pixel Purchase guards.
+8. **EventLog Payload Privacy** - Snippet-created EventLog rows now store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw email, phone, name, address, or customer ID. Queue jobs still receive transient raw userData for Meta/TikTok delivery.
+9. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, generated pixel Purchase guards, and EventLog payload sanitization.
 
 ## Not Yet Implemented
 
@@ -349,3 +352,5 @@ None currently tracked.
 | Team access | Invite members to workspace |
 | Custom ingest domain | e.g., `t.mystore.com` |
 | Batch ingestion | Multiple events per request |
+| Workspace product modes | Brief recommends nullable `productMode`/`installType` plus legacy headless classification before simplifying UI/backend behavior |
+| Shopify Meta+TikTok V1 UI allowlist | Hide non-V1 destinations only after the current headless workspace is explicitly classified as legacy/custom |
