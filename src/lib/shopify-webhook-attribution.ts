@@ -24,6 +24,26 @@ export interface LandingSiteAttribution extends OrderAttribution {
   pageUrl: string | null;
 }
 
+export function normalizeLandingPageUrl(
+  landingSite: string | null | undefined,
+  shopDomain: string
+): string | null {
+  const rawLandingSite = typeof landingSite === "string" ? landingSite.trim() : "";
+  if (!rawLandingSite) return null;
+
+  const fallbackUrl = `https://${shopDomain}`;
+
+  try {
+    const url = new URL(rawLandingSite, fallbackUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return fallbackUrl;
+    }
+    return url.toString();
+  } catch {
+    return fallbackUrl;
+  }
+}
+
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -121,8 +141,10 @@ export function buildOrderAttribution(
 
 export function extractLandingSiteAttribution(
   landingSite: string | null | undefined,
+  shopDomain: string,
   now = Date.now()
 ): LandingSiteAttribution {
+  const pageUrl = normalizeLandingPageUrl(landingSite, shopDomain);
   const empty: LandingSiteAttribution = {
     fbp: null,
     fbc: null,
@@ -139,13 +161,13 @@ export function extractLandingSiteAttribution(
     utmCampaign: null,
     utmContent: null,
     utmTerm: null,
-    pageUrl: landingSite || null,
+    pageUrl,
   };
 
-  if (!landingSite) return empty;
+  if (!pageUrl) return empty;
 
   try {
-    const url = new URL(landingSite, "https://placeholder.com");
+    const url = new URL(pageUrl);
     const fbclid = url.searchParams.get("fbclid");
 
     return {

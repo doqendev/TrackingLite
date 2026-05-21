@@ -257,7 +257,7 @@ async function handleOrderPaid(
   const orderBrowserIp = (orderData.browser_ip as string) || (clientDetails?.browser_ip as string) || null;
   const orderUserAgent = (clientDetails?.user_agent as string) || null;
 
-  const landingAttribution = extractLandingSiteAttribution(landingSite);
+  const landingAttribution = extractLandingSiteAttribution(landingSite, shopDomain);
 
   // Filter out non-web orders (POS, draft, subscription, manual, bulk)
   // Use a denylist so unknown/new source types (including Shopify test notifications) pass through
@@ -338,6 +338,7 @@ async function handleOrderPaid(
     }
     const finalFbc = orderAttribution.fbc ?? sessionContext?.fbc ?? landingAttribution.fbc ?? landingAttribution.fbcFromFbclid ?? null;
     const finalFbclid = orderAttribution.fbclid ?? landingAttribution.fbclid ?? null;
+    const purchasePageUrl = sessionContext?.url || landingAttribution.pageUrl || `https://${shopDomain}`;
 
     // Build destination list (before billing -- don't charge for consent-blocked events)
     const destinations: Array<{
@@ -496,7 +497,7 @@ async function handleOrderPaid(
       utmContent: orderAttribution.utmContent ?? sessionContext?.utmContent ?? landingAttribution.utmContent,
       utmTerm: orderAttribution.utmTerm ?? sessionContext?.utmTerm ?? landingAttribution.utmTerm,
       gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? landingAttribution.gclid,
-      pageUrl: sessionContext?.url ?? landingAttribution.pageUrl,
+      pageUrl: purchasePageUrl,
       fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
       fbc: finalFbc,
       ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? landingAttribution.ttclid,
@@ -537,7 +538,7 @@ async function handleOrderPaid(
       eventName: "Purchase",
       eventId: webhookEventId,
       timestamp: Date.now(),
-      url: sessionContext?.url || landingAttribution.pageUrl || `https://${shopDomain}`,
+      url: purchasePageUrl,
       referrer: "",
       fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
       fbc: finalFbc,

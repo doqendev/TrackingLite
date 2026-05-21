@@ -6,6 +6,7 @@ import {
   canonicalShopifyLineItemId,
   extractLandingSiteAttribution,
   extractOrderAttributes,
+  normalizeLandingPageUrl,
 } from "@/lib/shopify-webhook-attribution";
 
 describe("shopify-webhook-attribution", () => {
@@ -65,9 +66,13 @@ describe("shopify-webhook-attribution", () => {
   it("extracts landing_site fbclid and synthesizes fbc from it", () => {
     const attribution = extractLandingSiteAttribution(
       "/products/custom-sign?fbclid=LANDING_CLICK&utm_source=meta&utm_campaign=launch&gclid=GCLID123&ttclid=TT123&rdt_cid=RDT123&epik=EPIK123",
+      "mizoke.com",
       1700000000000
     );
 
+    expect(attribution.pageUrl).toBe(
+      "https://mizoke.com/products/custom-sign?fbclid=LANDING_CLICK&utm_source=meta&utm_campaign=launch&gclid=GCLID123&ttclid=TT123&rdt_cid=RDT123&epik=EPIK123"
+    );
     expect(attribution.fbclid).toBe("LANDING_CLICK");
     expect(attribution.fbcFromFbclid).toBe("fb.1.1700000000000.LANDING_CLICK");
     expect(attribution.utmSource).toBe("meta");
@@ -76,6 +81,47 @@ describe("shopify-webhook-attribution", () => {
     expect(attribution.ttclid).toBe("TT123");
     expect(attribution.rdtCid).toBe("RDT123");
     expect(attribution.epik).toBe("EPIK123");
+  });
+
+  it("normalizes relative landing_site values to absolute store URLs", () => {
+    expect(
+      normalizeLandingPageUrl(
+        "/products/custom-sign?fbclid=CLICK123&utm_source=meta",
+        "mizoke.com"
+      )
+    ).toBe("https://mizoke.com/products/custom-sign?fbclid=CLICK123&utm_source=meta");
+  });
+
+  it("keeps absolute landing_site values as absolute URLs", () => {
+    expect(
+      normalizeLandingPageUrl(
+        "https://www.mizoke.com/products/custom-sign?utm_source=meta",
+        "mizoke.com"
+      )
+    ).toBe("https://www.mizoke.com/products/custom-sign?utm_source=meta");
+  });
+
+  it("falls back to the shop URL for unsafe landing_site protocols", () => {
+    expect(normalizeLandingPageUrl("https://[", "mizoke.com")).toBe("https://mizoke.com");
+
+    const attribution = extractLandingSiteAttribution(
+      "javascript:alert(1)",
+      "mizoke.com",
+      1700000000000
+    );
+
+    expect(attribution.pageUrl).toBe("https://mizoke.com");
+    expect(attribution.fbclid).toBeNull();
+    expect(attribution.fbcFromFbclid).toBeNull();
+    expect(attribution.utmSource).toBeNull();
+  });
+
+  it("returns null pageUrl for empty landing_site values", () => {
+    expect(normalizeLandingPageUrl(null, "mizoke.com")).toBeNull();
+    expect(normalizeLandingPageUrl("", "mizoke.com")).toBeNull();
+
+    const attribution = extractLandingSiteAttribution(null, "mizoke.com", 1700000000000);
+    expect(attribution.pageUrl).toBeNull();
   });
 
   it("prefers variant IDs for webhook Purchase content IDs", () => {
