@@ -19,7 +19,7 @@
 - Updated `/diagnostics` so V1 workspaces display only allowed destinations and the event audit field count includes core fields plus optional click/UTM fields only when they were actually captured and are relevant to an allowed destination. This removes misleading missing-field counts for absent campaign click IDs and hidden legacy destinations.
 - Added `src/lib/diagnostics-audit-fields.ts` to centralize field visibility rules. Purchase keeps order ID as a core field, while AddToCart and InitiateCheckout hide order ID unless it is actually captured.
 - Added tests: `diagnostics-audit-fields.test.ts` and `diagnostics-route-mode.test.ts`.
-- Validation: targeted diagnostics tests passed 6/6; `pnpm test -- --run` passed 391/391 unit tests; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing dynamic route/static generation warnings. `pnpm exec tsc --noEmit` still reports pre-existing test-only issues in `content-id.test.ts` and `meta-event-processor.test.ts`; no source errors were reported.
+- Historical validation for this sprint passed; current project-wide validation is recorded in the latest entry above.
 
 ## 2026-05-22 - Maximum Tracking Quality Sprint 2
 
@@ -30,7 +30,7 @@
 - `/tracking-health` now includes a recent webhook Purchase attribution source breakdown so operators can see whether Purchases are being enriched by cart/order attributes, Redis session enrichment, landing-site fallback, or no attribution source.
 - EventLog payload sanitization now redacts `trackclearSessionId` from stored customData alongside checkout/cart tokens.
 - Added tests: `session-enrichment.test.ts`, plus expanded `ingest-attribution.test.ts`, `shopify-webhook-attribution.test.ts`, `shopify-webhook-route-mode.test.ts`, `pixel-route.test.ts`, and `event-log-payload.test.ts`.
-- Validation: targeted Sprint 2 regression tests passed 25/25; `pnpm test -- --run` passed 385/385 unit tests; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing dynamic route/static generation warnings.
+- Historical validation for this sprint passed; current project-wide validation is recorded in the latest entry above.
 - No database migration is required for this sprint.
 - Operational note: the cart attribute writer is best-effort inside Shopify's Custom Pixel runtime and should be confirmed on a real Shopify checkout. It is additive and does not change Mizoke/headless legacy mode or destination allowlisting.
 
@@ -43,8 +43,8 @@
 - Sanitized EventLog customData now redacts checkout/cart tokens, so deterministic ID inputs are not persisted as raw tokens after ingestion.
 - Dirava production workspace `cmlsa6h1w0001zm8nxuzn7a50` was intentionally reclassified to `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`; Mizoke/headless workspace `cmo1hd1x600045r6d9elaw3tg` remains protected as legacy/headless.
 - Added tests: `purchase-event-id.test.ts`, `content-id.test.ts`, `tiktok.test.ts`, plus expanded `ingest-attribution.test.ts`, `pixel-route.test.ts`, and `shopify-webhook-route-mode.test.ts`.
-- Validation: `pnpm test -- --run` passed 382/382 unit tests; targeted content/ingest tests passed 8/8 after strict TypeScript narrowing; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing dynamic route/static generation warnings.
-- Remaining roadmap work from the plan: explicit catalog-mode workspace settings UI, consent-mode policy hardening, headless SDK/Hydrogen helpers, Shopify Web Pixel app path, custom ingest domain, and encrypted short-lived retry payloads.
+- Historical validation for this sprint passed; current project-wide validation is recorded in the latest entry above.
+- Remaining roadmap work from the plan after Sprint 3: Shopify Web Pixel app path, custom ingest domain, encrypted short-lived retry payloads, and deeper CMP-specific consent automation if required.
 
 ## 2026-05-21 - Mizoke/TrackClear Attribution Hardening
 
@@ -67,6 +67,6 @@
 - Final rollout hardening added `docs/deploy.md`, internal script `scripts/set-workspace-mode.ts`, accurate privacy-cookie wording for `_fbp`/`_fbc`, and visible replay privacy wording in the Events UI.
 - Follow-up rollout polish filters the Events page failed-count/replay visibility by the same workspace destination allowlist as the visible event list, preventing V1 workspaces from surfacing old hidden legacy destination failures.
 - Added tests: `tracking-context.test.ts`, `shopify-webhook-attribution.test.ts`, `ingest-attribution.test.ts`, `pixel-route.test.ts`, `event-log-payload.test.ts`, `workspace-mode.test.ts`, `workspace-create-mode.test.ts`, `workspace-route-mode.test.ts`, `events-page-mode.test.ts`, `shopify-webhook-route-mode.test.ts`, plus expanded `event-normalizer.test.ts` coverage.
-- Validation: targeted workspace-mode/ingest/privacy/workspace-create/events-page/workspace-route/webhook-route tests passed 13/13; targeted attribution/normalizer/webhook tests passed 67/67; `pnpm test -- --run` passed 369/369 unit tests; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully; production `pnpm prisma migrate status` reported the schema up to date.
+- Historical validation for this sprint passed; current project-wide validation is recorded in the latest entry above.
 - Remaining assumption: Meta catalog canonical product ID format is still not confirmed. Webhook Purchases now prefer Shopify `variant_id`, then fall back to `product_id`, then `sku` to match the browser-event variant-ID direction without deleting fallbacks.
 - Product-mode rollout note: normal Shopify V1 is now live for newly created workspaces. Existing/null-mode workspaces remain legacy/custom unless explicitly migrated.
