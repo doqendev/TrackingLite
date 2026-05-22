@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Destination as PrismaDestination } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import {
+  getAllowedDestinationsForWorkspace,
+  resolveWorkspaceInstallType,
+  resolveWorkspaceProductMode,
+} from "@/lib/workspace-mode";
 
 const FUNNEL_ORDER = [
   "PageView",
@@ -22,7 +28,7 @@ const ALL_DESTINATIONS = [
   "REDDIT",
   "PINTEREST",
   "GOOGLE_ADS",
-] as const;
+] as const satisfies readonly PrismaDestination[];
 
 type Destination = (typeof ALL_DESTINATIONS)[number];
 
@@ -84,6 +90,8 @@ export async function GET(request: NextRequest) {
       id: true,
       name: true,
       isActive: true,
+      productMode: true,
+      installType: true,
       enableMeta: true,
       enableTikTok: true,
       enableGA4: true,
@@ -110,6 +118,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
+  const allowedDestinations = getAllowedDestinationsForWorkspace(workspace);
+  const allowedDestinationList = [...allowedDestinations];
+  const destinationWhere = { destination: { in: allowedDestinationList } };
+
   const now = new Date();
   const ago24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const ago7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -129,11 +141,13 @@ export async function GET(request: NextRequest) {
     stuckCount,
     oldestStuck,
     purchaseAuditRaw,
+    addToCartAuditRaw,
+    initiateCheckoutAuditRaw,
   ] = await Promise.all([
     // Event coverage 30d — for lastSeen (_max createdAt) and 30d totals
     db.eventLog.groupBy({
       by: ["eventName", "status"],
-      where: { workspaceId, createdAt: { gte: ago30d } },
+      where: { workspaceId, createdAt: { gte: ago30d }, ...destinationWhere },
       _count: { id: true },
       _max: { createdAt: true },
     }),
@@ -141,21 +155,21 @@ export async function GET(request: NextRequest) {
     // Event coverage 24h
     db.eventLog.groupBy({
       by: ["eventName", "status"],
-      where: { workspaceId, createdAt: { gte: ago24h } },
+      where: { workspaceId, createdAt: { gte: ago24h }, ...destinationWhere },
       _count: { id: true },
     }),
 
     // Event coverage 7d
     db.eventLog.groupBy({
       by: ["eventName", "status"],
-      where: { workspaceId, createdAt: { gte: ago7d } },
+      where: { workspaceId, createdAt: { gte: ago7d }, ...destinationWhere },
       _count: { id: true },
     }),
 
     // Destination health 24h — grouped by destination + status, with last seen createdAt
     db.eventLog.groupBy({
       by: ["destination", "status"],
-      where: { workspaceId, createdAt: { gte: ago24h } },
+      where: { workspaceId, createdAt: { gte: ago24h }, ...destinationWhere },
       _count: { id: true },
       _max: { createdAt: true },
     }),
@@ -163,31 +177,31 @@ export async function GET(request: NextRequest) {
     // Event×destination matrix 24h
     db.eventLog.groupBy({
       by: ["eventName", "destination", "status"],
-      where: { workspaceId, createdAt: { gte: ago24h } },
+      where: { workspaceId, createdAt: { gte: ago24h }, ...destinationWhere },
       _count: { id: true },
     }),
 
     // Data quality 7d — 7 parallel count queries
     Promise.all([
-      db.eventLog.count({ where: { workspaceId, createdAt: { gte: ago7d } } }),
-      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d } } }),
-      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, value: { gt: 0 } } }),
-      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, currency: { not: null } } }),
-      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, orderId: { not: null } } }),
-      db.eventLog.count({ where: { workspaceId, createdAt: { gte: ago7d }, utmSource: { not: null } } }),
-      db.eventLog.count({ where: { workspaceId, createdAt: { gte: ago7d }, gclid: { not: null } } }),
+      db.eventLog.count({ where: { workspaceId, createdAt: { gte: ago7d }, ...destinationWhere } }),
+      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, ...destinationWhere } }),
+      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, value: { gt: 0 }, ...destinationWhere } }),
+      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, currency: { not: null }, ...destinationWhere } }),
+      db.eventLog.count({ where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, orderId: { not: null }, ...destinationWhere } }),
+      db.eventLog.count({ where: { workspaceId, createdAt: { gte: ago7d }, utmSource: { not: null }, ...destinationWhere } }),
+      db.eventLog.count({ where: { workspaceId, createdAt: { gte: ago7d }, gclid: { not: null }, ...destinationWhere } }),
     ]),
 
     // Funnel 7d — total per event name
     db.eventLog.groupBy({
       by: ["eventName"],
-      where: { workspaceId, createdAt: { gte: ago7d } },
+      where: { workspaceId, createdAt: { gte: ago7d }, ...destinationWhere },
       _count: { id: true },
     }),
 
     // Recent failures — last 20 by createdAt desc
     db.eventLog.findMany({
-      where: { workspaceId, status: "FAILED" },
+      where: { workspaceId, status: "FAILED", ...destinationWhere },
       orderBy: { createdAt: "desc" },
       take: 20,
       select: {
@@ -202,19 +216,87 @@ export async function GET(request: NextRequest) {
 
     // Stuck events count (PENDING older than 10 minutes)
     db.eventLog.count({
-      where: { workspaceId, status: "PENDING", createdAt: { lt: ago10m } },
+      where: { workspaceId, status: "PENDING", createdAt: { lt: ago10m }, ...destinationWhere },
     }),
 
     // Oldest stuck event
     db.eventLog.findFirst({
-      where: { workspaceId, status: "PENDING", createdAt: { lt: ago10m } },
+      where: { workspaceId, status: "PENDING", createdAt: { lt: ago10m }, ...destinationWhere },
       orderBy: { createdAt: "asc" },
       select: { createdAt: true },
     }),
 
     // Purchase event audit — last 10 unique purchases (fetch extra rows for multi-destination fan-out)
     db.eventLog.findMany({
-      where: { workspaceId, eventName: "Purchase" },
+      where: { workspaceId, eventName: "Purchase", ...destinationWhere },
+      orderBy: { createdAt: "desc" },
+      take: 60,
+      select: {
+        id: true,
+        eventId: true,
+        destination: true,
+        status: true,
+        createdAt: true,
+        value: true,
+        currency: true,
+        numItems: true,
+        orderId: true,
+        fbp: true,
+        fbc: true,
+        pageUrl: true,
+        customerIp: true,
+        userAgent: true,
+        utmSource: true,
+        utmMedium: true,
+        utmCampaign: true,
+        utmContent: true,
+        utmTerm: true,
+        gclid: true,
+        ttclid: true,
+        rdtCid: true,
+        epik: true,
+        errorMessage: true,
+        retryCount: true,
+      },
+    }),
+
+    // AddToCart event audit — last 10 unique events
+    db.eventLog.findMany({
+      where: { workspaceId, eventName: "AddToCart", ...destinationWhere },
+      orderBy: { createdAt: "desc" },
+      take: 60,
+      select: {
+        id: true,
+        eventId: true,
+        destination: true,
+        status: true,
+        createdAt: true,
+        value: true,
+        currency: true,
+        numItems: true,
+        orderId: true,
+        fbp: true,
+        fbc: true,
+        pageUrl: true,
+        customerIp: true,
+        userAgent: true,
+        utmSource: true,
+        utmMedium: true,
+        utmCampaign: true,
+        utmContent: true,
+        utmTerm: true,
+        gclid: true,
+        ttclid: true,
+        rdtCid: true,
+        epik: true,
+        errorMessage: true,
+        retryCount: true,
+      },
+    }),
+
+    // InitiateCheckout event audit — last 10 unique events
+    db.eventLog.findMany({
+      where: { workspaceId, eventName: "InitiateCheckout", ...destinationWhere },
       orderBy: { createdAt: "desc" },
       take: 60,
       select: {
@@ -325,7 +407,7 @@ export async function GET(request: NextRequest) {
 
   const ws = workspace as Record<string, unknown>;
 
-  const destinationHealth = ALL_DESTINATIONS.map((dest) => {
+  const destinationHealth = allowedDestinations.map((dest) => {
     const d = destMap[dest] ?? {};
     const sent24h = d["SENT"]?.count ?? 0;
     const failed24h = d["FAILED"]?.count ?? 0;
@@ -376,7 +458,7 @@ export async function GET(request: NextRequest) {
     failed: number;
   }> = [];
   for (const eventName of FUNNEL_ORDER) {
-    for (const dest of ALL_DESTINATIONS) {
+    for (const dest of allowedDestinations) {
       const cell = matrixMap[eventName]?.[dest];
       if (cell) {
         eventDestinationMatrix.push({ eventName, destination: dest, ...cell });
@@ -440,19 +522,13 @@ export async function GET(request: NextRequest) {
     oldest: oldestStuck?.createdAt?.toISOString() ?? null,
   };
 
-  // --- Purchase Audit ---
-  // Group by eventId so each purchase shows per-destination breakdown
-  const purchasesByEventId: Record<
-    string,
-    {
+  // --- Event Audit (shared grouping logic) ---
+  // Group rows by eventId so each event shows per-destination breakdown
+  function groupAuditRows(rows: typeof purchaseAuditRaw, limit = 10) {
+    const byEventId: Record<string, {
       eventId: string;
       createdAt: string;
-      destinations: Array<{
-        destination: string;
-        status: string;
-        errorMessage: string | null;
-        retryCount: number;
-      }>;
+      destinations: Array<{ destination: string; status: string; errorMessage: string | null; retryCount: number }>;
       value: number | null;
       currency: string | null;
       orderId: string | null;
@@ -471,47 +547,50 @@ export async function GET(request: NextRequest) {
       ttclid: string | null;
       rdtCid: string | null;
       epik: string | null;
-    }
-  > = {};
+    }> = {};
 
-  for (const row of purchaseAuditRaw) {
-    const eid = row.eventId;
-    // Stop after 10 unique purchases
-    if (!purchasesByEventId[eid] && Object.keys(purchasesByEventId).length >= 10) continue;
-    if (!purchasesByEventId[eid]) {
-      purchasesByEventId[eid] = {
-        eventId: eid,
-        createdAt: row.createdAt.toISOString(),
-        destinations: [],
-        value: row.value ? Number(row.value) : null,
-        currency: row.currency,
-        orderId: row.orderId,
-        numItems: row.numItems,
-        fbp: row.fbp,
-        fbc: row.fbc,
-        pageUrl: row.pageUrl,
-        customerIp: row.customerIp ? "***" : null, // redact PII
-        userAgent: row.userAgent ? row.userAgent.substring(0, 60) + "..." : null,
-        utmSource: row.utmSource,
-        utmMedium: row.utmMedium,
-        utmCampaign: row.utmCampaign,
-        utmContent: row.utmContent,
-        utmTerm: row.utmTerm,
-        gclid: row.gclid,
-        ttclid: row.ttclid,
-        rdtCid: row.rdtCid,
-        epik: row.epik,
-      };
+    for (const row of rows) {
+      const eid = row.eventId;
+      if (!byEventId[eid] && Object.keys(byEventId).length >= limit) continue;
+      if (!byEventId[eid]) {
+        byEventId[eid] = {
+          eventId: eid,
+          createdAt: row.createdAt.toISOString(),
+          destinations: [],
+          value: row.value ? Number(row.value) : null,
+          currency: row.currency,
+          orderId: row.orderId,
+          numItems: row.numItems,
+          fbp: row.fbp,
+          fbc: row.fbc,
+          pageUrl: row.pageUrl,
+          customerIp: row.customerIp ? "***" : null,
+          userAgent: row.userAgent ? row.userAgent.substring(0, 60) + "..." : null,
+          utmSource: row.utmSource,
+          utmMedium: row.utmMedium,
+          utmCampaign: row.utmCampaign,
+          utmContent: row.utmContent,
+          utmTerm: row.utmTerm,
+          gclid: row.gclid,
+          ttclid: row.ttclid,
+          rdtCid: row.rdtCid,
+          epik: row.epik,
+        };
+      }
+      byEventId[eid].destinations.push({
+        destination: row.destination as string,
+        status: row.status as string,
+        errorMessage: row.errorMessage,
+        retryCount: row.retryCount,
+      });
     }
-    purchasesByEventId[eid].destinations.push({
-      destination: row.destination as string,
-      status: row.status as string,
-      errorMessage: row.errorMessage,
-      retryCount: row.retryCount,
-    });
+
+    return Object.values(byEventId);
   }
 
-  const purchaseAudit = Object.values(purchasesByEventId);
+  const purchaseAudit = groupAuditRows(purchaseAuditRaw);
+  const addToCartAudit = groupAuditRows(addToCartAuditRaw);
+  const initiateCheckoutAudit = groupAuditRows(initiateCheckoutAuditRaw);
 
   return NextResponse.json({
     generatedAt: now.toISOString(),
@@ -519,6 +598,9 @@ export async function GET(request: NextRequest) {
       id: workspace.id,
       name: workspace.name,
       isActive: workspace.isActive,
+      productMode: resolveWorkspaceProductMode(workspace),
+      installType: resolveWorkspaceInstallType(workspace),
+      allowedDestinations: allowedDestinationList,
     },
     eventCoverage,
     destinationHealth,
@@ -528,5 +610,7 @@ export async function GET(request: NextRequest) {
     recentFailures: recentFailuresMapped,
     stuckEvents,
     purchaseAudit,
+    addToCartAudit,
+    initiateCheckoutAudit,
   });
 }

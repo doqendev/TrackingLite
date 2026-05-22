@@ -1,5 +1,13 @@
 # MEMORY.md
 
+## 2026-05-22 - Diagnostics Mode-Aware Field Visibility
+
+- Updated `/api/diagnostics` to resolve workspace mode through `getAllowedDestinationsForWorkspace()` and filter destination health, event coverage, matrix, data quality, recent failures, stuck events, and event-audit queries to the workspace's allowed destinations.
+- Updated `/diagnostics` so V1 workspaces display only allowed destinations and the event audit field count includes core fields plus optional click/UTM fields only when they were actually captured and are relevant to an allowed destination. This removes misleading missing-field counts for absent campaign click IDs and hidden legacy destinations.
+- Added `src/lib/diagnostics-audit-fields.ts` to centralize field visibility rules. Purchase keeps order ID as a core field, while AddToCart and InitiateCheckout hide order ID unless it is actually captured.
+- Added tests: `diagnostics-audit-fields.test.ts` and `diagnostics-route-mode.test.ts`.
+- Validation: targeted diagnostics tests passed 6/6; `pnpm test -- --run` passed 391/391 unit tests; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing dynamic route/static generation warnings. `pnpm exec tsc --noEmit` still reports pre-existing test-only issues in `content-id.test.ts` and `meta-event-processor.test.ts`; no source errors were reported.
+
 ## 2026-05-22 - Maximum Tracking Quality Sprint 2
 
 - Implemented the second pass from the TrackClear Maximum Tracking Quality plan, scoped to session/cart attribution recovery, webhook enrichment quality, and Tracking Health visibility.

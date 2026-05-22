@@ -12,6 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  countPresentDiagnosticsAuditFields,
+  getVisibleDiagnosticsAuditFields,
+} from "@/lib/diagnostics-audit-fields";
 
 // ---------------------------------------------------------------------------
 // Types — mirror exact API response shape from /api/diagnostics
@@ -81,6 +85,15 @@ interface StuckEvents {
   oldest: string | null;
 }
 
+interface DiagnosticsWorkspace {
+  id: string;
+  name: string;
+  isActive: boolean;
+  productMode: string;
+  installType: string;
+  allowedDestinations: string[];
+}
+
 interface PurchaseAuditDestination {
   destination: string;
   status: string;
@@ -114,6 +127,7 @@ interface PurchaseAuditEntry {
 
 interface DiagnosticsData {
   generatedAt: string;
+  workspace: DiagnosticsWorkspace;
   eventCoverage: EventCoverageRow[];
   destinationHealth: DestinationHealthRow[];
   eventDestinationMatrix: MatrixEntry[];
@@ -122,6 +136,8 @@ interface DiagnosticsData {
   recentFailures: RecentFailure[];
   stuckEvents: StuckEvents;
   purchaseAudit: PurchaseAuditEntry[];
+  addToCartAudit: PurchaseAuditEntry[];
+  initiateCheckoutAudit: PurchaseAuditEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +303,13 @@ const destinationLabels: Record<string, string> = {
   GOOGLE_ADS: "Google Ads",
 };
 
-function DestinationHealthSection({ rows }: { rows: DestinationHealthRow[] }) {
+function DestinationHealthSection({
+  rows,
+  destinations,
+}: {
+  rows: DestinationHealthRow[];
+  destinations: readonly string[];
+}) {
   const rowMap = Object.fromEntries(rows.map((r) => [r.destination, r]));
 
   return (
@@ -314,7 +336,7 @@ function DestinationHealthSection({ rows }: { rows: DestinationHealthRow[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {DESTINATIONS.map((dest) => {
+            {destinations.map((dest) => {
               const row = rowMap[dest];
               const warnNoCredentials = row?.enabled && !row?.hasCredentials;
               return (
@@ -380,9 +402,11 @@ function DestinationHealthSection({ rows }: { rows: DestinationHealthRow[] }) {
 function MatrixSection({
   entries,
   enabledDestinations,
+  destinations,
 }: {
   entries: MatrixEntry[];
   enabledDestinations: Set<string>;
+  destinations: readonly string[];
 }) {
   // Build nested map: eventName -> destination -> {sent, total}
   const matrixMap: Record<string, Record<string, { sent: number; total: number }>> = {};
@@ -406,7 +430,7 @@ function MatrixSection({
           <TableHeader>
             <TableRow className="border-zinc-800">
               <TableHead className="text-zinc-400 text-xs">Event</TableHead>
-              {DESTINATIONS.map((dest) => (
+              {destinations.map((dest) => (
                 <TableHead
                   key={dest}
                   className={`text-xs text-center ${
@@ -422,7 +446,7 @@ function MatrixSection({
             {ALL_EVENTS.map((event) => (
               <TableRow key={event} className="border-zinc-800">
                 <TableCell className="font-mono text-xs text-white">{event}</TableCell>
-                {DESTINATIONS.map((dest) => {
+                {destinations.map((dest) => {
                   const cell = matrixMap[event]?.[dest];
                   const isEnabled = enabledDestinations.has(dest);
                   if (!isEnabled) {
@@ -481,14 +505,23 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-function DataQualitySection({ dq }: { dq: DataQuality }) {
+function DataQualitySection({
+  dq,
+  allowedDestinations,
+}: {
+  dq: DataQuality;
+  allowedDestinations: readonly string[];
+}) {
   const rows = [
     { label: "Purchase value capture", value: dq.purchasesWithValue, max: dq.purchaseEvents7d },
     { label: "Currency capture", value: dq.purchasesWithCurrency, max: dq.purchaseEvents7d },
     { label: "Order ID capture", value: dq.purchasesWithOrderId, max: dq.purchaseEvents7d },
     { label: "UTM attribution", value: dq.eventsWithUtmSource, max: dq.totalEvents7d },
-    { label: "Google Click ID", value: dq.eventsWithGclid, max: dq.totalEvents7d },
   ];
+
+  if (allowedDestinations.includes("GOOGLE_ADS")) {
+    rows.push({ label: "Google Click ID", value: dq.eventsWithGclid, max: dq.totalEvents7d });
+  }
 
   return (
     <Card className="bg-zinc-900 border-zinc-800">
@@ -692,7 +725,19 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function PurchaseAuditSection({ entries }: { entries: PurchaseAuditEntry[] }) {
+function EventAuditSection({
+  entries,
+  title,
+  emptyLabel,
+  eventName,
+  allowedDestinations,
+}: {
+  entries: PurchaseAuditEntry[];
+  title: string;
+  emptyLabel: string;
+  eventName: string;
+  allowedDestinations: readonly string[];
+}) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (entries.length === 0) {
@@ -700,52 +745,36 @@ function PurchaseAuditSection({ entries }: { entries: PurchaseAuditEntry[] }) {
       <Card className="bg-zinc-900 border-zinc-800">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">
-            <SectionTitle>Purchase Event Audit (last 10)</SectionTitle>
+            <SectionTitle>{title}</SectionTitle>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-zinc-500 text-center py-6">No Purchase events recorded yet</p>
+          <p className="text-sm text-zinc-500 text-center py-6">No {emptyLabel} events recorded yet</p>
         </CardContent>
       </Card>
     );
   }
 
-  const dataFields: { key: keyof PurchaseAuditEntry; label: string; category: string }[] = [
-    { key: "value", label: "Value", category: "Transaction" },
-    { key: "currency", label: "Currency", category: "Transaction" },
-    { key: "orderId", label: "Order ID", category: "Transaction" },
-    { key: "numItems", label: "Num Items", category: "Transaction" },
-    { key: "fbp", label: "fbp (Meta)", category: "Browser IDs" },
-    { key: "fbc", label: "fbc (Meta)", category: "Browser IDs" },
-    { key: "ttclid", label: "ttclid (TikTok)", category: "Click IDs" },
-    { key: "rdtCid", label: "rdtCid (Reddit)", category: "Click IDs" },
-    { key: "epik", label: "epik (Pinterest)", category: "Click IDs" },
-    { key: "gclid", label: "gclid (Google)", category: "Click IDs" },
-    { key: "utmSource", label: "utm_source", category: "UTM" },
-    { key: "utmMedium", label: "utm_medium", category: "UTM" },
-    { key: "utmCampaign", label: "utm_campaign", category: "UTM" },
-    { key: "utmContent", label: "utm_content", category: "UTM" },
-    { key: "utmTerm", label: "utm_term", category: "UTM" },
-    { key: "pageUrl", label: "Page URL", category: "Context" },
-    { key: "customerIp", label: "Customer IP", category: "Context" },
-    { key: "userAgent", label: "User Agent", category: "Context" },
-  ];
-
   return (
     <Card className="bg-zinc-900 border-zinc-800">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">
-          <SectionTitle>Purchase Event Audit (last 10)</SectionTitle>
+          <SectionTitle>{title}</SectionTitle>
         </CardTitle>
         <p className="text-xs text-zinc-500">
-          Shows exactly what data each Purchase event captured and which platforms received it. Click a row to expand.
+          Shows captured core data, plus optional click/UTM fields only when they exist for an allowed destination. Click a row to expand.
         </p>
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y divide-zinc-800">
           {entries.map((entry) => {
             const isExpanded = expanded === entry.eventId;
-            const presentCount = dataFields.filter((f) => entry[f.key] !== null && entry[f.key] !== undefined).length;
+            const dataFields = getVisibleDiagnosticsAuditFields(
+              entry,
+              allowedDestinations,
+              eventName
+            );
+            const presentCount = countPresentDiagnosticsAuditFields(entry, dataFields);
             const totalFields = dataFields.length;
             const completeness = Math.round((presentCount / totalFields) * 100);
             const allSent = entry.destinations.every((d) => d.status === "SENT");
@@ -937,6 +966,9 @@ export default function DiagnosticsPage() {
       .filter((r) => r.enabled)
       .map((r) => r.destination)
   );
+  const allowedDestinations = data?.workspace.allowedDestinations?.length
+    ? data.workspace.allowedDestinations
+    : [...DESTINATIONS];
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
@@ -993,23 +1025,50 @@ export default function DiagnosticsPage() {
 
           {/* Main sections */}
           <EventCoverageSection rows={data.eventCoverage} />
-          <DestinationHealthSection rows={data.destinationHealth} />
+          <DestinationHealthSection
+            rows={data.destinationHealth}
+            destinations={allowedDestinations}
+          />
           <MatrixSection
             entries={data.eventDestinationMatrix}
             enabledDestinations={enabledDestinations}
+            destinations={allowedDestinations}
           />
 
           {/* Two-column: Data Quality + Funnel */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DataQualitySection dq={data.dataQuality} />
+            <DataQualitySection
+              dq={data.dataQuality}
+              allowedDestinations={allowedDestinations}
+            />
             <FunnelSection funnel={data.funnel} />
           </div>
 
           {/* Recent Failures */}
           <RecentFailuresSection failures={data.recentFailures} />
 
-          {/* Purchase Event Audit */}
-          <PurchaseAuditSection entries={data.purchaseAudit} />
+          {/* Event Audits */}
+          <EventAuditSection
+            entries={data.purchaseAudit}
+            title="Purchase Event Audit (last 10)"
+            emptyLabel="Purchase"
+            eventName="Purchase"
+            allowedDestinations={allowedDestinations}
+          />
+          <EventAuditSection
+            entries={data.addToCartAudit}
+            title="Add to Cart Event Audit (last 10)"
+            emptyLabel="AddToCart"
+            eventName="AddToCart"
+            allowedDestinations={allowedDestinations}
+          />
+          <EventAuditSection
+            entries={data.initiateCheckoutAudit}
+            title="Initiate Checkout Event Audit (last 10)"
+            emptyLabel="InitiateCheckout"
+            eventName="InitiateCheckout"
+            allowedDestinations={allowedDestinations}
+          />
 
           {/* Footer note */}
           <p className="text-center text-xs text-zinc-700 pb-4">
