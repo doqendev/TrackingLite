@@ -43,6 +43,11 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain("\\d{7,20}");
     expect(js).toContain('"shopify-purchase:"+W+":"+id');
     expect(js).toContain("contentIds:ci(v.id)");
+    expect(js).toContain("_trackclear_session_id");
+    expect(js).toContain("/cart/update.js");
+    expect(js).toContain("trackclearSessionId:sid");
+    expect(js).toContain("gbraid:cid.gb");
+    expect(js).toContain("_tc_consent_marketing");
     expect(js).toContain('if(!H&&typeof fbq==="function")fbq("track","Purchase"');
   });
 
@@ -62,6 +67,8 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
     expect(js).toContain('"shopify-purchase:"+W+":"+id');
+    expect(js).toContain("_trackclear_session_id");
+    expect(js).toContain("/cart/update.js");
     expect(js).toContain('if(!H&&typeof fbq==="function")fbq("track","Purchase"');
   });
 
@@ -81,6 +88,9 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
     expect(js).toContain('"shopify-purchase:"+W+":"+id');
+    expect(js).toContain("_trackclear_session_id");
+    expect(js).toContain("/cart/update.js");
+    expect(js).toContain("trackclearSessionId:sid");
     expect(js).toContain('if(!H&&typeof fbq==="function")fbq("track","Purchase"');
   });
 });

@@ -18,7 +18,7 @@ import { checkRateLimit, checkPurchaseRateLimit } from "@/lib/rate-limit";
 import { checkOrderLimits } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
-import { storeSessionContext } from "@/lib/session-enrichment";
+import { storeSessionContextForIdentifiers } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
 import { getClientIpFromHeaders, getClientUserAgentFromHeaders, resolveFbc } from "@/lib/tracking-context";
 import { buildEventLogPayload } from "@/lib/event-log-payload";
@@ -39,6 +39,9 @@ const IngestPayloadSchema = z.object({
   fbclid: z.string().max(2048).nullable().optional(),
   gbraid: z.string().max(2048).nullable().optional(),
   wbraid: z.string().max(2048).nullable().optional(),
+  trackclearSessionId: z.string().max(512).nullable().optional(),
+  checkoutToken: z.string().max(1024).nullable().optional(),
+  cartToken: z.string().max(1024).nullable().optional(),
   ttclid: z.string().nullable().optional(),
   utmSource: z.string().nullable().optional(),
   utmMedium: z.string().nullable().optional(),
@@ -68,6 +71,19 @@ const IngestPayloadSchema = z.object({
   onlyDestinations: z.array(z.string()).optional(),
   excludeDestinations: z.array(z.string()).optional(),
 });
+
+function pickCustomString(
+  customData: Record<string, unknown>,
+  keys: string[]
+): string | null {
+  for (const key of keys) {
+    const value = customData[key];
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return null;
+}
 
 // CORS headers for cross-origin snippet requests
 const corsHeaders = {
@@ -177,20 +193,44 @@ export async function POST(request: NextRequest) {
     const clientIp = getClientIpFromHeaders(request.headers);
     const userAgent = getClientUserAgentFromHeaders(request.headers);
 
-    // Store browser context for session enrichment (all events with email, including Purchase)
+    // Store browser context for webhook enrichment. Email is useful, but
+    // session/cart/checkout/order identifiers survive more checkout variants.
+    const sessionIdentifiers = {
+      email: payload.userData?.email ?? null,
+      trackclearSessionId:
+        payload.trackclearSessionId ??
+        pickCustomString(normalizedCustomData, ["trackclearSessionId", "_trackclear_session_id"]),
+      checkoutToken:
+        payload.checkoutToken ??
+        pickCustomString(normalizedCustomData, ["checkoutToken", "checkout_token"]),
+      cartToken:
+        payload.cartToken ??
+        pickCustomString(normalizedCustomData, ["cartToken", "cart_token"]),
+      orderId: pickCustomString(normalizedCustomData, ["shopifyOrderId", "shopify_order_id", "orderId", "order_id"]),
+      orderName: pickCustomString(normalizedCustomData, ["orderName", "order_name"]),
+    };
     if (
-      payload.userData?.email &&
       workspace.id &&
+      (sessionIdentifiers.email ||
+        sessionIdentifiers.trackclearSessionId ||
+        sessionIdentifiers.checkoutToken ||
+        sessionIdentifiers.cartToken ||
+        sessionIdentifiers.orderId ||
+        sessionIdentifiers.orderName) &&
       (payload.fbp || resolvedFbc || payload.ttclid || payload.rdtCid ||
-       payload.epik || payload.gaClientId || (clientIp && clientIp !== "unknown") || userAgent)
+       payload.epik || payload.gaClientId || payload.gbraid || payload.wbraid ||
+       payload.utmSource || payload.gclid || payload.consent ||
+       (clientIp && clientIp !== "unknown") || userAgent)
     ) {
-      storeSessionContext(workspace.id, payload.userData.email, {
+      storeSessionContextForIdentifiers(workspace.id, sessionIdentifiers, {
         fbp: payload.fbp,
         fbc: resolvedFbc,
         ttclid: payload.ttclid,
         rdtCid: payload.rdtCid,
         epik: payload.epik,
         gaClientId: payload.gaClientId,
+        gbraid: payload.gbraid,
+        wbraid: payload.wbraid,
         clientIp,
         userAgent,
         url: payload.url,

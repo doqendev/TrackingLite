@@ -21,6 +21,7 @@ const REDACTED_CUSTOM_DATA_KEYS = new Set([
   "province",
   "shippingaddress",
   "state",
+  "trackclearsessionid",
   "zip",
   "zipcode",
 ]);

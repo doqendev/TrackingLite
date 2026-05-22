@@ -53,7 +53,7 @@ vi.mock("@/lib/billing", () => ({
 }));
 
 vi.mock("@/lib/session-enrichment", () => ({
-  lookupSessionContext: (...args: unknown[]) => mockLookupSessionContext(...args),
+  lookupSessionContextByIdentifiers: (...args: unknown[]) => mockLookupSessionContext(...args),
 }));
 
 vi.mock("@/lib/redis", () => ({
@@ -116,6 +116,11 @@ function makeOrder() {
     email: "buyer@example.com",
     source_name: "web",
     landing_site: "/products/sign?fbclid=CLICK123&utm_source=meta",
+    note_attributes: [
+      { name: "_trackclear_session_id", value: "tc-session-123" },
+      { name: "_fbp", value: "fb.1.1700000000000.1234567890" },
+      { name: "_tc_consent_marketing", value: "true" },
+    ],
     client_details: {
       browser_ip: "203.0.113.10",
       user_agent: "ShopifyBrowser/1.0",
@@ -169,6 +174,21 @@ describe("Shopify webhook workspace mode allowlist", () => {
       "send-meta-event",
       "send-tiktok-event",
     ]);
+    expect(mockLookupSessionContext).toHaveBeenCalledWith(
+      "ws_v1",
+      expect.objectContaining({
+        email: "buyer@example.com",
+        trackclearSessionId: "tc-session-123",
+        orderId: "1001",
+        orderName: "#1001",
+      })
+    );
+    expect(mockEventLogCreate.mock.calls[0][0].data.payload).toMatchObject({
+      attributionSource: "cart_attributes",
+      attributionSources: expect.arrayContaining(["cart_attributes"]),
+      trackclearSessionIdPresent: true,
+      consent: expect.objectContaining({ marketing: true }),
+    });
   });
 
   it("keeps a headless legacy workspace unaffected through LEGACY_WORKSPACE_IDS", async () => {

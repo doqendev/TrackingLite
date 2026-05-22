@@ -4,6 +4,7 @@ import { normalizeContentId, numericShopifyId, type ContentIdOptions } from "@/l
 type UnknownRecord = Record<string, unknown>;
 
 export interface OrderAttribution {
+  trackclearSessionId: string | null;
   fbp: string | null;
   fbc: string | null;
   fbclid: string | null;
@@ -18,6 +19,11 @@ export interface OrderAttribution {
   utmCampaign: string | null;
   utmContent: string | null;
   utmTerm: string | null;
+  landingPage: string | null;
+  consentAnalytics: string | null;
+  consentMarketing: string | null;
+  consentTimestamp: string | null;
+  consentSource: string | null;
 }
 
 export interface LandingSiteAttribution extends OrderAttribution {
@@ -123,6 +129,7 @@ export function buildOrderAttribution(
     synthesizeFbcFromFbclid(fbclid, now);
 
   return {
+    trackclearSessionId: readOrderAttribute(attrs, ["_trackclear_session_id", "trackclear_session_id"]),
     fbp: readOrderAttribute(attrs, ["_fbp", "fbp"]),
     fbc,
     fbclid,
@@ -137,6 +144,11 @@ export function buildOrderAttribution(
     utmCampaign: readOrderAttribute(attrs, ["_utm_campaign", "utm_campaign"]),
     utmContent: readOrderAttribute(attrs, ["_utm_content", "utm_content"]),
     utmTerm: readOrderAttribute(attrs, ["_utm_term", "utm_term"]),
+    landingPage: readOrderAttribute(attrs, ["_landing_page", "landing_page"]),
+    consentAnalytics: readOrderAttribute(attrs, ["_tc_consent_analytics", "tc_consent_analytics"]),
+    consentMarketing: readOrderAttribute(attrs, ["_tc_consent_marketing", "tc_consent_marketing"]),
+    consentTimestamp: readOrderAttribute(attrs, ["_tc_consent_timestamp", "tc_consent_timestamp"]),
+    consentSource: readOrderAttribute(attrs, ["_tc_consent_source", "tc_consent_source"]),
   };
 }
 
@@ -147,6 +159,7 @@ export function extractLandingSiteAttribution(
 ): LandingSiteAttribution {
   const pageUrl = normalizeLandingPageUrl(landingSite, shopDomain);
   const empty: LandingSiteAttribution = {
+    trackclearSessionId: null,
     fbp: null,
     fbc: null,
     fbclid: null,
@@ -162,6 +175,11 @@ export function extractLandingSiteAttribution(
     utmCampaign: null,
     utmContent: null,
     utmTerm: null,
+    landingPage: null,
+    consentAnalytics: null,
+    consentMarketing: null,
+    consentTimestamp: null,
+    consentSource: null,
     pageUrl,
   };
 

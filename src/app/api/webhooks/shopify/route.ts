@@ -15,7 +15,7 @@ import {
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkOrderLimits, decrementOrderCount } from "@/lib/billing";
-import { lookupSessionContext } from "@/lib/session-enrichment";
+import { lookupSessionContextByIdentifiers, type SessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import {
@@ -23,12 +23,87 @@ import {
   buildLineItemContents,
   buildOrderAttribution,
   extractLandingSiteAttribution,
+  normalizeLandingPageUrl,
 } from "@/lib/shopify-webhook-attribution";
 import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
 import { buildPurchaseEventId } from "@/lib/purchase-event-id";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
+
+function firstString(source: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return null;
+}
+
+function hasAnyValue(values: Array<string | null | undefined>): boolean {
+  return values.some((value) => typeof value === "string" && value.trim().length > 0);
+}
+
+function parseConsentValue(value: string | null | undefined): boolean | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes"].includes(normalized)) return true;
+  if (["false", "0", "no"].includes(normalized)) return false;
+  return null;
+}
+
+function attributionSourcesForPurchase(input: {
+  orderAttribution: ReturnType<typeof buildOrderAttribution>;
+  sessionContext: SessionContext | null;
+  landingAttribution: ReturnType<typeof extractLandingSiteAttribution>;
+}): string[] {
+  const sources: string[] = [];
+
+  if (
+    hasAnyValue([
+      input.orderAttribution.fbp,
+      input.orderAttribution.fbc,
+      input.orderAttribution.fbclid,
+      input.orderAttribution.gclid,
+      input.orderAttribution.gbraid,
+      input.orderAttribution.wbraid,
+      input.orderAttribution.ttclid,
+      input.orderAttribution.rdtCid,
+      input.orderAttribution.epik,
+      input.orderAttribution.utmSource,
+      input.orderAttribution.utmMedium,
+      input.orderAttribution.utmCampaign,
+      input.orderAttribution.landingPage,
+    ])
+  ) {
+    sources.push("cart_attributes");
+  }
+
+  if (input.sessionContext) {
+    sources.push("session_enrichment");
+  }
+
+  if (
+    hasAnyValue([
+      input.landingAttribution.fbc,
+      input.landingAttribution.fbcFromFbclid,
+      input.landingAttribution.fbclid,
+      input.landingAttribution.gclid,
+      input.landingAttribution.gbraid,
+      input.landingAttribution.wbraid,
+      input.landingAttribution.ttclid,
+      input.landingAttribution.rdtCid,
+      input.landingAttribution.epik,
+      input.landingAttribution.utmSource,
+      input.landingAttribution.utmCampaign,
+    ])
+  ) {
+    sources.push("landing_site");
+  }
+
+  return sources.length > 0 ? sources : ["none"];
+}
 
 function redactPii(rawPayload: string): string {
   try {
@@ -329,10 +404,17 @@ async function handleOrderPaid(
       continue;
     }
 
-    // Look up stored browser context for this customer
-    const sessionContext = email
-      ? await lookupSessionContext(workspace.id, email)
-      : null;
+    // Look up stored browser context by durable checkout identifiers. Email is
+    // still used, but cart/checkout/session/order keys keep attribution alive
+    // when Shopify withholds email or session enrichment happens before email.
+    const sessionContext = await lookupSessionContextByIdentifiers(workspace.id, {
+      email,
+      trackclearSessionId: orderAttribution.trackclearSessionId,
+      checkoutToken: firstString(orderData, ["checkout_token", "checkoutToken", "checkout_id", "checkoutId"]),
+      cartToken: firstString(orderData, ["cart_token", "cartToken", "cart_id", "cartId"]),
+      orderId,
+      orderName,
+    });
 
     if (sessionContext) {
       wsLog.info("Session enrichment found", {
@@ -342,7 +424,13 @@ async function handleOrderPaid(
     }
     const finalFbc = orderAttribution.fbc ?? sessionContext?.fbc ?? landingAttribution.fbc ?? landingAttribution.fbcFromFbclid ?? null;
     const finalFbclid = orderAttribution.fbclid ?? landingAttribution.fbclid ?? null;
-    const purchasePageUrl = sessionContext?.url || landingAttribution.pageUrl || `https://${shopDomain}`;
+    const orderLandingPageUrl = normalizeLandingPageUrl(orderAttribution.landingPage, shopDomain);
+    const purchasePageUrl = sessionContext?.url || orderLandingPageUrl || landingAttribution.pageUrl || `https://${shopDomain}`;
+    const attributionSources = attributionSourcesForPurchase({
+      orderAttribution,
+      sessionContext,
+      landingAttribution,
+    });
 
     // Build destination list (before billing -- don't charge for consent-blocked events)
     const destinations: Array<{
@@ -488,6 +576,15 @@ async function handleOrderPaid(
           contents,
         },
         hasUserData: !!(email || phone),
+        attributionSource: attributionSources[0],
+        attributionSources,
+        trackclearSessionIdPresent: !!orderAttribution.trackclearSessionId,
+        consent: {
+          analytics: parseConsentValue(orderAttribution.consentAnalytics) ?? sessionContext?.consent?.analytics ?? null,
+          marketing: parseConsentValue(orderAttribution.consentMarketing) ?? sessionContext?.consent?.marketing ?? null,
+          source: orderAttribution.consentSource ?? (sessionContext?.consent ? "session_enrichment" : null),
+          timestamp: orderAttribution.consentTimestamp ?? null,
+        },
         enrichment: sessionContext ? {
           fields: sessionContext.fieldsEnriched,
           ageMs: Date.now() - sessionContext.oldestTimestamp,
@@ -553,8 +650,8 @@ async function handleOrderPaid(
       fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
       fbc: finalFbc,
       fbclid: finalFbclid,
-      gbraid: orderAttribution.gbraid ?? null,
-      wbraid: orderAttribution.wbraid ?? null,
+      gbraid: orderAttribution.gbraid ?? sessionContext?.gbraid ?? null,
+      wbraid: orderAttribution.wbraid ?? sessionContext?.wbraid ?? null,
       userData: {
         email: email || null,
         phone: phone || null,
@@ -606,8 +703,8 @@ async function handleOrderPaid(
             event: {
               ...eventData,
               fbclid: finalFbclid,
-              gbraid: orderAttribution.gbraid ?? null,
-              wbraid: orderAttribution.wbraid ?? null,
+              gbraid: orderAttribution.gbraid ?? sessionContext?.gbraid ?? null,
+              wbraid: orderAttribution.wbraid ?? sessionContext?.wbraid ?? null,
               ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? landingAttribution.ttclid ?? null,
               gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? landingAttribution.gclid ?? null,
               rdtCid: orderAttribution.rdtCid ?? sessionContext?.rdtCid ?? landingAttribution.rdtCid ?? null,

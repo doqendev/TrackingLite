@@ -34,11 +34,15 @@ describe("shopify-webhook-attribution", () => {
           { name: "_epik", value: "EPIK123" },
           { name: "_utm_source", value: "meta" },
           { name: "_utm_medium", value: "paid_social" },
+          { name: "_trackclear_session_id", value: "tc-session-123" },
+          { name: "_landing_page", value: "https://mizoke.com/products/sign?utm_source=meta" },
+          { name: "_tc_consent_marketing", value: "true" },
         ],
       },
       1700000000000
     );
 
+    expect(attribution.trackclearSessionId).toBe("tc-session-123");
     expect(attribution.fbp).toBe("fb.1.1700000000000.1234567890");
     expect(attribution.fbc).toBe("fb.1.1700000000000.CLICK123");
     expect(attribution.gclid).toBe("GCLID123");
@@ -47,6 +51,8 @@ describe("shopify-webhook-attribution", () => {
     expect(attribution.epik).toBe("EPIK123");
     expect(attribution.utmSource).toBe("meta");
     expect(attribution.utmMedium).toBe("paid_social");
+    expect(attribution.landingPage).toBe("https://mizoke.com/products/sign?utm_source=meta");
+    expect(attribution.consentMarketing).toBe("true");
   });
 
   it("uses an explicit _fbc attribute when one exists", () => {

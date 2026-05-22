@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-22 (maximum tracking quality Sprint 1)
+Last updated: 2026-05-22 (maximum tracking quality Sprint 2)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 382/382 passing (29 files) |
+| Tests (`pnpm test -- --run`) | 385/385 passing (30 files) |
 | Migrations | `20260521_add_workspace_product_mode` applied in production; run `pnpm prisma migrate deploy` before app/worker deploys |
 | TypeScript | 0 source errors (`pnpm exec tsc --noEmit` still reports the pre-existing top-level-await config issue in `tests/unit/meta-event-processor.test.ts`) |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -26,7 +26,7 @@ Last updated: 2026-05-22 (maximum tracking quality Sprint 1)
 | `/privacy` | Public | Working | Privacy policy (accurate: IP/UA stored, PII hashing, data retention, GDPR rights) |
 | `/terms` | Public | Working | Terms of service (billing, acceptable use, liability, termination) |
 | `/dashboard` | Protected | Working | Mode-aware analytics with revenue cards (currency conversion), event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events. Full i18n (6 languages) |
-| `/tracking-health` | Protected | Working | Operational status for recent snippet activity, Shopify webhook, Meta/TikTok connection, Purchase, dedup, attribution, recent errors |
+| `/tracking-health` | Protected | Working | Operational status for recent snippet activity, Shopify webhook, Meta/TikTok connection, Purchase, dedup, attribution source breakdown, recent errors |
 | `/events` | Protected | Working | Mode-aware paginated event log with type/status filters, Source/Campaign columns, retry failed events |
 | `/settings` | Protected | Working | Event toggles, consent mode, snippet, alert preferences, language selector, currency selector, danger zone |
 | `/integrations` | Protected | Working | Mode-aware setup: V1 shows Shopify webhook + Meta/TikTok, legacy/custom workspaces show all destination cards |
@@ -42,7 +42,7 @@ Last updated: 2026-05-22 (maximum tracking quality Sprint 1)
 | `/api/auth/forgot-password` | POST | - | Working | Generates token, sends email via Resend |
 | `/api/auth/reset-password` | POST | - | Working | Validates token, updates password |
 | `/api/auth/verify-email` | GET | - | Working | Token-based email verification, sets emailVerified on User |
-| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Multi-destination fan-out pipeline with CORS, X-Request-ID header, server-proxy shopper IP/UA headers, fbclid-derived fbc |
+| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Multi-destination fan-out pipeline with CORS, X-Request-ID header, server-proxy shopper IP/UA headers, fbclid-derived fbc, multi-key session enrichment |
 | `/api/workspaces` | GET, POST | Session | Working | Unlimited workspaces, encrypts credentials |
 | `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, destination credentials, product mode/install type read-only from public PATCH |
 | `/api/workspaces/[id]/rotate-key` | POST | Session | Working | Generates new API key |
@@ -52,8 +52,8 @@ Last updated: 2026-05-22 (maximum tracking quality Sprint 1)
 | `/api/user/account` | DELETE | Session | Working | GDPR account deletion (cancels Stripe, cascades all data) |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
 | `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid) |
-| `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with bounded `_fbp` validation and webhook-aware Purchase `fbq` guard |
-| `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with bounded `_fbp` validation and webhook-aware Purchase `fbq` guard |
+| `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with `_trackclear_session_id`, best-effort cart attribution writer, bounded `_fbp` validation, and webhook-aware Purchase `fbq` guard |
+| `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with the same session/cart attribution, bounded `_fbp` validation, and webhook-aware Purchase `fbq` guard |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
@@ -103,7 +103,7 @@ Each destination has:
 | `purchase-event-id.ts` | Working | Builds deterministic Shopify Purchase event IDs for snippet, generated pixel, ingest, and webhook paths |
 | `content-id.ts` | Working | Normalizes Shopify catalog content IDs across numeric variant/product IDs, GraphQL IDs, SKU, and custom templates |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
-| `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness; snippet activity is activity-based, not a heartbeat |
+| `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness, including webhook attribution source breakdown; snippet activity is activity-based, not a heartbeat |
 | `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
@@ -125,7 +125,7 @@ Each destination has:
 | `redis.ts` | Working | Shared Redis singleton (lazyConnect) used by all web app modules — eliminates connection sprawl |
 | `logger.ts` | Working | Structured JSON logger (level, msg, timestamp, context) with child loggers |
 | `env-validation.ts` | Working | Validates required env vars at startup, warns for optional ones |
-| `session-enrichment.ts` | Working | Redis-backed browser context store for webhook Purchase attribution (fbp, fbc, ttclid, rdtCid, epik) |
+| `session-enrichment.ts` | Working | Redis-backed browser context store for webhook Purchase attribution keyed by `_trackclear_session_id`, checkout token, cart token, order ID/name, and email |
 | `shopify-webhook.ts` | Working | HMAC-SHA256 signature verification for Shopify webhooks |
 | `shopify-domain-resolver.ts` | Working | Resolves and validates Shopify store domains (myshopify.com normalization) |
 | `workspace-cache.ts` | Working | Redis-cached workspace lookup by shopifyDomain (used by webhook route) |
@@ -163,9 +163,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (34 files, 427 tests)
+### Test Coverage (35 files, 430 tests)
 
-#### Unit Tests (29 files, 382 tests)
+#### Unit Tests (30 files, 385 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -175,7 +175,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
 | `meta-capi.test.ts` | 21 | URL construction, request body, error handling |
 | `hash-pii.test.ts` | 24 | SHA-256 hashing, all PII fields, edge cases |
-| `pixel-route.test.ts` | 3 | Generated pixel scripts: bounded fbp validation and webhook-aware Purchase fbq guard |
+| `pixel-route.test.ts` | 3 | Generated pixel scripts: bounded fbp validation, TrackClear session/cart attribution writer, and webhook-aware Purchase fbq guard |
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
 | `purchase-event-id.test.ts` | 5 | Deterministic Shopify Purchase event ID priority and fallback behavior |
@@ -192,7 +192,8 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
 | `consent.test.ts` | 28 | STRICT/LAX mode, webhook bypass, edge cases |
-| `ingest-attribution.test.ts` | 4 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, session enrichment, V1 destination filtering, legacy onlyDestinations preservation, deterministic Purchase IDs, normalized content IDs |
+| `ingest-attribution.test.ts` | 5 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, multi-key session enrichment, V1 destination filtering, legacy onlyDestinations preservation, deterministic Purchase IDs, normalized content IDs |
+| `session-enrichment.test.ts` | 2 | Redis session context storage/lookup across TrackClear session ID, checkout token, cart token, order identifiers, and email |
 | `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
 | `shopify-webhook-attribution.test.ts` | 11 | Shopify order/landing attribution extraction, absolute landing URL normalization, fbc synthesis, variant-first content IDs, Purchase contents |
 | `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
@@ -373,6 +374,14 @@ None currently tracked.
 3. **Richer TikTok Payloads** - TikTok Events API payloads now hash `customerId` into `external_id` when available and prefer rich `contents` with quantity/item price over flat content IDs.
 4. **Token-Safe EventLog Payloads** - Sanitized EventLog payloads now redact checkout and cart tokens from stored `customData`; queue jobs still receive transient event data for delivery.
 5. **Regression Tests** - Added focused tests for deterministic Purchase IDs, content ID normalization, TikTok external_id/rich contents, generated pixel output, ingest normalization, and Shopify webhook event IDs.
+
+### Phase 14: Maximum Tracking Quality Sprint 2 (2026-05-22)
+1. **TrackClear Session ID** - Generated pixel scripts now create and persist `_trackclear_session_id` and include it on ingest payloads, giving webhook Purchases a stable non-PII browser-session join key.
+2. **Cart Attribute Attribution Writer** - Generated public and legacy pixel scripts best-effort preserve `_trackclear_session_id`, Meta/TikTok/Google/Reddit/Pinterest click IDs, UTMs, landing page, and consent markers into Shopify cart attributes during add-to-cart and checkout-start. This is intentionally additive and preserves existing cart attributes where the Custom Pixel sandbox allows cart mutation.
+3. **Multi-Key Session Enrichment** - Ingest now stores browser context under TrackClear session ID, checkout token, cart token, Shopify order ID/name, and email. The Shopify webhook lookup checks all available identifiers and merges fresh fields, reducing dependency on email-only enrichment.
+4. **Webhook Attribution Source Visibility** - Shopify webhook EventLog payloads now record sanitized attribution source metadata (`cart_attributes`, `session_enrichment`, `landing_site`, or `none`), consent markers, and TrackClear session presence without storing raw shopper PII or raw tokens.
+5. **Tracking Health Source Breakdown** - `/tracking-health` now reports recent webhook Purchase attribution source counts, making it easier to see whether Purchases are being enriched by cart/order attributes, Redis session enrichment, landing-site fallback, or no attribution source.
+6. **Regression Tests** - Added `session-enrichment.test.ts` and expanded ingest, webhook attribution, webhook route, pixel route, and EventLog payload tests for session IDs, cart attributes, consent markers, attribution source metadata, and token redaction.
 
 ## Not Yet Implemented
 

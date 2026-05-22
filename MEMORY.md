@@ -1,5 +1,18 @@
 # MEMORY.md
 
+## 2026-05-22 - Maximum Tracking Quality Sprint 2
+
+- Implemented the second pass from the TrackClear Maximum Tracking Quality plan, scoped to session/cart attribution recovery, webhook enrichment quality, and Tracking Health visibility.
+- Generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts now create a `_trackclear_session_id`, send it on ingest payloads, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart and checkout-start.
+- Ingest now accepts `trackclearSessionId`, `checkoutToken`, and `cartToken`, and stores browser context under TrackClear session ID, checkout token, cart token, Shopify order ID/name, and email. Session enrichment lookup merges fresh fields across all available identifiers instead of depending only on email.
+- Shopify webhook Purchase enrichment now looks up Redis session context with all available identifiers, records sanitized attribution source metadata (`cart_attributes`, `session_enrichment`, `landing_site`, or `none`), includes consent markers, and keeps webhook custom data unchanged for value, currency, num_items, order_id, content_type, content_ids, and contents.
+- `/tracking-health` now includes a recent webhook Purchase attribution source breakdown so operators can see whether Purchases are being enriched by cart/order attributes, Redis session enrichment, landing-site fallback, or no attribution source.
+- EventLog payload sanitization now redacts `trackclearSessionId` from stored customData alongside checkout/cart tokens.
+- Added tests: `session-enrichment.test.ts`, plus expanded `ingest-attribution.test.ts`, `shopify-webhook-attribution.test.ts`, `shopify-webhook-route-mode.test.ts`, `pixel-route.test.ts`, and `event-log-payload.test.ts`.
+- Validation: targeted Sprint 2 regression tests passed 25/25; `pnpm test -- --run` passed 385/385 unit tests; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing dynamic route/static generation warnings.
+- No database migration is required for this sprint.
+- Operational note: the cart attribute writer is best-effort inside Shopify's Custom Pixel runtime and should be confirmed on a real Shopify checkout. It is additive and does not change Mizoke/headless legacy mode or destination allowlisting.
+
 ## 2026-05-22 - Maximum Tracking Quality Sprint 1
 
 - Implemented the first pass from the TrackClear Maximum Tracking Quality plan, scoped to Purchase identity, catalog content IDs, and TikTok payload quality.
@@ -10,7 +23,7 @@
 - Dirava production workspace `cmlsa6h1w0001zm8nxuzn7a50` was intentionally reclassified to `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`; Mizoke/headless workspace `cmo1hd1x600045r6d9elaw3tg` remains protected as legacy/headless.
 - Added tests: `purchase-event-id.test.ts`, `content-id.test.ts`, `tiktok.test.ts`, plus expanded `ingest-attribution.test.ts`, `pixel-route.test.ts`, and `shopify-webhook-route-mode.test.ts`.
 - Validation: `pnpm test -- --run` passed 382/382 unit tests; targeted content/ingest tests passed 8/8 after strict TypeScript narrowing; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing dynamic route/static generation warnings.
-- Remaining roadmap work from the plan: cart/order attribution writer, explicit catalog-mode workspace settings UI, consent-mode policy hardening, headless SDK/Hydrogen helpers, Shopify Web Pixel app path, custom ingest domain, and encrypted short-lived retry payloads.
+- Remaining roadmap work from the plan: explicit catalog-mode workspace settings UI, consent-mode policy hardening, headless SDK/Hydrogen helpers, Shopify Web Pixel app path, custom ingest domain, and encrypted short-lived retry payloads.
 
 ## 2026-05-21 - Mizoke/TrackClear Attribution Hardening
 

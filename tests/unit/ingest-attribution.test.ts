@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 const mockQueueAdd = vi.fn().mockResolvedValue({ id: "job-1" });
 const mockLookupWorkspaceByApiKey = vi.fn();
 const mockEventLogCreate = vi.fn();
-const mockStoreSessionContext = vi.fn();
+const mockStoreSessionContextForIdentifiers = vi.fn();
 const mockRedisSet = vi.fn();
 
 vi.mock("@/lib/api-key", () => ({
@@ -35,7 +35,7 @@ vi.mock("@/lib/billing", () => ({
 }));
 
 vi.mock("@/lib/session-enrichment", () => ({
-  storeSessionContext: (...args: unknown[]) => mockStoreSessionContext(...args),
+  storeSessionContextForIdentifiers: (...args: unknown[]) => mockStoreSessionContextForIdentifiers(...args),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -132,9 +132,9 @@ describe("ingest attribution handling", () => {
     expect(response.status).toBe(200);
     const expectedFbc = "fb.1.1779364800000.CLICK123";
 
-    expect(mockStoreSessionContext).toHaveBeenCalledWith(
+    expect(mockStoreSessionContextForIdentifiers).toHaveBeenCalledWith(
       "ws_123",
-      "buyer@example.com",
+      expect.objectContaining({ email: "buyer@example.com" }),
       expect.objectContaining({
         fbc: expectedFbc,
         clientIp: "203.0.113.8",
@@ -334,6 +334,47 @@ describe("ingest attribution handling", () => {
             content_ids: ["111"],
           }),
         }),
+      })
+    );
+  });
+
+  it("stores session enrichment by TrackClear session and checkout identifiers without email", async () => {
+    const response = await postIngest(
+      makeRequest(
+        {
+          eventName: "InitiateCheckout",
+          eventId: "checkout-event",
+          timestamp: Date.now(),
+          trackclearSessionId: "tc-session-123",
+          checkoutToken: "checkout-token-123",
+          cartToken: "cart-token-123",
+          fbp: "fb.1.1700000000000.1234567890",
+          gbraid: "GBRAID123",
+          wbraid: "WBRAID123",
+          consent: { analyticsAllowed: true, marketingAllowed: true },
+          customData: {
+            checkoutToken: "checkout-token-123",
+            cartToken: "cart-token-123",
+            value: 99,
+            currency: "USD",
+          },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockStoreSessionContextForIdentifiers).toHaveBeenCalledWith(
+      "ws_123",
+      expect.objectContaining({
+        trackclearSessionId: "tc-session-123",
+        checkoutToken: "checkout-token-123",
+        cartToken: "cart-token-123",
+      }),
+      expect.objectContaining({
+        fbp: "fb.1.1700000000000.1234567890",
+        gbraid: "GBRAID123",
+        wbraid: "WBRAID123",
       })
     );
   });

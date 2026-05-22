@@ -51,6 +51,7 @@ describe("event-log-payload", () => {
     const sanitized = sanitizeEventLogCustomData({
       value: 40,
       currency: "USD",
+      trackclearSessionId: "tc-session-123",
       checkoutToken: "checkout-token-123",
       cartToken: "cart-token-123",
       email: "buyer@example.com",
@@ -77,5 +78,6 @@ describe("event-log-payload", () => {
     expect(JSON.stringify(sanitized)).not.toContain("123 Main St");
     expect(JSON.stringify(sanitized)).not.toContain("checkout-token-123");
     expect(JSON.stringify(sanitized)).not.toContain("cart-token-123");
+    expect(JSON.stringify(sanitized)).not.toContain("tc-session-123");
   });
 });

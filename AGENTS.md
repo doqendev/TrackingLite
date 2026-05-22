@@ -22,9 +22,9 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 13 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 14 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 382/382 passing (29 test files)
+- Unit tests: 385/385 passing (30 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports one pre-existing test top-level-await config issue)
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -78,9 +78,10 @@ JS Snippet (browser) --> POST /api/events/ingest (X-TL-API-Key header)
   |-- Check which destinations are enabled + have credentials
   |-- Check order limits (only for Purchase events, Redis monthly counter)
   |-- Check rate limit (100 req/sec/workspace)
-  |-- Zod validate payload (includes ttclid for TikTok, rdtCid for Reddit, epik for Pinterest)
+  |-- Zod validate payload (includes ttclid, rdtCid, epik, trackclearSessionId, cartToken, checkoutToken)
   |-- Prefer trusted X-TL-Client-IP / X-TL-Client-UA headers from server-side storefront proxies
   |-- Resolve fbc from fbc or fbclid (fb.1.<timestamp_ms>.<fbclid>)
+  |-- Store browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email when available
   |-- Check per-event toggle (enablePageView, etc.)
   |-- Check consent (STRICT/LAX mode)
   |-- Fan-out: Create one EventLog per enabled destination (status: PENDING)
@@ -146,7 +147,7 @@ src/
       auth/forgot-password/route.ts   # POST: generate token, send reset email
       auth/reset-password/route.ts    # POST: validate token, update password
       auth/verify-email/route.ts      # GET: token-based email verification, sets emailVerified
-      events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS, X-TL-Client IP/UA, fbclid->fbc)
+      events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS, X-TL-Client IP/UA, fbclid->fbc, multi-key session enrichment)
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
       workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD; product mode/install type are read-only to client PATCH requests
       workspaces/[id]/rotate-key/route.ts  # POST: rotate API key
@@ -156,8 +157,8 @@ src/
       user/preferences/route.ts      # PATCH: update display currency and language
       user/account/route.ts          # DELETE: GDPR account deletion (cancels Stripe, cascades all data)
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid)
-      pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (webhook-aware Purchase fbq guard)
-      s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same webhook-aware Purchase fbq guard)
+      pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (session ID, cart attribution writer, webhook-aware Purchase fbq guard)
+      s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same session/cart attribution and Purchase guard)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
       stripe/webhook/route.ts         # POST: handle Stripe webhooks (5 event types)
@@ -198,6 +199,7 @@ src/
     content-id.ts                     # Shopify catalog content ID normalization helpers (variant/product GID, numeric ID, SKU, custom template)
     workspace-mode.ts                 # Product mode/install type fallback + destination allowlist helpers
     tracking-health.ts                # Operational health checks for Shopify V1 readiness
+    session-enrichment.ts             # Redis browser context store keyed by TrackClear session ID, checkout/cart/order identifiers, and email
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
@@ -259,6 +261,7 @@ tests/
     event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
     purchase-event-id.test.ts         # 5 tests (deterministic Shopify Purchase event IDs)
     content-id.test.ts                # 4 tests (Shopify catalog content ID normalization)
+    session-enrichment.test.ts        # 2 tests (multi-key Redis session enrichment lookup)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
     workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
     workspace-route-mode.test.ts      # 1 test (public PATCH cannot mutate product mode/install type)
@@ -278,7 +281,7 @@ prisma/
 
 ### Data Model
 
-**Models:** User, Account, Session, VerificationToken (NextAuth), PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog
+**Models:** User, Account, Session, VerificationToken (NextAuth), PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog, WebhookDeadLetter
 
 **Key relationships:**
 - User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
@@ -319,7 +322,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (382 tests, 29 files)
+# Run unit tests (385 tests, 30 files)
 pnpm test
 
 # Run a single test file
@@ -396,6 +399,9 @@ Header: Content-Type: application/json
   timestamp: number,        // milliseconds
   url?: string,
   referrer?: string,
+  trackclearSessionId?: string | null, // _trackclear_session_id cookie generated by TrackClear pixel
+  checkoutToken?: string | null,       // Shopify checkout token when available
+  cartToken?: string | null,           // Shopify cart token when available
   fbp?: string | null,      // _fbp cookie
   fbc?: string | null,      // _fbc cookie
   fbclid?: string | null,   // raw Meta click ID; server derives fbc if fbc is missing
@@ -439,12 +445,13 @@ Header: Content-Type: application/json
 - **UTM attribution:** Snippet captures UTM params + gclid + rdtCid + epik once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
+- **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
 - **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`), improving Meta/TikTok deduplication and retry consistency.
 - **Catalog content ID normalization:** Generated pixel, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. The default uses variant numeric IDs, with product and SKU fallbacks, plus helper support for product numeric, GraphQL, SKU, and custom template modes.
 - **TikTok attribution quality:** TikTok Events API payloads include hashed `external_id` from `customerId` when available and prefer rich `contents` with quantity/item price over flat `content_ids`.
 - **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery. Replay is privacy-preserving: sanitized rows replay attribution columns and customData, but raw PII is not reconstructed after it has been removed.
-- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, and recent errors. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
-- **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, and `contents`.
+- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, attribution source breakdown, and recent errors. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
+- **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_trackclear_session_id`, `_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_gbraid`, `_wbraid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`, `_landing_page`, consent markers) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, `contents`, and sanitized attribution-source metadata.
 - **Webhook Purchase browser guard:** If a workspace has a Shopify webhook secret configured, TrackClear generated pixel scripts do not fire browser `fbq("track", "Purchase")`; they still send the TrackClear Purchase to ingest so session context can enrich the webhook Purchase.
 - **Stale pending requeue:** BullMQ repeatable job every 5 minutes finds PENDING events older than 5 minutes and re-queues them to the appropriate destination queue, preventing events from getting stuck after Redis restarts.
 - **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.

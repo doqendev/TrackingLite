@@ -32,6 +32,22 @@ function formatAge(date: Date | null | undefined): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function attributionSourcesFromPayload(payload: unknown): string[] {
+  if (!payload || typeof payload !== "object") return ["none"];
+  const sourcePayload = payload as {
+    attributionSource?: unknown;
+    attributionSources?: unknown;
+  };
+  if (Array.isArray(sourcePayload.attributionSources)) {
+    const sources = sourcePayload.attributionSources.filter(
+      (source): source is string => typeof source === "string" && source.length > 0
+    );
+    if (sources.length > 0) return sources;
+  }
+  const source = sourcePayload.attributionSource;
+  return [typeof source === "string" && source ? source : "none"];
+}
+
 export async function getTrackingHealth(
   workspaceId: string
 ): Promise<TrackingHealthSummary> {
@@ -77,6 +93,7 @@ export async function getTrackingHealth(
     duplicateOrders,
     latestAttributedPurchase,
     latestPurchase,
+    recentWebhookPurchases,
     recentDlqEntry,
   ] = await Promise.all([
     db.eventLog.findFirst({
@@ -154,6 +171,18 @@ export async function getTrackingHealth(
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     }),
+    db.eventLog.findMany({
+      where: {
+        workspaceId,
+        source: "webhook",
+        eventName: "Purchase",
+        destination: { in: ["META", "TIKTOK"] },
+        createdAt: { gte: since7d },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: { payload: true },
+    }),
     workspace.shopifyDomain
       ? db.webhookDeadLetter.findFirst({
           where: {
@@ -178,6 +207,16 @@ export async function getTrackingHealth(
     workspace.tiktokAccessTokenEncrypted
   );
   const webhookConfigured = !!workspace.shopifyWebhookSecretEncrypted;
+  const attributionCounts = recentWebhookPurchases.reduce<Record<string, number>>((counts, purchase) => {
+    for (const source of attributionSourcesFromPayload(purchase.payload)) {
+      counts[source] = (counts[source] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+  const attributionBreakdown =
+    recentWebhookPurchases.length > 0
+      ? ` Source breakdown last ${recentWebhookPurchases.length}: cart attributes ${attributionCounts.cart_attributes ?? 0}, session enrichment ${attributionCounts.session_enrichment ?? 0}, landing-site ${attributionCounts.landing_site ?? 0}, none ${attributionCounts.none ?? 0}.`
+      : "";
 
   const checks: TrackingHealthCheck[] = [
     {
@@ -244,9 +283,9 @@ export async function getTrackingHealth(
       label: "Attribution present",
       severity: latestAttributedPurchase ? "ok" : latestPurchase ? "warning" : "warning",
       detail: latestAttributedPurchase
-        ? `Recent webhook Purchase includes attribution context from ${formatAge(latestAttributedPurchase.createdAt)}.`
+        ? `Recent webhook Purchase includes attribution context from ${formatAge(latestAttributedPurchase.createdAt)}.${attributionBreakdown}`
         : latestPurchase
-          ? "A webhook Purchase was logged, but recent purchases lack fbp/fbc, ttclid, or UTM context."
+          ? `A webhook Purchase was logged, but recent purchases lack fbp/fbc, ttclid, or UTM context.${attributionBreakdown}`
           : "No webhook Purchase is available to inspect attribution context.",
       timestamp: latestAttributedPurchase?.createdAt ?? latestPurchase?.createdAt ?? null,
     },
