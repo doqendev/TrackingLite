@@ -606,11 +606,12 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
                 spellCheck={false}
               />
               <p className="text-xs text-muted-foreground">
-                Use a dedicated subdomain such as t.yourstore.com. Point DNS to{" "}
+                Use a dedicated subdomain such as t.yourstore.com. After TrackClear adds it in Vercel,
+                create the DNS record Vercel requests. Common CNAME target:{" "}
                 <code className="rounded bg-black/40 px-1 py-0.5 text-foreground/70">
                   {CUSTOM_INGEST_CNAME_TARGET}
                 </code>
-                . Save it here, then verify after DNS is active.
+                .
               </p>
             </div>
 

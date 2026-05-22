@@ -9,9 +9,10 @@ domain is saved and verified.
 
 1. Choose a dedicated subdomain, for example `t.example.com`.
 2. Add the subdomain to the TrackClear Vercel project.
-3. Point the subdomain DNS to the configured target. The default target shown
-   in Settings is `cname.vercel-dns.com`, controlled by
-   `NEXT_PUBLIC_CUSTOM_INGEST_CNAME_TARGET`.
+3. Point the subdomain DNS to the record Vercel requests for that domain.
+   Common Vercel subdomain setup uses a CNAME to `cname.vercel-dns.com`,
+   controlled by `NEXT_PUBLIC_CUSTOM_INGEST_CNAME_TARGET`, but Vercel may
+   request an A record such as `76.76.21.21` for a specific domain.
 4. Save the subdomain in Settings > Custom Ingest Domain.
 5. Click Verify domain.
 
@@ -45,4 +46,3 @@ domain only after `Workspace.customIngestDomainVerifiedAt` is set.
   is per workspace and opt-in.
 - Because generated pixel scripts are cached for 5 minutes, endpoint changes
   may take up to 5 minutes to appear on already-cached public pixel responses.
-
