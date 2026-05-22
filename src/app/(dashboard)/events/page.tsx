@@ -120,7 +120,13 @@ export default async function EventsPage({
         },
       }),
       db.eventLog.count({ where }),
-      db.eventLog.count({ where: { workspaceId: workspace.id, status: "FAILED" } }),
+      db.eventLog.count({
+        where: {
+          workspaceId: workspace.id,
+          status: "FAILED",
+          destination: { in: [...allowedDestinations] },
+        },
+      }),
     ]);
 
     totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

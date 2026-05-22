@@ -7,7 +7,7 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 368/368 passing (25 files) |
+| Tests (`pnpm test -- --run`) | 369/369 passing (26 files) |
 | Migrations | `20260521_add_workspace_product_mode` applied in production; run `pnpm prisma migrate deploy` before app/worker deploys |
 | TypeScript | 0 source errors (`pnpm exec tsc --noEmit` still reports the pre-existing top-level-await config issue in `tests/unit/meta-event-processor.test.ts`) |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -161,9 +161,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (30 files, 413 tests)
+### Test Coverage (31 files, 414 tests)
 
-#### Unit Tests (25 files, 368 tests)
+#### Unit Tests (26 files, 369 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -179,6 +179,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
 | `workspace-create-mode.test.ts` | 1 | New normal Shopify workspaces default to V1/custom-pixel mode |
 | `workspace-route-mode.test.ts` | 1 | Public workspace PATCH cannot switch normal workspaces to legacy/headless |
+| `events-page-mode.test.ts` | 1 | Events page failed-count/replay visibility respects workspace destination allowlist |
 | `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
 | `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
 | `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
@@ -358,7 +359,8 @@ None currently tracked.
 12. **Tracking Health Page** - Added `/tracking-health` for V1 readiness: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connection, dedup status, attribution context, and recent errors. The snippet check is intentionally named as event activity, not a pixel-install heartbeat.
 13. **V1 Product Copy** - Public landing/pricing/OpenGraph copy now describes Shopify purchase tracking for Meta + TikTok and no longer advertises hidden 7-platform, annual-pricing, or unproven delivery-rate claims for new users.
 14. **Production Legacy Protection** - Production migration `20260521_add_workspace_product_mode` was applied, `LEGACY_WORKSPACE_IDS` was set in Vercel Production, and Mizoke workspace `cmo1hd1x600045r6d9elaw3tg` was explicitly marked `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; null existing workspaces still resolve to legacy/custom.
-15. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, generated pixel Purchase guards, EventLog payload sanitization, workspace-mode fallback, V1 allowlisting, Shopify webhook fan-out filtering, public PATCH mode immutability, and legacy destination preservation.
+15. **Events Replay Count Filtering** - The Events page failed-count/replay note now uses the same workspace destination allowlist as the visible event table, so V1 workspaces do not surface hidden legacy destination failures.
+16. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, generated pixel Purchase guards, EventLog payload sanitization, workspace-mode fallback, V1 allowlisting, Shopify webhook fan-out filtering, Events page failed-count filtering, public PATCH mode immutability, and legacy destination preservation.
 
 ## Not Yet Implemented
 
