@@ -100,6 +100,7 @@
     "page": "Page",
     "replaying": "Replaying...",
     "retryFailed": "Retry {count} failed",
+    "replayPrivacyNote": "Replay retries failed delivery using stored event metadata and attribution fields. For privacy, raw customer PII is not reconstructed after sanitization.",
     "eventsQueuedForReplay": "{count} event(s) queued for replay",
     "failedToReplay": "Failed to replay events",
     "pleaseWait": "Please wait {seconds} seconds before replaying again",

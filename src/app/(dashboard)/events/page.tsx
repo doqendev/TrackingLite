@@ -160,6 +160,11 @@ export default async function EventsPage({
           <p className="text-sm text-muted-foreground mt-0.5">
             {t("totalEvents", { count: total.toLocaleString() })}
           </p>
+          {failedCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+              {td("replayPrivacyNote")}
+            </p>
+          )}
         </div>
         <ReplayButton workspaceId={workspace.id} failedCount={failedCount} />
       </div>

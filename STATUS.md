@@ -7,7 +7,8 @@ Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 367/367 passing (24 files) |
+| Tests (`pnpm test -- --run`) | 368/368 passing (25 files) |
+| Migrations | `20260521_add_workspace_product_mode` applied in production; run `pnpm prisma migrate deploy` before app/worker deploys |
 | TypeScript | 0 source errors (`pnpm exec tsc --noEmit` still reports the pre-existing top-level-await config issue in `tests/unit/meta-event-processor.test.ts`) |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 
@@ -160,9 +161,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (29 files, 412 tests)
+### Test Coverage (30 files, 413 tests)
 
-#### Unit Tests (24 files, 367 tests)
+#### Unit Tests (25 files, 368 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -176,6 +177,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
 | `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
+| `workspace-create-mode.test.ts` | 1 | New normal Shopify workspaces default to V1/custom-pixel mode |
 | `workspace-route-mode.test.ts` | 1 | Public workspace PATCH cannot switch normal workspaces to legacy/headless |
 | `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
 | `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |

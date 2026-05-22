@@ -24,7 +24,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 **Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 12 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 367/367 passing (24 test files)
+- Unit tests: 368/368 passing (25 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports one pre-existing test top-level-await config issue)
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -255,6 +255,7 @@ tests/
     event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
     event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
+    workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
     workspace-route-mode.test.ts      # 1 test (public PATCH cannot mutate product mode/install type)
     shopify-webhook-route-mode.test.ts # 2 tests (Shopify webhook V1 allowlist + legacy env bypass)
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
@@ -296,6 +297,9 @@ pnpm prisma migrate dev
 # Apply committed migrations in production/CI
 pnpm prisma migrate deploy
 
+# Internal-only workspace mode classification
+pnpm tsx scripts/set-workspace-mode.ts <workspaceId> <productMode> <installType>
+
 # Run development server (port 3000)
 pnpm dev
 
@@ -308,7 +312,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (367 tests, 24 files)
+# Run unit tests (368 tests, 25 files)
 pnpm test
 
 # Run a single test file
@@ -330,7 +334,8 @@ pnpm prisma studio
 ### Environment Variables
 
 All documented in `.env.example`. Critical ones:
-- `DATABASE_URL` - PostgreSQL (port 5433 to match docker-compose)
+- `DATABASE_URL` - PostgreSQL pooled/runtime connection (port 5433 to match docker-compose)
+- `DIRECT_DATABASE_URL` - PostgreSQL direct migration connection; required by Prisma migrate/status
 - `REDIS_URL` - Redis connection
 - `NEXTAUTH_SECRET` - JWT signing
 - `ENCRYPTION_KEY` - 64 hex chars (32 bytes) for AES-256-GCM
@@ -415,6 +420,7 @@ Header: Content-Type: application/json
 - **Workspace model:** Each merchant has a workspace with a unique API key (unlimited per user, shared order pool).
 - **Multi-destination fan-out:** Ingest route creates one EventLog + one BullMQ job per enabled destination. Each destination has its own queue, worker, normalizer, and API client.
 - **Product-mode rollout:** `Workspace.productMode` and `Workspace.installType` are nullable for safe migration. Runtime fallback treats missing values as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; new workspaces are created as `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`. V1 workspaces are allowlisted to Meta/TikTok in UI, ingest, webhook, replay, analytics, and event views. Public workspace PATCH requests cannot mutate product mode/install type. `LEGACY_WORKSPACE_IDS` can force legacy behavior as an emergency bypass.
+- **Deployment order:** Run `pnpm prisma migrate deploy` against production before deploying app/worker code that depends on new schema fields. Build scripts only run `prisma generate`; they do not apply migrations. See `docs/deploy.md`.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard "All" view deduplicates by filtering to a canonical destination (first enabled). Per-destination tabs show filtered stats. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.

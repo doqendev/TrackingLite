@@ -100,6 +100,7 @@
     "page": "Seite",
     "replaying": "Wird wiederholt...",
     "retryFailed": "{count} fehlgeschlagene wiederholen",
+    "replayPrivacyNote": "Replay wiederholt fehlgeschlagene Zustellungen mit gespeicherten Event-Metadaten und Attributionsfeldern. Aus Datenschutzgründen wird rohe Kunden-PII nach der Bereinigung nicht rekonstruiert.",
     "eventsQueuedForReplay": "{count} Event(s) zur Wiederholung in die Warteschlange gestellt",
     "failedToReplay": "Events konnten nicht wiederholt werden",
     "pleaseWait": "Bitte warte {seconds} Sekunden, bevor du erneut wiederholst",

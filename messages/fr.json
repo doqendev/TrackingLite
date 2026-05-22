@@ -100,6 +100,7 @@
     "page": "Page",
     "replaying": "Relecture en cours...",
     "retryFailed": "Relancer {count} échoué(s)",
+    "replayPrivacyNote": "La relecture retente la livraison avec les métadonnées d'événement et les champs d'attribution stockés. Pour la confidentialité, les données PII brutes du client ne sont pas reconstruites après sanitisation.",
     "eventsQueuedForReplay": "{count} événement(s) mis en file pour relecture",
     "failedToReplay": "Échec de la relecture des événements",
     "pleaseWait": "Veuillez attendre {seconds} secondes avant de relancer",

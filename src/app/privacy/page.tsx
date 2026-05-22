@@ -210,15 +210,16 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">6. Cookies</h2>
               <p className="text-muted-foreground leading-relaxed mb-3">
-                Our JavaScript snippet reads the following cookies from the end customer&apos;s browser to
-                support advertising platform attribution. The snippet does not set any cookies itself.
+                Our JavaScript snippet may read and, when needed, set attribution cookies in the end
+                customer&apos;s browser to support advertising platform attribution and deduplication,
+                subject to the merchant&apos;s consent setup.
               </p>
               <ul className="list-disc pl-5 space-y-2 text-muted-foreground leading-relaxed">
                 <li>
-                  <strong className="text-foreground">_fbp</strong> — Set by Meta&apos;s browser pixel. Used to identify browsers for Meta Conversions API deduplication.
+                  <strong className="text-foreground">_fbp</strong> — Meta browser identifier used to identify browsers for Meta Conversions API deduplication. Track Clear may reuse an existing value or create one when consent and the merchant&apos;s configuration allow it.
                 </li>
                 <li>
-                  <strong className="text-foreground">_fbc</strong> — Set by Meta&apos;s browser pixel when a visitor arrives via a Facebook ad. Used for attribution.
+                  <strong className="text-foreground">_fbc</strong> — Meta click identifier used when a visitor arrives via a Facebook ad. Track Clear may derive this from a <code className="text-sm bg-muted px-1 py-0.5 rounded">fbclid</code> URL parameter when consent and the merchant&apos;s configuration allow it.
                 </li>
               </ul>
               <p className="mt-3 text-muted-foreground leading-relaxed">

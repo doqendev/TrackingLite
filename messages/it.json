@@ -100,6 +100,7 @@
     "page": "Pagina",
     "replaying": "Ripetizione in corso...",
     "retryFailed": "Riprova {count} con errore",
+    "replayPrivacyNote": "La ripetizione ritenta la consegna usando metadati evento e campi di attribuzione salvati. Per privacy, i dati PII grezzi del cliente non vengono ricostruiti dopo la sanitizzazione.",
     "eventsQueuedForReplay": "{count} evento/i in coda per la ripetizione",
     "failedToReplay": "Ripetizione degli eventi non riuscita",
     "pleaseWait": "Attendi {seconds} secondi prima di ripetere",

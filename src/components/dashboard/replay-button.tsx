@@ -57,6 +57,7 @@ export function ReplayButton({
       onClick={handleReplay}
       disabled={replaying}
       className="gap-1.5"
+      title={t("replayPrivacyNote")}
     >
       <RefreshCw className={`h-3.5 w-3.5 ${replaying ? "animate-spin" : ""}`} />
       {replaying
