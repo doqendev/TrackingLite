@@ -22,6 +22,24 @@ export type ContentIdOptions = {
   template?: string | null;
 };
 
+export type ContentIdWorkspaceSource = {
+  catalogIdMode?: CatalogIdMode | string | null;
+  catalogIdPrefix?: string | null;
+  catalogIdSuffix?: string | null;
+  catalogIdTemplate?: string | null;
+};
+
+export function contentIdOptionsFromWorkspace(
+  workspace: ContentIdWorkspaceSource | null | undefined
+): ContentIdOptions {
+  return {
+    mode: workspace?.catalogIdMode ?? "VARIANT_NUMERIC_ID",
+    prefix: workspace?.catalogIdPrefix ?? null,
+    suffix: workspace?.catalogIdSuffix ?? null,
+    template: workspace?.catalogIdTemplate ?? null,
+  };
+}
+
 function clean(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const text = String(value).trim();

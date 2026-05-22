@@ -22,11 +22,11 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 15 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 16 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 391/391 passing (32 test files)
+- Unit tests: 404/404 passing (34 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
-- TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports pre-existing test-only issues in `content-id.test.ts` and `meta-event-processor.test.ts`)
+- TypeScript: `pnpm exec tsc --noEmit` passes cleanly
 - Lint: passes with pre-existing `<img>` optimization warnings
 - 7 destination codepaths retained for legacy/custom workspaces: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
 - Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, Shopify webhook, Meta CAPI, TikTok Events API, tracking health
@@ -135,9 +135,9 @@ src/
       dashboard/page.tsx              # Mode-aware analytics: revenue (currency conversion), conversion accuracy, event funnel, delivery, campaign performance, recent events
       tracking-health/page.tsx        # Operational tracking health for recent snippet activity, webhook, Meta/TikTok, Purchase, dedup, attribution, errors
       events/page.tsx                 # Mode-aware event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
-      diagnostics/page.tsx            # Internal mode-aware diagnostics: destination health, matrix, data quality, event audit fields
+      diagnostics/page.tsx            # Internal mode-aware diagnostics: destination health, matrix, data quality, event audit fields, AddToCart/checkout test events
       integrations/page.tsx           # Mode-aware destination setup; V1 shows Shopify webhook, Meta, TikTok; legacy shows all destination cards
-      settings/page.tsx               # Event toggles, consent, snippet, alerts, language/currency selectors, danger zone
+      settings/page.tsx               # Event toggles, consent, catalog ID matching, snippet, alerts, language/currency selectors, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
         page.tsx                      # 3-step wizard: create workspace, install snippet, connect platforms
@@ -151,7 +151,8 @@ src/
       diagnostics/route.ts            # GET: internal mode-aware diagnostics data for active workspace debugging
       events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS, X-TL-Client IP/UA, fbclid->fbc, multi-key session enrichment)
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
-      workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD; product mode/install type are read-only to client PATCH requests
+      workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD; product mode/install type are read-only to client PATCH requests; catalog ID matching is merchant-editable
+      workspaces/[id]/diagnostics/test-event/route.ts # POST: authenticated non-Purchase diagnostic AddToCart/InitiateCheckout through ingest
       workspaces/[id]/rotate-key/route.ts  # POST: rotate API key
       workspaces/[id]/analytics/route.ts   # GET: dashboard analytics (cached 60s)
       workspaces/[id]/replay/route.ts # POST: re-queue failed events (500 max, 5min cooldown, privacy-preserving replay)
@@ -159,8 +160,8 @@ src/
       user/preferences/route.ts      # PATCH: update display currency and language
       user/account/route.ts          # DELETE: GDPR account deletion (cancels Stripe, cascades all data)
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid)
-      pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (session ID, cart attribution writer, webhook-aware Purchase fbq guard)
-      s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same session/cart attribution and Purchase guard)
+      pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (session ID, cart attribution writer, catalog ID settings, webhook-aware Purchase fbq guard)
+      s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same session/cart attribution, catalog ID settings, and Purchase guard)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
       stripe/webhook/route.ts         # POST: handle Stripe webhooks (5 event types)
@@ -198,15 +199,16 @@ src/
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case and bounded Meta cookie validation)
     event-log-payload.ts              # Sanitized EventLog payload builder (customData + flags, no raw userData)
     purchase-event-id.ts              # Deterministic Shopify Purchase event_id helper for ingest and webhooks
-    content-id.ts                     # Shopify catalog content ID normalization helpers (variant/product GID, numeric ID, SKU, custom template)
+    content-id.ts                     # Shopify catalog content ID normalization helpers and workspace catalog settings resolver
     workspace-mode.ts                 # Product mode/install type fallback + destination allowlist helpers
-    diagnostics-audit-fields.ts       # Mode-aware diagnostics field visibility for core vs optional click/UTM data
+    diagnostics-audit-fields.ts       # Mode-aware diagnostics field visibility/counts for core vs optional click/UTM data
     tracking-health.ts                # Operational health checks for Shopify V1 readiness
     session-enrichment.ts             # Redis browser context store keyed by TrackClear session ID, checkout/cart/order identifiers, and email
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
     shopify-webhook-attribution.ts    # Shopify order/cart/landing-site attribution extraction + absolute webhook Purchase URL/content helpers
+    headless-sdk.ts                   # Headless/Hydrogen helper for click attribution, _fbp/_fbc cookies, cart attributes, and ingest calls
     currency.ts                       # Exchange rate fetcher (frankfurter.app API), Redis-cached 24h
     queue.ts                          # Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
@@ -253,31 +255,45 @@ messages/
   it.json                             # Italian translations
 tests/
   unit/
-    hash-pii.test.ts                  # 24 tests
-    phone-normalizer.test.ts          # 16 tests
-    encryption.test.ts                # 12 tests
+    analytics-cache.test.ts           # 7 tests (Redis analytics cache behavior)
+    analytics.test.ts                 # 28 tests (dashboard analytics)
     api-key.test.ts                   # 12 tests
-    consent.test.ts                   # 28 tests
-    meta-capi.test.ts                 # 21 tests
-    rate-limit.test.ts                # 16 tests
-    event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
-    event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
-    purchase-event-id.test.ts         # 5 tests (deterministic Shopify Purchase event IDs)
-    content-id.test.ts                # 4 tests (Shopify catalog content ID normalization)
-    session-enrichment.test.ts        # 2 tests (multi-key Redis session enrichment lookup)
-    workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
-    workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
-    workspace-route-mode.test.ts      # 1 test (public PATCH cannot mutate product mode/install type)
-    events-page-mode.test.ts          # 1 test (Events page failed-count respects workspace destination allowlist)
+    billing.test.ts                   # 22 tests
+    consent.test.ts                   # 29 tests
+    content-id.test.ts                # 5 tests (Shopify catalog content ID normalization and workspace settings resolver)
     diagnostics-audit-fields.test.ts  # 5 tests (mode-aware captured-field visibility and counts)
     diagnostics-route-mode.test.ts    # 1 test (Diagnostics API uses workspace destination allowlist)
-    shopify-webhook-route-mode.test.ts # 2 tests (Shopify webhook V1 allowlist + legacy env bypass)
-    meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
+    diagnostics-test-event-route.test.ts # 2 tests (safe AddToCart/InitiateCheckout diagnostics through ingest)
+    encryption.test.ts                # 12 tests
+    event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
+    event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
+    events-page-mode.test.ts          # 1 test (Events page failed-count respects workspace destination allowlist)
+    extract-custom-data.test.ts       # 27 tests (customData extraction)
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
+    hash-pii.test.ts                  # 24 tests
+    headless-sdk.test.ts              # 4 tests (headless attribution, Meta cookies, cart attributes, ingest client)
+    ingest-attribution.test.ts        # 6 tests (attribution propagation, session enrichment, V1 filtering, deterministic IDs, catalog affixes)
+    meta-capi.test.ts                 # 21 tests
+    meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
+    phone-normalizer.test.ts          # 16 tests
+    pixel-route.test.ts               # 4 tests (webhook-aware Purchase fbq suppression and catalog settings in generated pixel scripts)
+    purchase-event-id.test.ts         # 5 tests (deterministic Shopify Purchase event IDs)
+    rate-limit.test.ts                # 16 tests
+    session-enrichment.test.ts        # 2 tests (multi-key Redis session enrichment lookup)
+    shopify-domain-resolver.test.ts   # 28 tests (Shopify domain resolution)
+    shopify-webhook-attribution.test.ts # 12 tests (order/landing attribution and catalog-aware content IDs)
+    shopify-webhook-route-mode.test.ts # 2 tests (Shopify webhook V1 allowlist + legacy env bypass)
+    shopify-webhook.test.ts           # 6 tests (HMAC/replay/header verification)
     tiktok.test.ts                    # 3 tests (external_id hashing and rich contents)
-    pixel-route.test.ts               # 3 tests (webhook-aware Purchase fbq suppression in generated pixel scripts)
+    tracking-context.test.ts          # 6 tests (fbc synthesis and proxy headers)
+    workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
+    workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
+    workspace-route-mode.test.ts      # 3 tests (public PATCH cannot mutate product mode/install type, catalog settings validation)
 prisma/
-  schema.prisma                       # 11 models, 9 enums (see Data Model below)
+  schema.prisma                       # 11 models, 10 enums (see Data Model below)
+docs/
+  deploy.md                           # Deployment runbook including required production migrations
+  headless-shopify.md                 # Hydrogen/custom storefront tracking helper usage
 ```
 
 ### shadcn/ui Components (14 installed)
@@ -290,12 +306,12 @@ prisma/
 
 **Key relationships:**
 - User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
-- Workspace has many EventLogs, stores nullable `productMode`/`installType`, stores encrypted credentials for all 7 destination codepaths (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads), includes per-destination enable toggles
+- Workspace has many EventLogs, stores nullable `productMode`/`installType`, workspace-level catalog ID matching settings (`catalogIdMode`, prefix, suffix, template), encrypted credentials for all 7 destination codepaths (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads), and per-destination enable toggles
 - EventLog has a `destination` field (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 - EventLog stores UTM attribution data (utmSource, utmMedium, utmCampaign, utmContent, utmTerm, gclid)
 
-**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), WorkspaceProductMode (SHOPIFY_META_TIKTOK_V1/LEGACY_ALL_DESTINATIONS), WorkspaceInstallType (SHOPIFY_CUSTOM_PIXEL/HEADLESS_CUSTOM), EventName (6 events including Refund), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
+**Enums:** Platform (SHOPIFY/WOOCOMMERCE/BIGCOMMERCE/CUSTOM), WorkspaceProductMode (SHOPIFY_META_TIKTOK_V1/LEGACY_ALL_DESTINATIONS), WorkspaceInstallType (SHOPIFY_CUSTOM_PIXEL/HEADLESS_CUSTOM), CatalogIdMode (VARIANT_NUMERIC_ID/PRODUCT_NUMERIC_ID/VARIANT_GRAPHQL_ID/PRODUCT_GRAPHQL_ID/SKU/CUSTOM), EventName (6 events including Refund), EventStatus (PENDING/SENT/FAILED/RETRYING), ConsentMode (STRICT/LAX), BillingPlan (FREE/STARTER/GROWTH/SCALE), SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
 
 ## Development Commands
 
@@ -327,7 +343,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (391 tests, 32 files)
+# Run unit tests (404 tests, 34 files)
 pnpm test
 
 # Run a single test file
@@ -381,9 +397,10 @@ All documented in `.env.example`. Critical ones:
 |-------|--------|---------|
 | `GET /api/diagnostics` | GET | Internal diagnostics data filtered by workspace mode/destination allowlist |
 | `GET/POST /api/workspaces` | GET, POST | List/create workspaces |
-| `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD; product mode/install type are read-only to client PATCH requests |
+| `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD; product mode/install type are read-only to client PATCH requests; catalog ID matching settings are editable |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
 | `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown, privacy-preserving after EventLog sanitization) |
+| `POST /api/workspaces/:id/diagnostics/test-event` | POST | Authenticated non-Purchase AddToCart/InitiateCheckout diagnostic event through ingest |
 | `GET /api/workspaces/:id/analytics` | GET | Dashboard analytics with destination filter + currency conversion |
 | `PATCH /api/user/preferences` | PATCH | Update user display currency and language |
 | `DELETE /api/user/account` | DELETE | GDPR account deletion (cancels Stripe, cascades all data) |
@@ -439,7 +456,7 @@ Header: Content-Type: application/json
 - **Workspace model:** Each merchant has a workspace with a unique API key (unlimited per user, shared order pool).
 - **Multi-destination fan-out:** Ingest route creates one EventLog + one BullMQ job per enabled destination. Each destination has its own queue, worker, normalizer, and API client.
 - **Product-mode rollout:** `Workspace.productMode` and `Workspace.installType` are nullable for safe migration. Runtime fallback treats missing values as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; new workspaces are created as `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`. V1 workspaces are allowlisted to Meta/TikTok in UI, ingest, webhook, replay, analytics, and event views, including Events page failed-count/replay visibility. Public workspace PATCH requests cannot mutate product mode/install type. `LEGACY_WORKSPACE_IDS` can force legacy behavior as an emergency bypass.
-- **Deployment order:** Run `pnpm prisma migrate deploy` against production before deploying app/worker code that depends on new schema fields. Build scripts only run `prisma generate`; they do not apply migrations. See `docs/deploy.md`.
+- **Deployment order:** Run `pnpm prisma migrate deploy` against production before deploying app/worker code that depends on new schema fields, including `20260522_add_catalog_id_settings`. Build scripts only run `prisma generate`; they do not apply migrations. See `docs/deploy.md`.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard "All" view deduplicates by filtering to a canonical destination (first enabled). Per-destination tabs show filtered stats. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.
@@ -453,7 +470,8 @@ Header: Content-Type: application/json
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
 - **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
 - **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`), improving Meta/TikTok deduplication and retry consistency.
-- **Catalog content ID normalization:** Generated pixel, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. The default uses variant numeric IDs, with product and SKU fallbacks, plus helper support for product numeric, GraphQL, SKU, and custom template modes.
+- **Catalog content ID normalization:** Generated pixel, legacy script, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. Workspace settings control variant numeric, product numeric, GraphQL, SKU, prefix/suffix, and custom template modes from Settings.
+- **Headless storefront helper:** `headless-sdk.ts` gives Hydrogen/custom storefronts a reusable client for URL click-ID capture, Meta `_fbp`/`_fbc` cookie maintenance, Shopify cart attribution attributes, and TrackClear ingest calls.
 - **TikTok attribution quality:** TikTok Events API payloads include hashed `external_id` from `customerId` when available and prefer rich `contents` with quantity/item price over flat `content_ids`.
 - **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery. Replay is privacy-preserving: sanitized rows replay attribution columns and customData, but raw PII is not reconstructed after it has been removed.
 - **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, attribution source breakdown, and recent errors. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.

@@ -16,6 +16,10 @@ import { toast } from "sonner";
 interface Workspace {
   id: string;
   consentMode: ConsentMode;
+  catalogIdMode: string;
+  catalogIdPrefix: string | null;
+  catalogIdSuffix: string | null;
+  catalogIdTemplate: string | null;
   enablePageView: boolean;
   enableViewContent: boolean;
   enableAddToCart: boolean;
@@ -69,6 +73,39 @@ const LANGUAGES = [
   { code: "it", label: "Italian" },
 ];
 
+const CATALOG_ID_MODES = [
+  {
+    value: "VARIANT_NUMERIC_ID",
+    label: "Variant numeric ID",
+    description: "Default for Shopify catalogs that use variant IDs.",
+  },
+  {
+    value: "PRODUCT_NUMERIC_ID",
+    label: "Product numeric ID",
+    description: "Use when Meta/TikTok catalogs are keyed by product ID.",
+  },
+  {
+    value: "VARIANT_GRAPHQL_ID",
+    label: "Variant GraphQL ID",
+    description: "Use full Shopify variant GIDs.",
+  },
+  {
+    value: "PRODUCT_GRAPHQL_ID",
+    label: "Product GraphQL ID",
+    description: "Use full Shopify product GIDs.",
+  },
+  {
+    value: "SKU",
+    label: "SKU",
+    description: "Use SKU values when the ad catalog is SKU keyed.",
+  },
+  {
+    value: "CUSTOM",
+    label: "Custom template",
+    description: "Render a template such as {{variant_id}}_{{country}}.",
+  },
+] as const;
+
 export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) {
   // Event toggles state
   const [toggles, setToggles] = useState({
@@ -83,6 +120,15 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
   // Consent mode state
   const [consentMode, setConsentMode] = useState<ConsentMode>(workspace.consentMode);
   const [savingConsent, setSavingConsent] = useState(false);
+
+  // Catalog ID state
+  const [catalogSettings, setCatalogSettings] = useState({
+    catalogIdMode: workspace.catalogIdMode ?? "VARIANT_NUMERIC_ID",
+    catalogIdPrefix: workspace.catalogIdPrefix ?? "",
+    catalogIdSuffix: workspace.catalogIdSuffix ?? "",
+    catalogIdTemplate: workspace.catalogIdTemplate ?? "",
+  });
+  const [savingCatalog, setSavingCatalog] = useState(false);
 
   // User preferences state
   const [displayCurrency, setDisplayCurrency] = useState(userPreferences.displayCurrency);
@@ -140,6 +186,24 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingConsent(false);
+    }
+  }
+
+  async function handleSaveCatalog(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingCatalog(true);
+    try {
+      await patchWorkspace({
+        catalogIdMode: catalogSettings.catalogIdMode,
+        catalogIdPrefix: catalogSettings.catalogIdPrefix.trim() || null,
+        catalogIdSuffix: catalogSettings.catalogIdSuffix.trim() || null,
+        catalogIdTemplate: catalogSettings.catalogIdTemplate.trim() || null,
+      });
+      toast.success("Catalog ID settings saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingCatalog(false);
     }
   }
 
@@ -323,13 +387,93 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
                 <RadioGroupItem value="LAX" id="lax" className="mt-0.5" />
                 <div>
                   <Label htmlFor="lax" className="cursor-pointer">Lax</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">Forward all events regardless of consent.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Forward events unless the relevant analytics or marketing consent is explicitly denied.</p>
                 </div>
               </label>
             </RadioGroup>
             <div className="flex justify-end pt-4">
               <Button type="submit" variant="brand" disabled={savingConsent}>
                 {savingConsent ? "Saving\u2026" : "Save consent mode"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Catalog ID Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Catalog ID Matching</CardTitle>
+          <CardDescription>
+            Match TrackClear content IDs to the IDs used by your Meta and TikTok product catalogs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveCatalog} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="catalogIdMode">Content ID mode</Label>
+              <select
+                id="catalogIdMode"
+                value={catalogSettings.catalogIdMode}
+                onChange={(e) =>
+                  setCatalogSettings((prev) => ({ ...prev, catalogIdMode: e.target.value }))
+                }
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {CATALOG_ID_MODES.map((mode) => (
+                  <option key={mode.value} value={mode.value}>
+                    {mode.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {CATALOG_ID_MODES.find((mode) => mode.value === catalogSettings.catalogIdMode)?.description}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="catalogIdPrefix">Prefix</Label>
+                <Input
+                  id="catalogIdPrefix"
+                  value={catalogSettings.catalogIdPrefix}
+                  onChange={(e) =>
+                    setCatalogSettings((prev) => ({ ...prev, catalogIdPrefix: e.target.value }))
+                  }
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="catalogIdSuffix">Suffix</Label>
+                <Input
+                  id="catalogIdSuffix"
+                  value={catalogSettings.catalogIdSuffix}
+                  onChange={(e) =>
+                    setCatalogSettings((prev) => ({ ...prev, catalogIdSuffix: e.target.value }))
+                  }
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="catalogIdTemplate">Custom template</Label>
+              <Input
+                id="catalogIdTemplate"
+                value={catalogSettings.catalogIdTemplate}
+                onChange={(e) =>
+                  setCatalogSettings((prev) => ({ ...prev, catalogIdTemplate: e.target.value }))
+                }
+                placeholder="{{variant_id}}"
+              />
+              <p className="text-xs text-muted-foreground">
+                Available tokens: {"{{variant_id}}"}, {"{{product_id}}"}, {"{{variant_graphql_id}}"}, {"{{product_graphql_id}}"}, {"{{sku}}"}, {"{{country}}"}.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" variant="brand" disabled={savingCatalog}>
+                {savingCatalog ? "Saving\u2026" : "Save catalog settings"}
               </Button>
             </div>
           </form>

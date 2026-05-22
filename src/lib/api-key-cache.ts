@@ -16,7 +16,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     // Redis unavailable or corrupted data, fall through to DB
   }
 
-  // DB lookup — fetch only non-sensitive fields needed by the ingest route.
+  // DB lookup: fetch only non-sensitive fields needed by the ingest route.
   // Encrypted credential triplets (*Encrypted/*Iv/*Tag) are intentionally
   // excluded from the cached object to avoid storing secrets in Redis.
   // The raw encrypted fields are fetched transiently to compute boolean
@@ -30,6 +30,10 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
       isActive: true,
       productMode: true,
       installType: true,
+      catalogIdMode: true,
+      catalogIdPrefix: true,
+      catalogIdSuffix: true,
+      catalogIdTemplate: true,
       // Meta
       metaPixelId: true,
       metaTestEventCode: true,

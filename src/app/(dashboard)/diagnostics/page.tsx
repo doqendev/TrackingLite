@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/table";
 import {
   countPresentDiagnosticsAuditFields,
+  countOptionalDiagnosticsAuditFields,
   getVisibleDiagnosticsAuditFields,
+  isOptionalDiagnosticsAuditField,
 } from "@/lib/diagnostics-audit-fields";
 
 // ---------------------------------------------------------------------------
@@ -139,6 +141,8 @@ interface DiagnosticsData {
   addToCartAudit: PurchaseAuditEntry[];
   initiateCheckoutAudit: PurchaseAuditEntry[];
 }
+
+type DiagnosticTestEventName = "AddToCart" | "InitiateCheckout";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -700,6 +704,83 @@ function StuckEventsSection({ stuck }: { stuck: StuckEvents }) {
   );
 }
 
+function LiveValidationSection({
+  workspaceId,
+  onSent,
+}: {
+  workspaceId: string | null;
+  onSent: () => void;
+}) {
+  const [running, setRunning] = useState<DiagnosticTestEventName | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function sendTestEvent(eventName: DiagnosticTestEventName) {
+    if (!workspaceId) return;
+    setRunning(eventName);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/diagnostics/test-event`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventName }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error ?? "Failed to send diagnostic event");
+      }
+
+      const destinations = Array.isArray(body.destinations)
+        ? body.destinations.join(", ")
+        : "none";
+      setMessage(`${eventName} queued for ${destinations}. Refreshing diagnostics shortly.`);
+      setTimeout(onSent, 1500);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          <SectionTitle>Live Non-Purchase Validation</SectionTitle>
+        </CardTitle>
+        <p className="text-xs text-zinc-500">
+          Sends safe diagnostic AddToCart or InitiateCheckout events through the same ingest pipeline. Purchase/order events are intentionally not supported here.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-zinc-700 text-zinc-300 hover:text-white text-xs"
+            onClick={() => sendTestEvent("AddToCart")}
+            disabled={!workspaceId || running !== null}
+          >
+            {running === "AddToCart" ? "Sending..." : "Send AddToCart"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-zinc-700 text-zinc-300 hover:text-white text-xs"
+            onClick={() => sendTestEvent("InitiateCheckout")}
+            disabled={!workspaceId || running !== null}
+          >
+            {running === "InitiateCheckout" ? "Sending..." : "Send InitiateCheckout"}
+          </Button>
+        </div>
+        {message && (
+          <p className="mt-3 text-xs text-zinc-400">{message}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Section: Purchase Event Audit
 // ---------------------------------------------------------------------------
@@ -709,6 +790,20 @@ function FieldPresenceDot({ value }: { value: unknown }) {
     return <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" title="Missing" />;
   }
   return <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="Present" />;
+}
+
+function FieldKindBadge({ optional }: { optional: boolean }) {
+  return (
+    <span
+      className={`rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
+        optional
+          ? "border-blue-800/70 bg-blue-950/40 text-blue-300"
+          : "border-zinc-700 bg-zinc-800 text-zinc-400"
+      }`}
+    >
+      {optional ? "Optional" : "Core"}
+    </span>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -775,6 +870,7 @@ function EventAuditSection({
               eventName
             );
             const presentCount = countPresentDiagnosticsAuditFields(entry, dataFields);
+            const optionalCount = countOptionalDiagnosticsAuditFields(dataFields);
             const totalFields = dataFields.length;
             const completeness = Math.round((presentCount / totalFields) * 100);
             const allSent = entry.destinations.every((d) => d.status === "SENT");
@@ -806,8 +902,11 @@ function EventAuditSection({
                   </div>
                   <div className="flex items-center gap-2 ml-auto shrink-0">
                     <span className={`text-xs font-mono ${completeness >= 80 ? "text-green-400" : completeness >= 50 ? "text-yellow-400" : "text-red-400"}`}>
-                      {presentCount}/{totalFields} fields
+                      {presentCount}/{totalFields} captured
                     </span>
+                    {optionalCount > 0 && (
+                      <span className="text-xs text-blue-400">+{optionalCount} optional</span>
+                    )}
                     <span
                       className={`inline-block w-2 h-2 rounded-full ${
                         allSent ? "bg-green-500" : anyFailed ? "bg-red-500" : "bg-yellow-500"
@@ -857,10 +956,12 @@ function EventAuditSection({
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1">
                       {dataFields.map((field) => {
                         const val = entry[field.key];
+                        const optional = isOptionalDiagnosticsAuditField(field);
                         return (
                           <div key={field.key} className="flex items-center gap-2 py-1">
                             <FieldPresenceDot value={val} />
                             <span className="text-xs text-zinc-500 w-28 shrink-0">{field.label}</span>
+                            <FieldKindBadge optional={optional} />
                             <span
                               className={`text-xs font-mono truncate ${
                                 val !== null && val !== undefined ? "text-zinc-300" : "text-zinc-700"
@@ -1022,6 +1123,10 @@ export default function DiagnosticsPage() {
         <div className="space-y-6">
           {/* Stuck Events Banner — always top */}
           <StuckEventsSection stuck={data.stuckEvents} />
+          <LiveValidationSection
+            workspaceId={workspaceId}
+            onSent={fetchDiagnostics}
+          />
 
           {/* Main sections */}
           <EventCoverageSection rows={data.eventCoverage} />

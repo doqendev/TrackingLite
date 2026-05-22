@@ -27,6 +27,7 @@ import {
 } from "@/lib/shopify-webhook-attribution";
 import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
 import { buildPurchaseEventId } from "@/lib/purchase-event-id";
+import { contentIdOptionsFromWorkspace } from "@/lib/content-id";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
@@ -252,6 +253,10 @@ async function handleOrderPaid(
       userId: true,
       productMode: true,
       installType: true,
+      catalogIdMode: true,
+      catalogIdPrefix: true,
+      catalogIdSuffix: true,
+      catalogIdTemplate: true,
       shopifyWebhookSecretEncrypted: true,
       shopifyWebhookSecretIv: true,
       shopifyWebhookSecretTag: true,
@@ -327,8 +332,6 @@ async function handleOrderPaid(
     0
   );
   const orderAttribution = buildOrderAttribution(orderData);
-  const contentIds = buildLineItemContentIds(lineItems);
-  const contents = buildLineItemContents(lineItems);
 
   // Extract browser context directly from Shopify order payload (fallback for session enrichment)
   const landingSite = orderData.landing_site ? String(orderData.landing_site) : null;
@@ -403,6 +406,10 @@ async function handleOrderPaid(
       wsLog.info("Purchase events disabled for workspace");
       continue;
     }
+
+    const contentIdOptions = contentIdOptionsFromWorkspace(workspace);
+    const contentIds = buildLineItemContentIds(lineItems, contentIdOptions);
+    const contents = buildLineItemContents(lineItems, contentIdOptions);
 
     // Look up stored browser context by durable checkout identifiers. Email is
     // still used, but cart/checkout/session/order keys keep attribution alive

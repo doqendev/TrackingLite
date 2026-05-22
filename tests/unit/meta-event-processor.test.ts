@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import type { Job } from "bullmq";
 import type { MetaEventJob } from "@/lib/queue";
 
@@ -63,8 +63,7 @@ vi.mock("@/lib/constants", () => ({
   QUEUE_CONFIG: { QUEUE_NAME: "meta-events", MAX_ATTEMPTS: 3, BACKOFF_DELAY_MS: 2000 },
 }));
 
-// Import AFTER all mocks
-const { processMetaEvent } = await import("@/workers/meta-event-processor");
+let processMetaEvent: typeof import("@/workers/meta-event-processor").processMetaEvent;
 
 // Test data factory (new format: no credentials in job data; worker looks up from DB)
 function createMockJob(overrides?: Partial<MetaEventJob>): Job<MetaEventJob> {
@@ -103,6 +102,11 @@ describe("processMetaEvent", () => {
     metaAccessTokenTag: "test-tag",
     metaTestEventCode: null,
   };
+
+  beforeAll(async () => {
+    // Import after all mocks are registered.
+    ({ processMetaEvent } = await import("@/workers/meta-event-processor"));
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();

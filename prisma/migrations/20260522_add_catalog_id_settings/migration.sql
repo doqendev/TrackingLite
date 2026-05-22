@@ -1,0 +1,14 @@
+CREATE TYPE "CatalogIdMode" AS ENUM (
+  'VARIANT_NUMERIC_ID',
+  'PRODUCT_NUMERIC_ID',
+  'VARIANT_GRAPHQL_ID',
+  'PRODUCT_GRAPHQL_ID',
+  'SKU',
+  'CUSTOM'
+);
+
+ALTER TABLE "Workspace"
+  ADD COLUMN "catalogIdMode" "CatalogIdMode" NOT NULL DEFAULT 'VARIANT_NUMERIC_ID',
+  ADD COLUMN "catalogIdPrefix" TEXT,
+  ADD COLUMN "catalogIdSuffix" TEXT,
+  ADD COLUMN "catalogIdTemplate" TEXT;

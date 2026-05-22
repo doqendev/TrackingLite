@@ -92,6 +92,10 @@ model Workspace {
   platform                  Platform        @default(SHOPIFY)
   productMode               WorkspaceProductMode?
   installType               WorkspaceInstallType?
+  catalogIdMode             CatalogIdMode   @default(VARIANT_NUMERIC_ID)
+  catalogIdPrefix           String?
+  catalogIdSuffix           String?
+  catalogIdTemplate         String?
   apiKey                    String          @unique // Unique API key for this workspace (used in JS snippet)
   metaPixelId               String?         // Meta Pixel ID
   metaAccessTokenEncrypted  String?         // AES-256-GCM encrypted
@@ -292,6 +296,15 @@ enum WorkspaceProductMode {
 enum WorkspaceInstallType {
   SHOPIFY_CUSTOM_PIXEL
   HEADLESS_CUSTOM
+}
+
+enum CatalogIdMode {
+  VARIANT_NUMERIC_ID
+  PRODUCT_NUMERIC_ID
+  VARIANT_GRAPHQL_ID
+  PRODUCT_GRAPHQL_ID
+  SKU
+  CUSTOM
 }
 
 enum EventName {

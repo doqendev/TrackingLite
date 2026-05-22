@@ -1,5 +1,17 @@
 # MEMORY.md
 
+## 2026-05-22 - Tracking Quality Sprint 3
+
+- Added workspace-level catalog ID matching settings with migration `20260522_add_catalog_id_settings`: `catalogIdMode`, optional prefix/suffix, and optional custom template. Public PATCH can update catalog settings, but productMode/installType remain internal-only.
+- Applied catalog ID settings across generated `/api/pixel/:workspaceId`, legacy `/api/s/:workspaceId`, ingest customData normalization, and Shopify webhook Purchase `content_ids`/`contents`. The browser scripts preserve SKU/GraphQL casing instead of lowercasing catalog IDs.
+- Added a safe diagnostics live-validation route, `POST /api/workspaces/:id/diagnostics/test-event`, and `/diagnostics` buttons for AddToCart and InitiateCheckout. Purchase diagnostic events are intentionally rejected to avoid fake order signals.
+- Updated Diagnostics event audit UI to label Core vs Optional fields and show optional click/UTM field counts separately, clarifying why one order can be 8/8 while another is 14/14.
+- Hardened consent mapping by treating Google Ads as a marketing destination in `shouldSendToDestination()`.
+- Added `src/lib/headless-sdk.ts` and `docs/headless-shopify.md` for Hydrogen/custom storefronts: URL click-ID capture, Meta `_fbp`/`_fbc` cookie maintenance, Shopify cart attribution attributes, and TrackClear ingest calls.
+- Fixed the previous TypeScript-only top-level-await issue in `meta-event-processor.test.ts`; `pnpm exec tsc --noEmit` now passes cleanly.
+- Added/expanded tests for diagnostics test events, headless helper behavior, catalog settings, generated pixels, ingest catalog affixes, webhook catalog IDs, consent mapping, and workspace route validation.
+- Validation: targeted tracking-quality tests passed 65/65; `pnpm test -- --run` passed 404/404 unit tests; `pnpm exec tsc --noEmit` passed cleanly; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing lint/static-generation warnings. Local `pnpm prisma migrate status` could not complete because `DIRECT_DATABASE_URL` is missing and Docker/Postgres on `127.0.0.1:5433` is not running in this environment; production still requires `pnpm prisma migrate deploy` before app/worker deploy.
+
 ## 2026-05-22 - Diagnostics Mode-Aware Field Visibility
 
 - Updated `/api/diagnostics` to resolve workspace mode through `getAllowedDestinationsForWorkspace()` and filter destination health, event coverage, matrix, data quality, recent failures, stuck events, and event-audit queries to the workspace's allowed destinations.

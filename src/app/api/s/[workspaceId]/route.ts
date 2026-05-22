@@ -1,18 +1,25 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { contentIdOptionsFromWorkspace, type ContentIdOptions } from "@/lib/content-id";
+
+function sanitizeForJs(value: string): string {
+  return value.replace(/[\\'"<>&`\n\r\0]/g, "");
+}
 
 function generateTrackingScript(
   apiKey: string,
   pixelId: string | null,
   ingestUrl: string,
   hasShopifyWebhook: boolean,
-  workspaceId: string
+  workspaceId: string,
+  contentIdOptions: ContentIdOptions = {}
 ): string {
   return `(function(){
 var ctx=window.__tl||{},a=ctx.analytics||analytics;
-var K="${apiKey}",E="${ingestUrl}",W="${workspaceId}";
+var K="${sanitizeForJs(apiKey)}",E="${sanitizeForJs(ingestUrl)}",W="${sanitizeForJs(workspaceId)}";
 var H=${hasShopifyWebhook ? "true" : "false"};
-${pixelId ? `var P="${pixelId}";` : ""}
+var CM="${sanitizeForJs(String(contentIdOptions.mode ?? "VARIANT_NUMERIC_ID"))}",CP="${sanitizeForJs(contentIdOptions.prefix ?? "")}",CS="${sanitizeForJs(contentIdOptions.suffix ?? "")}",CT="${sanitizeForJs(contentIdOptions.template ?? "")}";
+${pixelId ? `var P="${sanitizeForJs(pixelId)}";` : ""}
 function gc(n){try{var m=document.cookie.match(new RegExp("(^| )"+n+"=([^;]+)"));return m?m[2]:null}catch(e){return null}}
 function gp(n){try{var u=new URL(location.href);return u.searchParams.get(n)}catch(e){return null}}
 function vp(v){if(!v)return null;return/^fb\\.1\\.\\d{13}\\.\\d{7,20}$/.test(v)?v:null}
@@ -31,17 +38,22 @@ function wa(){try{var o=at(),b=new URLSearchParams();for(var k in o)b.append("at
 function se(en,eid,cd,ud){var c=cn();try{fetch(E,{method:"POST",headers:{"Content-Type":"application/json","X-TL-API-Key":K},body:JSON.stringify({eventName:en,eventId:eid,timestamp:Date.now(),url:(typeof location!=="undefined")?location.href:"",referrer:(typeof document!=="undefined")?document.referrer:"",trackclearSessionId:sid,checkoutToken:(cd&&cd.checkoutToken)||undefined,cartToken:(cd&&cd.cartToken)||undefined,fbp:fbpVal,fbc:fbcVal,fbclid:cid.fb,gbraid:cid.gb,wbraid:cid.wb,ttclid:cid.tt,rdtCid:cid.rd,epik:cid.ep,utmSource:utm.s,utmMedium:utm.m,utmCampaign:utm.c,utmContent:utm.n,utmTerm:utm.t,gclid:cid.gl,consent:c,userData:ud||{},customData:cd||{}}),keepalive:true})}catch(e){}}
 function eu(co){if(!co)return{};var b=co.billingAddress||co.shippingAddress||{};return{email:co.email||(co.order&&co.order.customer&&co.order.customer.email)||null,phone:b.phone||co.phone||null,firstName:b.firstName||null,lastName:b.lastName||null,city:b.city||null,state:b.province||b.provinceCode||null,zip:b.zip||null,countryCode:b.countryCode||null}}
 function ni(v){if(v==null)return"";v=String(v).trim();var m=v.match(/^gid:\\/\\/shopify\\/[^\\/]+\\/([^\\/?#]+)/i);if(m)v=m[1];m=v.match(/\\/(\\d+)(?:[\\/?#].*)?$/);if(m)v=m[1];return String(v).replace(/^#+/,"").toLowerCase().replace(/[^a-z0-9._:-]+/g,"_").replace(/^_+|_+$/g,"").slice(0,180)}
-function ci(v){var id=ni(v);return id?[id]:[]}
+function cg(r,x,n){x=x||"";if(/^gid:\\/\\/shopify\\//.test(x))return x;var d=ni(x||n);return d?"gid://shopify/"+r+"/"+d:x||""}
+function cv(v){if(v==null)return"";return String(v).trim()}
+function ct(t,o){return t.replace(/\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}/g,function(_,k){return o[k]||""})}
+function fm(o){o=o||{};var v="",vals={variant_id:ni(o.variantId||o.variantGraphqlId),product_id:ni(o.productId||o.productGraphqlId),variant_graphql_id:cg("ProductVariant",o.variantGraphqlId,o.variantId),product_graphql_id:cg("Product",o.productGraphqlId,o.productId),sku:cv(o.sku),country:cv(o.country)};if(CM==="PRODUCT_NUMERIC_ID")v=vals.product_id;else if(CM==="VARIANT_GRAPHQL_ID")v=vals.variant_graphql_id;else if(CM==="PRODUCT_GRAPHQL_ID")v=vals.product_graphql_id;else if(CM==="SKU")v=vals.sku;else if(CM==="CUSTOM")v=ct(CT,vals);else v=vals.variant_id||vals.product_id||vals.sku;v=cv(v);return v?cv(CP+v+CS).slice(0,180):""}
+function ci(o){var id=fm(o);return id?[id]:[]}
+function lo(l){l=l||{};var v=l.variant||l.merchandise||{},p=v.product||l.product||{};return{variantId:v.id||v.variantId||l.variant_id,variantGraphqlId:v.id||v.admin_graphql_api_id,productId:p.id||p.productId||l.product_id,productGraphqlId:p.id||p.admin_graphql_api_id,sku:v.sku||l.sku}}
 function pid(co){co=co||{};var o=co.order||{},id=ni(o.id||o.admin_graphql_api_id||o.name||co.orderName||co.checkoutToken||co.token||co.id||co.cartToken||co.cartId);return id?"shopify-purchase:"+W+":"+id:crypto.randomUUID()}
 a.subscribe("page_viewed",function(e){var id=crypto.randomUUID();se("PageView",id,{},{});if(typeof fbq==="function")fbq("track","PageView",{},{eventID:id})});
-a.subscribe("product_viewed",function(e){var id=crypto.randomUUID(),v=e.data.productVariant||{},cd={contentIds:ci(v.id),contentType:"product",contentName:v.title||"",contentCategory:(v.product&&v.product.type)||"",value:v.price?parseFloat(v.price.amount):0,currency:v.price?v.price.currencyCode:"USD"};se("ViewContent",id,cd,{});if(typeof fbq==="function")fbq("track","ViewContent",{content_ids:cd.contentIds,content_type:cd.contentType,content_name:cd.contentName,value:cd.value,currency:cd.currency},{eventID:id})});
-a.subscribe("product_added_to_cart",function(e){var id=crypto.randomUUID(),cl=e.data.cartLine||{},m=cl.merchandise||{},t=(cl.cost||{}).totalAmount||{},cd={contentIds:ci(m.id),contentType:"product",value:t.amount?parseFloat(t.amount):0,currency:t.currencyCode||"USD",numItems:cl.quantity||1};wa();se("AddToCart",id,cd,{});if(typeof fbq==="function")fbq("track","AddToCart",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems},{eventID:id})});
-a.subscribe("checkout_started",function(e){var id=crypto.randomUUID(),co=e.data.checkout||{},tp=co.totalPrice||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:(co.lineItems||[]).map(function(l){return ni(l.variant&&l.variant.id)}).filter(Boolean),contentType:"product",numItems:(co.lineItems||[]).length,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};wa();se("InitiateCheckout",id,cd,eu(co));if(typeof fbq==="function")fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems},{eventID:id})});
-a.subscribe("checkout_completed",function(e){var co=e.data.checkout||{},id=pid(co),tp=co.totalPrice||{},li=co.lineItems||[],o=co.order||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return ni(l.variant&&l.variant.id)}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:ni(l.variant&&l.variant.id),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:o.id||o.name||null,orderName:o.name||null,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};se("Purchase",id,cd,eu(co));if(!H&&typeof fbq==="function")fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id})});
+a.subscribe("product_viewed",function(e){var id=crypto.randomUUID(),v=e.data.productVariant||{},cd={contentIds:ci({variantId:v.id,variantGraphqlId:v.id,productId:v.product&&v.product.id,productGraphqlId:v.product&&v.product.id,sku:v.sku}),contentType:"product",contentName:v.title||"",contentCategory:(v.product&&v.product.type)||"",value:v.price?parseFloat(v.price.amount):0,currency:v.price?v.price.currencyCode:"USD"};se("ViewContent",id,cd,{});if(typeof fbq==="function")fbq("track","ViewContent",{content_ids:cd.contentIds,content_type:cd.contentType,content_name:cd.contentName,value:cd.value,currency:cd.currency},{eventID:id})});
+a.subscribe("product_added_to_cart",function(e){var id=crypto.randomUUID(),cl=e.data.cartLine||{},m=cl.merchandise||{},t=(cl.cost||{}).totalAmount||{},cd={contentIds:ci({variantId:m.id,variantGraphqlId:m.id,productId:m.product&&m.product.id,productGraphqlId:m.product&&m.product.id,sku:m.sku}),contentType:"product",value:t.amount?parseFloat(t.amount):0,currency:t.currencyCode||"USD",numItems:cl.quantity||1};wa();se("AddToCart",id,cd,{});if(typeof fbq==="function")fbq("track","AddToCart",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems},{eventID:id})});
+a.subscribe("checkout_started",function(e){var id=crypto.randomUUID(),co=e.data.checkout||{},tp=co.totalPrice||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:(co.lineItems||[]).map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",numItems:(co.lineItems||[]).length,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};wa();se("InitiateCheckout",id,cd,eu(co));if(typeof fbq==="function")fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems},{eventID:id})});
+a.subscribe("checkout_completed",function(e){var co=e.data.checkout||{},id=pid(co),tp=co.totalPrice||{},li=co.lineItems||[],o=co.order||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:o.id||o.name||null,orderName:o.name||null,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};se("Purchase",id,cd,eu(co));if(!H&&typeof fbq==="function")fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id})});
 })();`;
 }
 
-// Public endpoint — no auth required (like ingest)
+// Public endpoint - no auth required (like ingest)
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ workspaceId: string }> }
@@ -50,7 +62,15 @@ export async function GET(
 
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, isActive: true },
-    select: { apiKey: true, metaPixelId: true, shopifyWebhookSecretEncrypted: true },
+    select: {
+      apiKey: true,
+      metaPixelId: true,
+      shopifyWebhookSecretEncrypted: true,
+      catalogIdMode: true,
+      catalogIdPrefix: true,
+      catalogIdSuffix: true,
+      catalogIdTemplate: true,
+    },
   });
 
   if (!workspace) {
@@ -69,7 +89,8 @@ export async function GET(
     workspace.metaPixelId,
     ingestUrl,
     !!workspace.shopifyWebhookSecretEncrypted,
-    workspaceId
+    workspaceId,
+    contentIdOptionsFromWorkspace(workspace)
   );
 
   return new NextResponse(script, {

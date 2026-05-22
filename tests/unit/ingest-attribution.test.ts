@@ -338,6 +338,71 @@ describe("ingest attribution handling", () => {
     );
   });
 
+  it("applies workspace catalog ID affixes during ingest normalization", async () => {
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_123",
+      userId: "user_123",
+      isActive: true,
+      catalogIdMode: "VARIANT_NUMERIC_ID",
+      catalogIdPrefix: "shopify_US_",
+      catalogIdSuffix: "_online",
+      catalogIdTemplate: null,
+      consentMode: "LAX",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: true,
+      hasTikTokCredentials: false,
+      hasGA4Credentials: false,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: false,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: false,
+      hasShopifyWebhookSecret: false,
+    });
+
+    const response = await postIngest(
+      makeRequest(
+        {
+          eventName: "AddToCart",
+          eventId: "evt_catalog",
+          timestamp: Date.now(),
+          consent: { analyticsAllowed: true, marketingAllowed: true },
+          customData: {
+            value: 25,
+            currency: "USD",
+            contentIds: ["gid://shopify/ProductVariant/111"],
+            contents: [{ id: "gid://shopify/ProductVariant/111", quantity: 1 }],
+          },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEventLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          payload: expect.objectContaining({
+            customData: expect.objectContaining({
+              contentIds: ["shopify_US_111_online"],
+              content_ids: ["shopify_US_111_online"],
+              contents: [
+                {
+                  id: "shopify_US_111_online",
+                  content_id: "shopify_US_111_online",
+                  quantity: 1,
+                },
+              ],
+            }),
+          }),
+        }),
+      })
+    );
+  });
+
   it("stores session enrichment by TrackClear session and checkout identifiers without email", async () => {
     const response = await postIngest(
       makeRequest(

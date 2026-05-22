@@ -157,4 +157,26 @@ describe("shopify-webhook-attribution", () => {
       { id: "333", quantity: 1, item_price: 9.99 },
     ]);
   });
+
+  it("applies workspace catalog ID settings to webhook line items", () => {
+    const lineItems = [
+      {
+        variant_id: 111,
+        product_id: 222,
+        sku: "SKU-333",
+        quantity: 1,
+        price: "10.00",
+      },
+    ];
+
+    expect(buildLineItemContentIds(lineItems, { mode: "SKU", prefix: "sku:" })).toEqual([
+      "sku:SKU-333",
+    ]);
+    expect(
+      buildLineItemContents(lineItems, {
+        mode: "CUSTOM",
+        template: "{{product_id}}-{{variant_id}}",
+      })
+    ).toEqual([{ id: "222-111", quantity: 1, item_price: 10 }]);
+  });
 });

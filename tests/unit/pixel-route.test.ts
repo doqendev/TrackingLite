@@ -31,6 +31,10 @@ describe("GET /api/pixel/[workspaceId]", () => {
       apiKey: "tl_test",
       metaPixelId: "123456",
       shopifyWebhookSecretEncrypted: null,
+      catalogIdMode: "VARIANT_NUMERIC_ID",
+      catalogIdPrefix: null,
+      catalogIdSuffix: null,
+      catalogIdTemplate: null,
     });
 
     const response = await getPixel(new Request("http://localhost/api/pixel/ws_123"), {
@@ -42,7 +46,8 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
     expect(js).toContain('"shopify-purchase:"+W+":"+id');
-    expect(js).toContain("contentIds:ci(v.id)");
+    expect(js).toContain('var CM="VARIANT_NUMERIC_ID"');
+    expect(js).toContain("contentIds:ci({variantId:v.id");
     expect(js).toContain("_trackclear_session_id");
     expect(js).toContain("/cart/update.js");
     expect(js).toContain("trackclearSessionId:sid");
@@ -56,6 +61,10 @@ describe("GET /api/pixel/[workspaceId]", () => {
       apiKey: "tl_test",
       metaPixelId: "123456",
       shopifyWebhookSecretEncrypted: "encrypted-secret",
+      catalogIdMode: "VARIANT_NUMERIC_ID",
+      catalogIdPrefix: null,
+      catalogIdSuffix: null,
+      catalogIdTemplate: null,
     });
 
     const response = await getPixel(new Request("http://localhost/api/pixel/ws_123"), {
@@ -77,6 +86,10 @@ describe("GET /api/pixel/[workspaceId]", () => {
       apiKey: "tl_test",
       metaPixelId: "123456",
       shopifyWebhookSecretEncrypted: "encrypted-secret",
+      catalogIdMode: "VARIANT_NUMERIC_ID",
+      catalogIdPrefix: null,
+      catalogIdSuffix: null,
+      catalogIdTemplate: null,
     });
 
     const response = await getLegacyScript(new Request("http://localhost/api/s/ws_123"), {
@@ -92,5 +105,35 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain("/cart/update.js");
     expect(js).toContain("trackclearSessionId:sid");
     expect(js).toContain('if(!H&&typeof fbq==="function")fbq("track","Purchase"');
+  });
+
+  it("embeds catalog ID settings in generated pixel scripts", async () => {
+    mockFindFirst.mockResolvedValue({
+      apiKey: "tl_test",
+      metaPixelId: "123456",
+      shopifyWebhookSecretEncrypted: null,
+      catalogIdMode: "SKU",
+      catalogIdPrefix: "sku:",
+      catalogIdSuffix: ":us",
+      catalogIdTemplate: null,
+    });
+
+    const pixelResponse = await getPixel(new Request("http://localhost/api/pixel/ws_123"), {
+      params: Promise.resolve({ workspaceId: "ws_123" }),
+    });
+    const pixelJs = await pixelResponse.text();
+
+    expect(pixelJs).toContain('var CM="SKU",CP="sku:",CS=":us",CT=""');
+    expect(pixelJs).toContain("function fm(o)");
+    expect(pixelJs).toContain("contentIds:ci({variantId:v.id");
+
+    const legacyResponse = await getLegacyScript(new Request("http://localhost/api/s/ws_123"), {
+      params: Promise.resolve({ workspaceId: "ws_123" }),
+    });
+    const legacyJs = await legacyResponse.text();
+
+    expect(legacyJs).toContain('var CM="SKU",CP="sku:",CS=":us",CT=""');
+    expect(legacyJs).toContain("function fm(o)");
+    expect(legacyJs).toContain("contentIds:ci({variantId:v.id");
   });
 });

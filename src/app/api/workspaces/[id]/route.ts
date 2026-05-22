@@ -19,6 +19,17 @@ const UpdateWorkspaceSchema = z.object({
   metaTestEventCode: z.string().optional().nullable(),
   enableMeta: z.boolean().optional(),
   consentMode: z.enum(["STRICT", "LAX"]).optional(),
+  catalogIdMode: z.enum([
+    "VARIANT_NUMERIC_ID",
+    "PRODUCT_NUMERIC_ID",
+    "VARIANT_GRAPHQL_ID",
+    "PRODUCT_GRAPHQL_ID",
+    "SKU",
+    "CUSTOM",
+  ]).optional(),
+  catalogIdPrefix: z.string().max(64).optional().nullable(),
+  catalogIdSuffix: z.string().max(64).optional().nullable(),
+  catalogIdTemplate: z.string().max(200).optional().nullable(),
   enablePageView: z.boolean().optional(),
   enableViewContent: z.boolean().optional(),
   enableAddToCart: z.boolean().optional(),
@@ -109,6 +120,10 @@ export async function GET(
         platform: true,
         productMode: true,
         installType: true,
+        catalogIdMode: true,
+        catalogIdPrefix: true,
+        catalogIdSuffix: true,
+        catalogIdTemplate: true,
         metaPixelId: true,
         metaAccessTokenEncrypted: true,
         metaTestEventCode: true,
@@ -221,6 +236,18 @@ export async function PATCH(
     }
 
     const data = UpdateWorkspaceSchema.parse(body);
+    const nextCatalogMode = data.catalogIdMode ?? workspace.catalogIdMode ?? "VARIANT_NUMERIC_ID";
+    const nextCatalogTemplate =
+      data.catalogIdTemplate !== undefined
+        ? data.catalogIdTemplate
+        : workspace.catalogIdTemplate;
+    if (nextCatalogMode === "CUSTOM" && !nextCatalogTemplate?.trim()) {
+      return NextResponse.json(
+        { error: "Custom catalog ID mode requires a template." },
+        { status: 422 }
+      );
+    }
+
     const workspaceMode = {
       id: workspace.id,
       productMode: workspace.productMode,
@@ -240,7 +267,7 @@ export async function PATCH(
     }
 
     // Re-resolve shopifyDomain if domain is being updated
-    // shopifyDomain is server-computed only — never accepted from client input
+    // shopifyDomain is server-computed only; never accepted from client input.
     let resolvedShopifyDomain: string | null | undefined = undefined; // undefined = no change
     if (data.domain !== undefined) {
       if (data.domain) {
@@ -261,11 +288,11 @@ export async function PATCH(
           }
           resolvedShopifyDomain = resolved.shopifyDomain;
         } else {
-          // Not a Shopify store or couldn't resolve — clear shopifyDomain
+          // Not a Shopify store or resolution failed; clear shopifyDomain.
           resolvedShopifyDomain = null;
         }
       } else {
-        // Domain cleared — also clear shopifyDomain
+        // Domain cleared; also clear shopifyDomain.
         resolvedShopifyDomain = null;
       }
     }
@@ -334,6 +361,10 @@ export async function PATCH(
         platform: true,
         productMode: true,
         installType: true,
+        catalogIdMode: true,
+        catalogIdPrefix: true,
+        catalogIdSuffix: true,
+        catalogIdTemplate: true,
         metaPixelId: true,
         metaAccessTokenEncrypted: true,
         metaTestEventCode: true,

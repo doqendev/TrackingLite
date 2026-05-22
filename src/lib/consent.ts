@@ -16,6 +16,7 @@ export const DESTINATION_CONSENT_CATEGORY: Record<string, DestinationCategory> =
   KLAVIYO: "marketing",
   REDDIT: "marketing",
   PINTEREST: "marketing",
+  GOOGLE_ADS: "marketing",
 };
 
 /**

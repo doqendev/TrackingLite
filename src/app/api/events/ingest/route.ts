@@ -24,7 +24,7 @@ import { getClientIpFromHeaders, getClientUserAgentFromHeaders, resolveFbc } fro
 import { buildEventLogPayload } from "@/lib/event-log-payload";
 import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
 import { buildPurchaseEventIdFromCustomData } from "@/lib/purchase-event-id";
-import { normalizeCustomDataContentIds } from "@/lib/content-id";
+import { contentIdOptionsFromWorkspace, normalizeCustomDataContentIds } from "@/lib/content-id";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -163,7 +163,10 @@ export async function POST(request: NextRequest) {
     }
     const payload = IngestPayloadSchema.parse(body);
     const resolvedFbc = resolveFbc(payload.fbc, payload.fbclid);
-    const normalizedCustomData = normalizeCustomDataContentIds(payload.customData);
+    const normalizedCustomData = normalizeCustomDataContentIds(
+      payload.customData,
+      contentIdOptionsFromWorkspace(workspace)
+    );
     const extracted = extractCustomData(normalizedCustomData);
     const effectiveEventId =
       payload.eventName === "Purchase"

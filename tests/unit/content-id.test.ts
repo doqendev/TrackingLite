@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  contentIdOptionsFromWorkspace,
   normalizeContentId,
   normalizeCustomDataContentIds,
   numericShopifyId,
@@ -39,7 +40,7 @@ describe("content-id", () => {
   });
 
   it("normalizes customData content IDs and rich contents", () => {
-    const customData = normalizeCustomDataContentIds({
+    const customData = normalizeCustomDataContentIds<Record<string, unknown>>({
       contentIds: ["gid://shopify/ProductVariant/111"],
       contents: [
         { id: "gid://shopify/ProductVariant/111", quantity: 2, itemPrice: 19.99 },
@@ -51,5 +52,28 @@ describe("content-id", () => {
     expect(customData.contents).toEqual([
       { id: "111", content_id: "111", quantity: 2, itemPrice: 19.99 },
     ]);
+  });
+
+  it("builds content ID options from workspace catalog settings", () => {
+    expect(
+      contentIdOptionsFromWorkspace({
+        catalogIdMode: "SKU",
+        catalogIdPrefix: "sku:",
+        catalogIdSuffix: ":us",
+        catalogIdTemplate: "{{sku}}",
+      })
+    ).toEqual({
+      mode: "SKU",
+      prefix: "sku:",
+      suffix: ":us",
+      template: "{{sku}}",
+    });
+
+    expect(contentIdOptionsFromWorkspace(null)).toEqual({
+      mode: "VARIANT_NUMERIC_ID",
+      prefix: null,
+      suffix: null,
+      template: null,
+    });
   });
 });

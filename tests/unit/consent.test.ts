@@ -62,6 +62,10 @@ describe("shouldSendToDestination - STRICT mode - Marketing destinations", () =>
     expect(shouldSendToDestination("STRICT", { marketing: true }, "GOOGLE_ADS")).toBe(true);
   });
 
+  it("STRICT + marketing=false -> block GOOGLE_ADS", () => {
+    expect(shouldSendToDestination("STRICT", { marketing: false }, "GOOGLE_ADS")).toBe(false);
+  });
+
   it("STRICT + marketing=true -> allow TIKTOK", () => {
     expect(shouldSendToDestination("STRICT", { marketing: true }, "TIKTOK")).toBe(true);
   });

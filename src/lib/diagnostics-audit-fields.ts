@@ -80,3 +80,15 @@ export function countPresentDiagnosticsAuditFields(
 ): number {
   return fields.filter((field) => hasCapturedValue(entry[field.key])).length;
 }
+
+export function isOptionalDiagnosticsAuditField(
+  field: DiagnosticsAuditField
+): boolean {
+  return OPTIONAL_FIELD_KEYS.has(field.key);
+}
+
+export function countOptionalDiagnosticsAuditFields(
+  fields: readonly DiagnosticsAuditField[]
+): number {
+  return fields.filter(isOptionalDiagnosticsAuditField).length;
+}

@@ -1,9 +1,10 @@
 # Deployment Runbook
 
-## Workspace Mode Release
+## Workspace Mode And Catalog Settings Release
 
-Before deploying app or worker code that reads `Workspace.productMode` and
-`Workspace.installType`, apply committed Prisma migrations against production:
+Before deploying app or worker code that reads `Workspace.productMode`,
+`Workspace.installType`, or the catalog ID settings fields, apply committed
+Prisma migrations against production:
 
 ```bash
 pnpm prisma migrate deploy
@@ -11,6 +12,11 @@ pnpm prisma migrate deploy
 
 The build scripts only run `prisma generate`; Vercel and Railway do not apply
 database migrations automatically.
+
+This release includes:
+
+- `20260521_add_workspace_product_mode`
+- `20260522_add_catalog_id_settings`
 
 Protect existing headless/custom Shopify workspaces before or during rollout:
 
