@@ -8,7 +8,7 @@ Last updated: 2026-05-22 (tracking quality sprint 3)
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
 | Tests (`pnpm test -- --run`) | 404/404 passing (34 files) |
-| Migrations | `20260521_add_workspace_product_mode` applied in production; `20260522_add_catalog_id_settings` must be applied with `pnpm prisma migrate deploy` before app/worker deploys |
+| Migrations | `20260521_add_workspace_product_mode` and `20260522_add_catalog_id_settings` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 
