@@ -22,9 +22,9 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 12 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 13 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 369/369 passing (26 test files)
+- Unit tests: 382/382 passing (29 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: 0 source errors (`pnpm exec tsc --noEmit` still reports one pre-existing test top-level-await config issue)
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -110,7 +110,8 @@ Stale Pending Requeue (every 5 minutes)
 
 - JS snippet/pixel events generate `event_id` via `crypto.randomUUID()`.
 - For normal snippet events, the TrackClear pixel fires `fbq()` with the same `event_id` that the server sends to Meta CAPI, so Meta can deduplicate browser + server events.
-- For Shopify webhook Purchase workspaces, the generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts still send TrackClear Purchase context to ingest, but they suppress browser `fbq("track", "Purchase")`. The webhook sends the server-side Purchase with deterministic `webhook-${orderId}` to avoid browser/server Purchase ID mismatches.
+- Purchase events are normalized to deterministic `shopify-purchase:<workspaceId>:<order|checkout|cart>` IDs when Shopify order, checkout, or cart identifiers are available. Ingest applies the same helper to snippet Purchase events, and Shopify webhook Purchase events use the same deterministic format.
+- For Shopify webhook Purchase workspaces, the generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts still send TrackClear Purchase context to ingest, but they suppress browser `fbq("track", "Purchase")`, avoiding browser/server Purchase ID mismatches.
 
 ## Project Structure
 
@@ -193,6 +194,8 @@ src/
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case and bounded Meta cookie validation)
     event-log-payload.ts              # Sanitized EventLog payload builder (customData + flags, no raw userData)
+    purchase-event-id.ts              # Deterministic Shopify Purchase event_id helper for ingest and webhooks
+    content-id.ts                     # Shopify catalog content ID normalization helpers (variant/product GID, numeric ID, SKU, custom template)
     workspace-mode.ts                 # Product mode/install type fallback + destination allowlist helpers
     tracking-health.ts                # Operational health checks for Shopify V1 readiness
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
@@ -210,8 +213,8 @@ src/
     env-validation.ts                 # Validates required env vars at startup, warns for optional
     extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
     destinations/
-      index.ts                        # DESTINATION_EVENT_MAP for all 6 platforms
-      tiktok.ts                       # TikTok normalizer + Events API client
+      index.ts                        # DESTINATION_EVENT_MAP for all 7 platforms
+      tiktok.ts                       # TikTok normalizer + Events API client, external_id hashing, rich contents
       ga4.ts                          # GA4 normalizer + Measurement Protocol client
       klaviyo.ts                      # Klaviyo normalizer + Events API client (raw email)
       reddit.ts                       # Reddit normalizer + Conversions API client (rdtCid click ID)
@@ -254,6 +257,8 @@ tests/
     rate-limit.test.ts                # 16 tests
     event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
     event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
+    purchase-event-id.test.ts         # 5 tests (deterministic Shopify Purchase event IDs)
+    content-id.test.ts                # 4 tests (Shopify catalog content ID normalization)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
     workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
     workspace-route-mode.test.ts      # 1 test (public PATCH cannot mutate product mode/install type)
@@ -261,6 +266,7 @@ tests/
     shopify-webhook-route-mode.test.ts # 2 tests (Shopify webhook V1 allowlist + legacy env bypass)
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
+    tiktok.test.ts                    # 3 tests (external_id hashing and rich contents)
     pixel-route.test.ts               # 3 tests (webhook-aware Purchase fbq suppression in generated pixel scripts)
 prisma/
   schema.prisma                       # 11 models, 9 enums (see Data Model below)
@@ -276,8 +282,8 @@ prisma/
 
 **Key relationships:**
 - User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
-- Workspace has many EventLogs, stores nullable `productMode`/`installType`, stores encrypted credentials for all 7 destination codepaths (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest), includes per-destination enable toggles
-- EventLog has a `destination` field (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST), one row per event per destination
+- Workspace has many EventLogs, stores nullable `productMode`/`installType`, stores encrypted credentials for all 7 destination codepaths (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads), includes per-destination enable toggles
+- EventLog has a `destination` field (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 - EventLog stores UTM attribution data (utmSource, utmMedium, utmCampaign, utmContent, utmTerm, gclid)
 
@@ -313,7 +319,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (369 tests, 26 files)
+# Run unit tests (382 tests, 29 files)
 pnpm test
 
 # Run a single test file
@@ -433,6 +439,9 @@ Header: Content-Type: application/json
 - **UTM attribution:** Snippet captures UTM params + gclid + rdtCid + epik once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
+- **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`), improving Meta/TikTok deduplication and retry consistency.
+- **Catalog content ID normalization:** Generated pixel, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. The default uses variant numeric IDs, with product and SKU fallbacks, plus helper support for product numeric, GraphQL, SKU, and custom template modes.
+- **TikTok attribution quality:** TikTok Events API payloads include hashed `external_id` from `customerId` when available and prefer rich `contents` with quantity/item price over flat `content_ids`.
 - **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery. Replay is privacy-preserving: sanitized rows replay attribution columns and customData, but raw PII is not reconstructed after it has been removed.
 - **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, and recent errors. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
 - **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, and `contents`.

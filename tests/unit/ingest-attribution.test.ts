@@ -5,6 +5,7 @@ const mockQueueAdd = vi.fn().mockResolvedValue({ id: "job-1" });
 const mockLookupWorkspaceByApiKey = vi.fn();
 const mockEventLogCreate = vi.fn();
 const mockStoreSessionContext = vi.fn();
+const mockRedisSet = vi.fn();
 
 vi.mock("@/lib/api-key", () => ({
   isValidApiKeyFormat: () => true,
@@ -44,6 +45,12 @@ vi.mock("@/lib/db", () => ({
       findFirst: vi.fn(),
     },
   },
+}));
+
+vi.mock("@/lib/redis", () => ({
+  getSharedRedis: () => ({
+    set: (...args: unknown[]) => mockRedisSet(...args),
+  }),
 }));
 
 let postIngest: typeof import("@/app/api/events/ingest/route").POST;
@@ -90,6 +97,7 @@ describe("ingest attribution handling", () => {
       hasShopifyWebhookSecret: false,
     });
     mockEventLogCreate.mockResolvedValue({ id: "event_log_123" });
+    mockRedisSet.mockResolvedValue("OK");
   });
 
   afterEach(() => {
@@ -272,6 +280,60 @@ describe("ingest attribution handling", () => {
     expect(mockEventLogCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ destination: "GA4" }),
+      })
+    );
+  });
+
+  it("normalizes Purchase event IDs and Shopify content IDs before logging and queueing", async () => {
+    const response = await postIngest(
+      makeRequest(
+        {
+          eventName: "Purchase",
+          eventId: "random-browser-id",
+          timestamp: Date.now(),
+          consent: { analyticsAllowed: true, marketingAllowed: true },
+          customData: {
+            orderId: "gid://shopify/Order/987654321",
+            value: 99,
+            currency: "USD",
+            contentIds: ["gid://shopify/ProductVariant/111"],
+            contents: [{ id: "gid://shopify/ProductVariant/111", quantity: 2, itemPrice: 49.5 }],
+          },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.eventId).toBe("shopify-purchase:ws_123:987654321");
+    expect(mockEventLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventId: "shopify-purchase:ws_123:987654321",
+          orderId: "gid://shopify/Order/987654321",
+          payload: expect.objectContaining({
+            customData: expect.objectContaining({
+              contentIds: ["111"],
+              content_ids: ["111"],
+              contents: [
+                { id: "111", content_id: "111", quantity: 2, itemPrice: 49.5 },
+              ],
+            }),
+          }),
+        }),
+      })
+    );
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "send-meta-event",
+      expect.objectContaining({
+        event: expect.objectContaining({
+          eventId: "shopify-purchase:ws_123:987654321",
+          customData: expect.objectContaining({
+            contentIds: ["111"],
+            content_ids: ["111"],
+          }),
+        }),
       })
     );
   });

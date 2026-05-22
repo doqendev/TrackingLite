@@ -23,6 +23,8 @@ import { getSharedRedis } from "@/lib/redis";
 import { getClientIpFromHeaders, getClientUserAgentFromHeaders, resolveFbc } from "@/lib/tracking-context";
 import { buildEventLogPayload } from "@/lib/event-log-payload";
 import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
+import { buildPurchaseEventIdFromCustomData } from "@/lib/purchase-event-id";
+import { normalizeCustomDataContentIds } from "@/lib/content-id";
 import { z } from "zod";
 import type { Queue } from "bullmq";
 
@@ -145,6 +147,16 @@ export async function POST(request: NextRequest) {
     }
     const payload = IngestPayloadSchema.parse(body);
     const resolvedFbc = resolveFbc(payload.fbc, payload.fbclid);
+    const normalizedCustomData = normalizeCustomDataContentIds(payload.customData);
+    const extracted = extractCustomData(normalizedCustomData);
+    const effectiveEventId =
+      payload.eventName === "Purchase"
+        ? buildPurchaseEventIdFromCustomData({
+            workspaceId: workspace.id,
+            eventId: payload.eventId,
+            customData: normalizedCustomData,
+          })
+        : payload.eventId;
 
     // 7. Check event toggle
     const eventToggleMap: Record<string, boolean> = {
@@ -155,7 +167,7 @@ export async function POST(request: NextRequest) {
       Purchase: workspace.enablePurchase,
     };
     if (!eventToggleMap[payload.eventName]) {
-      return NextResponse.json({ success: true, eventId: payload.eventId, skipped: true }, { status: 200, headers: corsHeaders });
+      return NextResponse.json({ success: true, eventId: effectiveEventId, skipped: true }, { status: 200, headers: corsHeaders });
     }
 
     // 8. Consent is now checked per-destination after building the destinations list (step 11b)
@@ -196,15 +208,15 @@ export async function POST(request: NextRequest) {
     // Purchase events after session enrichment so the later webhook Purchase can
     // recover browser attribution collected during checkout.
     if (payload.eventName === "Purchase" && workspace.hasShopifyWebhookSecret) {
-      log.info("Skipping snippet Purchase — Shopify webhook active", { workspaceId: workspace.id, eventId: payload.eventId });
+      log.info("Skipping snippet Purchase — Shopify webhook active", { workspaceId: workspace.id, eventId: effectiveEventId });
       return NextResponse.json(
-        { success: true, eventId: payload.eventId, skipped: true, reason: "webhook_active" },
+        { success: true, eventId: effectiveEventId, skipped: true, reason: "webhook_active" },
         { status: 200, headers: corsHeaders }
       );
     }
 
-    // 10. Extract monetary fields from customData
-    const extracted = extractCustomData(payload.customData);
+    // 10. Monetary fields were extracted before the webhook-active skip so
+    // deterministic Purchase IDs can be normalized.
     // 10b. Dedup: if this Purchase orderId was already tracked (e.g. by webhook), skip
     if (payload.eventName === "Purchase") {
       const orderId = extracted.orderId;
@@ -214,7 +226,7 @@ export async function POST(request: NextRequest) {
         const lockAcquired = await getSharedRedis().set(dedupLockKey, "snippet", "EX", 300, "NX").catch(() => "OK");
         if (!lockAcquired) {
           // Another path (webhook) already claimed this orderId
-          return NextResponse.json({ success: true, eventId: payload.eventId, deduplicated: true }, { status: 200, headers: corsHeaders });
+          return NextResponse.json({ success: true, eventId: effectiveEventId, deduplicated: true }, { status: 200, headers: corsHeaders });
         }
         const existingOrder = await db.eventLog.findFirst({
           where: {
@@ -226,7 +238,7 @@ export async function POST(request: NextRequest) {
         });
         if (existingOrder) {
           return NextResponse.json(
-            { success: true, eventId: payload.eventId, deduplicated: true, destinations: [] },
+            { success: true, eventId: effectiveEventId, deduplicated: true, destinations: [] },
             { status: 200, headers: corsHeaders }
           );
         }
@@ -335,7 +347,7 @@ export async function POST(request: NextRequest) {
 
     if (consentFilteredDestinations.length === 0) {
       return NextResponse.json(
-        { success: true, eventId: payload.eventId, skipped: true },
+        { success: true, eventId: effectiveEventId, skipped: true },
         { status: 200, headers: corsHeaders }
       );
     }
@@ -366,11 +378,11 @@ export async function POST(request: NextRequest) {
     const eventLogBaseData = {
       workspaceId: workspace.id,
       eventName: payload.eventName as any,
-      eventId: payload.eventId,
+      eventId: effectiveEventId,
       status: "PENDING" as const,
       payload: buildEventLogPayload({
         eventName: payload.eventName,
-        customData: payload.customData,
+        customData: normalizedCustomData,
         userData: payload.userData,
         fbp: payload.fbp,
         fbc: resolvedFbc,
@@ -434,7 +446,7 @@ export async function POST(request: NextRequest) {
 
       if (validEntries.length === 0) {
         return NextResponse.json(
-          { success: true, eventId: payload.eventId, deduplicated: true },
+          { success: true, eventId: effectiveEventId, deduplicated: true },
           { status: 200, headers: corsHeaders }
         );
       }
@@ -451,7 +463,7 @@ export async function POST(request: NextRequest) {
             requestId,
             event: {
               eventName: payload.eventName,
-              eventId: payload.eventId,
+              eventId: effectiveEventId,
               timestamp: payload.timestamp,
               url: payload.url,
               referrer: payload.referrer,
@@ -461,7 +473,7 @@ export async function POST(request: NextRequest) {
               gbraid: payload.gbraid || null,
               wbraid: payload.wbraid || null,
               userData: payload.userData,
-              customData: payload.customData,
+              customData: normalizedCustomData,
               clientIp,
               userAgent,
             },
@@ -475,7 +487,7 @@ export async function POST(request: NextRequest) {
             eventLogId,
             event: {
               eventName: payload.eventName,
-              eventId: payload.eventId,
+              eventId: effectiveEventId,
               timestamp: payload.timestamp,
               url: payload.url,
               referrer: payload.referrer,
@@ -490,7 +502,7 @@ export async function POST(request: NextRequest) {
               epik: payload.epik || null,
               gaClientId: payload.gaClientId || null,
               userData: payload.userData,
-              customData: payload.customData,
+              customData: normalizedCustomData,
               clientIp,
               userAgent,
             },
@@ -502,7 +514,7 @@ export async function POST(request: NextRequest) {
     // 13. Return success
     const response: any = {
       success: true,
-      eventId: payload.eventId,
+      eventId: effectiveEventId,
       destinations: validDestinations.map((d) => d.destination),
     };
     if (billing.upgraded) {

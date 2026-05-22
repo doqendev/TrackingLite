@@ -159,6 +159,12 @@ describe("Shopify webhook workspace mode allowlist", () => {
       "META",
       "TIKTOK",
     ]);
+    expect(mockEventLogCreate.mock.calls[0][0].data.eventId).toBe(
+      "shopify-purchase:ws_v1:1001"
+    );
+    expect(mockQueueAdd.mock.calls[0][1].event.eventId).toBe(
+      "shopify-purchase:ws_v1:1001"
+    );
     expect(mockQueueAdd.mock.calls.map((call) => call[0])).toEqual([
       "send-meta-event",
       "send-tiktok-event",

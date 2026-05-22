@@ -1,5 +1,17 @@
 # MEMORY.md
 
+## 2026-05-22 - Maximum Tracking Quality Sprint 1
+
+- Implemented the first pass from the TrackClear Maximum Tracking Quality plan, scoped to Purchase identity, catalog content IDs, and TikTok payload quality.
+- Added deterministic Shopify Purchase event IDs through `purchase-event-id.ts`. Generated pixel scripts, ingest, and Shopify webhooks now prefer `shopify-purchase:<workspaceId>:<order|checkout|cart>` when Shopify identifiers are available, with safe fallback to the original event ID/random UUID.
+- Added `content-id.ts` and applied normalized content IDs across generated pixel payloads, ingest customData, and Shopify webhook line items. Default output is Shopify variant numeric ID with product/SKU fallbacks; helper support exists for product numeric IDs, GraphQL IDs, SKU, and custom template modes.
+- Improved TikTok Events API payloads by hashing `customerId` into `external_id` when available and preferring rich `contents` with quantity/item price over flat `content_ids`.
+- Sanitized EventLog customData now redacts checkout/cart tokens, so deterministic ID inputs are not persisted as raw tokens after ingestion.
+- Dirava production workspace `cmlsa6h1w0001zm8nxuzn7a50` was intentionally reclassified to `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`; Mizoke/headless workspace `cmo1hd1x600045r6d9elaw3tg` remains protected as legacy/headless.
+- Added tests: `purchase-event-id.test.ts`, `content-id.test.ts`, `tiktok.test.ts`, plus expanded `ingest-attribution.test.ts`, `pixel-route.test.ts`, and `shopify-webhook-route-mode.test.ts`.
+- Validation: `pnpm test -- --run` passed 382/382 unit tests; targeted content/ingest tests passed 8/8 after strict TypeScript narrowing; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing dynamic route/static generation warnings.
+- Remaining roadmap work from the plan: cart/order attribution writer, explicit catalog-mode workspace settings UI, consent-mode policy hardening, headless SDK/Hydrogen helpers, Shopify Web Pixel app path, custom ingest domain, and encrypted short-lived retry payloads.
+
 ## 2026-05-21 - Mizoke/TrackClear Attribution Hardening
 
 - Implemented TrackClear-side changes from the Mizoke tracking handoff while preserving the existing normal Shopify Custom Pixel contract used by Dirava.
@@ -16,7 +28,7 @@
 - Added `LEGACY_WORKSPACE_IDS` emergency bypass support in `workspace-mode.ts`; production must include current headless/custom workspace IDs in that env var before deploy.
 - Added `/tracking-health` with operational V1 checks for recent snippet event activity, webhook active/Purchase received, Meta/TikTok connection, dedup status, attribution context, and recent errors. The snippet check is not a heartbeat.
 - Updated landing/pricing/OpenGraph copy to describe Shopify purchase tracking for Meta + TikTok and removed the annual pricing toggle, hidden 7-platform claims, and unproven delivery-rate claims from the public V1 path.
-- Production database migration `20260521_add_workspace_product_mode` was applied, and production Mizoke workspace `cmo1hd1x600045r6d9elaw3tg` was explicitly set to `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`. Dirava/existing null-mode workspaces still resolve to legacy/custom behavior, preserving current tracking.
+- Production database migration `20260521_add_workspace_product_mode` was applied, and production Mizoke workspace `cmo1hd1x600045r6d9elaw3tg` was explicitly set to `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`. Existing null-mode workspaces still resolve to legacy/custom behavior until explicitly migrated.
 - Follow-up patch after super-dev review: added idempotent Prisma migration `20260521_add_workspace_product_mode`, removed productMode/installType from public PATCH mutation, made the integrations UI use backend mode resolvers, fixed dashboard TikTok setup detection to require credentials, documented privacy-preserving replay after EventLog sanitization, and added `LEGACY_WORKSPACE_IDS` to `.env.example`.
 - Final rollout hardening added `docs/deploy.md`, internal script `scripts/set-workspace-mode.ts`, accurate privacy-cookie wording for `_fbp`/`_fbc`, and visible replay privacy wording in the Events UI.
 - Follow-up rollout polish filters the Events page failed-count/replay visibility by the same workspace destination allowlist as the visible event list, preventing V1 workspaces from surfacing old hidden legacy destination failures.

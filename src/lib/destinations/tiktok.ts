@@ -76,6 +76,10 @@ export function normalizeToTikTokEvent(
   if (ud.phone && typeof ud.phone === "string") {
     user.phone = hashPhonePii(ud.phone, ud.countryCode as string | undefined);
   }
+  if (ud.customerId !== undefined && ud.customerId !== null) {
+    const externalId = hashPii(String(ud.customerId));
+    if (externalId) user.external_id = externalId;
+  }
   if (eventData.ttclid) {
     user.ttclid = eventData.ttclid;
   }
@@ -95,23 +99,30 @@ export function normalizeToTikTokEvent(
 
   // Build contents array
   const contentIds = cd.contentIds ?? cd.content_ids;
-  if (contentIds && Array.isArray(contentIds)) {
+  const richContents = Array.isArray(cd.contents)
+    ? (cd.contents as Array<Record<string, unknown>>)
+        .map((item, index) => {
+          const fallbackId = Array.isArray(contentIds) ? contentIds[index] : undefined;
+          return {
+            content_id: String(item.id || item.content_id || fallbackId || ""),
+            content_type: contentType ? String(contentType) : "product",
+            quantity: item.quantity ? Number(item.quantity) : 1,
+            price:
+              item.itemPrice !== undefined
+                ? Number(item.itemPrice)
+                : item.item_price !== undefined
+                ? Number(item.item_price)
+                : undefined,
+          };
+        })
+        .filter((item) => item.content_id)
+    : [];
+  if (richContents.length > 0) {
+    properties.contents = richContents;
+  } else if (contentIds && Array.isArray(contentIds)) {
     properties.contents = (contentIds as string[]).map((id) => ({
       content_id: String(id),
       content_type: contentType ? String(contentType) : "product",
-    }));
-  } else if (cd.contents && Array.isArray(cd.contents)) {
-    properties.contents = (
-      cd.contents as Array<Record<string, unknown>>
-    ).map((item) => ({
-      content_id: String(item.id || ""),
-      quantity: item.quantity ? Number(item.quantity) : 1,
-      price:
-        item.itemPrice !== undefined
-          ? Number(item.itemPrice)
-          : item.item_price !== undefined
-          ? Number(item.item_price)
-          : undefined,
     }));
   }
 
@@ -161,4 +172,3 @@ export async function sendToTikTok(
 
   return result;
 }
-

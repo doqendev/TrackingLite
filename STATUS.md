@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-21 (post Mizoke/TrackClear attribution hardening)
+Last updated: 2026-05-22 (maximum tracking quality Sprint 1)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 369/369 passing (26 files) |
+| Tests (`pnpm test -- --run`) | 382/382 passing (29 files) |
 | Migrations | `20260521_add_workspace_product_mode` applied in production; run `pnpm prisma migrate deploy` before app/worker deploys |
 | TypeScript | 0 source errors (`pnpm exec tsc --noEmit` still reports the pre-existing top-level-await config issue in `tests/unit/meta-event-processor.test.ts`) |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -99,7 +99,9 @@ Each destination has:
 | `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (7 queues) |
 | `meta-capi.ts` | Working | POST to Meta Graph API, MetaCapiError with status/response |
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case, bounded Meta cookie validation |
-| `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, and clickIdFlags instead of raw shopper userData |
+| `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, clickIdFlags, and redacted checkout/cart tokens instead of raw shopper userData |
+| `purchase-event-id.ts` | Working | Builds deterministic Shopify Purchase event IDs for snippet, generated pixel, ingest, and webhook paths |
+| `content-id.ts` | Working | Normalizes Shopify catalog content IDs across numeric variant/product IDs, GraphQL IDs, SKU, and custom templates |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
 | `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness; snippet activity is activity-based, not a heartbeat |
 | `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
@@ -112,7 +114,7 @@ Each destination has:
 | `replay-rate-limit.ts` | Working | Redis cooldown for event replay (5min per workspace) |
 | `extract-custom-data.ts` | Working | Extract value/currency/numItems/orderId from customData |
 | `destinations/index.ts` | Working | DESTINATION_EVENT_MAP for all 7 platforms |
-| `destinations/tiktok.ts` | Working | TikTok normalizer + API client |
+| `destinations/tiktok.ts` | Working | TikTok normalizer + API client, hashed external_id support, rich contents payloads |
 | `destinations/ga4.ts` | Working | GA4 Measurement Protocol normalizer + API client |
 | `destinations/klaviyo.ts` | Working | Klaviyo normalizer + API client (raw email, not hashed) |
 | `destinations/reddit.ts` | Working | Reddit Conversions API normalizer + API client (Bearer token, SHA-256 hashed PII, rdt_cid click ID) |
@@ -161,9 +163,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (31 files, 414 tests)
+### Test Coverage (34 files, 427 tests)
 
-#### Unit Tests (26 files, 369 tests)
+#### Unit Tests (29 files, 382 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -176,6 +178,8 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `pixel-route.test.ts` | 3 | Generated pixel scripts: bounded fbp validation and webhook-aware Purchase fbq guard |
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
+| `purchase-event-id.test.ts` | 5 | Deterministic Shopify Purchase event ID priority and fallback behavior |
+| `content-id.test.ts` | 4 | Shopify catalog content ID normalization for numeric IDs, GIDs, SKU, templates, and customData |
 | `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
 | `workspace-create-mode.test.ts` | 1 | New normal Shopify workspaces default to V1/custom-pixel mode |
 | `workspace-route-mode.test.ts` | 1 | Public workspace PATCH cannot switch normal workspaces to legacy/headless |
@@ -184,10 +188,11 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
 | `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
 | `google-ads.test.ts` | 34 | Google Ads normalizer (email normalization, param building, all 4 events), pixel endpoint (URL construction, error handling) |
+| `tiktok.test.ts` | 3 | TikTok external_id hashing, rich contents, and fallback content_ids |
 | `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
 | `consent.test.ts` | 28 | STRICT/LAX mode, webhook bypass, edge cases |
-| `ingest-attribution.test.ts` | 3 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, session enrichment, V1 destination filtering, legacy onlyDestinations preservation |
+| `ingest-attribution.test.ts` | 4 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, session enrichment, V1 destination filtering, legacy onlyDestinations preservation, deterministic Purchase IDs, normalized content IDs |
 | `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
 | `shopify-webhook-attribution.test.ts` | 11 | Shopify order/landing attribution extraction, absolute landing URL normalization, fbc synthesis, variant-first content IDs, Purchase contents |
 | `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
@@ -361,6 +366,13 @@ None currently tracked.
 14. **Production Legacy Protection** - Production migration `20260521_add_workspace_product_mode` was applied, `LEGACY_WORKSPACE_IDS` was set in Vercel Production, and Mizoke workspace `cmo1hd1x600045r6d9elaw3tg` was explicitly marked `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; null existing workspaces still resolve to legacy/custom.
 15. **Events Replay Count Filtering** - The Events page failed-count/replay note now uses the same workspace destination allowlist as the visible event table, so V1 workspaces do not surface hidden legacy destination failures.
 16. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, generated pixel Purchase guards, EventLog payload sanitization, workspace-mode fallback, V1 allowlisting, Shopify webhook fan-out filtering, Events page failed-count filtering, public PATCH mode immutability, and legacy destination preservation.
+
+### Phase 13: Maximum Tracking Quality Sprint 1 (2026-05-22)
+1. **Deterministic Shopify Purchase IDs** - Generated pixel scripts, ingest, and Shopify webhooks now use `shopify-purchase:<workspaceId>:<order|checkout|cart>` where Shopify order, checkout, or cart identifiers are available. This improves browser/server deduplication, webhook retry consistency, and cross-path Purchase identity.
+2. **Normalized Catalog Content IDs** - Added shared content ID helpers and applied them to generated pixel payloads, ingest customData, and Shopify webhook line items. The default is Shopify variant numeric ID, with product numeric ID and SKU fallbacks; helper support exists for GraphQL ID, SKU, and custom template modes.
+3. **Richer TikTok Payloads** - TikTok Events API payloads now hash `customerId` into `external_id` when available and prefer rich `contents` with quantity/item price over flat content IDs.
+4. **Token-Safe EventLog Payloads** - Sanitized EventLog payloads now redact checkout and cart tokens from stored `customData`; queue jobs still receive transient event data for delivery.
+5. **Regression Tests** - Added focused tests for deterministic Purchase IDs, content ID normalization, TikTok external_id/rich contents, generated pixel output, ingest normalization, and Shopify webhook event IDs.
 
 ## Not Yet Implemented
 

@@ -51,6 +51,8 @@ describe("event-log-payload", () => {
     const sanitized = sanitizeEventLogCustomData({
       value: 40,
       currency: "USD",
+      checkoutToken: "checkout-token-123",
+      cartToken: "cart-token-123",
       email: "buyer@example.com",
       customer: {
         first_name: "Jane",
@@ -73,5 +75,7 @@ describe("event-log-payload", () => {
     expect(JSON.stringify(sanitized)).not.toContain("buyer@example.com");
     expect(JSON.stringify(sanitized)).not.toContain("Jane");
     expect(JSON.stringify(sanitized)).not.toContain("123 Main St");
+    expect(JSON.stringify(sanitized)).not.toContain("checkout-token-123");
+    expect(JSON.stringify(sanitized)).not.toContain("cart-token-123");
   });
 });

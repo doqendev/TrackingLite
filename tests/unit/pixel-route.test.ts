@@ -39,7 +39,10 @@ describe("GET /api/pixel/[workspaceId]", () => {
     const js = await response.text();
 
     expect(js).toContain("var H=false;");
+    expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
+    expect(js).toContain('"shopify-purchase:"+W+":"+id');
+    expect(js).toContain("contentIds:ci(v.id)");
     expect(js).toContain('if(!H&&typeof fbq==="function")fbq("track","Purchase"');
   });
 
@@ -56,7 +59,9 @@ describe("GET /api/pixel/[workspaceId]", () => {
     const js = await response.text();
 
     expect(js).toContain("var H=true;");
+    expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
+    expect(js).toContain('"shopify-purchase:"+W+":"+id');
     expect(js).toContain('if(!H&&typeof fbq==="function")fbq("track","Purchase"');
   });
 
@@ -73,7 +78,9 @@ describe("GET /api/pixel/[workspaceId]", () => {
     const js = await response.text();
 
     expect(js).toContain("var H=true;");
+    expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
+    expect(js).toContain('"shopify-purchase:"+W+":"+id');
     expect(js).toContain('if(!H&&typeof fbq==="function")fbq("track","Purchase"');
   });
 });

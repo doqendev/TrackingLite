@@ -1,4 +1,5 @@
 import { synthesizeFbcFromFbclid } from "@/lib/tracking-context";
+import { normalizeContentId, numericShopifyId, type ContentIdOptions } from "@/lib/content-id";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -220,33 +221,41 @@ function firstNumberValue(source: UnknownRecord, paths: string[]): number | unde
 }
 
 export function canonicalShopifyLineItemId(
-  lineItem: Record<string, unknown>
+  lineItem: Record<string, unknown>,
+  options: ContentIdOptions = {}
 ): string | null {
-  return firstStringValue(lineItem, [
-    "variant_id",
-    "variantId",
-    "variant.id",
-    "variant.admin_graphql_api_id",
-    "product_id",
-    "productId",
-    "sku",
-  ]);
+  return normalizeContentId(
+    {
+      variantId:
+        firstStringValue(lineItem, ["variant_id", "variantId"]) ??
+        numericShopifyId(firstStringValue(lineItem, ["variant.id", "variant.admin_graphql_api_id"])),
+      productId:
+        firstStringValue(lineItem, ["product_id", "productId"]) ??
+        numericShopifyId(firstStringValue(lineItem, ["product.id", "product.admin_graphql_api_id"])),
+      variantGraphqlId: firstStringValue(lineItem, ["variant.admin_graphql_api_id", "variant.graphqlId"]),
+      productGraphqlId: firstStringValue(lineItem, ["product.admin_graphql_api_id", "product.graphqlId"]),
+      sku: firstStringValue(lineItem, ["sku", "variant.sku"]),
+    },
+    options
+  );
 }
 
 export function buildLineItemContentIds(
-  lineItems: Array<Record<string, unknown>>
+  lineItems: Array<Record<string, unknown>>,
+  options: ContentIdOptions = {}
 ): string[] {
   return lineItems
-    .map((lineItem) => canonicalShopifyLineItemId(lineItem))
+    .map((lineItem) => canonicalShopifyLineItemId(lineItem, options))
     .filter((id): id is string => !!id);
 }
 
 export function buildLineItemContents(
-  lineItems: Array<Record<string, unknown>>
+  lineItems: Array<Record<string, unknown>>,
+  options: ContentIdOptions = {}
 ): Array<{ id: string; quantity: number; item_price?: number }> {
   return lineItems
     .map((lineItem) => {
-      const id = canonicalShopifyLineItemId(lineItem);
+      const id = canonicalShopifyLineItemId(lineItem, options);
       if (!id) return null;
 
       const quantity = firstNumberValue(lineItem, ["quantity"]) ?? 1;

@@ -25,6 +25,7 @@ import {
   extractLandingSiteAttribution,
 } from "@/lib/shopify-webhook-attribution";
 import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
+import { buildPurchaseEventId } from "@/lib/purchase-event-id";
 import type { Queue } from "bullmq";
 
 const log = createLogger({ component: "shopify-webhook" });
@@ -422,8 +423,12 @@ async function handleOrderPaid(
     // Fix 3: Webhook events are server-side financial transactions triggered by Shopify,
     // not browser behavioral tracking. Consent filtering does not apply.
 
-    // Deterministic eventId for dedup
-    const webhookEventId = `webhook-${orderId || orderName || crypto.randomUUID()}`;
+    // Deterministic eventId for browser/server Purchase dedup.
+    const webhookEventId = buildPurchaseEventId({
+      workspaceId: workspace.id,
+      shopifyOrderId: orderId,
+      orderName,
+    });
 
     // Atomic orderId dedup lock (prevents race between snippet and webhook)
     const dedupLockKey = `dedup:purchase:${workspace.id}:${orderId || orderName}`;
