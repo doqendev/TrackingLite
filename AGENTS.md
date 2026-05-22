@@ -22,19 +22,19 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 16 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 17 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 404/404 passing (34 test files)
+- Unit tests: 417/417 passing (37 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: `pnpm exec tsc --noEmit` passes cleanly
 - Lint: passes with pre-existing `<img>` optimization warnings
-- Production migrations applied: `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`
+- Production migrations applied: `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, `20260522_add_custom_ingest_domain`
 - 7 destination codepaths retained for legacy/custom workspaces: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
 - Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, Shopify webhook, Meta CAPI, TikTok Events API, tracking health
 - Dashboard: mode-aware destination visibility, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
-- Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages, server-proxy attribution hardening
+- Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages, server-proxy attribution hardening, verified custom ingest domains
 - Hosting: web app on Vercel (serverless), workers on Railway, Postgres + Redis on Railway with public TCP proxies
 
 See `STATUS.md` for the full audit and remaining work.
@@ -66,7 +66,7 @@ See `STATUS.md` for the full audit and remaining work.
 4. Gets a unique **JS snippet** with embedded API key
 5. Pastes snippet into Shopify Admin > Settings > Customer Events > Add Custom Pixel
 6. Snippet captures browser events via Shopify's `analytics.subscribe()` API
-7. Snippet sends event data + `event_id` to `/api/events/ingest` with `X-TL-API-Key` header
+7. Snippet sends event data + `event_id` to `/api/events/ingest` with `X-TL-API-Key` header, using a verified workspace custom ingest domain when configured
 8. Vercel serverless function validates, checks billing/rate limits/consent, creates EventLog, queues BullMQ job
 9. Railway worker decrypts token, hashes PII (SHA-256), normalizes phone (E.164), sends to Meta CAPI
 10. EventLog updated to SENT/FAILED, dashboard shows status
@@ -138,7 +138,7 @@ src/
       events/page.tsx                 # Mode-aware event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
       diagnostics/page.tsx            # Internal mode-aware diagnostics: destination health, matrix, data quality, event audit fields, AddToCart/checkout test events
       integrations/page.tsx           # Mode-aware destination setup; V1 shows Shopify webhook, Meta, TikTok; legacy shows all destination cards
-      settings/page.tsx               # Event toggles, consent, catalog ID matching, snippet, alerts, language/currency selectors, danger zone
+      settings/page.tsx               # Event toggles, consent, catalog ID matching, custom ingest domain, snippet, alerts, language/currency selectors, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
         page.tsx                      # 3-step wizard: create workspace, install snippet, connect platforms
@@ -151,8 +151,10 @@ src/
       auth/verify-email/route.ts      # GET: token-based email verification, sets emailVerified
       diagnostics/route.ts            # GET: internal mode-aware diagnostics data for active workspace debugging
       events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS, X-TL-Client IP/UA, fbclid->fbc, multi-key session enrichment)
+      custom-ingest-domain/check/route.ts # GET: public marker route used to verify merchant-owned custom ingest domains
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
-      workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD; product mode/install type are read-only to client PATCH requests; catalog ID matching is merchant-editable
+      workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD; product mode/install type are read-only to client PATCH requests; catalog ID matching and custom ingest domain are merchant-editable
+      workspaces/[id]/custom-ingest-domain/verify/route.ts # POST: checks saved custom domain routes to TrackClear before enabling it
       workspaces/[id]/diagnostics/test-event/route.ts # POST: authenticated non-Purchase diagnostic AddToCart/InitiateCheckout through ingest
       workspaces/[id]/rotate-key/route.ts  # POST: rotate API key
       workspaces/[id]/analytics/route.ts   # GET: dashboard analytics (cached 60s)
@@ -160,9 +162,9 @@ src/
       alerts/preferences/route.ts     # GET/PUT: alert notification preferences
       user/preferences/route.ts      # PATCH: update display currency and language
       user/account/route.ts          # DELETE: GDPR account deletion (cancels Stripe, cascades all data)
-      snippet/[workspaceId]/route.ts  # GET: generate JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid)
-      pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (session ID, cart attribution writer, catalog ID settings, webhook-aware Purchase fbq guard)
-      s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same session/cart attribution, catalog ID settings, and Purchase guard)
+      snippet/[workspaceId]/route.ts  # GET: generate JS snippet; verified custom domains become the pixel-loader host
+      pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (session ID, cart attribution writer, catalog ID settings, verified custom ingest URL, webhook-aware Purchase fbq guard)
+      s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same session/cart attribution, catalog ID settings, verified custom ingest URL, and Purchase guard)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
       stripe/portal/route.ts          # POST: create Stripe billing portal session
       stripe/webhook/route.ts         # POST: handle Stripe webhooks (5 event types)
@@ -180,7 +182,7 @@ src/
       replay-button.tsx               # Retry failed events button (bulk + per-event)
       campaign-performance.tsx        # Top campaigns by revenue with per-platform tabs (30d)
     settings/
-      settings-form.tsx               # Workspace settings: event toggles, consent, snippet, language/currency selectors, danger zone
+      settings-form.tsx               # Workspace settings: event toggles, consent, catalog IDs, custom ingest domain, snippet, language/currency selectors, danger zone
       alert-preferences.tsx           # Email alert notification toggles
     billing/
       plan-cards.tsx                  # Starter/Growth plan comparison + subscribe buttons
@@ -201,6 +203,7 @@ src/
     event-log-payload.ts              # Sanitized EventLog payload builder (customData + flags, no raw userData)
     purchase-event-id.ts              # Deterministic Shopify Purchase event_id helper for ingest and webhooks
     content-id.ts                     # Shopify catalog content ID normalization helpers and workspace catalog settings resolver
+    custom-ingest-domain.ts           # Custom ingest domain normalization, validation, verification URL, and endpoint resolvers
     workspace-mode.ts                 # Product mode/install type fallback + destination allowlist helpers
     diagnostics-audit-fields.ts       # Mode-aware diagnostics field visibility/counts for core vs optional click/UTM data
     tracking-health.ts                # Operational health checks for Shopify V1 readiness
@@ -262,6 +265,8 @@ tests/
     billing.test.ts                   # 22 tests
     consent.test.ts                   # 29 tests
     content-id.test.ts                # 5 tests (Shopify catalog content ID normalization and workspace settings resolver)
+    custom-ingest-domain.test.ts      # 4 tests (custom domain normalization, validation, and verified endpoint resolution)
+    custom-ingest-domain-verify-route.test.ts # 3 tests (verification route success/failure/missing-domain guard)
     diagnostics-audit-fields.test.ts  # 5 tests (mode-aware captured-field visibility and counts)
     diagnostics-route-mode.test.ts    # 1 test (Diagnostics API uses workspace destination allowlist)
     diagnostics-test-event-route.test.ts # 2 tests (safe AddToCart/InitiateCheckout diagnostics through ingest)
@@ -277,7 +282,7 @@ tests/
     meta-capi.test.ts                 # 21 tests
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     phone-normalizer.test.ts          # 16 tests
-    pixel-route.test.ts               # 4 tests (webhook-aware Purchase fbq suppression and catalog settings in generated pixel scripts)
+    pixel-route.test.ts               # 5 tests (webhook-aware Purchase fbq suppression, catalog settings, and custom ingest URLs in generated pixel scripts)
     purchase-event-id.test.ts         # 5 tests (deterministic Shopify Purchase event IDs)
     rate-limit.test.ts                # 16 tests
     session-enrichment.test.ts        # 2 tests (multi-key Redis session enrichment lookup)
@@ -285,15 +290,17 @@ tests/
     shopify-webhook-attribution.test.ts # 12 tests (order/landing attribution and catalog-aware content IDs)
     shopify-webhook-route-mode.test.ts # 2 tests (Shopify webhook V1 allowlist + legacy env bypass)
     shopify-webhook.test.ts           # 6 tests (HMAC/replay/header verification)
+    snippet-route.test.ts             # 3 tests (snippet host uses verified custom domain only after verification)
     tiktok.test.ts                    # 3 tests (external_id hashing and rich contents)
     tracking-context.test.ts          # 6 tests (fbc synthesis and proxy headers)
     workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
-    workspace-route-mode.test.ts      # 3 tests (public PATCH cannot mutate product mode/install type, catalog settings validation)
+    workspace-route-mode.test.ts      # 5 tests (public PATCH cannot mutate product mode/install type, catalog/custom domain validation)
 prisma/
   schema.prisma                       # 11 models, 10 enums (see Data Model below)
 docs/
   deploy.md                           # Deployment runbook including required production migrations
+  custom-ingest-domain.md             # Custom ingest domain setup, verification, and operational notes
   headless-shopify.md                 # Hydrogen/custom storefront tracking helper usage
 ```
 
@@ -307,7 +314,7 @@ docs/
 
 **Key relationships:**
 - User has many Workspaces (unlimited), one Subscription, one AlertPreference, many PasswordResetTokens, displayCurrency (default "USD"), language (default "en")
-- Workspace has many EventLogs, stores nullable `productMode`/`installType`, workspace-level catalog ID matching settings (`catalogIdMode`, prefix, suffix, template), encrypted credentials for all 7 destination codepaths (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads), and per-destination enable toggles
+- Workspace has many EventLogs, stores nullable `productMode`/`installType`, workspace-level catalog ID matching settings (`catalogIdMode`, prefix, suffix, template), optional verified custom ingest domain fields, encrypted credentials for all 7 destination codepaths (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads), and per-destination enable toggles
 - EventLog has a `destination` field (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS), one row per event per destination
 - EventLog stores monetary data (value, currency, numItems, orderId) extracted from customData
 - EventLog stores UTM attribution data (utmSource, utmMedium, utmCampaign, utmContent, utmTerm, gclid)
@@ -344,7 +351,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (404 tests, 34 files)
+# Run unit tests (417 tests, 37 files)
 pnpm test
 
 # Run a single test file
@@ -375,6 +382,7 @@ All documented in `.env.example`. Critical ones:
 - `STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`, `STRIPE_SCALE_PRICE_ID` - Stripe product prices
 - `NEXT_PUBLIC_INGEST_URL` - **Required for local dev** (defaults to production URL if unset)
 - `NEXT_PUBLIC_APP_URL` - Base URL for Stripe redirect callbacks
+- `NEXT_PUBLIC_CUSTOM_INGEST_CNAME_TARGET` - DNS target shown in Settings for custom ingest domains (default `cname.vercel-dns.com`)
 - `LEGACY_WORKSPACE_IDS` - comma-separated emergency bypass list; matching workspace IDs always resolve to legacy/headless mode
 
 ## API Reference
@@ -384,6 +392,7 @@ All documented in `.env.example`. Critical ones:
 | Route | Method | Purpose |
 |-------|--------|---------|
 | `POST /api/events/ingest` | POST | Event ingestion from snippets/proxies. Header: `X-TL-API-Key`. Optional server-only headers: `X-TL-Client-IP`, `X-TL-Client-UA`. CORS: `*` |
+| `GET /api/custom-ingest-domain/check` | GET | Public marker route used by server-side custom ingest domain verification |
 | `POST /api/stripe/webhook` | POST | Stripe webhook handler (signature verified) |
 | `GET /api/health` | GET | Health check (DB ping) |
 | `POST /api/auth/signup` | POST | User registration, sends verification email |
@@ -398,7 +407,8 @@ All documented in `.env.example`. Critical ones:
 |-------|--------|---------|
 | `GET /api/diagnostics` | GET | Internal diagnostics data filtered by workspace mode/destination allowlist |
 | `GET/POST /api/workspaces` | GET, POST | List/create workspaces |
-| `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD; product mode/install type are read-only to client PATCH requests; catalog ID matching settings are editable |
+| `GET/PATCH/DELETE /api/workspaces/:id` | GET, PATCH, DELETE | Workspace CRUD; product mode/install type are read-only to client PATCH requests; catalog ID matching and custom ingest domain settings are editable |
+| `POST /api/workspaces/:id/custom-ingest-domain/verify` | POST | Verify saved custom ingest domain by checking the TrackClear marker route through that host |
 | `POST /api/workspaces/:id/rotate-key` | POST | Rotate workspace API key |
 | `POST /api/workspaces/:id/replay` | POST | Re-queue failed events (500 max, 5min cooldown, privacy-preserving after EventLog sanitization) |
 | `POST /api/workspaces/:id/diagnostics/test-event` | POST | Authenticated non-Purchase AddToCart/InitiateCheckout diagnostic event through ingest |
@@ -457,7 +467,8 @@ Header: Content-Type: application/json
 - **Workspace model:** Each merchant has a workspace with a unique API key (unlimited per user, shared order pool).
 - **Multi-destination fan-out:** Ingest route creates one EventLog + one BullMQ job per enabled destination. Each destination has its own queue, worker, normalizer, and API client.
 - **Product-mode rollout:** `Workspace.productMode` and `Workspace.installType` are nullable for safe migration. Runtime fallback treats missing values as `LEGACY_ALL_DESTINATIONS` + `HEADLESS_CUSTOM`; new workspaces are created as `SHOPIFY_META_TIKTOK_V1` + `SHOPIFY_CUSTOM_PIXEL`. V1 workspaces are allowlisted to Meta/TikTok in UI, ingest, webhook, replay, analytics, and event views, including Events page failed-count/replay visibility. Public workspace PATCH requests cannot mutate product mode/install type. `LEGACY_WORKSPACE_IDS` can force legacy behavior as an emergency bypass.
-- **Deployment order:** Run `pnpm prisma migrate deploy` against production before deploying app/worker code that depends on new schema fields, including `20260522_add_catalog_id_settings`. Build scripts only run `prisma generate`; they do not apply migrations. See `docs/deploy.md`.
+- **Custom ingest domains:** Workspaces can save a merchant-owned custom ingest domain. TrackClear only uses it after `POST /api/workspaces/:id/custom-ingest-domain/verify` confirms that `https://<domain>/api/custom-ingest-domain/check` returns the TrackClear marker. Unverified workspaces keep the default TrackClear app/ingest endpoints.
+- **Deployment order:** Run `pnpm prisma migrate deploy` against production before deploying app/worker code that depends on new schema fields, including `20260522_add_custom_ingest_domain`. Build scripts only run `prisma generate`; they do not apply migrations. See `docs/deploy.md`.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
 - **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard "All" view deduplicates by filtering to a canonical destination (first enabled). Per-destination tabs show filtered stats. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.

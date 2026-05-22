@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getWorkspacePixelUrl } from "@/lib/custom-ingest-domain";
 
 function generateLoaderSnippet(pixelUrl: string): string {
   return `// Track Clear - Server-Side Event Tracking (auto-updating)
@@ -29,18 +30,19 @@ export async function GET(
 
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, userId: session.user.id, isActive: true },
-    select: { apiKey: true, metaPixelId: true },
+    select: {
+      apiKey: true,
+      metaPixelId: true,
+      customIngestDomain: true,
+      customIngestDomainVerifiedAt: true,
+    },
   });
 
   if (!workspace) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "https://trackclear.io";
-
-  const pixelUrl = `${appUrl}/api/pixel/${workspaceId}`;
+  const pixelUrl = getWorkspacePixelUrl(workspace, workspaceId);
   const snippet = generateLoaderSnippet(pixelUrl);
 
   return NextResponse.json({ snippet });

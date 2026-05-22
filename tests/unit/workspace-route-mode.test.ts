@@ -44,6 +44,62 @@ function makePatchRequest(body: Record<string, unknown>) {
   });
 }
 
+function makeUpdatedWorkspace(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "ws_v1",
+    name: "V1 Store",
+    domain: "store.myshopify.com",
+    platform: "SHOPIFY",
+    productMode: "SHOPIFY_META_TIKTOK_V1",
+    installType: "SHOPIFY_CUSTOM_PIXEL",
+    catalogIdMode: "VARIANT_NUMERIC_ID",
+    catalogIdPrefix: null,
+    catalogIdSuffix: null,
+    catalogIdTemplate: null,
+    customIngestDomain: null,
+    customIngestDomainVerifiedAt: null,
+    customIngestDomainLastCheckedAt: null,
+    customIngestDomainLastError: null,
+    metaPixelId: null,
+    metaAccessTokenEncrypted: null,
+    metaTestEventCode: null,
+    enableMeta: true,
+    consentMode: "LAX",
+    enablePageView: true,
+    enableViewContent: true,
+    enableAddToCart: true,
+    enableInitiateCheckout: true,
+    enablePurchase: true,
+    isActive: true,
+    eventsForwardedCount: 0,
+    tiktokPixelId: null,
+    tiktokAccessTokenEncrypted: null,
+    enableTikTok: false,
+    ga4MeasurementId: null,
+    ga4ApiSecretEncrypted: null,
+    enableGA4: false,
+    klaviyoApiKeyEncrypted: null,
+    enableKlaviyo: false,
+    redditAccountId: null,
+    redditAccessTokenEncrypted: null,
+    enableReddit: false,
+    pinterestAdAccountId: null,
+    pinterestConversionTokenEncrypted: null,
+    enablePinterest: false,
+    googleAdsConversionId: null,
+    googleAdsLabelPurchase: null,
+    googleAdsLabelAddToCart: null,
+    googleAdsLabelInitiateCheckout: null,
+    googleAdsLabelViewContent: null,
+    enableGoogleAds: false,
+    shopifyDomain: "store.myshopify.com",
+    shopifyWebhookSecretEncrypted: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
 describe("workspace mode route guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,6 +115,10 @@ describe("workspace mode route guard", () => {
       catalogIdPrefix: null,
       catalogIdSuffix: null,
       catalogIdTemplate: null,
+      customIngestDomain: null,
+      customIngestDomainVerifiedAt: null,
+      customIngestDomainLastCheckedAt: null,
+      customIngestDomainLastError: null,
     });
   });
 
@@ -78,54 +138,11 @@ describe("workspace mode route guard", () => {
   });
 
   it("allows public PATCH to update catalog ID matching settings", async () => {
-    mockWorkspaceUpdate.mockResolvedValue({
-      id: "ws_v1",
-      name: "V1 Store",
-      domain: "store.myshopify.com",
-      platform: "SHOPIFY",
-      productMode: "SHOPIFY_META_TIKTOK_V1",
-      installType: "SHOPIFY_CUSTOM_PIXEL",
+    mockWorkspaceUpdate.mockResolvedValue(makeUpdatedWorkspace({
       catalogIdMode: "SKU",
       catalogIdPrefix: "sku:",
       catalogIdSuffix: ":us",
-      catalogIdTemplate: null,
-      metaPixelId: null,
-      metaAccessTokenEncrypted: null,
-      metaTestEventCode: null,
-      enableMeta: true,
-      consentMode: "LAX",
-      enablePageView: true,
-      enableViewContent: true,
-      enableAddToCart: true,
-      enableInitiateCheckout: true,
-      enablePurchase: true,
-      isActive: true,
-      eventsForwardedCount: 0,
-      tiktokPixelId: null,
-      tiktokAccessTokenEncrypted: null,
-      enableTikTok: false,
-      ga4MeasurementId: null,
-      ga4ApiSecretEncrypted: null,
-      enableGA4: false,
-      klaviyoApiKeyEncrypted: null,
-      enableKlaviyo: false,
-      redditAccountId: null,
-      redditAccessTokenEncrypted: null,
-      enableReddit: false,
-      pinterestAdAccountId: null,
-      pinterestConversionTokenEncrypted: null,
-      enablePinterest: false,
-      googleAdsConversionId: null,
-      googleAdsLabelPurchase: null,
-      googleAdsLabelAddToCart: null,
-      googleAdsLabelInitiateCheckout: null,
-      googleAdsLabelViewContent: null,
-      enableGoogleAds: false,
-      shopifyDomain: "store.myshopify.com",
-      shopifyWebhookSecretEncrypted: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    }));
 
     const response = await PATCH(
       makePatchRequest({
@@ -148,6 +165,66 @@ describe("workspace mode route guard", () => {
         }),
       })
     );
+  });
+
+  it("normalizes custom ingest domains and clears verification when changed", async () => {
+    mockWorkspaceFindFirst.mockResolvedValue({
+      id: "ws_v1",
+      userId: "user_123",
+      apiKey: "tl_test",
+      isActive: true,
+      productMode: "SHOPIFY_META_TIKTOK_V1",
+      installType: "SHOPIFY_CUSTOM_PIXEL",
+      catalogIdMode: "VARIANT_NUMERIC_ID",
+      catalogIdPrefix: null,
+      catalogIdSuffix: null,
+      catalogIdTemplate: null,
+      customIngestDomain: "old.dirava.com",
+      customIngestDomainVerifiedAt: new Date("2026-05-22T10:00:00Z"),
+      customIngestDomainLastCheckedAt: new Date("2026-05-22T10:00:00Z"),
+      customIngestDomainLastError: null,
+    });
+    mockWorkspaceUpdate.mockResolvedValue(makeUpdatedWorkspace({
+      customIngestDomain: "t.dirava.com",
+      customIngestDomainVerifiedAt: null,
+      customIngestDomainLastCheckedAt: null,
+      customIngestDomainLastError: null,
+    }));
+
+    const response = await PATCH(
+      makePatchRequest({
+        customIngestDomain: "https://T.Dirava.COM/path?fbclid=ignored",
+      }),
+      { params: Promise.resolve({ id: "ws_v1" }) }
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.customIngestDomain).toBe("t.dirava.com");
+    expect(mockWorkspaceUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          customIngestDomain: "t.dirava.com",
+          customIngestDomainVerifiedAt: null,
+          customIngestDomainLastCheckedAt: null,
+          customIngestDomainLastError: null,
+        }),
+      })
+    );
+  });
+
+  it("rejects invalid custom ingest domains", async () => {
+    const response = await PATCH(
+      makePatchRequest({
+        customIngestDomain: "localhost",
+      }),
+      { params: Promise.resolve({ id: "ws_v1" }) }
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(data.error).toContain("public hostname");
+    expect(mockWorkspaceUpdate).not.toHaveBeenCalled();
   });
 
   it("requires a template before enabling custom catalog ID mode", async () => {

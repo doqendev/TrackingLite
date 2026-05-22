@@ -96,6 +96,10 @@ model Workspace {
   catalogIdPrefix           String?
   catalogIdSuffix           String?
   catalogIdTemplate         String?
+  customIngestDomain        String?         @unique
+  customIngestDomainVerifiedAt DateTime?
+  customIngestDomainLastCheckedAt DateTime?
+  customIngestDomainLastError String?
   apiKey                    String          @unique // Unique API key for this workspace (used in JS snippet)
   metaPixelId               String?         // Meta Pixel ID
   metaAccessTokenEncrypted  String?         // AES-256-GCM encrypted

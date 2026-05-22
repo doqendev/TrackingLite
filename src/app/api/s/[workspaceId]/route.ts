@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contentIdOptionsFromWorkspace, type ContentIdOptions } from "@/lib/content-id";
+import { getWorkspaceIngestUrl } from "@/lib/custom-ingest-domain";
 
 function sanitizeForJs(value: string): string {
   return value.replace(/[\\'"<>&`\n\r\0]/g, "");
@@ -70,6 +71,8 @@ export async function GET(
       catalogIdPrefix: true,
       catalogIdSuffix: true,
       catalogIdTemplate: true,
+      customIngestDomain: true,
+      customIngestDomainVerifiedAt: true,
     },
   });
 
@@ -80,9 +83,7 @@ export async function GET(
     });
   }
 
-  const ingestUrl =
-    process.env.NEXT_PUBLIC_INGEST_URL ||
-    "https://api.trackclear.io/api/events/ingest";
+  const ingestUrl = getWorkspaceIngestUrl(workspace);
 
   const script = generateTrackingScript(
     workspace.apiKey,

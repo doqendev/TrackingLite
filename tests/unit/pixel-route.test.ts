@@ -136,4 +136,32 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(legacyJs).toContain("function fm(o)");
     expect(legacyJs).toContain("contentIds:ci({variantId:v.id");
   });
+
+  it("uses a verified custom ingest domain in generated pixel scripts", async () => {
+    mockFindFirst.mockResolvedValue({
+      apiKey: "tl_test",
+      metaPixelId: "123456",
+      shopifyWebhookSecretEncrypted: null,
+      catalogIdMode: "VARIANT_NUMERIC_ID",
+      catalogIdPrefix: null,
+      catalogIdSuffix: null,
+      catalogIdTemplate: null,
+      customIngestDomain: "t.dirava.com",
+      customIngestDomainVerifiedAt: new Date("2026-05-22T10:00:00Z"),
+    });
+
+    const pixelResponse = await getPixel(new Request("http://localhost/api/pixel/ws_123"), {
+      params: Promise.resolve({ workspaceId: "ws_123" }),
+    });
+    const pixelJs = await pixelResponse.text();
+
+    expect(pixelJs).toContain('E="https://t.dirava.com/api/events/ingest"');
+
+    const legacyResponse = await getLegacyScript(new Request("http://localhost/api/s/ws_123"), {
+      params: Promise.resolve({ workspaceId: "ws_123" }),
+    });
+    const legacyJs = await legacyResponse.text();
+
+    expect(legacyJs).toContain('E="https://t.dirava.com/api/events/ingest"');
+  });
 });

@@ -66,6 +66,7 @@ export default async function middleware(req: NextRequest) {
     pathname === "/terms" ||
     pathname.startsWith("/api/auth") ||
     pathname === "/api/events/ingest" ||
+    pathname === "/api/custom-ingest-domain/check" ||
     pathname === "/api/stripe/webhook" ||
     pathname === "/api/health" ||
     pathname.startsWith("/api/webhooks/") ||

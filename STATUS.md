@@ -1,14 +1,14 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-22 (tracking quality sprint 3)
+Last updated: 2026-05-22 (custom ingest domain sprint)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 404/404 passing (34 files) |
-| Migrations | `20260521_add_workspace_product_mode` and `20260522_add_catalog_id_settings` applied in production |
+| Tests (`pnpm test -- --run`) | 417/417 passing (37 files) |
+| Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 
@@ -29,7 +29,7 @@ Last updated: 2026-05-22 (tracking quality sprint 3)
 | `/tracking-health` | Protected | Working | Operational status for recent snippet activity, Shopify webhook, Meta/TikTok connection, Purchase, dedup, attribution source breakdown, recent errors |
 | `/events` | Protected | Working | Mode-aware paginated event log with type/status filters, Source/Campaign columns, retry failed events |
 | `/diagnostics` | Protected | Working | Internal mode-aware diagnostics for destination health, event/destination matrix, data quality, event audit fields, and safe non-Purchase test events |
-| `/settings` | Protected | Working | Event toggles, consent mode, catalog ID matching, snippet, alert preferences, language selector, currency selector, danger zone |
+| `/settings` | Protected | Working | Event toggles, consent mode, catalog ID matching, custom ingest domain, snippet, alert preferences, language selector, currency selector, danger zone |
 | `/integrations` | Protected | Working | Mode-aware setup: V1 shows Shopify webhook + Meta/TikTok, legacy/custom workspaces show all destination cards |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
 | `/onboarding` | Protected | Working | 3-step wizard: create workspace, install snippet, connect platforms |
@@ -46,7 +46,8 @@ Last updated: 2026-05-22 (tracking quality sprint 3)
 | `/api/diagnostics` | GET | Session | Working | Internal diagnostics data filtered through workspace destination allowlist |
 | `/api/events/ingest` | POST, OPTIONS | API Key | Working | Multi-destination fan-out pipeline with CORS, X-Request-ID header, server-proxy shopper IP/UA headers, fbclid-derived fbc, multi-key session enrichment |
 | `/api/workspaces` | GET, POST | Session | Working | Unlimited workspaces, encrypts credentials |
-| `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, destination credentials, product mode/install type read-only from public PATCH, catalog ID settings editable |
+| `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, destination credentials, product mode/install type read-only from public PATCH, catalog ID settings and custom ingest domain editable |
+| `/api/workspaces/[id]/custom-ingest-domain/verify` | POST | Session | Working | Verifies a saved custom ingest domain by checking the public TrackClear marker route through that host |
 | `/api/workspaces/[id]/rotate-key` | POST | Session | Working | Generates new API key |
 | `/api/workspaces/[id]/replay` | POST | Session | Working | Re-queue failed events (max 500, 5min cooldown), all destinations supported; sanitized rows replay without reconstructing raw PII |
 | `/api/workspaces/[id]/analytics` | GET | Session | Working | Dashboard analytics (60s Redis cache, destination filter, currency conversion) |
@@ -54,9 +55,10 @@ Last updated: 2026-05-22 (tracking quality sprint 3)
 | `/api/user/preferences` | PATCH | Session | Working | Update user display currency and language |
 | `/api/user/account` | DELETE | Session | Working | GDPR account deletion (cancels Stripe, cascades all data) |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
-| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet (captures ttclid, rdtCid, epik, UTMs, gclid) |
-| `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with `_trackclear_session_id`, best-effort cart attribution writer, catalog ID settings, bounded `_fbp` validation, and webhook-aware Purchase `fbq` guard |
-| `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with the same session/cart attribution, catalog ID settings, bounded `_fbp` validation, and webhook-aware Purchase `fbq` guard |
+| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet and uses a verified custom ingest domain as the pixel-loader host when configured |
+| `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with `_trackclear_session_id`, best-effort cart attribution writer, catalog ID settings, custom ingest URL resolution, bounded `_fbp` validation, and webhook-aware Purchase `fbq` guard |
+| `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with the same session/cart attribution, catalog ID settings, custom ingest URL resolution, and Purchase guard |
+| `/api/custom-ingest-domain/check` | GET | Public | Working | Public no-store marker route used by custom ingest domain verification |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
@@ -105,6 +107,7 @@ Each destination has:
 | `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, clickIdFlags, and redacted checkout/cart tokens instead of raw shopper userData |
 | `purchase-event-id.ts` | Working | Builds deterministic Shopify Purchase event IDs for snippet, generated pixel, ingest, and webhook paths |
 | `content-id.ts` | Working | Normalizes Shopify catalog content IDs across numeric variant/product IDs, GraphQL IDs, SKU, custom templates, and workspace catalog settings |
+| `custom-ingest-domain.ts` | Working | Normalizes/validates merchant-owned ingest domains and resolves verified pixel-loader and ingest URLs with safe defaults |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
 | `diagnostics-audit-fields.ts` | Working | Computes Diagnostics event-audit field visibility and counts: core fields plus captured optional click/UTM fields relevant to allowed destinations |
 | `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness, including webhook attribution source breakdown; snippet activity is activity-based, not a heartbeat |
@@ -168,9 +171,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (39 files, 449 tests)
+### Test Coverage (42 files, 462 tests)
 
-#### Unit Tests (34 files, 404 tests)
+#### Unit Tests (37 files, 417 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -180,14 +183,17 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
 | `meta-capi.test.ts` | 21 | URL construction, request body, error handling |
 | `hash-pii.test.ts` | 24 | SHA-256 hashing, all PII fields, edge cases |
-| `pixel-route.test.ts` | 4 | Generated pixel scripts: bounded fbp validation, TrackClear session/cart attribution writer, catalog settings, and webhook-aware Purchase fbq guard |
+| `custom-ingest-domain.test.ts` | 4 | Custom domain normalization, invalid host rejection, verified endpoint resolution, verification URL construction |
+| `custom-ingest-domain-verify-route.test.ts` | 3 | Authenticated custom ingest domain verification success, failure clearing, and missing-domain guard |
+| `snippet-route.test.ts` | 3 | Snippet route uses default app host until a custom domain is verified, then uses the custom pixel-loader host |
+| `pixel-route.test.ts` | 5 | Generated pixel scripts: bounded fbp validation, TrackClear session/cart attribution writer, catalog settings, verified custom ingest URL, and webhook-aware Purchase fbq guard |
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
 | `purchase-event-id.test.ts` | 5 | Deterministic Shopify Purchase event ID priority and fallback behavior |
 | `content-id.test.ts` | 5 | Shopify catalog content ID normalization for numeric IDs, GIDs, SKU, templates, customData, and workspace settings |
 | `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
 | `workspace-create-mode.test.ts` | 1 | New normal Shopify workspaces default to V1/custom-pixel mode |
-| `workspace-route-mode.test.ts` | 3 | Public workspace PATCH cannot switch normal workspaces to legacy/headless; catalog settings can be updated with custom-template validation |
+| `workspace-route-mode.test.ts` | 5 | Public workspace PATCH cannot switch normal workspaces to legacy/headless; catalog settings and custom ingest domains can be updated with validation |
 | `events-page-mode.test.ts` | 1 | Events page failed-count/replay visibility respects workspace destination allowlist |
 | `diagnostics-audit-fields.test.ts` | 5 | Mode-aware Diagnostics captured-field visibility for core, optional click IDs, UTM fields, and non-Purchase events |
 | `diagnostics-route-mode.test.ts` | 1 | Diagnostics route returns and queries only destinations allowed by workspace mode |
@@ -227,7 +233,9 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 
 **10 enums:** Platform, WorkspaceProductMode, WorkspaceInstallType, CatalogIdMode, EventName (5 events + Refund), EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
 
-**Key indexes:** Workspace on `[userId]`, `[apiKey]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[workspaceId, status, createdAt]`, `[workspaceId, eventName, destination, createdAt]`, `[eventId]`, `[status, createdAt]`. AlertLog on `[userId, alertType, sentAt]`. WebhookDeadLetter on `[shopDomain, topic, createdAt]`, `[resolvedAt, createdAt]`.
+**Workspace tracking fields:** product mode/install type, catalog ID mode/prefix/suffix/template, and optional custom ingest domain with verified/last-check/last-error metadata.
+
+**Key indexes:** Workspace on `[userId]`, `[apiKey]`, unique `[customIngestDomain]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[workspaceId, status, createdAt]`, `[workspaceId, eventName, destination, createdAt]`, `[eventId]`, `[status, createdAt]`. AlertLog on `[userId, alertType, sentAt]`. WebhookDeadLetter on `[shopDomain, topic, createdAt]`, `[resolvedAt, createdAt]`.
 
 ---
 
@@ -408,10 +416,17 @@ None currently tracked.
 7. **TypeScript Cleanup** - Removed the previous test-only top-level-await TypeScript failure in `meta-event-processor.test.ts`; `pnpm exec tsc --noEmit` now passes cleanly.
 8. **Regression Tests** - Added `diagnostics-test-event-route.test.ts` and `headless-sdk.test.ts`, and expanded pixel, content-ID, webhook-attribution, ingest-attribution, consent, workspace route, and Meta worker tests.
 
+### Phase 17: Custom Ingest Domain (2026-05-22)
+1. **Workspace Custom Domain Fields** - Added nullable `customIngestDomain`, `customIngestDomainVerifiedAt`, `customIngestDomainLastCheckedAt`, and `customIngestDomainLastError` fields with a unique domain constraint.
+2. **Verified Endpoint Resolution** - Generated snippets use `https://<custom-domain>/api/pixel/:workspaceId` only after verification; generated `/api/pixel` and legacy `/api/s` scripts use `https://<custom-domain>/api/events/ingest` only after verification. Unverified and unset workspaces continue using the existing TrackClear defaults.
+3. **Domain Verification Route** - Added public `GET /api/custom-ingest-domain/check` and protected `POST /api/workspaces/:id/custom-ingest-domain/verify`; failures clear verification and store the latest error.
+4. **Settings UI** - Added a Custom Ingest Domain card with DNS target guidance, status, active endpoint, last checked time, save, and verify controls.
+5. **Docs and Tests** - Added `docs/custom-ingest-domain.md`, updated the deployment runbook for the new migration, and added tests for helper behavior, snippet host selection, pixel ingest URL selection, workspace PATCH validation, and verification route behavior.
+6. **Production Migration** - Applied `20260522_add_custom_ingest_domain` to the production Railway Postgres database before deployment.
+
 ## Not Yet Implemented
 
 | Feature | Notes |
 |---------|-------|
 | Team access | Invite members to workspace |
-| Custom ingest domain | e.g., `t.mystore.com` |
 | Batch ingestion | Multiple events per request |

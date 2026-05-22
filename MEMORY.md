@@ -1,5 +1,18 @@
 # MEMORY.md
 
+## 2026-05-22 - Custom Ingest Domain Sprint
+
+- Added migration `20260522_add_custom_ingest_domain` with nullable workspace fields for `customIngestDomain`, verification timestamp, last checked timestamp, and last error. The domain is unique when present.
+- Added `src/lib/custom-ingest-domain.ts` for hostname normalization/validation, default endpoint fallback, verification URL construction, and verified custom pixel/ingest URL resolution.
+- Added public marker route `GET /api/custom-ingest-domain/check` and protected verification route `POST /api/workspaces/:id/custom-ingest-domain/verify`. Verification failure clears `customIngestDomainVerifiedAt` and stores a concise error.
+- Updated workspace PATCH/GET to support merchant-editable custom ingest domains while keeping productMode/installType internal-only. Changing or clearing the domain clears prior verification.
+- Updated generated snippets so verified custom domains become the pixel-loader host, and updated generated `/api/pixel/:workspaceId` plus legacy `/api/s/:workspaceId` so verified custom domains become the ingest endpoint. Unverified domains continue to use existing TrackClear defaults.
+- Added a Settings card for Custom Ingest Domain with DNS target guidance, status, active endpoint, last checked time, save, and verify controls.
+- Added `docs/custom-ingest-domain.md`, updated deployment docs for the new migration, and added `NEXT_PUBLIC_CUSTOM_INGEST_CNAME_TARGET` to `.env.example`.
+- Added/expanded tests for custom domain helpers, verification route behavior, snippet host selection, generated pixel ingest URL selection, and workspace PATCH validation.
+- Validation: focused custom-domain tests passed 20/20; `pnpm test -- --run` passed 417/417 unit tests; `pnpm prisma validate` passed when `DIRECT_DATABASE_URL` was supplied; `pnpm exec tsc --noEmit --pretty false` passed cleanly; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing lint/static-generation warnings.
+- Production migration applied after implementation: using `.vercel/.env.production.local`, `pnpm prisma migrate deploy` applied `20260522_add_custom_ingest_domain` to the Railway production Postgres database and `pnpm prisma migrate status` then reported the schema up to date.
+
 ## 2026-05-22 - Tracking Quality Sprint 3
 
 - Added workspace-level catalog ID matching settings with migration `20260522_add_catalog_id_settings`: `catalogIdMode`, optional prefix/suffix, and optional custom template. Public PATCH can update catalog settings, but productMode/installType remain internal-only.

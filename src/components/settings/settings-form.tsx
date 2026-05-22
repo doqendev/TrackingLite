@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ConsentMode } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Globe2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 interface Workspace {
@@ -20,6 +21,10 @@ interface Workspace {
   catalogIdPrefix: string | null;
   catalogIdSuffix: string | null;
   catalogIdTemplate: string | null;
+  customIngestDomain: string | null;
+  customIngestDomainVerifiedAt: string | null;
+  customIngestDomainLastCheckedAt: string | null;
+  customIngestDomainLastError: string | null;
   enablePageView: boolean;
   enableViewContent: boolean;
   enableAddToCart: boolean;
@@ -106,6 +111,9 @@ const CATALOG_ID_MODES = [
   },
 ] as const;
 
+const CUSTOM_INGEST_CNAME_TARGET =
+  process.env.NEXT_PUBLIC_CUSTOM_INGEST_CNAME_TARGET || "cname.vercel-dns.com";
+
 export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) {
   // Event toggles state
   const [toggles, setToggles] = useState({
@@ -130,6 +138,17 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
   });
   const [savingCatalog, setSavingCatalog] = useState(false);
 
+  // Custom ingest domain state
+  const [customDomain, setCustomDomain] = useState({
+    input: workspace.customIngestDomain ?? "",
+    savedDomain: workspace.customIngestDomain ?? "",
+    verifiedAt: workspace.customIngestDomainVerifiedAt,
+    lastCheckedAt: workspace.customIngestDomainLastCheckedAt,
+    lastError: workspace.customIngestDomainLastError,
+  });
+  const [savingCustomDomain, setSavingCustomDomain] = useState(false);
+  const [verifyingCustomDomain, setVerifyingCustomDomain] = useState(false);
+
   // User preferences state
   const [displayCurrency, setDisplayCurrency] = useState(userPreferences.displayCurrency);
   const [language, setLanguage] = useState(userPreferences.language);
@@ -143,12 +162,16 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
   const [rotatingKey, setRotatingKey] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/snippet/${workspace.id}`)
+  const loadSnippet = useCallback(() => {
+    return fetch(`/api/snippet/${workspace.id}`)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => setSnippet(data.snippet))
       .catch(() => setSnippet("// Failed to load snippet. Please refresh."));
   }, [workspace.id]);
+
+  useEffect(() => {
+    loadSnippet();
+  }, [loadSnippet]);
 
   async function patchWorkspace(data: Record<string, unknown>) {
     const res = await fetch(`/api/workspaces/${workspace.id}`, {
@@ -204,6 +227,56 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingCatalog(false);
+    }
+  }
+
+  async function handleSaveCustomDomain(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingCustomDomain(true);
+    try {
+      const data = await patchWorkspace({
+        customIngestDomain: customDomain.input.trim() || null,
+      });
+      setCustomDomain({
+        input: data.customIngestDomain ?? "",
+        savedDomain: data.customIngestDomain ?? "",
+        verifiedAt: data.customIngestDomainVerifiedAt ?? null,
+        lastCheckedAt: data.customIngestDomainLastCheckedAt ?? null,
+        lastError: data.customIngestDomainLastError ?? null,
+      });
+      await loadSnippet();
+      toast.success(data.customIngestDomain ? "Custom ingest domain saved" : "Custom ingest domain cleared");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingCustomDomain(false);
+    }
+  }
+
+  async function handleVerifyCustomDomain() {
+    setVerifyingCustomDomain(true);
+    try {
+      const res = await fetch(`/api/workspaces/${workspace.id}/custom-ingest-domain/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      setCustomDomain((prev) => ({
+        ...prev,
+        savedDomain: data.customIngestDomain ?? prev.savedDomain,
+        verifiedAt: data.customIngestDomainVerifiedAt ?? null,
+        lastCheckedAt: data.customIngestDomainLastCheckedAt ?? null,
+        lastError: data.customIngestDomainLastError ?? data.error ?? null,
+      }));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Domain verification failed");
+      }
+      await loadSnippet();
+      toast.success("Custom ingest domain verified");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Domain verification failed");
+    } finally {
+      setVerifyingCustomDomain(false);
     }
   }
 
@@ -282,6 +355,28 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
     { key: "enableInitiateCheckout" as const, label: "InitiateCheckout", description: "Track checkout starts" },
     { key: "enablePurchase" as const, label: "Purchase", description: "Track completed orders" },
   ];
+
+  const normalizedCustomDomainInput = customDomain.input.trim().toLowerCase();
+  const customDomainDirty = normalizedCustomDomainInput !== customDomain.savedDomain;
+  const customDomainVerified =
+    !!customDomain.savedDomain && !customDomainDirty && !!customDomain.verifiedAt;
+  const customDomainStatus = !customDomain.savedDomain
+    ? "Not configured"
+    : customDomainDirty
+      ? "Unsaved changes"
+      : customDomainVerified
+        ? "Verified"
+        : "Needs verification";
+  const customDomainStatusClass = customDomainVerified
+    ? "border-green-500/30 bg-green-500/10 text-green-300"
+    : customDomainDirty
+      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+      : customDomain.savedDomain
+        ? "border-red-500/30 bg-red-500/10 text-red-300"
+        : "border-white/[0.08] bg-white/[0.03] text-muted-foreground";
+  const customDomainLastChecked = customDomain.lastCheckedAt
+    ? new Date(customDomain.lastCheckedAt).toLocaleString()
+    : null;
 
   return (
     <div className="space-y-8">
@@ -474,6 +569,88 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
             <div className="flex justify-end">
               <Button type="submit" variant="brand" disabled={savingCatalog}>
                 {savingCatalog ? "Saving\u2026" : "Save catalog settings"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Custom Ingest Domain */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Custom Ingest Domain</CardTitle>
+              <CardDescription>
+                Route the pixel loader and event ingest through a verified merchant-owned subdomain.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className={customDomainStatusClass}>
+              {customDomainStatus}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveCustomDomain} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="customIngestDomain">Subdomain</Label>
+              <Input
+                id="customIngestDomain"
+                value={customDomain.input}
+                onChange={(e) =>
+                  setCustomDomain((prev) => ({ ...prev, input: e.target.value }))
+                }
+                placeholder="t.example.com"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use a dedicated subdomain such as t.yourstore.com. Point DNS to{" "}
+                <code className="rounded bg-black/40 px-1 py-0.5 text-foreground/70">
+                  {CUSTOM_INGEST_CNAME_TARGET}
+                </code>
+                . Save it here, then verify after DNS is active.
+              </p>
+            </div>
+
+            <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-3 text-xs text-muted-foreground">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <span className="text-foreground/80">Active endpoint:</span>{" "}
+                  {customDomainVerified
+                    ? `https://${customDomain.savedDomain}/api/events/ingest`
+                    : "Default TrackClear ingest endpoint"}
+                </div>
+                <div>
+                  <span className="text-foreground/80">Last checked:</span>{" "}
+                  {customDomainLastChecked ?? "Never"}
+                </div>
+              </div>
+              {customDomain.lastError && !customDomainVerified && (
+                <p className="mt-2 text-red-300">{customDomain.lastError}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button type="submit" variant="outline" disabled={savingCustomDomain}>
+                <Globe2 className="h-4 w-4 mr-2" />
+                {savingCustomDomain ? "Saving..." : "Save domain"}
+              </Button>
+              <Button
+                type="button"
+                variant="brand"
+                onClick={handleVerifyCustomDomain}
+                disabled={
+                  verifyingCustomDomain ||
+                  savingCustomDomain ||
+                  !customDomain.savedDomain ||
+                  customDomainDirty
+                }
+                title={customDomainDirty ? "Save the domain before verifying." : undefined}
+              >
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                {verifyingCustomDomain ? "Verifying..." : "Verify domain"}
               </Button>
             </div>
           </form>

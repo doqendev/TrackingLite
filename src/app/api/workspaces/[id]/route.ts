@@ -5,9 +5,11 @@ import { encrypt } from "@/lib/encryption";
 import { invalidateApiKeyCache } from "@/lib/api-key-cache";
 import { invalidateWorkspaceCache } from "@/lib/workspace-cache";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { createLogger } from "@/lib/logger";
 import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
 import { isLegacyWorkspace } from "@/lib/workspace-mode";
+import { normalizeCustomIngestDomainInput } from "@/lib/custom-ingest-domain";
 
 const log = createLogger({ component: "workspaces-id" });
 
@@ -30,6 +32,7 @@ const UpdateWorkspaceSchema = z.object({
   catalogIdPrefix: z.string().max(64).optional().nullable(),
   catalogIdSuffix: z.string().max(64).optional().nullable(),
   catalogIdTemplate: z.string().max(200).optional().nullable(),
+  customIngestDomain: z.string().max(300).optional().nullable(),
   enablePageView: z.boolean().optional(),
   enableViewContent: z.boolean().optional(),
   enableAddToCart: z.boolean().optional(),
@@ -124,6 +127,10 @@ export async function GET(
         catalogIdPrefix: true,
         catalogIdSuffix: true,
         catalogIdTemplate: true,
+        customIngestDomain: true,
+        customIngestDomainVerifiedAt: true,
+        customIngestDomainLastCheckedAt: true,
+        customIngestDomainLastError: true,
         metaPixelId: true,
         metaAccessTokenEncrypted: true,
         metaTestEventCode: true,
@@ -248,6 +255,20 @@ export async function PATCH(
       );
     }
 
+    let customIngestDomainChanged = false;
+    if (data.customIngestDomain !== undefined) {
+      try {
+        const normalizedDomain = normalizeCustomIngestDomainInput(data.customIngestDomain);
+        customIngestDomainChanged = normalizedDomain !== (workspace.customIngestDomain ?? null);
+        data.customIngestDomain = normalizedDomain;
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid custom ingest domain." },
+          { status: 422 }
+        );
+      }
+    }
+
     const workspaceMode = {
       id: workspace.id,
       productMode: workspace.productMode,
@@ -313,6 +334,12 @@ export async function PATCH(
     // Build the update payload
     const updateData: Record<string, unknown> = { ...scalarFields };
 
+    if (customIngestDomainChanged) {
+      updateData.customIngestDomainVerifiedAt = null;
+      updateData.customIngestDomainLastCheckedAt = null;
+      updateData.customIngestDomainLastError = null;
+    }
+
     // Add server-computed shopifyDomain if domain was updated
     if (resolvedShopifyDomain !== undefined) {
       updateData.shopifyDomain = resolvedShopifyDomain;
@@ -365,6 +392,10 @@ export async function PATCH(
         catalogIdPrefix: true,
         catalogIdSuffix: true,
         catalogIdTemplate: true,
+        customIngestDomain: true,
+        customIngestDomainVerifiedAt: true,
+        customIngestDomainLastCheckedAt: true,
+        customIngestDomainLastError: true,
         metaPixelId: true,
         metaAccessTokenEncrypted: true,
         metaTestEventCode: true,
@@ -442,6 +473,16 @@ export async function PATCH(
         { error: error.errors[0].message },
         { status: 422 }
       );
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const target = error.meta?.target;
+      const targetText = Array.isArray(target) ? target.join(",") : String(target ?? "");
+      if (targetText.includes("customIngestDomain")) {
+        return NextResponse.json(
+          { error: "This custom ingest domain is already assigned to another workspace." },
+          { status: 409 }
+        );
+      }
     }
     log.error("Workspace update failed", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(

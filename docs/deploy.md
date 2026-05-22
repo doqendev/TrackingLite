@@ -3,8 +3,8 @@
 ## Workspace Mode And Catalog Settings Release
 
 Before deploying app or worker code that reads `Workspace.productMode`,
-`Workspace.installType`, or the catalog ID settings fields, apply committed
-Prisma migrations against production:
+`Workspace.installType`, catalog ID settings fields, or custom ingest domain
+fields, apply committed Prisma migrations against production:
 
 ```bash
 pnpm prisma migrate deploy
@@ -17,6 +17,7 @@ This release includes:
 
 - `20260521_add_workspace_product_mode`
 - `20260522_add_catalog_id_settings`
+- `20260522_add_custom_ingest_domain`
 
 Protect existing headless/custom Shopify workspaces before or during rollout:
 
@@ -46,3 +47,7 @@ Supported values:
 
 After deployment, verify `https://trackclear.io/api/health` reports the expected
 commit and `database: "connected"`.
+
+Custom ingest domains are per-workspace and remain inactive until saved and
+verified. See `docs/custom-ingest-domain.md` before configuring a merchant
+domain.
