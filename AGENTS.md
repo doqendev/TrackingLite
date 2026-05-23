@@ -36,6 +36,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
 - Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages, server-proxy attribution hardening, verified custom ingest domains
 - Hosting: web app on Vercel (serverless), workers on Railway, Postgres + Redis on Railway with public TCP proxies
+- Branching: GitHub default branch is `main`; Vercel production and Railway worker deploy from `main`
 
 See `STATUS.md` for the full audit and remaining work.
 

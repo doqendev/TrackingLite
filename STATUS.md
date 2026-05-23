@@ -11,6 +11,7 @@ Last updated: 2026-05-23 (catalog and headless hardening)
 | Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
+| Production branch | GitHub default branch is `main`; Vercel production and Railway worker deploy from `main` |
 
 ## What's Implemented
 
@@ -436,7 +437,7 @@ None currently tracked.
 2. **Webhook Catalog Regression Coverage** - Shopify webhook Purchase tests now assert workspace SKU and product-numeric catalog modes flow into EventLog payloads and queued destination jobs.
 3. **Headless Session Helper** - `headless-sdk.ts` now exposes `ensureTrackClearSessionId()`, which reuses or creates `_trackclear_session_id`, persists it to localStorage and/or cookies when available, and remains safe when called without browser storage.
 4. **Headless Docs Updated** - `docs/headless-shopify.md` now uses `ensureTrackClearSessionId()` for TrackClear ingest and Shopify cart attributes instead of assuming each storefront implements its own session ID storage.
-5. **Branch Deployment Check** - Vercel production deployment for `645b449` was confirmed as the `git-main` deployment alias. Railway worker status is attached to and green on the `main` commit. While GitHub default branch remains `master`, keep `master` fast-forwarded to `main` or change the repo default to `main` to avoid operator confusion.
+5. **Branch Deployment Cleanup** - GitHub default branch is now `main`. Vercel production deployment exposes the `git-main` alias, Railway worker status is attached to `main` commits, and `master` was fast-forwarded to `main` before the default branch was changed.
 
 ## Not Yet Implemented
 

@@ -54,11 +54,10 @@ Current production deployment is driven from `main`:
 
 - Vercel production deployments expose the `tracking-lite-git-main-*` alias.
 - Railway worker GitHub statuses are reported against `main` commits.
+- GitHub default branch is `main`.
 
-The GitHub repository default branch has historically been `master`. Until the
-repository default is changed to `main`, keep `master` fast-forwarded to `main`
-after production-ready tracking releases so operators do not accidentally deploy
-or review stale code from `master`.
+`master` was fast-forwarded to `main` during the branch cleanup. New production
+work should target `main`.
 
 Custom ingest domains are per-workspace and remain inactive until saved and
 verified. See `docs/custom-ingest-domain.md` before configuring a merchant

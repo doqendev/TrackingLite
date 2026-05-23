@@ -1,8 +1,17 @@
 # MEMORY.md
 
+## 2026-05-23 - Branch And Production Verification
+
+- Changed the GitHub default branch from `master` to `main` with `gh api repos/doqendev/TrackingLite -X PATCH -f default_branch=main`.
+- Confirmed `origin/main` and `origin/master` both pointed to `182cffb7f36cf78a2d4acf48407c4f1c612b7aa1` before changing the default branch, so there is no longer a stale default-branch review target.
+- Confirmed Vercel production deployment uses the `tracking-lite-git-main-*` alias and `/api/health` reported commit `182cffb`, `database: "connected"`, and `redis: "connected"`.
+- Confirmed GitHub commit status for `182cffb` is green for both Vercel and Railway worker.
+- Ran production migration status with `.vercel/.env.production.local`; Prisma reported 5 migrations found and "Database schema is up to date!" against the Railway Postgres database.
+- Remaining proof work is operational QA, not code implementation: real Shopify cart/order attribute preservation, canonical webhook Purchase proof, catalog mode proof with real payloads, headless integration proof, and custom ingest DNS proof.
+
 ## 2026-05-23 - Catalog And Headless Hardening
 
-- Confirmed the current production branch signals: GitHub default branch is still `master`, but Vercel production deployment for `645b449` exposes the `tracking-lite-git-main-*` alias and Railway worker status is attached to the `main` commit. Deployment docs now say production is driven from `main` and `master` should be kept fast-forwarded until the repo default branch is changed.
+- Confirmed the production branch signals before cleanup: GitHub default branch was still `master`, but Vercel production deployment for `645b449` exposed the `tracking-lite-git-main-*` alias and Railway worker status was attached to the `main` commit. Deployment docs now say production is driven from `main`; a later operational cleanup changed the GitHub default branch to `main`.
 - Tightened catalog normalization for direct/headless ingest. `normalizeCustomDataContentIds()` now uses rich content item/root fields (`variantId`, `productId`, GraphQL IDs, SKU, country) instead of treating every raw ID as only a variant ID, so SKU/custom workspace catalog modes can be applied to direct ingest payloads.
 - Added route-level regression tests proving ingest applies SKU and custom-template catalog modes, and Shopify webhook Purchase applies SKU and product-numeric catalog modes into EventLog payloads plus queued destination jobs.
 - Added `ensureTrackClearSessionId()` to `headless-sdk.ts`. It reuses existing `_trackclear_session_id` from storage/cookies, creates one when absent, persists it to localStorage and/or cookies when available, and remains safe when browser storage is unavailable.
