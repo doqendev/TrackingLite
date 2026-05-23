@@ -45,6 +45,7 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain("var H=false;");
     expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
+    expect(js).toContain("o.name||co.orderName||o.id||o.admin_graphql_api_id");
     expect(js).toContain('"shopify-purchase:"+W+":"+id');
     expect(js).toContain('var CM="VARIANT_NUMERIC_ID"');
     expect(js).toContain("contentIds:ci({variantId:v.id");
@@ -75,6 +76,7 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain("var H=true;");
     expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
+    expect(js).toContain("o.name||co.orderName||o.id||o.admin_graphql_api_id");
     expect(js).toContain('"shopify-purchase:"+W+":"+id');
     expect(js).toContain("_trackclear_session_id");
     expect(js).toContain("/cart/update.js");
@@ -100,6 +102,7 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain("var H=true;");
     expect(js).toContain('W="ws_123"');
     expect(js).toContain("\\d{7,20}");
+    expect(js).toContain("o.name||co.orderName||o.id||o.admin_graphql_api_id");
     expect(js).toContain('"shopify-purchase:"+W+":"+id');
     expect(js).toContain("_trackclear_session_id");
     expect(js).toContain("/cart/update.js");

@@ -1,5 +1,15 @@
 # MEMORY.md
 
+## 2026-05-23 - Purchase ID Convergence Hardening
+
+- Rechecked the super-dev review against the current repo head. GitHub status for the pre-patch head `d54f2082a9084216939d70f622e130a28a78b0ea` was green, including the Railway worker context reporting success/no deployment needed. The local Railway CLI is not authenticated, so direct Railway log inspection was not available from this machine.
+- Hardened deterministic Shopify Purchase IDs by preferring order name before numeric/GraphQL order ID when order name is available. This makes browser checkout events with only `order.name` converge with Shopify webhook payloads that include both numeric `id` and `name`.
+- Kept numeric/GraphQL order ID normalization as the next fallback, so `gid://shopify/Order/987654321` and `987654321` still produce the same event ID.
+- Documented checkout/cart-token-only Purchase identity as an intentional fallback: it cannot share a later order-name webhook ID unless Shopify exposes order identity in the browser event. Webhook-enabled workspaces still suppress browser Meta Purchase firing to avoid browser/server dedup mismatches.
+- Updated generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` Purchase ID priority to match `purchase-event-id.ts`.
+- Added tests for browser order-name vs webhook order-id/name convergence, GraphQL vs numeric order ID convergence, checkout-token-only fallback behavior, and generated pixel priority. `purchase-event-id.test.ts` now has 8 tests; total unit coverage is 420 tests across 37 files.
+- Validation: targeted Purchase/pixel/ingest/webhook route tests passed 21/21; `pnpm test -- --run` passed 420/420 unit tests; `pnpm exec tsc --noEmit --pretty false` passed; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing `<img>` and dynamic-server static-generation warnings.
+
 ## 2026-05-22 - Custom Ingest Domain Sprint
 
 - Added migration `20260522_add_custom_ingest_domain` with nullable workspace fields for `customIngestDomain`, verification timestamp, last checked timestamp, and last error. The domain is unique when present.

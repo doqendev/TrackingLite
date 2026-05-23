@@ -22,9 +22,9 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 17 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 18 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 417/417 passing (37 test files)
+- Unit tests: 420/420 passing (37 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: `pnpm exec tsc --noEmit` passes cleanly
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -112,7 +112,7 @@ Stale Pending Requeue (every 5 minutes)
 
 - JS snippet/pixel events generate `event_id` via `crypto.randomUUID()`.
 - For normal snippet events, the TrackClear pixel fires `fbq()` with the same `event_id` that the server sends to Meta CAPI, so Meta can deduplicate browser + server events.
-- Purchase events are normalized to deterministic `shopify-purchase:<workspaceId>:<order|checkout|cart>` IDs when Shopify order, checkout, or cart identifiers are available. Ingest applies the same helper to snippet Purchase events, and Shopify webhook Purchase events use the same deterministic format.
+- Purchase events are normalized to deterministic `shopify-purchase:<workspaceId>:<order|checkout|cart>` IDs when Shopify order, checkout, or cart identifiers are available. Order name is preferred when present so browser checkout events with only `order.name` converge with webhook payloads that also include numeric order IDs. GraphQL and numeric order IDs normalize to the same segment. Checkout/cart-token-only browser Purchases are documented fallbacks and cannot share the later order-based webhook ID unless Shopify exposes order identity in the browser event.
 - For Shopify webhook Purchase workspaces, the generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts still send TrackClear Purchase context to ingest, but they suppress browser `fbq("track", "Purchase")`, avoiding browser/server Purchase ID mismatches.
 
 ## Project Structure
@@ -237,7 +237,7 @@ src/
     app.ts                            # WorkspaceWithStats, DashboardStats
     next-auth.d.ts                    # Module augmentation (adds id to Session.user)
   workers/
-    start-worker.ts                   # Entry point: starts all 8 workers, graceful shutdown
+    start-worker.ts                   # Entry point: starts all 10 workers, graceful shutdown
     meta-event-processor.ts           # BullMQ worker: circuit breaker, decrypt, normalize, send to Meta CAPI
     tiktok-event-processor.ts         # BullMQ worker: circuit breaker, TikTok Events API
     ga4-event-processor.ts            # BullMQ worker: circuit breaker, GA4 Measurement Protocol
@@ -283,7 +283,7 @@ tests/
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     phone-normalizer.test.ts          # 16 tests
     pixel-route.test.ts               # 5 tests (webhook-aware Purchase fbq suppression, catalog settings, and custom ingest URLs in generated pixel scripts)
-    purchase-event-id.test.ts         # 5 tests (deterministic Shopify Purchase event IDs)
+    purchase-event-id.test.ts         # 8 tests (deterministic Shopify Purchase event IDs, order-name convergence, checkout-token fallback)
     rate-limit.test.ts                # 16 tests
     session-enrichment.test.ts        # 2 tests (multi-key Redis session enrichment lookup)
     shopify-domain-resolver.test.ts   # 28 tests (Shopify domain resolution)
@@ -351,7 +351,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (417 tests, 37 files)
+# Run unit tests (420 tests, 37 files)
 pnpm test
 
 # Run a single test file
@@ -481,7 +481,7 @@ Header: Content-Type: application/json
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
 - **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
-- **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`), improving Meta/TikTok deduplication and retry consistency.
+- **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`). Order name is preferred over numeric order ID when both are present so browser checkout events and Shopify webhooks converge on the same order-based ID; numeric and GraphQL order IDs still normalize to the same fallback segment.
 - **Catalog content ID normalization:** Generated pixel, legacy script, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. Workspace settings control variant numeric, product numeric, GraphQL, SKU, prefix/suffix, and custom template modes from Settings.
 - **Headless storefront helper:** `headless-sdk.ts` gives Hydrogen/custom storefronts a reusable client for URL click-ID capture, Meta `_fbp`/`_fbc` cookie maintenance, Shopify cart attribution attributes, and TrackClear ingest calls.
 - **TikTok attribution quality:** TikTok Events API payloads include hashed `external_id` from `customerId` when available and prefer rich `contents` with quantity/item price over flat `content_ids`.

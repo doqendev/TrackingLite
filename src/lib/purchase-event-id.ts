@@ -36,8 +36,8 @@ function randomEventId(): string {
 export function buildPurchaseEventId(input: PurchaseEventIdInput): string {
   const scope = normalizeSegment(input.workspaceId ?? input.storeId) ?? "unknown";
   const identifier =
-    normalizeSegment(input.shopifyOrderId) ??
     normalizeSegment(input.orderName) ??
+    normalizeSegment(input.shopifyOrderId) ??
     normalizeSegment(input.checkoutToken) ??
     normalizeSegment(input.cartToken);
 
@@ -67,8 +67,8 @@ export function buildPurchaseEventIdFromCustomData(input: {
 
   return buildPurchaseEventId({
     workspaceId: input.workspaceId,
-    shopifyOrderId: pickString(customData, ["shopifyOrderId", "shopify_order_id", "orderId", "order_id"]),
     orderName: pickString(customData, ["orderName", "order_name"]),
+    shopifyOrderId: pickString(customData, ["shopifyOrderId", "shopify_order_id", "orderId", "order_id"]),
     checkoutToken: pickString(customData, ["checkoutToken", "checkout_token"]),
     cartToken: pickString(customData, ["cartToken", "cart_token"]),
     fallbackId: input.eventId,

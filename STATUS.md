@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-22 (custom ingest domain sprint)
+Last updated: 2026-05-23 (Purchase ID convergence hardening)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 417/417 passing (37 files) |
+| Tests (`pnpm test -- --run`) | 420/420 passing (37 files) |
 | Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -105,7 +105,7 @@ Each destination has:
 | `meta-capi.ts` | Working | POST to Meta Graph API, MetaCapiError with status/response |
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case, bounded Meta cookie validation |
 | `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, clickIdFlags, and redacted checkout/cart tokens instead of raw shopper userData |
-| `purchase-event-id.ts` | Working | Builds deterministic Shopify Purchase event IDs for snippet, generated pixel, ingest, and webhook paths |
+| `purchase-event-id.ts` | Working | Builds deterministic Shopify Purchase event IDs for snippet, generated pixel, ingest, and webhook paths, preferring order name when available for browser/webhook convergence |
 | `content-id.ts` | Working | Normalizes Shopify catalog content IDs across numeric variant/product IDs, GraphQL IDs, SKU, custom templates, and workspace catalog settings |
 | `custom-ingest-domain.ts` | Working | Normalizes/validates merchant-owned ingest domains and resolves verified pixel-loader and ingest URLs with safe defaults |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
@@ -171,9 +171,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (42 files, 462 tests)
+### Test Coverage (42 files, 465 tests)
 
-#### Unit Tests (37 files, 417 tests)
+#### Unit Tests (37 files, 420 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -189,7 +189,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `pixel-route.test.ts` | 5 | Generated pixel scripts: bounded fbp validation, TrackClear session/cart attribution writer, catalog settings, verified custom ingest URL, and webhook-aware Purchase fbq guard |
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
-| `purchase-event-id.test.ts` | 5 | Deterministic Shopify Purchase event ID priority and fallback behavior |
+| `purchase-event-id.test.ts` | 8 | Deterministic Shopify Purchase event ID priority, order-name browser/webhook convergence, GraphQL/numeric order convergence, and checkout-token fallback behavior |
 | `content-id.test.ts` | 5 | Shopify catalog content ID normalization for numeric IDs, GIDs, SKU, templates, customData, and workspace settings |
 | `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
 | `workspace-create-mode.test.ts` | 1 | New normal Shopify workspaces default to V1/custom-pixel mode |
@@ -386,7 +386,7 @@ None currently tracked.
 16. **Regression Tests** - Added focused unit tests for header precedence, fbc synthesis, order/landing attribution extraction, line-item payload shape, ingest propagation, event-normalizer cookie bounds, generated pixel Purchase guards, EventLog payload sanitization, workspace-mode fallback, V1 allowlisting, Shopify webhook fan-out filtering, Events page failed-count filtering, public PATCH mode immutability, and legacy destination preservation.
 
 ### Phase 13: Maximum Tracking Quality Sprint 1 (2026-05-22)
-1. **Deterministic Shopify Purchase IDs** - Generated pixel scripts, ingest, and Shopify webhooks now use `shopify-purchase:<workspaceId>:<order|checkout|cart>` where Shopify order, checkout, or cart identifiers are available. This improves browser/server deduplication, webhook retry consistency, and cross-path Purchase identity.
+1. **Deterministic Shopify Purchase IDs** - Generated pixel scripts, ingest, and Shopify webhooks now use `shopify-purchase:<workspaceId>:<order|checkout|cart>` where Shopify order, checkout, or cart identifiers are available. Order name is preferred when present so browser checkout events with only `order.name` converge with webhook payloads that also include numeric order IDs; GraphQL and numeric order IDs normalize to the same fallback segment.
 2. **Normalized Catalog Content IDs** - Added shared content ID helpers and applied them to generated pixel payloads, ingest customData, and Shopify webhook line items. The default is Shopify variant numeric ID, with product numeric ID and SKU fallbacks; helper support exists for GraphQL ID, SKU, and custom template modes.
 3. **Richer TikTok Payloads** - TikTok Events API payloads now hash `customerId` into `external_id` when available and prefer rich `contents` with quantity/item price over flat content IDs.
 4. **Token-Safe EventLog Payloads** - Sanitized EventLog payloads now redact checkout and cart tokens from stored `customData`; queue jobs still receive transient event data for delivery.
@@ -425,9 +425,18 @@ None currently tracked.
 6. **Production Migration** - Applied `20260522_add_custom_ingest_domain` to the production Railway Postgres database before deployment.
 7. **Dirava Managed Setup Removed** - The unverified `t.dirava.com` setting was cleared from Dirava and the temporary Vercel `dirava.com` domain entry was removed. Dirava continues using the default TrackClear ingest URL.
 
+### Phase 18: Purchase ID Convergence Hardening (2026-05-23)
+1. **Order-Name-First Purchase Identity** - `purchase-event-id.ts`, generated `/api/pixel/:workspaceId`, and legacy `/api/s/:workspaceId` now prefer Shopify order name before numeric/GraphQL order ID when order name is available. This reduces browser/webhook Purchase ID divergence when Shopify exposes `order.name` in checkout events and both `id` plus `name` in webhooks.
+2. **Order ID Normalization Confirmed** - GraphQL order IDs such as `gid://shopify/Order/987654321` and numeric webhook IDs normalize to the same deterministic segment.
+3. **Checkout Token Fallback Documented** - Browser Purchases that only have checkout/cart token identity intentionally keep a checkout/cart-token-based event ID. They cannot deduplicate against a later order-name webhook ID unless Shopify exposes order identity in the browser event; webhook-enabled workspaces still suppress browser `fbq("track", "Purchase")` to avoid Meta browser/server mismatches.
+4. **Regression Tests** - Expanded `purchase-event-id.test.ts` and `pixel-route.test.ts` to cover order-name convergence, GraphQL/numeric order convergence, checkout-token-only fallback behavior, and generated pixel priority.
+
 ## Not Yet Implemented
 
 | Feature | Notes |
 |---------|-------|
 | Team access | Invite members to workspace |
 | Batch ingestion | Multiple events per request |
+| Real Shopify cart attribute QA | The generated cart attribution writer is best-effort in Shopify's Custom Pixel sandbox and still needs confirmation on a real Shopify test order before claiming guaranteed order attributes |
+| Webhook consent policy | Add an explicit workspace-level policy for webhook Purchase consent handling before stricter compliance rollouts |
+| Tracking Health signal percentages | Add percentages for webhook Purchases with fbp/fbc/fbclid-derived fbc/ttclid/gbraid/wbraid/email/phone/content IDs/value+currency |
