@@ -1,5 +1,16 @@
 # MEMORY.md
 
+## 2026-05-23 - Checkout-Path QA Preparation
+
+- Tightened `/tracking-health` cart-helper attribution language so merchants can interpret quality directly: excellent means the Cart Helper is doing its job, warning means attribution survived but not through durable cart attributes, and error means purchase attribution is weak or missing.
+- Added pending QA artifacts for the remaining normal Shopify checkout-path proof:
+  - `docs/qa/dirava-buy-now-flow.md`
+  - `docs/qa/dirava-returning-visitor-flow.md`
+  - `docs/qa/dirava-delayed-checkout-flow.md`
+  - `docs/qa/dirava-catalog-modes.md`
+- The new QA artifacts are templates only. They do not claim these flows have passed.
+- Required evidence remains flags and summaries only. Do not store raw PII or full webhook payloads in QA artifacts.
+
 ## 2026-05-23 - Normal Shopify Install Hardening
 
 - Updated Settings to label the Cart Attribution Helper as required for reliable Shopify purchase attribution.

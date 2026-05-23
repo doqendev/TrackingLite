@@ -87,7 +87,7 @@ export function buildCartAttributionCheck(input: {
       key: "attribution",
       label: "Cart helper attribution",
       severity: "ok",
-      detail: `Excellent: recent webhook Purchases use cart_attributes from the Cart Attribution Helper.${breakdown}`,
+      detail: `Excellent: the Cart Attribution Helper is doing its job. Recent webhook Purchases used durable cart_attributes.${breakdown}`,
       timestamp: latestAttributedPurchaseAt ?? latestPurchaseAt,
     };
   }
@@ -97,7 +97,7 @@ export function buildCartAttributionCheck(input: {
       key: "attribution",
       label: "Cart helper attribution",
       severity: "warning",
-      detail: `Warning: recent webhook Purchases only use session_enrichment or landing_site. Install and verify the Cart Attribution Helper.${breakdown}`,
+      detail: `Warning: attribution survived, but not through durable cart attributes. Recent webhook Purchases used session_enrichment or landing_site only. Install and verify the Cart Attribution Helper.${breakdown}`,
       timestamp: latestAttributedPurchaseAt ?? latestPurchaseAt,
     };
   }
@@ -106,7 +106,7 @@ export function buildCartAttributionCheck(input: {
     key: "attribution",
     label: "Cart helper attribution",
     severity: "error",
-    detail: `Recent webhook Purchases have no attribution context. Verify Custom Pixel, Shopify webhook, and Cart Attribution Helper installation.${breakdown}`,
+    detail: `Error: purchase attribution is weak or missing. Recent webhook Purchases have no attribution context. Verify Custom Pixel, Shopify webhook, and Cart Attribution Helper installation.${breakdown}`,
     timestamp: latestPurchaseAt,
   };
 }

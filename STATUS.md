@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-23 (normal Shopify install hardening)
+Last updated: 2026-05-23 (checkout-path QA preparation)
 
 ## Build Health
 
@@ -22,6 +22,7 @@ Last updated: 2026-05-23 (normal Shopify install hardening)
 - Cart/order attribute persistence remains unproven for the Shopify Custom Pixel `/cart/update.js` writer: `_trackclear_session_id` was not present in webhook/order attribution, and the order was enriched through Redis session enrichment rather than cart attributes.
 - Order `#5077` proved the storefront Cart Attribution Helper path on a paid `0.5 EUR` order: `/cart/update.js` fired, `/cart.js` verification passed before checkout, webhook Purchase attribution source was `cart_attributes`, `_trackclear_session_id` was present in webhook/order attribution, Meta/TikTok accepted the event, and Shopify/TrackClear/destination payload value matched `0.5 EUR`.
 - Normal Shopify V1 now treats the Cart Attribution Helper as part of the required install stack for reliable purchase attribution. The proven path is still one normal-cart paid checkout; buy-now/direct checkout, returning visitor, delayed checkout, live non-default catalog modes, and platform UI visibility remain open QA.
+- Pending QA templates now exist for buy-now/direct checkout, returning visitor, delayed checkout, and non-default catalog modes under `docs/qa/`.
 
 ## What's Implemented
 
@@ -485,6 +486,14 @@ None currently tracked.
 4. **Actionable Tracking Health** - `/tracking-health` now classifies recent webhook Purchase attribution as excellent when `cart_attributes` are present, warning when Purchases only use session enrichment or landing-site fallback, and error when no attribution context is present.
 5. **Regression Tests** - Added `tracking-health.test.ts` coverage for the cart-helper attribution health states.
 6. **Validation** - `pnpm test -- --run` passed 443/443, `pnpm exec tsc --noEmit --pretty false` passed, `pnpm lint` passed with the existing `<img>` warnings, and `pnpm build` completed successfully with the existing image/dynamic-render warnings.
+
+### Phase 24: Checkout-Path QA Preparation (2026-05-23)
+1. **Direct Health Language** - Tracking Health wording now explicitly says what the attribution state means: excellent means the Cart Helper is doing its job, warning means attribution survived but not through durable cart attributes, and error means purchase attribution is weak or missing.
+2. **Buy-Now QA Artifact** - Added `docs/qa/dirava-buy-now-flow.md` as the required evidence template for product-page buy-now/direct checkout.
+3. **Returning Visitor QA Artifact** - Added `docs/qa/dirava-returning-visitor-flow.md` for same-browser purchases without fresh click parameters.
+4. **Delayed Checkout QA Artifact** - Added `docs/qa/dirava-delayed-checkout-flow.md` for attribution capture followed by a delayed purchase.
+5. **Catalog Modes QA Artifact** - Added `docs/qa/dirava-catalog-modes.md` for `PRODUCT_NUMERIC_ID`, `SKU`, and `CUSTOM` mode proof.
+6. **Privacy Guardrail** - The new QA artifacts require flags and summaries only, with no raw PII or full webhook payloads.
 
 ## Not Yet Implemented
 

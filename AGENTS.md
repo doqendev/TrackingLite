@@ -22,7 +22,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 23 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 24 phases of expansion implemented:
 - Build: compiles clean
 - Unit tests: 443/443 passing (41 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
@@ -313,6 +313,10 @@ docs/
   qa/
     dirava-order-5076.md              # Controlled production order QA evidence and remaining proof gaps
     dirava-cart-helper-test.md        # Paid Dirava cart-helper QA evidence for cart_attributes attribution
+    dirava-buy-now-flow.md            # Pending buy-now/direct-checkout QA evidence template
+    dirava-returning-visitor-flow.md  # Pending returning-visitor QA evidence template
+    dirava-delayed-checkout-flow.md   # Pending delayed-checkout QA evidence template
+    dirava-catalog-modes.md           # Pending non-default catalog mode QA evidence template
 ```
 
 ### shadcn/ui Components (14 installed)
@@ -500,7 +504,7 @@ Header: Content-Type: application/json
 - **TikTok attribution quality:** TikTok Events API payloads include hashed `external_id` from `customerId` when available and prefer rich `contents` with quantity/item price over flat `content_ids`.
 - **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery. Replay is privacy-preserving: sanitized rows replay attribution columns and customData, but raw PII is not reconstructed after it has been removed.
 - **Normal Shopify V1 install standard:** A normal Shopify workspace is not considered live until the Custom Pixel, Shopify webhook, Cart Attribution Helper, Meta credentials, TikTok credentials, test AddToCart, and test webhook Purchase are all verified. The Cart Helper is required for reliable purchase attribution, not optional dashboard polish.
-- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, actionable cart-helper attribution status, attribution source breakdown, and recent errors. It reports `cart_attributes` as excellent, session/landing-only attribution as warning, and missing attribution context as error. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
+- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, actionable cart-helper attribution status, attribution source breakdown, and recent errors. It reports `cart_attributes` as excellent because the Cart Helper is doing its job, session/landing-only attribution as warning because attribution survived without durable cart attributes, and missing attribution context as error because purchase attribution is weak or missing. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
 - **Diagnostics visibility:** `/diagnostics` resolves workspace mode with the same backend helper as ingest/webhooks. V1 workspaces show only allowed destinations, and event audit field counts include core fields plus optional click/UTM fields only when those values are actually captured and relevant to an allowed destination.
 - **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_trackclear_session_id`, `_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_gbraid`, `_wbraid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`, `_landing_page`, consent markers) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, `contents`, and sanitized attribution-source metadata.
 - **Webhook Purchase browser guard:** If a workspace has a Shopify webhook secret configured, TrackClear generated pixel scripts do not fire browser `fbq("track", "Purchase")`; they still send the TrackClear Purchase to ingest so session context can enrich the webhook Purchase.
