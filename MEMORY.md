@@ -1,5 +1,15 @@
 # MEMORY.md
 
+## 2026-05-23 - Shopify Cart Attribution Helper
+
+- Built the approved storefront-context Cart Attribution Helper as the reliability layer for normal Shopify cart/order attribution.
+- Added public `GET /api/cart-helper/:workspaceId`, backed by `src/lib/shopify-cart-attribution-helper.ts`.
+- The helper creates/reuses `_trackclear_session_id`, reads Meta cookies/click IDs/UTMs/landing page/consent, writes TrackClear attributes with same-origin `/cart/update.js`, verifies via `/cart.js`, retries once, and stores local non-PII diagnostics (`_tc_cart_attr_last_ok`, `_tc_cart_attr_last_checked_at`, `_tc_cart_attr_missing`).
+- The helper writes early and repeatedly on page load, pageshow, add-to-cart submit/click, detected cart mutations through `fetch`/`XMLHttpRequest`, before checkout navigation, and pagehide. It does not block checkout.
+- Settings now includes a dedicated "Cart Attribution Helper" install card with a workspace-specific `<script async src="https://www.trackclear.io/api/cart-helper/<workspaceId>"></script>` snippet for `theme.liquid` before `</head>` or Custom Liquid/theme app block equivalent.
+- Added `docs/shopify-cart-attribution-helper.md`, `tests/unit/cart-helper-route.test.ts`, and `tests/unit/shopify-cart-attribution-helper.test.ts`.
+- Remaining proof gap: the helper still needs real Dirava QA showing cart attributes are present before checkout and webhook Purchase attribution includes `cart_attributes`; paid-order revenue propagation is also still unproven.
+
 ## 2026-05-23 - Dirava Controlled Order 5076 QA Artifact
 
 - Added permanent QA evidence for Dirava controlled order `#5076` in `docs/qa/dirava-order-5076.md`.

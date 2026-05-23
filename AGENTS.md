@@ -22,15 +22,15 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 18 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 21 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 427/427 passing (37 test files)
+- Unit tests: 439/439 passing (39 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: `pnpm exec tsc --noEmit` passes cleanly
 - Lint: passes with pre-existing `<img>` optimization warnings
 - Production migrations applied: `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, `20260522_add_custom_ingest_domain`
 - 7 destination codepaths retained for legacy/custom workspaces: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
-- Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, Shopify webhook, Meta CAPI, TikTok Events API, tracking health
+- Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, storefront cart attribution helper, Shopify webhook, Meta CAPI, TikTok Events API, tracking health
 - Dashboard: mode-aware destination visibility, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
@@ -66,11 +66,12 @@ See `STATUS.md` for the full audit and remaining work.
 3. Enters Meta Pixel ID + Conversions API access token (encrypted at rest with AES-256-GCM)
 4. Gets a unique **JS snippet** with embedded API key
 5. Pastes snippet into Shopify Admin > Settings > Customer Events > Add Custom Pixel
-6. Snippet captures browser events via Shopify's `analytics.subscribe()` API
-7. Snippet sends event data + `event_id` to `/api/events/ingest` with `X-TL-API-Key` header, using a verified workspace custom ingest domain when configured
-8. Vercel serverless function validates, checks billing/rate limits/consent, creates EventLog, queues BullMQ job
-9. Railway worker decrypts token, hashes PII (SHA-256), normalizes phone (E.164), sends to Meta CAPI
-10. EventLog updated to SENT/FAILED, dashboard shows status
+6. Adds the Cart Attribution Helper script to the Shopify theme (`theme.liquid` before `</head>` or Custom Liquid/theme app block equivalent) for durable cart attributes
+7. Snippet captures browser events via Shopify's `analytics.subscribe()` API
+8. Snippet sends event data + `event_id` to `/api/events/ingest` with `X-TL-API-Key` header, using a verified workspace custom ingest domain when configured
+9. Vercel serverless function validates, checks billing/rate limits/consent, creates EventLog, queues BullMQ job
+10. Railway worker decrypts token, hashes PII (SHA-256), normalizes phone (E.164), sends to Meta CAPI
+11. EventLog updated to SENT/FAILED, dashboard shows status
 
 ### Event Pipeline Detail
 
@@ -164,6 +165,7 @@ src/
       user/preferences/route.ts      # PATCH: update display currency and language
       user/account/route.ts          # DELETE: GDPR account deletion (cancels Stripe, cascades all data)
       snippet/[workspaceId]/route.ts  # GET: generate JS snippet; verified custom domains become the pixel-loader host
+      cart-helper/[workspaceId]/route.ts # GET: storefront theme helper JS for durable Shopify cart attribution attributes
       pixel/[workspaceId]/route.ts    # GET: public Shopify Custom Pixel JS (session ID, cart attribution writer, catalog ID settings, verified custom ingest URL, webhook-aware Purchase fbq guard)
       s/[workspaceId]/route.ts        # GET: legacy public pixel JS (same session/cart attribution, catalog ID settings, verified custom ingest URL, and Purchase guard)
       stripe/checkout/route.ts        # POST: create Stripe checkout session
@@ -213,6 +215,7 @@ src/
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
     shopify-webhook-attribution.ts    # Shopify order/cart/landing-site attribution extraction + absolute webhook Purchase URL/content helpers
+    shopify-cart-attribution-helper.ts # Storefront cart attribution helper generator + pure cart attribute extraction/write/verify helpers
     headless-sdk.ts                   # Headless/Hydrogen helper for click attribution, _fbp/_fbc cookies, _trackclear_session_id, cart attributes, and ingest calls
     currency.ts                       # Exchange rate fetcher (frankfurter.app API), Redis-cached 24h
     queue.ts                          # Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces
@@ -279,6 +282,7 @@ tests/
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
     hash-pii.test.ts                  # 24 tests
     headless-sdk.test.ts              # 6 tests (headless attribution, Meta cookies, TrackClear session ID, cart attributes, ingest client)
+    shopify-cart-attribution-helper.test.ts # 9 tests (helper generation, URL extraction, session ID, cart write/verify/retry, no raw PII)
     ingest-attribution.test.ts        # 8 tests (attribution propagation, session enrichment, V1 filtering, deterministic IDs, SKU/custom catalog normalization)
     meta-capi.test.ts                 # 21 tests
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
@@ -302,6 +306,7 @@ prisma/
 docs/
   deploy.md                           # Deployment runbook including required production migrations
   custom-ingest-domain.md             # Custom ingest domain setup, verification, and operational notes
+  shopify-cart-attribution-helper.md  # Storefront cart attribution helper install and QA notes
   headless-shopify.md                 # Hydrogen/custom storefront tracking helper usage
   qa/
     dirava-order-5076.md              # Controlled production order QA evidence and remaining proof gaps
@@ -354,7 +359,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (427 tests, 37 files)
+# Run unit tests (439 tests, 39 files)
 pnpm test
 
 # Run a single test file
@@ -396,6 +401,7 @@ All documented in `.env.example`. Critical ones:
 |-------|--------|---------|
 | `POST /api/events/ingest` | POST | Event ingestion from snippets/proxies. Header: `X-TL-API-Key`. Optional server-only headers: `X-TL-Client-IP`, `X-TL-Client-UA`. CORS: `*` |
 | `GET /api/custom-ingest-domain/check` | GET | Public marker route used by server-side custom ingest domain verification |
+| `GET /api/cart-helper/:workspaceId` | GET | Public storefront theme helper JS that writes and verifies TrackClear attribution in Shopify cart attributes |
 | `POST /api/stripe/webhook` | POST | Stripe webhook handler (signature verified) |
 | `GET /api/health` | GET | Health check (DB ping) |
 | `POST /api/auth/signup` | POST | User registration, sends verification email |
@@ -483,7 +489,7 @@ Header: Content-Type: application/json
 - **UTM attribution:** Snippet captures UTM params + gclid + rdtCid + epik once at IIFE init (landing page URL) and passes with every event. Stored on EventLog for campaign performance analytics.
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
-- **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
+- **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. The storefront Cart Attribution Helper (`/api/cart-helper/:workspaceId`) is the reliability layer for normal Shopify themes: it runs outside the Custom Pixel sandbox, writes early/repeatedly through same-origin `/cart/update.js`, verifies through `/cart.js`, retries once, stores local diagnostics, and never writes raw shopper PII. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
 - **Controlled production QA artifacts:** Store real-order QA evidence under `docs/qa/` without raw PII or full webhook payloads. Dirava order `#5076` proved webhook Purchase flow and session enrichment for a controlled `0 EUR` order, but did not prove paid revenue propagation or durable cart/order attribute persistence.
 - **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`). Order name is preferred over numeric order ID when both are present so browser checkout events and Shopify webhooks converge on the same order-based ID; numeric and GraphQL order IDs still normalize to the same fallback segment.
 - **Catalog content ID normalization:** Generated pixel, legacy script, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. Workspace settings control variant numeric, product numeric, GraphQL, SKU, prefix/suffix, and custom template modes from Settings.
@@ -514,7 +520,7 @@ Header: Content-Type: application/json
 
 ## Known Issues
 
-See `STATUS.md` for the full list. Current tracking-quality gaps are operational proof gaps: paid non-zero revenue propagation, real Shopify cart/order attribute persistence, catalog mode live QA, headless live QA, and custom ingest staging DNS QA.
+See `STATUS.md` for the full list. Current tracking-quality gaps are operational proof gaps: paid non-zero revenue propagation, real Shopify cart/order attribute persistence using the new storefront helper, catalog mode live QA, headless live QA, and custom ingest staging DNS QA.
 
 Note: `pnpm build` previously hung on Windows but this is no longer an issue — the Vercel build command is `prisma generate && next build` (no standalone output). A `build:railway` script exists for Railway/Docker deployments that sets `STANDALONE=true` before building.
 
@@ -544,3 +550,4 @@ All previous critical bugs (billing.ts Redis, rotate key, landing page copy, PII
 - UI migration plan: `.omc/plans/shadcn-ui-implementation.md` (9 phases, all executed)
 - Billing model plan: `.omc/plans/purchase-based-billing.md` (10 phases, all executed)
 - Analytics/Currency/i18n plan: `C:\Users\Marcos\.Codex\plans\jaunty-weaving-lobster.md` (3 workstreams, all executed)
+    cart-helper-route.test.ts          # 3 tests (public cart helper route output, missing workspace, CORS)

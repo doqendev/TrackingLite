@@ -113,6 +113,10 @@ const CATALOG_ID_MODES = [
 
 const CUSTOM_INGEST_CNAME_TARGET =
   process.env.NEXT_PUBLIC_CUSTOM_INGEST_CNAME_TARGET || "cname.vercel-dns.com";
+const TRACKCLEAR_APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://www.trackclear.io").replace(
+  /\/$/,
+  ""
+);
 
 export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) {
   // Event toggles state
@@ -157,6 +161,7 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
   // Snippet state
   const [snippet, setSnippet] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [helperCopied, setHelperCopied] = useState(false);
 
   // Danger zone state
   const [rotatingKey, setRotatingKey] = useState(false);
@@ -316,6 +321,12 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleCopyCartHelper() {
+    await navigator.clipboard.writeText(cartHelperSnippet).catch(() => {});
+    setHelperCopied(true);
+    setTimeout(() => setHelperCopied(false), 2000);
+  }
+
   async function handleRotateKeyConfirmed() {
     setRotatingKey(true);
     try {
@@ -377,6 +388,7 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
   const customDomainLastChecked = customDomain.lastCheckedAt
     ? new Date(customDomain.lastCheckedAt).toLocaleString()
     : null;
+  const cartHelperSnippet = `<script async src="${TRACKCLEAR_APP_URL}/api/cart-helper/${workspace.id}"></script>`;
 
   return (
     <div className="space-y-8">
@@ -655,6 +667,50 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Cart Attribution Helper */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cart Attribution Helper</CardTitle>
+          <CardDescription>
+            Recommended for reliable purchase attribution. Install this in your Shopify theme to preserve click IDs and session IDs into Shopify cart/order attributes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="relative">
+              <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
+                <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
+                  {cartHelperSnippet}
+                </pre>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pt-12 pb-3 px-4 rounded-b-lg">
+                  <Button
+                    type="button"
+                    variant="brand"
+                    className="w-full"
+                    onClick={handleCopyCartHelper}
+                  >
+                    {helperCopied ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy helper
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Add this to Shopify Admin &gt; Online Store &gt; Themes &gt; Edit code &gt; <code className="rounded bg-black/40 px-1 py-0.5 text-foreground/70">theme.liquid</code> before <code className="rounded bg-black/40 px-1 py-0.5 text-foreground/70">&lt;/head&gt;</code>, or install it with a Custom Liquid block/theme app block equivalent.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

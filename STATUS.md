@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-23 (Dirava controlled order QA artifact)
+Last updated: 2026-05-23 (Shopify cart attribution helper)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 427/427 passing (37 files) |
+| Tests (`pnpm test -- --run`) | 439/439 passing (39 files) |
 | Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -64,6 +64,7 @@ Last updated: 2026-05-23 (Dirava controlled order QA artifact)
 | `/api/user/account` | DELETE | Session | Working | GDPR account deletion (cancels Stripe, cascades all data) |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
 | `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet and uses a verified custom ingest domain as the pixel-loader host when configured |
+| `/api/cart-helper/[workspaceId]` | GET, OPTIONS | Public | Working | Storefront theme helper script for durable cart attribution: writes through same-origin `/cart/update.js`, verifies through `/cart.js`, retries once, and stores local non-PII diagnostics |
 | `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with `_trackclear_session_id`, best-effort cart attribution writer, catalog ID settings, custom ingest URL resolution, bounded `_fbp` validation, and webhook-aware Purchase `fbq` guard |
 | `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with the same session/cart attribution, catalog ID settings, custom ingest URL resolution, and Purchase guard |
 | `/api/custom-ingest-domain/check` | GET | Public | Working | Public no-store marker route used by custom ingest domain verification |
@@ -147,6 +148,7 @@ Each destination has:
 | `guide-content.ts` | Working | Setup guide content for all 7 integration platforms + Shopify webhook |
 | `tracking-context.ts` | Working | Shared helper for server-proxy client IP/UA extraction and fbclid -> fbc synthesis |
 | `shopify-webhook-attribution.ts` | Working | Extracts Shopify order/cart/landing-site attribution, normalizes webhook Purchase URLs, and shapes line-item content IDs/contents |
+| `shopify-cart-attribution-helper.ts` | Working | Generates the storefront cart attribution helper and exposes tested extraction/write/verify utilities for Shopify cart attributes |
 | `headless-sdk.ts` | Working | Headless/Hydrogen helper for URL attribution capture, Meta `_fbp`/`_fbc` cookies, `_trackclear_session_id` creation, Shopify cart attributes, and TrackClear ingest calls |
 
 ### Workers (10 files in src/workers/)
@@ -179,9 +181,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (42 files, 472 tests)
+### Test Coverage (44 files, 484 tests)
 
-#### Unit Tests (37 files, 427 tests)
+#### Unit Tests (39 files, 439 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -194,6 +196,8 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `custom-ingest-domain.test.ts` | 4 | Custom domain normalization, invalid host rejection, verified endpoint resolution, verification URL construction |
 | `custom-ingest-domain-verify-route.test.ts` | 3 | Authenticated custom ingest domain verification success, failure clearing, and missing-domain guard |
 | `snippet-route.test.ts` | 3 | Snippet route uses default app host until a custom domain is verified, then uses the custom pixel-loader host |
+| `cart-helper-route.test.ts` | 3 | Public cart helper route output, CORS, missing workspace handling |
+| `shopify-cart-attribution-helper.test.ts` | 9 | Helper JavaScript generation, attribution extraction, session ID persistence, cart write/verify/retry behavior, and no raw PII attributes |
 | `pixel-route.test.ts` | 5 | Generated pixel scripts: bounded fbp validation, TrackClear session/cart attribution writer, catalog settings, verified custom ingest URL, and webhook-aware Purchase fbq guard |
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
@@ -452,6 +456,15 @@ None currently tracked.
 3. **Revenue Proof Still Required** - Because the order total was intentionally `0 EUR`, a paid non-zero order is still required before claiming revenue propagation is proven end to end.
 4. **Cart Attribute Persistence Still Unproven** - `_trackclear_session_id` was absent from webhook/order attribution for this order. The current `/cart/update.js` writer remains best-effort until a test captures request firing, cart attribute presence before checkout, and final webhook/order attribute persistence.
 
+### Phase 21: Shopify Cart Attribution Helper (2026-05-23)
+1. **Storefront Helper Route** - Added public `GET /api/cart-helper/:workspaceId` for a Shopify theme-installed helper script that runs in the normal storefront context rather than the Customer Events Custom Pixel sandbox.
+2. **Durable Cart Attribute Writes** - The helper creates/reuses `_trackclear_session_id`, reads Meta cookies, click IDs, UTMs, landing page, and Shopify customer privacy consent where available, writes TrackClear attribution attributes through same-origin `/cart/update.js`, verifies with `/cart.js`, and retries once if verification misses expected attributes.
+3. **Early/Repetitive Timing** - The helper writes on page load/pageshow, add-to-cart submit/click, detected cart mutations through `fetch`/`XMLHttpRequest`, before checkout navigation, and pagehide. It does not block checkout.
+4. **Local Diagnostics** - The helper stores `_tc_cart_attr_last_ok`, `_tc_cart_attr_last_checked_at`, and `_tc_cart_attr_missing` in localStorage. Debug mode is enabled with `?trackclear_debug=1` or `localStorage.setItem("trackclear_debug", "1")`.
+5. **Settings Install Card** - Settings now has a dedicated Cart Attribution Helper card with the workspace-specific `<script async src=".../api/cart-helper/:workspaceId"></script>` snippet and install instructions for `theme.liquid` before `</head>` or a Custom Liquid/theme app block equivalent.
+6. **Privacy Guardrail** - The helper only writes attribution/session/click/consent fields. It does not write raw email, phone, name, address, customer ID, or full customer data to cart attributes.
+7. **Docs and Tests** - Added `docs/shopify-cart-attribution-helper.md`, `cart-helper-route.test.ts`, and `shopify-cart-attribution-helper.test.ts`.
+
 ## Not Yet Implemented
 
 | Feature | Notes |
@@ -459,7 +472,7 @@ None currently tracked.
 | Team access | Invite members to workspace |
 | Batch ingestion | Multiple events per request |
 | Paid Shopify revenue QA | A non-zero paid order is still required to prove Shopify total price, TrackClear EventLog value, Meta value, TikTok value, and currency all match |
-| Real Shopify cart attribute QA | Controlled Dirava order `#5076` proved session enrichment but did not prove cart/order attribute persistence; `_trackclear_session_id` was absent from webhook/order attribution, so the Custom Pixel `/cart/update.js` writer remains best-effort |
+| Real Shopify cart attribute QA | The storefront Cart Attribution Helper is implemented but still needs a real Dirava order proving `_trackclear_session_id`, click IDs, UTMs, and `cart_attributes` attribution source survive into the webhook/order payload |
 | Custom ingest staging DNS QA | The implementation is in place, but a staging merchant-owned domain should still be verified end-to-end before promoting this as a recommended launch step |
 | Webhook consent policy | Add an explicit workspace-level policy for webhook Purchase consent handling before stricter compliance rollouts |
 | Tracking Health signal percentages | Add percentages for webhook Purchases with fbp/fbc/fbclid-derived fbc/ttclid/gbraid/wbraid/email/phone/content IDs/value+currency |
