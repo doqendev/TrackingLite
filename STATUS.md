@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-23 (catalog and headless hardening)
+Last updated: 2026-05-23 (Dirava controlled order QA artifact)
 
 ## Build Health
 
@@ -12,6 +12,13 @@ Last updated: 2026-05-23 (catalog and headless hardening)
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production branch | GitHub default branch is `main`; Vercel production and Railway worker deploy from `main` |
+
+## Production QA Evidence
+
+- Dirava controlled order `#5076` is documented in `docs/qa/dirava-order-5076.md`.
+- The order proved the canonical Shopify webhook Purchase path for a controlled `0 EUR` order: deterministic Purchase event ID, one Meta and one TikTok EventLog, Meta API acceptance (`events_received: 1`), TikTok API acceptance (`code: 0`, `message: OK`), attribution through Redis session enrichment plus landing-site fallback, and variant-ID `content_ids`/`contents`.
+- The order did not prove paid-order revenue propagation because the final Shopify order total was intentionally `0 EUR` after two discount codes.
+- Cart/order attribute persistence remains unproven for the Shopify Custom Pixel `/cart/update.js` writer: `_trackclear_session_id` was not present in webhook/order attribution, and the order was enriched through Redis session enrichment rather than cart attributes.
 
 ## What's Implemented
 
@@ -439,13 +446,20 @@ None currently tracked.
 4. **Headless Docs Updated** - `docs/headless-shopify.md` now uses `ensureTrackClearSessionId()` for TrackClear ingest and Shopify cart attributes instead of assuming each storefront implements its own session ID storage.
 5. **Branch Deployment Cleanup** - GitHub default branch is now `main`. Vercel production deployment exposes the `git-main` alias, Railway worker status is attached to `main` commits, and `master` was fast-forwarded to `main` before the default branch was changed.
 
+### Phase 20: Dirava Controlled Order QA (2026-05-23)
+1. **Controlled Real Order Evidence** - Added `docs/qa/dirava-order-5076.md` for Dirava order `#5076`, including the test URL, zero-value discount context, deterministic Purchase event ID, EventLog IDs, destination API response summaries, attribution source, content IDs, and limitations.
+2. **Canonical Purchase Path Result** - The order proved webhook receipt/processing, deterministic event identity, Meta/TikTok fan-out, destination API acceptance, browser Purchase suppression, session enrichment, landing-site fallback, and default variant-ID Purchase contents for one controlled `0 EUR` order.
+3. **Revenue Proof Still Required** - Because the order total was intentionally `0 EUR`, a paid non-zero order is still required before claiming revenue propagation is proven end to end.
+4. **Cart Attribute Persistence Still Unproven** - `_trackclear_session_id` was absent from webhook/order attribution for this order. The current `/cart/update.js` writer remains best-effort until a test captures request firing, cart attribute presence before checkout, and final webhook/order attribute persistence.
+
 ## Not Yet Implemented
 
 | Feature | Notes |
 |---------|-------|
 | Team access | Invite members to workspace |
 | Batch ingestion | Multiple events per request |
-| Real Shopify cart attribute QA | The generated cart attribution writer is best-effort in Shopify's Custom Pixel sandbox and still needs confirmation on a real Shopify test order before claiming guaranteed order attributes |
+| Paid Shopify revenue QA | A non-zero paid order is still required to prove Shopify total price, TrackClear EventLog value, Meta value, TikTok value, and currency all match |
+| Real Shopify cart attribute QA | Controlled Dirava order `#5076` proved session enrichment but did not prove cart/order attribute persistence; `_trackclear_session_id` was absent from webhook/order attribution, so the Custom Pixel `/cart/update.js` writer remains best-effort |
 | Custom ingest staging DNS QA | The implementation is in place, but a staging merchant-owned domain should still be verified end-to-end before promoting this as a recommended launch step |
 | Webhook consent policy | Add an explicit workspace-level policy for webhook Purchase consent handling before stricter compliance rollouts |
 | Tracking Health signal percentages | Add percentages for webhook Purchases with fbp/fbc/fbclid-derived fbc/ttclid/gbraid/wbraid/email/phone/content IDs/value+currency |

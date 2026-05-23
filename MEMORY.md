@@ -1,5 +1,16 @@
 # MEMORY.md
 
+## 2026-05-23 - Dirava Controlled Order 5076 QA Artifact
+
+- Added permanent QA evidence for Dirava controlled order `#5076` in `docs/qa/dirava-order-5076.md`.
+- Production health at the time of documentation was `status: "ok"`, `database: "connected"`, `redis: "connected"`, `platform: "vercel"`, `commit: "638707a"`.
+- Order `#5076` used controlled landing URL parameters (`fbclid=FB123`, `ttclid=TT123`, `gbraid=GB123`, `wbraid=WB123`, `utm_source=meta`, `utm_campaign=test`) and produced deterministic Purchase event ID `shopify-purchase:cmlsa6h1w0001zm8nxuzn7a50:5076`.
+- Meta EventLog `cmpiacdmj00096z61ghhwddqa` was `SENT` with API summary `events_received: 1`, `messages: []`, and TikTok EventLog `cmpiacdml000b6z61jfk1fvbx` was `SENT` with API summary `code: 0`, `message: OK`.
+- The order proved canonical webhook Purchase flow, session enrichment, landing-site fallback, browser Purchase suppression, and default variant-ID content payloads for one controlled `0 EUR` order.
+- The test did not prove paid-order revenue propagation because two discount codes made Shopify total `0 EUR`.
+- Cart/order attribute persistence remains unproven: `_trackclear_session_id` was not present in webhook/order attribution, and the Purchase was enriched through Redis session enrichment plus landing-site fallback rather than cart attributes.
+- Recommended next durable attribution path is a theme/app-embed cart helper outside the Shopify Custom Pixel sandbox, while keeping Shopify app/web pixel extension work as the longer-term platform path.
+
 ## 2026-05-23 - Branch And Production Verification
 
 - Changed the GitHub default branch from `master` to `main` with `gh api repos/doqendev/TrackingLite -X PATCH -f default_branch=main`.
