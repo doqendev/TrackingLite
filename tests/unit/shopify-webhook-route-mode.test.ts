@@ -70,6 +70,10 @@ const baseWorkspace = {
   userId: "user_123",
   productMode: "SHOPIFY_META_TIKTOK_V1",
   installType: "SHOPIFY_CUSTOM_PIXEL",
+  catalogIdMode: "VARIANT_NUMERIC_ID",
+  catalogIdPrefix: null,
+  catalogIdSuffix: null,
+  catalogIdTemplate: null,
   shopifyWebhookSecretEncrypted: "encrypted",
   shopifyWebhookSecretIv: "iv",
   shopifyWebhookSecretTag: "tag",
@@ -107,7 +111,7 @@ function makeShopifyRequest(body: Record<string, unknown>) {
   });
 }
 
-function makeOrder() {
+function makeOrder(): Record<string, unknown> & { line_items: Array<Record<string, unknown>> } {
   return {
     id: 1001,
     name: "#1001",
@@ -198,5 +202,57 @@ describe("Shopify webhook workspace mode allowlist", () => {
 
     expect(response.status).toBe(200);
     expect(mockEventLogCreate.mock.calls.map((call) => call[0].data.destination)).toContain("GA4");
+  });
+
+  it("applies SKU catalog mode to webhook Purchase content IDs and queue payloads", async () => {
+    mockWorkspaceFindMany.mockResolvedValue([
+      {
+        ...baseWorkspace,
+        catalogIdMode: "SKU",
+      },
+    ]);
+    const order = makeOrder();
+    order.line_items = [
+      {
+        variant_id: 111,
+        product_id: 222,
+        sku: "SKU-111",
+        quantity: 2,
+        price: "21.25",
+      },
+    ];
+
+    const response = await POST(makeShopifyRequest(order));
+
+    expect(response.status).toBe(200);
+    expect(mockEventLogCreate.mock.calls[0][0].data.payload.customData).toMatchObject({
+      content_ids: ["SKU-111"],
+      contents: [{ id: "SKU-111", quantity: 2, item_price: 21.25 }],
+    });
+    expect(mockQueueAdd.mock.calls[0][1].event.customData).toMatchObject({
+      content_ids: ["SKU-111"],
+      contents: [{ id: "SKU-111", quantity: 2, item_price: 21.25 }],
+    });
+  });
+
+  it("applies product numeric catalog mode to webhook Purchase content IDs and queue payloads", async () => {
+    mockWorkspaceFindMany.mockResolvedValue([
+      {
+        ...baseWorkspace,
+        catalogIdMode: "PRODUCT_NUMERIC_ID",
+      },
+    ]);
+
+    const response = await POST(makeShopifyRequest(makeOrder()));
+
+    expect(response.status).toBe(200);
+    expect(mockEventLogCreate.mock.calls[0][0].data.payload.customData).toMatchObject({
+      content_ids: ["222"],
+      contents: [{ id: "222", quantity: 2, item_price: 21.25 }],
+    });
+    expect(mockQueueAdd.mock.calls[0][1].event.customData).toMatchObject({
+      content_ids: ["222"],
+      contents: [{ id: "222", quantity: 2, item_price: 21.25 }],
+    });
   });
 });

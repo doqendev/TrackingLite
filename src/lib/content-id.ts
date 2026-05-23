@@ -129,18 +129,68 @@ function scalarContentId(value: unknown): string | number | null {
   return null;
 }
 
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function firstDefined(source: Record<string, unknown> | null, keys: string[]): unknown {
+  if (!source) return null;
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== null && value !== undefined && clean(value)) return value;
+  }
+  return null;
+}
+
+function contentInputFromSource(
+  source: Record<string, unknown> | null,
+  fallbackId: unknown
+): ContentIdInput {
+  const itemId = firstDefined(source, ["id", "content_id", "contentId"]);
+  const variantId = firstDefined(source, ["variantId", "variant_id", "variantID"]) ?? fallbackId ?? itemId;
+  const productId = firstDefined(source, ["productId", "product_id", "productID"]);
+
+  return {
+    variantId: scalarContentId(variantId),
+    productId: scalarContentId(productId),
+    variantGraphqlId: clean(firstDefined(source, ["variantGraphqlId", "variant_graphql_id"])),
+    productGraphqlId: clean(firstDefined(source, ["productGraphqlId", "product_graphql_id"])),
+    sku: clean(firstDefined(source, ["sku", "SKU"])),
+    country: clean(firstDefined(source, ["country", "countryCode", "country_code"])),
+  };
+}
+
+function normalizeContentIdFromSource(
+  source: Record<string, unknown> | null,
+  fallbackId: unknown,
+  options: ContentIdOptions
+): string | null {
+  const input = contentInputFromSource(source, fallbackId);
+  return (
+    normalizeContentId(input, options) ??
+    normalizeRawShopifyContentId(fallbackId ?? input.variantId ?? input.productId ?? input.sku)
+  );
+}
+
 export function normalizeCustomDataContentIds<T extends Record<string, unknown>>(
   customData: T,
   options: ContentIdOptions = {}
 ): T {
   const normalized = { ...customData } as Record<string, unknown>;
   const rawContentIds = normalized.contentIds ?? normalized.content_ids;
+  const contentItems = Array.isArray(normalized.contents)
+    ? (normalized.contents as unknown[]).map(recordValue)
+    : [];
+  const rootSource = recordValue(normalized);
 
   if (Array.isArray(rawContentIds)) {
     const contentIds = rawContentIds
-      .map((rawId) => {
+      .map((rawId, index) => {
         const id = scalarContentId(rawId);
-        return id ? normalizeContentId({ variantId: id }, options) ?? normalizeRawShopifyContentId(id) : null;
+        const itemSource = contentItems[index] ?? rootSource;
+        return id ? normalizeContentIdFromSource(itemSource, id, options) : null;
       })
       .filter((id): id is string => !!id);
     normalized.contentIds = contentIds;
@@ -148,9 +198,11 @@ export function normalizeCustomDataContentIds<T extends Record<string, unknown>>
   }
 
   if (Array.isArray(normalized.contents)) {
-    normalized.contents = (normalized.contents as Array<Record<string, unknown>>).map((item) => {
-      const rawId = scalarContentId(item.id ?? item.content_id);
-      const id = normalizeContentId({ variantId: rawId }, options) ?? normalizeRawShopifyContentId(rawId);
+    normalized.contents = (normalized.contents as unknown[]).map((rawItem) => {
+      const item = recordValue(rawItem);
+      if (!item) return rawItem;
+      const rawId = scalarContentId(item.id ?? item.content_id ?? item.contentId);
+      const id = normalizeContentIdFromSource(item, rawId, options);
       return id ? { ...item, id, content_id: id } : item;
     });
   }

@@ -1,5 +1,15 @@
 # MEMORY.md
 
+## 2026-05-23 - Catalog And Headless Hardening
+
+- Confirmed the current production branch signals: GitHub default branch is still `master`, but Vercel production deployment for `645b449` exposes the `tracking-lite-git-main-*` alias and Railway worker status is attached to the `main` commit. Deployment docs now say production is driven from `main` and `master` should be kept fast-forwarded until the repo default branch is changed.
+- Tightened catalog normalization for direct/headless ingest. `normalizeCustomDataContentIds()` now uses rich content item/root fields (`variantId`, `productId`, GraphQL IDs, SKU, country) instead of treating every raw ID as only a variant ID, so SKU/custom workspace catalog modes can be applied to direct ingest payloads.
+- Added route-level regression tests proving ingest applies SKU and custom-template catalog modes, and Shopify webhook Purchase applies SKU and product-numeric catalog modes into EventLog payloads plus queued destination jobs.
+- Added `ensureTrackClearSessionId()` to `headless-sdk.ts`. It reuses existing `_trackclear_session_id` from storage/cookies, creates one when absent, persists it to localStorage and/or cookies when available, and remains safe when browser storage is unavailable.
+- Updated `docs/headless-shopify.md` to use `ensureTrackClearSessionId()` for TrackClear ingest and cart attribution attributes instead of relying on each headless merchant to hand-roll session ID persistence.
+- Validation: targeted catalog/headless route tests passed 24/24; `pnpm test -- --run` passed 427/427 unit tests; `pnpm exec tsc --noEmit --pretty false` passed; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing `<img>` and dynamic-server static-generation warnings.
+- Remaining operational QA: real Shopify Custom Pixel cart-attribute writing still needs a safe test order, and custom ingest domain DNS still needs an end-to-end staging domain check before recommending it broadly.
+
 ## 2026-05-23 - Purchase ID Convergence Hardening
 
 - Rechecked the super-dev review against the current repo head. GitHub status for the pre-patch head `d54f2082a9084216939d70f622e130a28a78b0ea` was green, including the Railway worker context reporting success/no deployment needed. The local Railway CLI is not authenticated, so direct Railway log inspection was not available from this machine.

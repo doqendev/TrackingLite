@@ -10,6 +10,7 @@ schema:
 - captures click IDs and UTMs from the landing URL
 - validates or creates Meta `_fbp`
 - synthesizes `_fbc` as `fb.1.<timestamp_ms>.<fbclid>`
+- creates and persists `_trackclear_session_id`
 - builds Shopify cart attributes for webhook Purchase attribution recovery
 - sends PageView, ViewContent, AddToCart, InitiateCheckout, and Purchase events
   to `/api/events/ingest`
@@ -22,9 +23,11 @@ import {
   captureUrlAttribution,
   createTrackClearClient,
   ensureMetaAttributionCookies,
+  ensureTrackClearSessionId,
   toShopifyCartAttributes,
 } from "@/lib/headless-sdk";
 
+const trackclearSessionId = ensureTrackClearSessionId();
 const landingAttribution = captureUrlAttribution(window.location.href);
 const attribution = await ensureMetaAttributionCookies({
   attribution: landingAttribution,
@@ -38,7 +41,7 @@ const trackclear = createTrackClearClient({
     analyticsAllowed: true,
     marketingAllowed: true,
   },
-  getSessionId: () => localStorage.getItem("_trackclear_session_id"),
+  getSessionId: () => trackclearSessionId,
 });
 ```
 
@@ -51,7 +54,7 @@ durable fallback even when Redis session enrichment is missing.
 ```ts
 const attributes = buildTrackClearCartAttributes({
   attribution,
-  trackclearSessionId: localStorage.getItem("_trackclear_session_id"),
+  trackclearSessionId,
   landingPage: window.location.href,
   consent: {
     analyticsAllowed: true,

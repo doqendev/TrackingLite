@@ -54,6 +54,42 @@ describe("content-id", () => {
     ]);
   });
 
+  it("uses rich content item fields for SKU and custom template ingest normalization", () => {
+    const skuData = normalizeCustomDataContentIds<Record<string, unknown>>(
+      {
+        contentIds: ["gid://shopify/ProductVariant/111"],
+        contents: [
+          {
+            id: "gid://shopify/ProductVariant/111",
+            productId: "gid://shopify/Product/222",
+            sku: "SKU-111",
+            quantity: 1,
+          },
+        ],
+      },
+      { mode: "SKU" }
+    );
+    expect(skuData.contentIds).toEqual(["SKU-111"]);
+    expect(skuData.contents).toEqual([
+      {
+        id: "SKU-111",
+        content_id: "SKU-111",
+        productId: "gid://shopify/Product/222",
+        sku: "SKU-111",
+        quantity: 1,
+      },
+    ]);
+
+    const customData = normalizeCustomDataContentIds<Record<string, unknown>>(
+      {
+        contentIds: ["gid://shopify/ProductVariant/111"],
+        contents: [{ variantId: 111, productId: 222, sku: "SKU-111" }],
+      },
+      { mode: "CUSTOM", template: "{{product_id}}-{{variant_id}}-{{sku}}" }
+    );
+    expect(customData.contentIds).toEqual(["222-111-SKU-111"]);
+  });
+
   it("builds content ID options from workspace catalog settings", () => {
     expect(
       contentIdOptionsFromWorkspace({

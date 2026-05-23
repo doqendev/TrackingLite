@@ -24,7 +24,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 **Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 18 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 420/420 passing (37 test files)
+- Unit tests: 427/427 passing (37 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: `pnpm exec tsc --noEmit` passes cleanly
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -212,7 +212,7 @@ src/
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
     shopify-webhook-attribution.ts    # Shopify order/cart/landing-site attribution extraction + absolute webhook Purchase URL/content helpers
-    headless-sdk.ts                   # Headless/Hydrogen helper for click attribution, _fbp/_fbc cookies, cart attributes, and ingest calls
+    headless-sdk.ts                   # Headless/Hydrogen helper for click attribution, _fbp/_fbc cookies, _trackclear_session_id, cart attributes, and ingest calls
     currency.ts                       # Exchange rate fetcher (frankfurter.app API), Redis-cached 24h
     queue.ts                          # Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces
     rate-limit.ts                     # Lazy Redis rate limiter (100 req/sec/workspace)
@@ -264,7 +264,7 @@ tests/
     api-key.test.ts                   # 12 tests
     billing.test.ts                   # 22 tests
     consent.test.ts                   # 29 tests
-    content-id.test.ts                # 5 tests (Shopify catalog content ID normalization and workspace settings resolver)
+    content-id.test.ts                # 6 tests (Shopify catalog content ID normalization, rich direct-ingest fields, and workspace settings resolver)
     custom-ingest-domain.test.ts      # 4 tests (custom domain normalization, validation, and verified endpoint resolution)
     custom-ingest-domain-verify-route.test.ts # 3 tests (verification route success/failure/missing-domain guard)
     diagnostics-audit-fields.test.ts  # 5 tests (mode-aware captured-field visibility and counts)
@@ -277,8 +277,8 @@ tests/
     extract-custom-data.test.ts       # 27 tests (customData extraction)
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
     hash-pii.test.ts                  # 24 tests
-    headless-sdk.test.ts              # 4 tests (headless attribution, Meta cookies, cart attributes, ingest client)
-    ingest-attribution.test.ts        # 6 tests (attribution propagation, session enrichment, V1 filtering, deterministic IDs, catalog affixes)
+    headless-sdk.test.ts              # 6 tests (headless attribution, Meta cookies, TrackClear session ID, cart attributes, ingest client)
+    ingest-attribution.test.ts        # 8 tests (attribution propagation, session enrichment, V1 filtering, deterministic IDs, SKU/custom catalog normalization)
     meta-capi.test.ts                 # 21 tests
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
     phone-normalizer.test.ts          # 16 tests
@@ -288,7 +288,7 @@ tests/
     session-enrichment.test.ts        # 2 tests (multi-key Redis session enrichment lookup)
     shopify-domain-resolver.test.ts   # 28 tests (Shopify domain resolution)
     shopify-webhook-attribution.test.ts # 12 tests (order/landing attribution and catalog-aware content IDs)
-    shopify-webhook-route-mode.test.ts # 2 tests (Shopify webhook V1 allowlist + legacy env bypass)
+    shopify-webhook-route-mode.test.ts # 4 tests (Shopify webhook V1 allowlist, legacy env bypass, SKU/product catalog modes)
     shopify-webhook.test.ts           # 6 tests (HMAC/replay/header verification)
     snippet-route.test.ts             # 3 tests (snippet host uses verified custom domain only after verification)
     tiktok.test.ts                    # 3 tests (external_id hashing and rich contents)
@@ -351,7 +351,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (420 tests, 37 files)
+# Run unit tests (427 tests, 37 files)
 pnpm test
 
 # Run a single test file
@@ -483,7 +483,7 @@ Header: Content-Type: application/json
 - **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
 - **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`). Order name is preferred over numeric order ID when both are present so browser checkout events and Shopify webhooks converge on the same order-based ID; numeric and GraphQL order IDs still normalize to the same fallback segment.
 - **Catalog content ID normalization:** Generated pixel, legacy script, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. Workspace settings control variant numeric, product numeric, GraphQL, SKU, prefix/suffix, and custom template modes from Settings.
-- **Headless storefront helper:** `headless-sdk.ts` gives Hydrogen/custom storefronts a reusable client for URL click-ID capture, Meta `_fbp`/`_fbc` cookie maintenance, Shopify cart attribution attributes, and TrackClear ingest calls.
+- **Headless storefront helper:** `headless-sdk.ts` gives Hydrogen/custom storefronts a reusable client for URL click-ID capture, Meta `_fbp`/`_fbc` cookie maintenance, `_trackclear_session_id` creation/persistence, Shopify cart attribution attributes, and TrackClear ingest calls.
 - **TikTok attribution quality:** TikTok Events API payloads include hashed `external_id` from `customerId` when available and prefer rich `contents` with quantity/item price over flat `content_ids`.
 - **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery. Replay is privacy-preserving: sanitized rows replay attribution columns and customData, but raw PII is not reconstructed after it has been removed.
 - **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, attribution source breakdown, and recent errors. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.

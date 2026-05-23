@@ -4,6 +4,7 @@ import {
   captureUrlAttribution,
   createTrackClearClient,
   ensureMetaAttributionCookies,
+  ensureTrackClearSessionId,
   fbcClickId,
   generateFbp,
   synthesizeFbcFromFbclid,
@@ -11,6 +12,7 @@ import {
   validateFbc,
   validateFbp,
   type HeadlessCookieAdapter,
+  type StorageLike,
 } from "@/lib/headless-sdk";
 
 function memoryCookies(initial: Record<string, string> = {}) {
@@ -22,6 +24,17 @@ function memoryCookies(initial: Record<string, string> = {}) {
     },
   };
   return { store, adapter };
+}
+
+function memoryStorage(initial: Record<string, string> = {}) {
+  const store = { ...initial };
+  const storage: StorageLike = {
+    getItem: (key) => store[key] ?? null,
+    setItem: (key, value) => {
+      store[key] = value;
+    },
+  };
+  return { store, storage };
 }
 
 describe("headless-sdk", () => {
@@ -65,6 +78,40 @@ describe("headless-sdk", () => {
     expect(fbcClickId(attribution.fbc)).toBe("CLICK123");
     expect(synthesizeFbcFromFbclid("CLICK123", now)).toBe(attribution.fbc);
     expect(generateFbp(now, () => 0.999999)).toMatch(/^fb\.1\.1712345678901\.\d{10}$/);
+  });
+
+  it("creates and persists a TrackClear session ID for headless storefronts", () => {
+    const { adapter, store: cookieStore } = memoryCookies();
+    const { storage, store: storageStore } = memoryStorage();
+
+    const sessionId = ensureTrackClearSessionId({
+      storage,
+      cookies: adapter,
+      generateId: () => "session_123",
+    });
+
+    expect(sessionId).toBe("session_123");
+    expect(storageStore._trackclear_session_id).toBe("session_123");
+    expect(cookieStore._trackclear_session_id).toBe("session_123");
+  });
+
+  it("reuses existing TrackClear session IDs and is safe without browser storage", () => {
+    const { adapter } = memoryCookies({ _trackclear_session_id: "cookie_session" });
+
+    expect(
+      ensureTrackClearSessionId({
+        storage: null,
+        cookies: adapter,
+        generateId: () => "new_session",
+      })
+    ).toBe("cookie_session");
+    expect(
+      ensureTrackClearSessionId({
+        storage: null,
+        cookies: null,
+        generateId: () => "ssr_safe_session",
+      })
+    ).toBe("ssr_safe_session");
   });
 
   it("builds Shopify cart attributes for Hydrogen cart mutations", () => {

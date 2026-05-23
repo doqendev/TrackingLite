@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-23 (Purchase ID convergence hardening)
+Last updated: 2026-05-23 (catalog and headless hardening)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 420/420 passing (37 files) |
+| Tests (`pnpm test -- --run`) | 427/427 passing (37 files) |
 | Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -106,7 +106,7 @@ Each destination has:
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case, bounded Meta cookie validation |
 | `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, clickIdFlags, and redacted checkout/cart tokens instead of raw shopper userData |
 | `purchase-event-id.ts` | Working | Builds deterministic Shopify Purchase event IDs for snippet, generated pixel, ingest, and webhook paths, preferring order name when available for browser/webhook convergence |
-| `content-id.ts` | Working | Normalizes Shopify catalog content IDs across numeric variant/product IDs, GraphQL IDs, SKU, custom templates, and workspace catalog settings |
+| `content-id.ts` | Working | Normalizes Shopify catalog content IDs across numeric variant/product IDs, GraphQL IDs, SKU, custom templates, rich direct-ingest contents, and workspace catalog settings |
 | `custom-ingest-domain.ts` | Working | Normalizes/validates merchant-owned ingest domains and resolves verified pixel-loader and ingest URLs with safe defaults |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
 | `diagnostics-audit-fields.ts` | Working | Computes Diagnostics event-audit field visibility and counts: core fields plus captured optional click/UTM fields relevant to allowed destinations |
@@ -139,7 +139,7 @@ Each destination has:
 | `guide-content.ts` | Working | Setup guide content for all 7 integration platforms + Shopify webhook |
 | `tracking-context.ts` | Working | Shared helper for server-proxy client IP/UA extraction and fbclid -> fbc synthesis |
 | `shopify-webhook-attribution.ts` | Working | Extracts Shopify order/cart/landing-site attribution, normalizes webhook Purchase URLs, and shapes line-item content IDs/contents |
-| `headless-sdk.ts` | Working | Headless/Hydrogen helper for URL attribution capture, Meta `_fbp`/`_fbc` cookies, Shopify cart attributes, and TrackClear ingest calls |
+| `headless-sdk.ts` | Working | Headless/Hydrogen helper for URL attribution capture, Meta `_fbp`/`_fbc` cookies, `_trackclear_session_id` creation, Shopify cart attributes, and TrackClear ingest calls |
 
 ### Workers (10 files in src/workers/)
 
@@ -171,9 +171,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (42 files, 465 tests)
+### Test Coverage (42 files, 472 tests)
 
-#### Unit Tests (37 files, 420 tests)
+#### Unit Tests (37 files, 427 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -190,7 +190,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
 | `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
 | `purchase-event-id.test.ts` | 8 | Deterministic Shopify Purchase event ID priority, order-name browser/webhook convergence, GraphQL/numeric order convergence, and checkout-token fallback behavior |
-| `content-id.test.ts` | 5 | Shopify catalog content ID normalization for numeric IDs, GIDs, SKU, templates, customData, and workspace settings |
+| `content-id.test.ts` | 6 | Shopify catalog content ID normalization for numeric IDs, GIDs, SKU, templates, rich direct-ingest customData, and workspace settings |
 | `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
 | `workspace-create-mode.test.ts` | 1 | New normal Shopify workspaces default to V1/custom-pixel mode |
 | `workspace-route-mode.test.ts` | 5 | Public workspace PATCH cannot switch normal workspaces to legacy/headless; catalog settings and custom ingest domains can be updated with validation |
@@ -206,14 +206,14 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
 | `consent.test.ts` | 29 | STRICT/LAX mode, per-destination marketing/analytics mapping, webhook bypass, edge cases |
-| `ingest-attribution.test.ts` | 6 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, multi-key session enrichment, V1 destination filtering, legacy onlyDestinations preservation, deterministic Purchase IDs, normalized catalog IDs |
+| `ingest-attribution.test.ts` | 8 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, multi-key session enrichment, V1 destination filtering, legacy onlyDestinations preservation, deterministic Purchase IDs, SKU/custom catalog IDs |
 | `session-enrichment.test.ts` | 2 | Redis session context storage/lookup across TrackClear session ID, checkout token, cart token, order identifiers, and email |
 | `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
 | `shopify-webhook-attribution.test.ts` | 12 | Shopify order/landing attribution extraction, absolute landing URL normalization, fbc synthesis, catalog-aware content IDs, Purchase contents |
 | `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
 | `shopify-webhook.test.ts` | 6 | HMAC verification, replay protection, header extraction |
-| `shopify-webhook-route-mode.test.ts` | 2 | Shopify webhook fan-out filters V1 to Meta/TikTok and preserves legacy env-bypass behavior |
-| `headless-sdk.test.ts` | 4 | Headless attribution capture, Meta cookie synthesis, Shopify cart attributes, TrackClear ingest client |
+| `shopify-webhook-route-mode.test.ts` | 4 | Shopify webhook fan-out filters V1 to Meta/TikTok, preserves legacy env-bypass behavior, and applies SKU/product catalog settings |
+| `headless-sdk.test.ts` | 6 | Headless attribution capture, Meta cookie synthesis, TrackClear session ID creation, Shopify cart attributes, TrackClear ingest client |
 
 #### Integration Tests (5 files, 45 tests)
 
@@ -431,6 +431,13 @@ None currently tracked.
 3. **Checkout Token Fallback Documented** - Browser Purchases that only have checkout/cart token identity intentionally keep a checkout/cart-token-based event ID. They cannot deduplicate against a later order-name webhook ID unless Shopify exposes order identity in the browser event; webhook-enabled workspaces still suppress browser `fbq("track", "Purchase")` to avoid Meta browser/server mismatches.
 4. **Regression Tests** - Expanded `purchase-event-id.test.ts` and `pixel-route.test.ts` to cover order-name convergence, GraphQL/numeric order convergence, checkout-token-only fallback behavior, and generated pixel priority.
 
+### Phase 19: Catalog And Headless Hardening (2026-05-23)
+1. **Direct Ingest Catalog Settings** - `normalizeCustomDataContentIds()` now uses rich item/root fields such as `variantId`, `productId`, GraphQL IDs, SKU, and country when applying workspace SKU/custom catalog modes to direct or headless ingest payloads.
+2. **Webhook Catalog Regression Coverage** - Shopify webhook Purchase tests now assert workspace SKU and product-numeric catalog modes flow into EventLog payloads and queued destination jobs.
+3. **Headless Session Helper** - `headless-sdk.ts` now exposes `ensureTrackClearSessionId()`, which reuses or creates `_trackclear_session_id`, persists it to localStorage and/or cookies when available, and remains safe when called without browser storage.
+4. **Headless Docs Updated** - `docs/headless-shopify.md` now uses `ensureTrackClearSessionId()` for TrackClear ingest and Shopify cart attributes instead of assuming each storefront implements its own session ID storage.
+5. **Branch Deployment Check** - Vercel production deployment for `645b449` was confirmed as the `git-main` deployment alias. Railway worker status is attached to and green on the `main` commit. While GitHub default branch remains `master`, keep `master` fast-forwarded to `main` or change the repo default to `main` to avoid operator confusion.
+
 ## Not Yet Implemented
 
 | Feature | Notes |
@@ -438,5 +445,6 @@ None currently tracked.
 | Team access | Invite members to workspace |
 | Batch ingestion | Multiple events per request |
 | Real Shopify cart attribute QA | The generated cart attribution writer is best-effort in Shopify's Custom Pixel sandbox and still needs confirmation on a real Shopify test order before claiming guaranteed order attributes |
+| Custom ingest staging DNS QA | The implementation is in place, but a staging merchant-owned domain should still be verified end-to-end before promoting this as a recommended launch step |
 | Webhook consent policy | Add an explicit workspace-level policy for webhook Purchase consent handling before stricter compliance rollouts |
 | Tracking Health signal percentages | Add percentages for webhook Purchases with fbp/fbc/fbclid-derived fbc/ttclid/gbraid/wbraid/email/phone/content IDs/value+currency |

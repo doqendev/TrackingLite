@@ -403,6 +403,153 @@ describe("ingest attribution handling", () => {
     );
   });
 
+  it("applies workspace SKU catalog mode during direct ingest normalization", async () => {
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_123",
+      userId: "user_123",
+      isActive: true,
+      catalogIdMode: "SKU",
+      catalogIdPrefix: null,
+      catalogIdSuffix: null,
+      catalogIdTemplate: null,
+      consentMode: "LAX",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: true,
+      hasTikTokCredentials: false,
+      hasGA4Credentials: false,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: false,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: false,
+      hasShopifyWebhookSecret: false,
+    });
+
+    const response = await postIngest(
+      makeRequest(
+        {
+          eventName: "AddToCart",
+          eventId: "evt_sku_catalog",
+          timestamp: Date.now(),
+          consent: { analyticsAllowed: true, marketingAllowed: true },
+          customData: {
+            value: 25,
+            currency: "USD",
+            contentIds: ["gid://shopify/ProductVariant/111"],
+            contents: [
+              {
+                id: "gid://shopify/ProductVariant/111",
+                productId: "gid://shopify/Product/222",
+                sku: "SKU-111",
+                quantity: 1,
+              },
+            ],
+          },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEventLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          payload: expect.objectContaining({
+            customData: expect.objectContaining({
+              contentIds: ["SKU-111"],
+              content_ids: ["SKU-111"],
+              contents: [
+                expect.objectContaining({
+                  id: "SKU-111",
+                  content_id: "SKU-111",
+                  sku: "SKU-111",
+                }),
+              ],
+            }),
+          }),
+        }),
+      })
+    );
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "send-meta-event",
+      expect.objectContaining({
+        event: expect.objectContaining({
+          customData: expect.objectContaining({
+            contentIds: ["SKU-111"],
+            content_ids: ["SKU-111"],
+          }),
+        }),
+      })
+    );
+  });
+
+  it("applies workspace custom catalog templates during direct ingest normalization", async () => {
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_123",
+      userId: "user_123",
+      isActive: true,
+      catalogIdMode: "CUSTOM",
+      catalogIdPrefix: "catalog:",
+      catalogIdSuffix: ":online",
+      catalogIdTemplate: "{{product_id}}-{{variant_id}}-{{sku}}",
+      consentMode: "LAX",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: true,
+      hasTikTokCredentials: false,
+      hasGA4Credentials: false,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: false,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: false,
+      hasShopifyWebhookSecret: false,
+    });
+
+    const response = await postIngest(
+      makeRequest(
+        {
+          eventName: "AddToCart",
+          eventId: "evt_custom_catalog",
+          timestamp: Date.now(),
+          consent: { analyticsAllowed: true, marketingAllowed: true },
+          customData: {
+            value: 25,
+            currency: "USD",
+            contentIds: ["gid://shopify/ProductVariant/111"],
+            contents: [{ variantId: 111, productId: 222, sku: "SKU-111", quantity: 1 }],
+          },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEventLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          payload: expect.objectContaining({
+            customData: expect.objectContaining({
+              contentIds: ["catalog:222-111-SKU-111:online"],
+              content_ids: ["catalog:222-111-SKU-111:online"],
+              contents: [
+                expect.objectContaining({
+                  id: "catalog:222-111-SKU-111:online",
+                  content_id: "catalog:222-111-SKU-111:online",
+                }),
+              ],
+            }),
+          }),
+        }),
+      })
+    );
+  });
+
   it("stores session enrichment by TrackClear session and checkout identifiers without email", async () => {
     const response = await postIngest(
       makeRequest(

@@ -65,6 +65,11 @@ export type TrackClearClientConfig = {
   getSessionId?: () => string | null | undefined;
 };
 
+export type StorageLike = {
+  getItem(key: string): string | null | undefined;
+  setItem(key: string, value: string): void;
+};
+
 export type HeadlessCookieAdapter = {
   get(name: string): string | null | undefined | Promise<string | null | undefined>;
   set(
@@ -78,6 +83,8 @@ const FBP_REGEX = /^fb\.1\.\d{13}\.\d{7,20}$/;
 const FBC_REGEX = /^fb\.1\.(\d{13})\..+$/;
 const META_COOKIE_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
 const META_COOKIE_MAX_AGE_MS = META_COOKIE_MAX_AGE_SECONDS * 1000;
+const TRACKCLEAR_SESSION_KEY = "_trackclear_session_id";
+const TRACKCLEAR_SESSION_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
 function clean(value: unknown): string | null {
   if (value === null || value === undefined) return null;
@@ -156,6 +163,92 @@ export function createDocumentCookieAdapter(): HeadlessCookieAdapter | null {
       document.cookie = `${name}=${encodeURIComponent(value)};max-age=${maxAge};path=${path};SameSite=${sameSite}`;
     },
   };
+}
+
+function defaultStorage(): StorageLike | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeSessionId(value: unknown): string | null {
+  const text = clean(value);
+  return text && text.length <= 512 ? text : null;
+}
+
+function readStorageSessionId(storage: StorageLike | null, key: string): string | null {
+  if (!storage) return null;
+  try {
+    return normalizeSessionId(storage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function readCookieSessionId(cookies: HeadlessCookieAdapter | null, key: string): string | null {
+  if (!cookies) return null;
+  try {
+    const value = cookies.get(key);
+    return typeof value === "string" || value === null || value === undefined
+      ? normalizeSessionId(value)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistSessionId(
+  sessionId: string,
+  storage: StorageLike | null,
+  cookies: HeadlessCookieAdapter | null,
+  key: string
+) {
+  try {
+    storage?.setItem(key, sessionId);
+  } catch {
+    // Ignore blocked storage; cookie persistence below is still attempted.
+  }
+
+  try {
+    const result = cookies?.set(key, sessionId, {
+      maxAgeSeconds: TRACKCLEAR_SESSION_MAX_AGE_SECONDS,
+      path: "/",
+      sameSite: "Lax",
+    });
+    if (result && typeof (result as Promise<void>).catch === "function") {
+      void (result as Promise<void>).catch(() => undefined);
+    }
+  } catch {
+    // Ignore blocked cookies; callers still receive the in-memory ID.
+  }
+}
+
+export function ensureTrackClearSessionId({
+  storage = defaultStorage(),
+  cookies = createDocumentCookieAdapter(),
+  key = TRACKCLEAR_SESSION_KEY,
+  generateId = randomId,
+}: {
+  storage?: StorageLike | null;
+  cookies?: HeadlessCookieAdapter | null;
+  key?: string;
+  generateId?: () => string;
+} = {}): string {
+  const existing =
+    readStorageSessionId(storage, key) ??
+    readCookieSessionId(cookies, key);
+
+  if (existing) {
+    persistSessionId(existing, storage, cookies, key);
+    return existing;
+  }
+
+  const sessionId = normalizeSessionId(generateId()) ?? randomId();
+  persistSessionId(sessionId, storage, cookies, key);
+  return sessionId;
 }
 
 export async function ensureMetaAttributionCookies({
