@@ -12,7 +12,7 @@
 - Added/expanded tests for custom domain helpers, verification route behavior, snippet host selection, generated pixel ingest URL selection, and workspace PATCH validation.
 - Validation: focused custom-domain tests passed 20/20; `pnpm test -- --run` passed 417/417 unit tests; `pnpm prisma validate` passed when `DIRECT_DATABASE_URL` was supplied; `pnpm exec tsc --noEmit --pretty false` passed cleanly; `pnpm lint` passed with existing `<img>` warnings; `pnpm build` completed successfully with existing lint/static-generation warnings.
 - Production migration applied after implementation: using `.vercel/.env.production.local`, `pnpm prisma migrate deploy` applied `20260522_add_custom_ingest_domain` to the Railway production Postgres database and `pnpm prisma migrate status` then reported the schema up to date.
-- Dirava operational setup started on 2026-05-23: `t.dirava.com` was added to the TrackClear Vercel project and saved on Dirava workspace `cmlsa6h1w0001zm8nxuzn7a50` as unverified. Vercel requested DNS `A t.dirava.com 76.76.21.21`; live Dirava pixel still uses the default TrackClear ingest URL until verification succeeds.
+- Dirava custom-domain setup was removed on 2026-05-23: the unverified `t.dirava.com` workspace setting was cleared, the temporary Vercel `dirava.com` domain entry was removed, and the live Dirava pixel continues using the default TrackClear ingest URL.
 
 ## 2026-05-22 - Tracking Quality Sprint 3
 

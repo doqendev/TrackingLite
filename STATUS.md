@@ -423,7 +423,7 @@ None currently tracked.
 4. **Settings UI** - Added a Custom Ingest Domain card with DNS target guidance, status, active endpoint, last checked time, save, and verify controls.
 5. **Docs and Tests** - Added `docs/custom-ingest-domain.md`, updated the deployment runbook for the new migration, and added tests for helper behavior, snippet host selection, pixel ingest URL selection, workspace PATCH validation, and verification route behavior.
 6. **Production Migration** - Applied `20260522_add_custom_ingest_domain` to the production Railway Postgres database before deployment.
-7. **Dirava Managed Setup** - `t.dirava.com` has been added to the TrackClear Vercel project and saved on Dirava as unverified; Vercel is waiting for DNS `A t.dirava.com 76.76.21.21`.
+7. **Dirava Managed Setup Removed** - The unverified `t.dirava.com` setting was cleared from Dirava and the temporary Vercel `dirava.com` domain entry was removed. Dirava continues using the default TrackClear ingest URL.
 
 ## Not Yet Implemented
 
