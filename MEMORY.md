@@ -1,5 +1,14 @@
 # MEMORY.md
 
+## 2026-05-23 - Dirava Cart Helper Paid QA
+
+- Added permanent QA evidence for Dirava order `#5077` in `docs/qa/dirava-cart-helper-test.md`.
+- Production health during QA was `status: "ok"`, `database: "connected"`, `redis: "connected"`, `platform: "vercel"`, `commit: "9930a43"`.
+- User-provided debug console output proved the storefront helper loaded, reused `_trackclear_session_id` `7cdc8bfa-d0bc-4140-a8da-a4a0fbc08ea7`, wrote through `/cart/update.js`, verified through `/cart.js`, and reported cart update verified before checkout.
+- Production EventLogs for order `#5077` used event ID `shopify-purchase:cmlsa6h1w0001zm8nxuzn7a50:5077`, value `0.5`, currency `EUR`, and `attributionSource: "cart_attributes"` with `_trackclear_session_id` present.
+- Meta EventLog `cmpifn2no0005ryfa81kml5jx` was `SENT` with API summary `events_received: 1`, `messages: []`. TikTok EventLog `cmpifn2nr0007ryfalei6rgoy` was `SENT` with API summary `code: 0`, `message: OK`.
+- Remaining QA: Meta/TikTok Events Manager UI visibility, buy-now/direct checkout, returning visitor without fresh click params, delayed checkout, and live non-default catalog modes.
+
 ## 2026-05-23 - Shopify Cart Attribution Helper
 
 - Built the approved storefront-context Cart Attribution Helper as the reliability layer for normal Shopify cart/order attribution.

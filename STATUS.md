@@ -16,9 +16,11 @@ Last updated: 2026-05-23 (Shopify cart attribution helper)
 ## Production QA Evidence
 
 - Dirava controlled order `#5076` is documented in `docs/qa/dirava-order-5076.md`.
+- Dirava cart helper paid order `#5077` is documented in `docs/qa/dirava-cart-helper-test.md`.
 - The order proved the canonical Shopify webhook Purchase path for a controlled `0 EUR` order: deterministic Purchase event ID, one Meta and one TikTok EventLog, Meta API acceptance (`events_received: 1`), TikTok API acceptance (`code: 0`, `message: OK`), attribution through Redis session enrichment plus landing-site fallback, and variant-ID `content_ids`/`contents`.
 - The order did not prove paid-order revenue propagation because the final Shopify order total was intentionally `0 EUR` after two discount codes.
 - Cart/order attribute persistence remains unproven for the Shopify Custom Pixel `/cart/update.js` writer: `_trackclear_session_id` was not present in webhook/order attribution, and the order was enriched through Redis session enrichment rather than cart attributes.
+- Order `#5077` proved the storefront Cart Attribution Helper path on a paid `0.5 EUR` order: `/cart/update.js` fired, `/cart.js` verification passed before checkout, webhook Purchase attribution source was `cart_attributes`, `_trackclear_session_id` was present in webhook/order attribution, Meta/TikTok accepted the event, and Shopify/TrackClear/destination payload value matched `0.5 EUR`.
 
 ## What's Implemented
 
@@ -467,14 +469,20 @@ None currently tracked.
 7. **Public Middleware Allowlist** - Added `/api/cart-helper/:workspaceId` to the middleware public-route allowlist so Shopify themes can load the helper without an authenticated dashboard session.
 8. **Docs and Tests** - Added `docs/shopify-cart-attribution-helper.md`, `cart-helper-route.test.ts`, `shopify-cart-attribution-helper.test.ts`, and `middleware-public-routes.test.ts`.
 
+### Phase 22: Dirava Cart Helper Paid QA (2026-05-23)
+1. **Paid Order Proof** - Dirava order `#5077` was a paid `0.5 EUR` order. TrackClear EventLog value and destination payload value matched `0.5 EUR`.
+2. **Cart Attribute Proof** - User-provided debug console evidence showed the storefront helper loaded, reused `_trackclear_session_id`, wrote through `/cart/update.js`, verified through `/cart.js`, and reported cart update verified before checkout.
+3. **Webhook Attribution Source** - The Shopify webhook Purchase EventLog used `attributionSource: "cart_attributes"` with `_trackclear_session_id` present and attribution sources `cart_attributes`, `session_enrichment`, and `landing_site`.
+4. **Destination Acceptance** - Meta returned `events_received: 1` with no messages, and TikTok returned `code: 0`, `message: OK`.
+5. **Permanent QA Artifact** - Added `docs/qa/dirava-cart-helper-test.md`.
+
 ## Not Yet Implemented
 
 | Feature | Notes |
 |---------|-------|
 | Team access | Invite members to workspace |
 | Batch ingestion | Multiple events per request |
-| Paid Shopify revenue QA | A non-zero paid order is still required to prove Shopify total price, TrackClear EventLog value, Meta value, TikTok value, and currency all match |
-| Real Shopify cart attribute QA | The storefront Cart Attribution Helper is implemented but still needs a real Dirava order proving `_trackclear_session_id`, click IDs, UTMs, and `cart_attributes` attribution source survive into the webhook/order payload |
+| Remaining Shopify flow QA | Cart helper and paid revenue are proven for one normal Dirava paid order; buy-now/direct checkout, returning visitor without fresh click params, delayed checkout, and live non-default catalog modes still need QA |
 | Custom ingest staging DNS QA | The implementation is in place, but a staging merchant-owned domain should still be verified end-to-end before promoting this as a recommended launch step |
 | Webhook consent policy | Add an explicit workspace-level policy for webhook Purchase consent handling before stricter compliance rollouts |
 | Tracking Health signal percentages | Add percentages for webhook Purchases with fbp/fbc/fbclid-derived fbc/ttclid/gbraid/wbraid/email/phone/content IDs/value+currency |

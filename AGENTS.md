@@ -311,6 +311,7 @@ docs/
   headless-shopify.md                 # Hydrogen/custom storefront tracking helper usage
   qa/
     dirava-order-5076.md              # Controlled production order QA evidence and remaining proof gaps
+    dirava-cart-helper-test.md        # Paid Dirava cart-helper QA evidence for cart_attributes attribution
 ```
 
 ### shadcn/ui Components (14 installed)
@@ -491,7 +492,7 @@ Header: Content-Type: application/json
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp` validation accepts bounded Meta-style random IDs from 7 to 20 digits.
 - **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. The storefront Cart Attribution Helper (`/api/cart-helper/:workspaceId`) is the reliability layer for normal Shopify themes: it runs outside the Custom Pixel sandbox, writes early/repeatedly through same-origin `/cart/update.js`, verifies through `/cart.js`, retries once, stores local diagnostics, and never writes raw shopper PII. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
-- **Controlled production QA artifacts:** Store real-order QA evidence under `docs/qa/` without raw PII or full webhook payloads. Dirava order `#5076` proved webhook Purchase flow and session enrichment for a controlled `0 EUR` order, but did not prove paid revenue propagation or durable cart/order attribute persistence.
+- **Controlled production QA artifacts:** Store real-order QA evidence under `docs/qa/` without raw PII or full webhook payloads. Dirava order `#5076` proved webhook Purchase flow and session enrichment for a controlled `0 EUR` order. Dirava order `#5077` proved the storefront Cart Attribution Helper and paid revenue propagation for one normal paid `0.5 EUR` order with `cart_attributes` attribution.
 - **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`). Order name is preferred over numeric order ID when both are present so browser checkout events and Shopify webhooks converge on the same order-based ID; numeric and GraphQL order IDs still normalize to the same fallback segment.
 - **Catalog content ID normalization:** Generated pixel, legacy script, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. Workspace settings control variant numeric, product numeric, GraphQL, SKU, prefix/suffix, and custom template modes from Settings.
 - **Headless storefront helper:** `headless-sdk.ts` gives Hydrogen/custom storefronts a reusable client for URL click-ID capture, Meta `_fbp`/`_fbc` cookie maintenance, `_trackclear_session_id` creation/persistence, Shopify cart attribution attributes, and TrackClear ingest calls.
@@ -521,7 +522,7 @@ Header: Content-Type: application/json
 
 ## Known Issues
 
-See `STATUS.md` for the full list. Current tracking-quality gaps are operational proof gaps: paid non-zero revenue propagation, real Shopify cart/order attribute persistence using the new storefront helper, catalog mode live QA, headless live QA, and custom ingest staging DNS QA.
+See `STATUS.md` for the full list. Current tracking-quality gaps are operational proof gaps: buy-now/direct checkout QA, returning visitor QA, delayed checkout QA, catalog mode live QA, headless live QA, custom ingest staging DNS QA, and Meta/TikTok Events Manager UI visibility.
 
 Note: `pnpm build` previously hung on Windows but this is no longer an issue — the Vercel build command is `prisma generate && next build` (no standalone output). A `build:railway` script exists for Railway/Docker deployments that sets `STANDALONE=true` before building.
 
