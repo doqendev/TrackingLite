@@ -24,7 +24,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 **Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 21 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 439/439 passing (39 test files)
+- Unit tests: 440/440 passing (40 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: `pnpm exec tsc --noEmit` passes cleanly
 - Lint: passes with pre-existing `<img>` optimization warnings
@@ -286,6 +286,7 @@ tests/
     ingest-attribution.test.ts        # 8 tests (attribution propagation, session enrichment, V1 filtering, deterministic IDs, SKU/custom catalog normalization)
     meta-capi.test.ts                 # 21 tests
     meta-event-processor.test.ts      # 5 tests (happy path, errors, retry)
+    middleware-public-routes.test.ts  # 1 test (cart helper remains public through middleware)
     phone-normalizer.test.ts          # 16 tests
     pixel-route.test.ts               # 5 tests (webhook-aware Purchase fbq suppression, catalog settings, and custom ingest URLs in generated pixel scripts)
     purchase-event-id.test.ts         # 8 tests (deterministic Shopify Purchase event IDs, order-name convergence, checkout-token fallback)
@@ -359,7 +360,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (439 tests, 39 files)
+# Run unit tests (440 tests, 40 files)
 pnpm test
 
 # Run a single test file

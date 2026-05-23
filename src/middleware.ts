@@ -70,6 +70,7 @@ export default async function middleware(req: NextRequest) {
     pathname === "/api/stripe/webhook" ||
     pathname === "/api/health" ||
     pathname.startsWith("/api/webhooks/") ||
+    pathname.startsWith("/api/cart-helper/") ||
     pathname.startsWith("/api/pixel/") ||
     pathname.startsWith("/api/s/") ||
     // Marketing pages

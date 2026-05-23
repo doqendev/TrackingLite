@@ -7,7 +7,7 @@ Last updated: 2026-05-23 (Shopify cart attribution helper)
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 439/439 passing (39 files) |
+| Tests (`pnpm test -- --run`) | 440/440 passing (40 files) |
 | Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -181,9 +181,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (44 files, 484 tests)
+### Test Coverage (45 files, 485 tests)
 
-#### Unit Tests (39 files, 439 tests)
+#### Unit Tests (40 files, 440 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -217,6 +217,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `tiktok.test.ts` | 3 | TikTok external_id hashing, rich contents, and fallback content_ids |
 | `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
+| `middleware-public-routes.test.ts` | 1 | Middleware keeps the public cart helper route unauthenticated |
 | `consent.test.ts` | 29 | STRICT/LAX mode, per-destination marketing/analytics mapping, webhook bypass, edge cases |
 | `ingest-attribution.test.ts` | 8 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, multi-key session enrichment, V1 destination filtering, legacy onlyDestinations preservation, deterministic Purchase IDs, SKU/custom catalog IDs |
 | `session-enrichment.test.ts` | 2 | Redis session context storage/lookup across TrackClear session ID, checkout token, cart token, order identifiers, and email |
@@ -463,7 +464,8 @@ None currently tracked.
 4. **Local Diagnostics** - The helper stores `_tc_cart_attr_last_ok`, `_tc_cart_attr_last_checked_at`, and `_tc_cart_attr_missing` in localStorage. Debug mode is enabled with `?trackclear_debug=1` or `localStorage.setItem("trackclear_debug", "1")`.
 5. **Settings Install Card** - Settings now has a dedicated Cart Attribution Helper card with the workspace-specific `<script async src=".../api/cart-helper/:workspaceId"></script>` snippet and install instructions for `theme.liquid` before `</head>` or a Custom Liquid/theme app block equivalent.
 6. **Privacy Guardrail** - The helper only writes attribution/session/click/consent fields. It does not write raw email, phone, name, address, customer ID, or full customer data to cart attributes.
-7. **Docs and Tests** - Added `docs/shopify-cart-attribution-helper.md`, `cart-helper-route.test.ts`, and `shopify-cart-attribution-helper.test.ts`.
+7. **Public Middleware Allowlist** - Added `/api/cart-helper/:workspaceId` to the middleware public-route allowlist so Shopify themes can load the helper without an authenticated dashboard session.
+8. **Docs and Tests** - Added `docs/shopify-cart-attribution-helper.md`, `cart-helper-route.test.ts`, `shopify-cart-attribution-helper.test.ts`, and `middleware-public-routes.test.ts`.
 
 ## Not Yet Implemented
 
