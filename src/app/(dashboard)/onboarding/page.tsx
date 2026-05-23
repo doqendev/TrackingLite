@@ -44,6 +44,7 @@ export default function OnboardingPage() {
   // Step 1 state
   const [snippet, setSnippet] = useState("");
   const [copied, setCopied] = useState(false);
+  const [helperCopied, setHelperCopied] = useState(false);
 
   async function handleResolveDomain(domain: string) {
     if (!domain.trim()) {
@@ -129,6 +130,21 @@ export default function OnboardingPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  async function handleCopyCartHelper() {
+    if (!createdWorkspace) return;
+    await navigator.clipboard.writeText(cartHelperSnippet).catch(() => {});
+    setHelperCopied(true);
+    setTimeout(() => setHelperCopied(false), 2000);
+  }
+
+  const trackClearAppUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.trackclear.io").replace(
+    /\/$/,
+    ""
+  );
+  const cartHelperSnippet = createdWorkspace
+    ? `<script async src="${trackClearAppUrl}/api/cart-helper/${createdWorkspace.id}"></script>`
+    : "";
 
   // Render as a full-screen overlay that covers the dashboard sidebar layout.
   // This avoids needing a separate route group while still giving onboarding
@@ -284,6 +300,7 @@ export default function OnboardingPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
+                <p className="mb-2 text-sm font-medium text-foreground">{t("customPixelSnippet")}</p>
                 <div className="relative">
                   <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
                     <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
@@ -305,6 +322,38 @@ export default function OnboardingPage() {
                           <>
                             <Copy className="h-4 w-4 mr-2" />
                             {t("copySnippet")}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-foreground">{t("cartHelperSnippet")}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t("cartHelperDescription")}</p>
+                <div className="relative">
+                  <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
+                    <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
+                      {cartHelperSnippet}
+                    </pre>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent pt-12 pb-3 px-4 rounded-b-lg">
+                      <Button
+                        type="button"
+                        variant="brand"
+                        className="w-full"
+                        onClick={handleCopyCartHelper}
+                      >
+                        {helperCopied ? (
+                          <>
+                            <Check className="h-4 w-4 mr-2" />
+                            {t("copiedCartHelper")}
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            {t("copyCartHelper")}
                           </>
                         )}
                       </Button>

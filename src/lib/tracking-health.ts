@@ -48,6 +48,69 @@ function attributionSourcesFromPayload(payload: unknown): string[] {
   return [typeof source === "string" && source ? source : "none"];
 }
 
+function attributionBreakdownDetail(counts: Record<string, number>, total: number): string {
+  return `Source breakdown last ${total}: cart attributes ${counts.cart_attributes ?? 0}, session enrichment ${counts.session_enrichment ?? 0}, landing-site ${counts.landing_site ?? 0}, none ${counts.none ?? 0}.`;
+}
+
+export function buildCartAttributionCheck(input: {
+  attributionCounts: Record<string, number>;
+  recentWebhookPurchaseCount: number;
+  latestAttributedPurchaseAt?: Date | null;
+  latestPurchaseAt?: Date | null;
+}): TrackingHealthCheck {
+  const {
+    attributionCounts,
+    recentWebhookPurchaseCount,
+    latestAttributedPurchaseAt,
+    latestPurchaseAt,
+  } = input;
+  const cartAttributeCount = attributionCounts.cart_attributes ?? 0;
+  const nonCartAttributionCount =
+    (attributionCounts.session_enrichment ?? 0) + (attributionCounts.landing_site ?? 0);
+  const breakdown =
+    recentWebhookPurchaseCount > 0
+      ? ` ${attributionBreakdownDetail(attributionCounts, recentWebhookPurchaseCount)}`
+      : "";
+
+  if (!latestPurchaseAt) {
+    return {
+      key: "attribution",
+      label: "Cart helper attribution",
+      severity: "warning",
+      detail: "No webhook Purchase is available to inspect cart-helper attribution.",
+      timestamp: null,
+    };
+  }
+
+  if (cartAttributeCount > 0) {
+    return {
+      key: "attribution",
+      label: "Cart helper attribution",
+      severity: "ok",
+      detail: `Excellent: recent webhook Purchases use cart_attributes from the Cart Attribution Helper.${breakdown}`,
+      timestamp: latestAttributedPurchaseAt ?? latestPurchaseAt,
+    };
+  }
+
+  if (nonCartAttributionCount > 0) {
+    return {
+      key: "attribution",
+      label: "Cart helper attribution",
+      severity: "warning",
+      detail: `Warning: recent webhook Purchases only use session_enrichment or landing_site. Install and verify the Cart Attribution Helper.${breakdown}`,
+      timestamp: latestAttributedPurchaseAt ?? latestPurchaseAt,
+    };
+  }
+
+  return {
+    key: "attribution",
+    label: "Cart helper attribution",
+    severity: "error",
+    detail: `Recent webhook Purchases have no attribution context. Verify Custom Pixel, Shopify webhook, and Cart Attribution Helper installation.${breakdown}`,
+    timestamp: latestPurchaseAt,
+  };
+}
+
 export async function getTrackingHealth(
   workspaceId: string
 ): Promise<TrackingHealthSummary> {
@@ -213,10 +276,12 @@ export async function getTrackingHealth(
     }
     return counts;
   }, {});
-  const attributionBreakdown =
-    recentWebhookPurchases.length > 0
-      ? ` Source breakdown last ${recentWebhookPurchases.length}: cart attributes ${attributionCounts.cart_attributes ?? 0}, session enrichment ${attributionCounts.session_enrichment ?? 0}, landing-site ${attributionCounts.landing_site ?? 0}, none ${attributionCounts.none ?? 0}.`
-      : "";
+  const attributionCheck = buildCartAttributionCheck({
+    attributionCounts,
+    recentWebhookPurchaseCount: recentWebhookPurchases.length,
+    latestAttributedPurchaseAt: latestAttributedPurchase?.createdAt ?? null,
+    latestPurchaseAt: latestPurchase?.createdAt ?? null,
+  });
 
   const checks: TrackingHealthCheck[] = [
     {
@@ -278,17 +343,7 @@ export async function getTrackingHealth(
         ? "No duplicate Meta/TikTok Purchase order IDs found in the last 7 days."
         : `${duplicateOrders.filter((group) => group._count._all > 1).length} duplicate order/destination group(s) found in the last 7 days.`,
     },
-    {
-      key: "attribution",
-      label: "Attribution present",
-      severity: latestAttributedPurchase ? "ok" : latestPurchase ? "warning" : "warning",
-      detail: latestAttributedPurchase
-        ? `Recent webhook Purchase includes attribution context from ${formatAge(latestAttributedPurchase.createdAt)}.${attributionBreakdown}`
-        : latestPurchase
-          ? `A webhook Purchase was logged, but recent purchases lack fbp/fbc, ttclid, or UTM context.${attributionBreakdown}`
-          : "No webhook Purchase is available to inspect attribution context.",
-      timestamp: latestAttributedPurchase?.createdAt ?? latestPurchase?.createdAt ?? null,
-    },
+    attributionCheck,
     {
       key: "errors",
       label: "Last error",

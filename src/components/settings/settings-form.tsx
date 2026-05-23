@@ -673,10 +673,17 @@ export function SettingsForm({ workspace, userPreferences }: SettingsFormProps) 
       {/* Cart Attribution Helper */}
       <Card>
         <CardHeader>
-          <CardTitle>Cart Attribution Helper</CardTitle>
-          <CardDescription>
-            Recommended for reliable purchase attribution. Install this in your Shopify theme to preserve click IDs and session IDs into Shopify cart/order attributes.
-          </CardDescription>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Cart Attribution Helper</CardTitle>
+              <CardDescription>
+                Required for reliable Shopify purchase attribution. Install this helper in your Shopify theme so click IDs and TrackClear session IDs survive into Shopify order webhooks.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
+              Required
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">

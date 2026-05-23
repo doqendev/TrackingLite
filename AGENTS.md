@@ -22,15 +22,15 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 21 phases of expansion implemented:
+**Production-ready with multi-destination support, i18n, currency conversion, and security hardening.** All core features + 23 phases of expansion implemented:
 - Build: compiles clean
-- Unit tests: 440/440 passing (40 test files)
+- Unit tests: 443/443 passing (41 test files)
 - Integration tests: 45 tests across 5 files (health, signup, ingest, workspaces, stripe-webhook)
 - TypeScript: `pnpm exec tsc --noEmit` passes cleanly
 - Lint: passes with pre-existing `<img>` optimization warnings
 - Production migrations applied: `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, `20260522_add_custom_ingest_domain`
 - 7 destination codepaths retained for legacy/custom workspaces: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
-- Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, storefront cart attribution helper, Shopify webhook, Meta CAPI, TikTok Events API, tracking health
+- Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, required storefront cart attribution helper, Shopify webhook, Meta CAPI, TikTok Events API, actionable tracking health
 - Dashboard: mode-aware destination visibility, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
@@ -66,7 +66,7 @@ See `STATUS.md` for the full audit and remaining work.
 3. Enters Meta Pixel ID + Conversions API access token (encrypted at rest with AES-256-GCM)
 4. Gets a unique **JS snippet** with embedded API key
 5. Pastes snippet into Shopify Admin > Settings > Customer Events > Add Custom Pixel
-6. Adds the Cart Attribution Helper script to the Shopify theme (`theme.liquid` before `</head>` or Custom Liquid/theme app block equivalent) for durable cart attributes
+6. Adds the required Cart Attribution Helper script to the Shopify theme (`theme.liquid` before `</head>` or Custom Liquid/theme app block equivalent) for durable cart attributes
 7. Snippet captures browser events via Shopify's `analytics.subscribe()` API
 8. Snippet sends event data + `event_id` to `/api/events/ingest` with `X-TL-API-Key` header, using a verified workspace custom ingest domain when configured
 9. Vercel serverless function validates, checks billing/rate limits/consent, creates EventLog, queues BullMQ job
@@ -136,14 +136,14 @@ src/
     (dashboard)/
       layout.tsx                      # Auth-gated shell with sidebar nav + mobile nav
       dashboard/page.tsx              # Mode-aware analytics: revenue (currency conversion), conversion accuracy, event funnel, delivery, campaign performance, recent events
-      tracking-health/page.tsx        # Operational tracking health for recent snippet activity, webhook, Meta/TikTok, Purchase, dedup, attribution, errors
+      tracking-health/page.tsx        # Operational tracking health for recent snippet activity, webhook, Meta/TikTok, Purchase, dedup, cart-helper attribution, errors
       events/page.tsx                 # Mode-aware event log table with filters + pagination (50/page) + Source/Campaign columns + event replay
       diagnostics/page.tsx            # Internal mode-aware diagnostics: destination health, matrix, data quality, event audit fields, AddToCart/checkout test events
       integrations/page.tsx           # Mode-aware destination setup; V1 shows Shopify webhook, Meta, TikTok; legacy shows all destination cards
       settings/page.tsx               # Event toggles, consent, catalog ID matching, custom ingest domain, snippet, alerts, language/currency selectors, danger zone
       billing/page.tsx                # Current plan, trial status, plan cards, FAQ
       onboarding/
-        page.tsx                      # 3-step wizard: create workspace, install snippet, connect platforms
+        page.tsx                      # 3-step wizard: create workspace, install Custom Pixel + Cart Helper snippets, connect platforms
         layout.tsx                    # Pass-through (page renders as fixed overlay)
     api/
       auth/[...nextauth]/route.ts     # NextAuth handler
@@ -185,7 +185,7 @@ src/
       replay-button.tsx               # Retry failed events button (bulk + per-event)
       campaign-performance.tsx        # Top campaigns by revenue with per-platform tabs (30d)
     settings/
-      settings-form.tsx               # Workspace settings: event toggles, consent, catalog IDs, custom ingest domain, snippet, language/currency selectors, danger zone
+      settings-form.tsx               # Workspace settings: event toggles, consent, catalog IDs, custom ingest domain, required Cart Helper install card, snippet, language/currency selectors, danger zone
       alert-preferences.tsx           # Email alert notification toggles
     billing/
       plan-cards.tsx                  # Starter/Growth plan comparison + subscribe buttons
@@ -209,7 +209,7 @@ src/
     custom-ingest-domain.ts           # Custom ingest domain normalization, validation, verification URL, and endpoint resolvers
     workspace-mode.ts                 # Product mode/install type fallback + destination allowlist helpers
     diagnostics-audit-fields.ts       # Mode-aware diagnostics field visibility/counts for core vs optional click/UTM data
-    tracking-health.ts                # Operational health checks for Shopify V1 readiness
+    tracking-health.ts                # Operational health checks for Shopify V1 readiness, including actionable cart-helper attribution status
     session-enrichment.ts             # Redis browser context store keyed by TrackClear session ID, checkout/cart/order identifiers, and email
     analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
@@ -299,6 +299,7 @@ tests/
     snippet-route.test.ts             # 3 tests (snippet host uses verified custom domain only after verification)
     tiktok.test.ts                    # 3 tests (external_id hashing and rich contents)
     tracking-context.test.ts          # 6 tests (fbc synthesis and proxy headers)
+    tracking-health.test.ts           # 3 tests (cart_attributes excellent, session/landing warning, no-attribution error)
     workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
     workspace-route-mode.test.ts      # 5 tests (public PATCH cannot mutate product mode/install type, catalog/custom domain validation)
@@ -361,7 +362,7 @@ pnpm build
 # Build for Railway standalone (Docker)
 pnpm build:railway
 
-# Run unit tests (440 tests, 40 files)
+# Run unit tests (443 tests, 41 files)
 pnpm test
 
 # Run a single test file
@@ -498,7 +499,8 @@ Header: Content-Type: application/json
 - **Headless storefront helper:** `headless-sdk.ts` gives Hydrogen/custom storefronts a reusable client for URL click-ID capture, Meta `_fbp`/`_fbc` cookie maintenance, `_trackclear_session_id` creation/persistence, Shopify cart attribution attributes, and TrackClear ingest calls.
 - **TikTok attribution quality:** TikTok Events API payloads include hashed `external_id` from `customerId` when available and prefer rich `contents` with quantity/item price over flat `content_ids`.
 - **EventLog payload privacy:** EventLog rows store sanitized `customData`, `userDataFlags`, and `clickIdFlags` instead of raw shopper `userData`. Raw shopper data is still passed transiently to queue jobs for destination delivery. Replay is privacy-preserving: sanitized rows replay attribution columns and customData, but raw PII is not reconstructed after it has been removed.
-- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, attribution context, attribution source breakdown, and recent errors. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
+- **Normal Shopify V1 install standard:** A normal Shopify workspace is not considered live until the Custom Pixel, Shopify webhook, Cart Attribution Helper, Meta credentials, TikTok credentials, test AddToCart, and test webhook Purchase are all verified. The Cart Helper is required for reliable purchase attribution, not optional dashboard polish.
+- **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, actionable cart-helper attribution status, attribution source breakdown, and recent errors. It reports `cart_attributes` as excellent, session/landing-only attribution as warning, and missing attribution context as error. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
 - **Diagnostics visibility:** `/diagnostics` resolves workspace mode with the same backend helper as ingest/webhooks. V1 workspaces show only allowed destinations, and event audit field counts include core fields plus optional click/UTM fields only when those values are actually captured and relevant to an allowed destination.
 - **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_trackclear_session_id`, `_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_gbraid`, `_wbraid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`, `_landing_page`, consent markers) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, `contents`, and sanitized attribution-source metadata.
 - **Webhook Purchase browser guard:** If a workspace has a Shopify webhook secret configured, TrackClear generated pixel scripts do not fire browser `fbq("track", "Purchase")`; they still send the TrackClear Purchase to ingest so session context can enrich the webhook Purchase.

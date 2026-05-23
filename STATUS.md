@@ -1,13 +1,13 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-23 (Shopify cart attribution helper)
+Last updated: 2026-05-23 (normal Shopify install hardening)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 440/440 passing (40 files) |
+| Tests (`pnpm test -- --run`) | 443/443 passing (41 files) |
 | Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
@@ -21,6 +21,7 @@ Last updated: 2026-05-23 (Shopify cart attribution helper)
 - The order did not prove paid-order revenue propagation because the final Shopify order total was intentionally `0 EUR` after two discount codes.
 - Cart/order attribute persistence remains unproven for the Shopify Custom Pixel `/cart/update.js` writer: `_trackclear_session_id` was not present in webhook/order attribution, and the order was enriched through Redis session enrichment rather than cart attributes.
 - Order `#5077` proved the storefront Cart Attribution Helper path on a paid `0.5 EUR` order: `/cart/update.js` fired, `/cart.js` verification passed before checkout, webhook Purchase attribution source was `cart_attributes`, `_trackclear_session_id` was present in webhook/order attribution, Meta/TikTok accepted the event, and Shopify/TrackClear/destination payload value matched `0.5 EUR`.
+- Normal Shopify V1 now treats the Cart Attribution Helper as part of the required install stack for reliable purchase attribution. The proven path is still one normal-cart paid checkout; buy-now/direct checkout, returning visitor, delayed checkout, live non-default catalog modes, and platform UI visibility remain open QA.
 
 ## What's Implemented
 
@@ -36,13 +37,13 @@ Last updated: 2026-05-23 (Shopify cart attribution helper)
 | `/privacy` | Public | Working | Privacy policy (accurate: IP/UA stored, PII hashing, data retention, GDPR rights) |
 | `/terms` | Public | Working | Terms of service (billing, acceptable use, liability, termination) |
 | `/dashboard` | Protected | Working | Mode-aware analytics with revenue cards (currency conversion), event funnel, delivery stats, order usage, health badge, conversion accuracy, campaign performance, recent events. Full i18n (6 languages) |
-| `/tracking-health` | Protected | Working | Operational status for recent snippet activity, Shopify webhook, Meta/TikTok connection, Purchase, dedup, attribution source breakdown, recent errors |
+| `/tracking-health` | Protected | Working | Operational status for recent snippet activity, Shopify webhook, Meta/TikTok connection, Purchase, dedup, actionable cart-helper attribution source status, recent errors |
 | `/events` | Protected | Working | Mode-aware paginated event log with type/status filters, Source/Campaign columns, retry failed events |
 | `/diagnostics` | Protected | Working | Internal mode-aware diagnostics for destination health, event/destination matrix, data quality, event audit fields, and safe non-Purchase test events |
-| `/settings` | Protected | Working | Event toggles, consent mode, catalog ID matching, custom ingest domain, snippet, alert preferences, language selector, currency selector, danger zone |
+| `/settings` | Protected | Working | Event toggles, consent mode, catalog ID matching, custom ingest domain, snippet, required Cart Attribution Helper install card, alert preferences, language selector, currency selector, danger zone |
 | `/integrations` | Protected | Working | Mode-aware setup: V1 shows Shopify webhook + Meta/TikTok, legacy/custom workspaces show all destination cards |
 | `/billing` | Protected | Working | Current plan, order usage, 4-tier plan cards, FAQ accordion |
-| `/onboarding` | Protected | Working | 3-step wizard: create workspace, install snippet, connect platforms |
+| `/onboarding` | Protected | Working | 3-step wizard: create workspace, install Custom Pixel + Cart Attribution Helper snippets, connect platforms |
 
 ### API Routes (core endpoints)
 
@@ -121,7 +122,7 @@ Each destination has:
 | `custom-ingest-domain.ts` | Working | Normalizes/validates merchant-owned ingest domains and resolves verified pixel-loader and ingest URLs with safe defaults |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
 | `diagnostics-audit-fields.ts` | Working | Computes Diagnostics event-audit field visibility and counts: core fields plus captured optional click/UTM fields relevant to allowed destinations |
-| `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness, including webhook attribution source breakdown; snippet activity is activity-based, not a heartbeat |
+| `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness, including actionable cart-helper attribution source status; snippet activity is activity-based, not a heartbeat |
 | `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
@@ -183,9 +184,9 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (45 files, 485 tests)
+### Test Coverage (46 files, 488 tests)
 
-#### Unit Tests (40 files, 440 tests)
+#### Unit Tests (41 files, 443 tests)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -217,6 +218,7 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
 | `google-ads.test.ts` | 34 | Google Ads normalizer (email normalization, param building, all 4 events), pixel endpoint (URL construction, error handling) |
 | `tiktok.test.ts` | 3 | TikTok external_id hashing, rich contents, and fallback content_ids |
+| `tracking-health.test.ts` | 3 | Cart-helper attribution health status: cart_attributes excellent, session/landing-only warning, no-attribution error |
 | `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
 | `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
 | `middleware-public-routes.test.ts` | 1 | Middleware keeps the public cart helper route unauthenticated |
@@ -476,13 +478,21 @@ None currently tracked.
 4. **Destination Acceptance** - Meta returned `events_received: 1` with no messages, and TikTok returned `code: 0`, `message: OK`.
 5. **Permanent QA Artifact** - Added `docs/qa/dirava-cart-helper-test.md`.
 
+### Phase 23: Normal Shopify Install Hardening (2026-05-23)
+1. **Cart Helper Required Copy** - Settings now labels the Cart Attribution Helper as required for reliable Shopify purchase attribution, not an optional enhancement.
+2. **Onboarding Install Stack** - Onboarding now gives merchants both snippets: Shopify Customer Events / Custom Pixel and the Cart Attribution Helper for theme/storefront context.
+3. **Install Checklist Updated** - Onboarding and docs now define the normal Shopify V1 install standard as Custom Pixel, Shopify webhook, Cart Attribution Helper, Meta credentials, TikTok credentials, test AddToCart, and test webhook Purchase.
+4. **Actionable Tracking Health** - `/tracking-health` now classifies recent webhook Purchase attribution as excellent when `cart_attributes` are present, warning when Purchases only use session enrichment or landing-site fallback, and error when no attribution context is present.
+5. **Regression Tests** - Added `tracking-health.test.ts` coverage for the cart-helper attribution health states.
+6. **Validation** - `pnpm test -- --run` passed 443/443, `pnpm exec tsc --noEmit --pretty false` passed, `pnpm lint` passed with the existing `<img>` warnings, and `pnpm build` completed successfully with the existing image/dynamic-render warnings.
+
 ## Not Yet Implemented
 
 | Feature | Notes |
 |---------|-------|
 | Team access | Invite members to workspace |
 | Batch ingestion | Multiple events per request |
-| Remaining Shopify flow QA | Cart helper and paid revenue are proven for one normal Dirava paid order; buy-now/direct checkout, returning visitor without fresh click params, delayed checkout, and live non-default catalog modes still need QA |
+| Remaining Shopify flow QA | Cart helper and paid revenue are proven for one normal Dirava paid order; buy-now/direct checkout, returning visitor without fresh click params, delayed checkout, live non-default catalog modes, and Meta/TikTok Events Manager UI visibility still need QA |
 | Custom ingest staging DNS QA | The implementation is in place, but a staging merchant-owned domain should still be verified end-to-end before promoting this as a recommended launch step |
 | Webhook consent policy | Add an explicit workspace-level policy for webhook Purchase consent handling before stricter compliance rollouts |
 | Tracking Health signal percentages | Add percentages for webhook Purchases with fbp/fbc/fbclid-derived fbc/ttclid/gbraid/wbraid/email/phone/content IDs/value+currency |

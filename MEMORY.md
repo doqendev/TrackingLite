@@ -1,5 +1,15 @@
 # MEMORY.md
 
+## 2026-05-23 - Normal Shopify Install Hardening
+
+- Updated Settings to label the Cart Attribution Helper as required for reliable Shopify purchase attribution.
+- Updated Onboarding to provide both the Shopify Customer Events / Custom Pixel snippet and the Cart Attribution Helper snippet during setup.
+- Updated normal Shopify V1 install guidance: Custom Pixel, Shopify webhook, Cart Attribution Helper, Meta credentials, TikTok credentials, test AddToCart, and test webhook Purchase are all required before a workspace is treated as live.
+- Tracking Health now classifies webhook Purchase attribution sources: `cart_attributes` is excellent, session/landing-only attribution is warning, and no attribution context is error.
+- Added `tests/unit/tracking-health.test.ts` with 3 tests for the cart-helper attribution health states.
+- Validation passed: `pnpm test -- --run` 443/443, `pnpm exec tsc --noEmit --pretty false`, `pnpm lint` with existing `<img>` warnings, and `pnpm build` with existing image/dynamic-render warnings.
+- Remaining QA remains unchanged: buy-now/direct checkout, returning visitor without fresh click params, delayed checkout, live non-default catalog modes, and Meta/TikTok Events Manager UI visibility.
+
 ## 2026-05-23 - Dirava Cart Helper Paid QA
 
 - Added permanent QA evidence for Dirava order `#5077` in `docs/qa/dirava-cart-helper-test.md`.
