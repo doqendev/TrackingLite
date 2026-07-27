@@ -26,8 +26,10 @@ const defaultJobOptions = {
     type: "exponential" as const,
     delay: QUEUE_CONFIG.BACKOFF_DELAY_MS,
   },
-  removeOnComplete: 1000,
-  removeOnFail: 5000,
+  // Job data contains short-lived matching identifiers and raw userData. Bound
+  // retention by age as well as count so low-volume queues cannot keep it forever.
+  removeOnComplete: { age: 24 * 60 * 60, count: 1000 },
+  removeOnFail: { age: 72 * 60 * 60, count: 5000 },
 };
 
 // Meta queue (existing)
@@ -140,14 +142,14 @@ export interface MetaEventJob {
     clientIp: string;
     userAgent: string;
   };
-  eventLogId: string | null;  // null for fire-and-forget events (PageView, ViewContent)
+  eventLogId: string | null;  // nullable only for backward-compatible jobs queued before full delivery logging
 }
 
 export interface DestinationEventJob {
   workspaceId: string;
   destination: string;
   requestId?: string;
-  eventLogId: string | null;  // null for fire-and-forget events (PageView, ViewContent)
+  eventLogId: string | null;  // nullable only for backward-compatible jobs queued before full delivery logging
   event: {
     eventName: string;
     eventId: string;
@@ -160,6 +162,7 @@ export interface DestinationEventJob {
     gbraid?: string | null;
     wbraid?: string | null;
     ttclid?: string | null;
+    ttp?: string | null;
     gclid?: string | null;
     rdtCid?: string | null;
     epik?: string | null;

@@ -8,11 +8,21 @@ import {
   getKlaviyoQueue,
   getRedditQueue,
   getPinterestQueue,
+  getGoogleAdsQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
 import { checkReplayCooldown } from "@/lib/replay-rate-limit";
 import { createLogger } from "@/lib/logger";
 import { getAllowedDestinationsForWorkspace } from "@/lib/workspace-mode";
+import {
+  enqueueReplayJob,
+  type ReplayJobData,
+} from "@/lib/event-replay-queue";
+import {
+  clearedEventRetryEnvelope,
+  decryptEventRetryEnvelope,
+  type EventRetryEnvelope,
+} from "@/lib/event-retry-envelope";
 import type { Queue } from "bullmq";
 
 const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = {
@@ -22,6 +32,7 @@ const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = 
   KLAVIYO: { queue: getKlaviyoQueue, jobName: "send-klaviyo-event" },
   REDDIT: { queue: getRedditQueue, jobName: "send-reddit-event" },
   PINTEREST: { queue: getPinterestQueue, jobName: "send-pinterest-event" },
+  GOOGLE_ADS: { queue: getGoogleAdsQueue, jobName: "send-google-ads-event" },
 };
 
 function workspaceHasCredentials(
@@ -32,15 +43,17 @@ function workspaceHasCredentials(
     case "META":
       return !!(workspace.enableMeta && workspace.metaAccessTokenEncrypted);
     case "TIKTOK":
-      return !!workspace.tiktokAccessTokenEncrypted;
+      return !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
     case "GA4":
-      return !!workspace.ga4ApiSecretEncrypted;
+      return !!(workspace.enableGA4 && workspace.ga4ApiSecretEncrypted);
     case "KLAVIYO":
-      return !!workspace.klaviyoApiKeyEncrypted;
+      return !!(workspace.enableKlaviyo && workspace.klaviyoApiKeyEncrypted);
     case "REDDIT":
       return !!(workspace.enableReddit && workspace.redditAccessTokenEncrypted);
     case "PINTEREST":
       return !!(workspace.enablePinterest && workspace.pinterestConversionTokenEncrypted);
+    case "GOOGLE_ADS":
+      return !!(workspace.enableGoogleAds && workspace.googleAdsConversionId);
     default:
       return false;
   }
@@ -64,20 +77,25 @@ export async function POST(
 
   // 2. Verify workspace belongs to user (only need credential-check fields, not actual encrypted values)
   const workspace = await db.workspace.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId: session.user.id, isActive: true },
     select: {
       id: true,
       productMode: true,
       installType: true,
       enableMeta: true,
       metaAccessTokenEncrypted: true,
+      enableTikTok: true,
       tiktokAccessTokenEncrypted: true,
+      enableGA4: true,
       ga4ApiSecretEncrypted: true,
+      enableKlaviyo: true,
       klaviyoApiKeyEncrypted: true,
       enableReddit: true,
       redditAccessTokenEncrypted: true,
       enablePinterest: true,
       pinterestConversionTokenEncrypted: true,
+      enableGoogleAds: true,
+      googleAdsConversionId: true,
     },
   });
 
@@ -132,10 +150,22 @@ export async function POST(
       userAgent: true,
       fbp: true,
       fbc: true,
+      ttclid: true,
+      gclid: true,
+      rdtCid: true,
+      epik: true,
       pageUrl: true,
       value: true,
       currency: true,
       createdAt: true,
+      retryCount: true,
+      lastAttemptAt: true,
+      nextRetryAt: true,
+      errorMessage: true,
+      retryPayloadEncrypted: true,
+      retryPayloadIv: true,
+      retryPayloadTag: true,
+      retryPayloadExpiresAt: true,
     },
   });
 
@@ -143,18 +173,47 @@ export async function POST(
     return NextResponse.json({ replayed: 0, message: "No failed events found" });
   }
 
-  // 6. Re-queue each event to the correct destination queue and reset status to PENDING.
-  //    EventLog payloads are intentionally sanitized for privacy. Replay preserves
-  //    event metadata, attribution columns, and sanitized customData, but it does not
-  //    reconstruct raw email/phone/name/address after those values have been removed.
-  //    Older failed rows that still contain payload.userData can replay that data.
+  // 6. Atomically claim and re-queue each event to the correct destination queue.
+  //    A short-lived encrypted envelope preserves the original identity/event data.
+  //    After it expires, legacy rows fall back to durable attribution columns and
+  //    sanitized customData without reconstructing removed email/phone/address data.
   //    Workers look up credentials from DB themselves; we only pass workspaceId + event data.
   let replayed = 0;
 
   for (const event of failedEvents) {
+    let claimed = false;
     try {
+      const destConfig = DEST_QUEUE_MAP[event.destination];
+      if (!destConfig) continue;
+
+      // Destination allowlisting is handled in the query; also require the
+      // integration to remain explicitly enabled and configured at replay time.
+      if (!workspaceHasCredentials(workspace as unknown as Record<string, unknown>, event.destination)) {
+        continue;
+      }
+
+      // Compare-and-set prevents the automatic retry worker and two manual
+      // requests from queueing the same failed EventLog concurrently.
+      const claim = await db.eventLog.updateMany({
+        where: {
+          id: event.id,
+          workspaceId: workspace.id,
+          status: "FAILED",
+          retryCount: event.retryCount,
+        },
+        data: {
+          status: "RETRYING",
+          errorMessage: null,
+          retryCount: { increment: 1 },
+          lastAttemptAt: new Date(),
+          nextRetryAt: null,
+        },
+      });
+      if (claim.count !== 1) continue;
+      claimed = true;
+
       const payload = (event.payload as Record<string, unknown>) || {};
-      const eventData = {
+      const legacyEventData: EventRetryEnvelope["event"] = {
         eventName: event.eventName,
         eventId: event.eventId,
         timestamp: event.createdAt.getTime(),
@@ -162,43 +221,97 @@ export async function POST(
         referrer: "",
         fbp: event.fbp,
         fbc: event.fbc,
+        ttclid: event.ttclid,
+        gclid: event.gclid,
+        rdtCid: event.rdtCid,
+        epik: event.epik,
         userData: (payload.userData as Record<string, unknown>) || {},
         customData: (payload.customData as Record<string, unknown>) || {},
         clientIp: event.customerIp || "unknown",
         userAgent: event.userAgent || "",
       };
+      const retryEnvelope = decryptEventRetryEnvelope(event);
+      const eventData =
+        retryEnvelope?.event.eventId === event.eventId &&
+        retryEnvelope.event.eventName === event.eventName
+          ? retryEnvelope.event
+          : legacyEventData;
 
-      const destConfig = DEST_QUEUE_MAP[event.destination];
-      if (!destConfig) continue;
-
-      // Check workspace has credentials for this destination
-      if (!workspaceHasCredentials(workspace as unknown as Record<string, unknown>, event.destination)) {
-        continue;
-      }
-
+      let jobData: ReplayJobData;
       if (event.destination === "META") {
-        await destConfig.queue().add(destConfig.jobName, {
+        jobData = {
           workspaceId: workspace.id,
           event: eventData,
           eventLogId: event.id,
-        } satisfies MetaEventJob);
+        } satisfies MetaEventJob;
       } else {
-        await destConfig.queue().add(destConfig.jobName, {
+        jobData = {
           workspaceId: workspace.id,
           destination: event.destination,
           eventLogId: event.id,
-          event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null },
-        } satisfies DestinationEventJob);
+          event: {
+            ...eventData,
+            ttclid: event.ttclid ?? eventData.ttclid ?? null,
+            gclid: event.gclid ?? eventData.gclid ?? null,
+            rdtCid: event.rdtCid ?? eventData.rdtCid ?? null,
+            epik: event.epik ?? eventData.epik ?? null,
+          },
+        } satisfies DestinationEventJob;
       }
 
-      await db.eventLog.update({
-        where: { id: event.id },
-        data: { status: "PENDING", errorMessage: null, retryCount: 0 },
-      });
+      const enqueueResult = await enqueueReplayJob(
+        destConfig.queue(),
+        destConfig.jobName,
+        event.id,
+        jobData
+      );
+
+      if (enqueueResult === "completed") {
+        // Retained completed jobs must not be duplicated. Repair the stale DB
+        // state that allowed this replay request instead.
+        await db.eventLog.updateMany({
+          where: {
+            id: event.id,
+            workspaceId: workspace.id,
+            status: "RETRYING",
+            retryCount: event.retryCount + 1,
+          },
+          data: {
+            status: "SENT",
+            errorMessage: null,
+            nextRetryAt: null,
+            ...clearedEventRetryEnvelope(),
+          },
+        });
+      }
+
+      if (enqueueResult === "active") {
+        // The existing worker already captured its data. Keep the row leased as
+        // RETRYING; the scheduled stale-RETRYING reconciliation will repair it
+        // if that worker does not produce a terminal state.
+        continue;
+      }
 
       replayed++;
     } catch (err) {
       log.error("Failed to requeue event", { eventId: event.id, error: err instanceof Error ? err.message : String(err) });
+      if (claimed) {
+        await db.eventLog.updateMany({
+          where: {
+            id: event.id,
+            workspaceId: workspace.id,
+            status: "RETRYING",
+            retryCount: event.retryCount + 1,
+          },
+          data: {
+            status: "FAILED",
+            retryCount: event.retryCount,
+            errorMessage: event.errorMessage,
+            lastAttemptAt: event.lastAttemptAt,
+            nextRetryAt: event.nextRetryAt,
+          },
+        }).catch(() => {});
+      }
     }
   }
 

@@ -14,12 +14,15 @@ schema:
 - builds Shopify cart attributes for webhook Purchase attribution recovery
 - sends PageView, ViewContent, AddToCart, InitiateCheckout, and Purchase events
   to `/api/events/ingest`
+- persists explicit consent revocations before transport and replays a
+  privacy-minimized, no-destination request after transient ingest failures
 
 ## Browser setup
 
 ```ts
 import {
   buildTrackClearCartAttributes,
+  captureTikTokAttributionCookie,
   captureUrlAttribution,
   createTrackClearClient,
   ensureMetaAttributionCookies,
@@ -27,20 +30,30 @@ import {
   toShopifyCartAttributes,
 } from "@/lib/headless-sdk";
 
-const trackclearSessionId = ensureTrackClearSessionId();
+const consent = {
+  analyticsAllowed: true,
+  marketingAllowed: true,
+};
+const consentMode = "STRICT" as const;
+const trackclearSessionId = await ensureTrackClearSessionId();
 const landingAttribution = captureUrlAttribution(window.location.href);
-const attribution = await ensureMetaAttributionCookies({
+const metaAttribution = await ensureMetaAttributionCookies({
   attribution: landingAttribution,
+  consent,
+  consentMode,
+});
+const attribution = await captureTikTokAttributionCookie({
+  attribution: metaAttribution,
+  consent,
+  consentMode,
 });
 
 const trackclear = createTrackClearClient({
   apiKey: "tl_...",
-  ingestUrl: "https://api.trackclear.io/api/events/ingest",
+  ingestUrl: "https://www.trackclear.io/api/events/ingest",
   defaultAttribution: attribution,
-  defaultConsent: {
-    analyticsAllowed: true,
-    marketingAllowed: true,
-  },
+  defaultConsent: consent,
+  consentMode,
   getSessionId: () => trackclearSessionId,
 });
 ```
@@ -56,10 +69,8 @@ const attributes = buildTrackClearCartAttributes({
   attribution,
   trackclearSessionId,
   landingPage: window.location.href,
-  consent: {
-    analyticsAllowed: true,
-    marketingAllowed: true,
-  },
+  consent,
+  consentMode,
 });
 
 const shopifyAttributes = toShopifyCartAttributes(attributes);
@@ -67,6 +78,36 @@ const shopifyAttributes = toShopifyCartAttributes(attributes);
 
 Use `shopifyAttributes` with your Storefront API `cartAttributesUpdate` or cart
 create/update mutation.
+
+Use the same `consentMode` in cookie capture, cart attributes, and the TrackClear
+client. `STRICT` requires an explicit category grant; `LAX` permits a category
+until it is explicitly denied. On a consent change, recapture attribution,
+rewrite the cart attributes, and pass the current consent in each subsequent
+event input. A denied event is then sent without ad identifiers or shopper
+identity instead of reusing older defaults.
+
+The client accepts both the canonical `analyticsAllowed` / `marketingAllowed`
+keys and the shorter `analytics` / `marketing` aliases. An event-level decision
+always overrides the corresponding default regardless of which spelling each
+source used. Outbound ingest payloads contain only the canonical keys.
+
+In a browser, `createTrackClearClient` generates and reuses a fallback
+`_trackclear_session_id` when neither the event nor `getSessionId` supplies one.
+This gives consent deletion an opaque anchor without making session setup a
+hard integration prerequisite. The client uses local storage key
+`_trackclear_pending_consent_v1` for at most 20 pending revocations. The stored
+request contains only the TrackClear session/order/cart aliases and consent
+decision, never shopper PII or advertising identifiers. It expires after 30
+days, retries with bounded backoff during initialization and later events, and
+is removed only after a 2xx ingest response for that exact queue generation.
+An older in-flight replay therefore cannot settle a newer denial that reused
+the same event ID and timestamp. Headless applications may also
+call `await trackclear.flushPendingConsentRevocations()` after connectivity is
+restored. The server requires a session, checkout, or cart anchor, ignores
+predictable order aliases as direct fast-path deletion keys, and applies a
+separate revocation budget so normal tracking saturation cannot block deletion.
+Server-side callers without browser storage still receive the failed ingest
+promise and must retry it.
 
 ## Event example
 

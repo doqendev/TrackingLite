@@ -74,6 +74,7 @@ const STATUS_COLORS: Record<string, string> = {
   FAILED: "bg-red-900/50 text-red-400 border-red-800",
   PENDING: "bg-yellow-900/50 text-yellow-400 border-yellow-800",
   RETRYING: "bg-orange-900/50 text-orange-400 border-orange-800",
+  SUPERSEDED: "bg-slate-900/50 text-slate-400 border-slate-800",
   ACTIVE: "bg-green-900/50 text-green-400 border-green-800",
   CANCELED: "bg-red-900/50 text-red-400 border-red-800",
   PAST_DUE: "bg-orange-900/50 text-orange-400 border-orange-800",

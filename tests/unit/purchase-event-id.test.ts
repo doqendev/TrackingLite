@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildPurchaseEventId, buildPurchaseEventIdFromCustomData } from "@/lib/purchase-event-id";
+import {
+  buildPurchaseBillingAliases,
+  buildPurchaseBillingIdentityKey,
+  buildPurchaseEventId,
+  buildPurchaseEventIdFromCustomData,
+} from "@/lib/purchase-event-id";
 
 describe("purchase-event-id", () => {
   it("prefers Shopify order name over order ID when both are present", () => {
@@ -86,6 +91,43 @@ describe("purchase-event-id", () => {
     expect(browserEventId).toBe("shopify-purchase:ws_123:checkout-token");
     expect(webhookEventId).toBe("shopify-purchase:ws_123:1001");
     expect(browserEventId).not.toBe(webhookEventId);
+  });
+
+  it("uses the shared checkout token for browser/webhook billing identity", () => {
+    const browserIdentity = buildPurchaseBillingIdentityKey({
+      workspaceId: "ws_123",
+      checkoutToken: "checkout-token",
+    });
+    const webhookIdentity = buildPurchaseBillingIdentityKey({
+      workspaceId: "ws_123",
+      checkoutToken: "checkout-token",
+      shopifyOrderId: "987654321",
+      orderName: "#1001",
+    });
+
+    expect(browserIdentity).toBe("shopify-billing:ws_123:checkout-token");
+    expect(webhookIdentity).toBe(browserIdentity);
+  });
+
+  it("returns all aliases so either side may have extra Shopify identifiers", () => {
+    const browserAliases = buildPurchaseBillingAliases({
+      workspaceId: "ws_123",
+      shopifyOrderId: "gid://shopify/Order/987654321",
+    });
+    const webhookAliases = buildPurchaseBillingAliases({
+      workspaceId: "ws_123",
+      checkoutToken: "checkout-token",
+      shopifyOrderId: "987654321",
+      orderName: "#1001",
+    });
+
+    expect(browserAliases).toEqual(["order:987654321"]);
+    expect(webhookAliases).toEqual([
+      "checkout:checkout-token",
+      "order:987654321",
+      "name:1001",
+    ]);
+    expect(webhookAliases).toEqual(expect.arrayContaining(browserAliases));
   });
 
   it("generates a random fallback if no identifier or fallback is provided", () => {

@@ -3,6 +3,10 @@ import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import { BILLING_PLANS, BillingPlanKey } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
+import {
+  cleanupTerminalShopifyWebhookInboxes,
+  expireStaleShopifyWebhookInboxes,
+} from "@/lib/shopify-webhook-inbox";
 import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 
 const QUEUE_NAME = "event-log-cleanup";
@@ -44,8 +48,45 @@ function getQueue(): Queue {
   return _queue;
 }
 
-async function runEventLogCleanup(): Promise<void> {
+export async function runEventLogCleanup(): Promise<void> {
   log.info("Starting event log retention cleanup");
+
+  // Step 0: Encrypted retry envelopes intentionally outlive the 48h display-PII
+  // window for recovery, but must be erased as soon as their 72h TTL expires.
+  const retryEnvelopeCutoff = new Date();
+  const expiredRetryEnvelopes = await db.eventLog.updateMany({
+    where: {
+      retryPayloadExpiresAt: { lte: retryEnvelopeCutoff },
+      retryPayloadEncrypted: { not: null },
+    },
+    data: {
+      retryPayloadEncrypted: null,
+      retryPayloadIv: null,
+      retryPayloadTag: null,
+      retryPayloadExpiresAt: null,
+    },
+  });
+  if (expiredRetryEnvelopes.count > 0) {
+    log.info("Cleared expired encrypted retry envelopes", {
+      count: expiredRetryEnvelopes.count,
+    });
+  }
+
+  const expiredWebhookInboxes = await expireStaleShopifyWebhookInboxes();
+  if (expiredWebhookInboxes > 0) {
+    log.error("Expired unprocessed Shopify webhook inbox payloads", {
+      count: expiredWebhookInboxes,
+      recoveryDays: 30,
+    });
+  }
+
+  const deletedWebhookInboxes = await cleanupTerminalShopifyWebhookInboxes();
+  if (deletedWebhookInboxes > 0) {
+    log.info("Deleted processed Shopify webhook inbox receipts", {
+      count: deletedWebhookInboxes,
+      retentionDays: 30,
+    });
+  }
 
   // Step 1: Anonymize PII (IP + user agent) on events older than 48 hours
   const piiCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -102,8 +143,33 @@ async function runEventLogCleanup(): Promise<void> {
   // Step 3: Delete old events per retention period
   for (const [days, workspaceIds] of Array.from(retentionGroups)) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const durableIdentityOwners = {
+      eventName: "Purchase" as const,
+      deliveryClaimToken: { not: null },
+      deliveryClaimOwner: {
+        in: ["WORKER", "WORKER_ATTEMPTING", "WORKER_ACCEPTED"],
+      },
+    };
+    const protectedCount = await db.eventLog.count({
+      where: {
+        workspaceId: { in: workspaceIds },
+        createdAt: { lt: cutoff },
+        ...durableIdentityOwners,
+      },
+    });
+    if (protectedCount > 0) {
+      log.warn("Retaining ambiguous Purchase delivery identity owners", {
+        count: protectedCount,
+        workspaceCount: workspaceIds.length,
+        retentionDays: days,
+      });
+    }
     const result = await db.eventLog.deleteMany({
-      where: { workspaceId: { in: workspaceIds }, createdAt: { lt: cutoff } },
+      where: {
+        workspaceId: { in: workspaceIds },
+        createdAt: { lt: cutoff },
+        NOT: durableIdentityOwners,
+      },
     });
     if (result.count > 0) {
       log.info("Deleted events for retention period", {
@@ -149,6 +215,7 @@ export const cleanupWorker = new Worker(
   },
   {
     connection: getConnection() as never,
+    autorun: false,
     concurrency: 1,
     lockDuration: WORKER_LOCK_DURATION_MS,
     stalledInterval: WORKER_STALLED_INTERVAL_MS,

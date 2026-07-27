@@ -7,6 +7,7 @@ import {
   extractLandingSiteAttribution,
   extractOrderAttributes,
   normalizeLandingPageUrl,
+  resolveNewestConsentValue,
 } from "@/lib/shopify-webhook-attribution";
 
 describe("shopify-webhook-attribution", () => {
@@ -30,6 +31,7 @@ describe("shopify-webhook-attribution", () => {
           { name: "_fbclid", value: "CLICK123" },
           { name: "_gclid", value: "GCLID123" },
           { name: "_ttclid", value: "TTCLID123" },
+          { name: "_ttp", value: "TTP123" },
           { name: "_rdt_cid", value: "RDT123" },
           { name: "_epik", value: "EPIK123" },
           { name: "_utm_source", value: "meta" },
@@ -37,6 +39,8 @@ describe("shopify-webhook-attribution", () => {
           { name: "_trackclear_session_id", value: "tc-session-123" },
           { name: "_landing_page", value: "https://mizoke.com/products/sign?utm_source=meta" },
           { name: "_tc_consent_marketing", value: "true" },
+          { name: "_tc_attribution_timestamp", value: "1699999999000" },
+          { name: "_tc_attribution_source", value: "meta" },
         ],
       },
       1700000000000
@@ -44,15 +48,97 @@ describe("shopify-webhook-attribution", () => {
 
     expect(attribution.trackclearSessionId).toBe("tc-session-123");
     expect(attribution.fbp).toBe("fb.1.1700000000000.1234567890");
-    expect(attribution.fbc).toBe("fb.1.1700000000000.CLICK123");
+    expect(attribution.fbc).toBe("fb.1.1699999999000.CLICK123");
     expect(attribution.gclid).toBe("GCLID123");
     expect(attribution.ttclid).toBe("TTCLID123");
+    expect(attribution.ttp).toBe("TTP123");
     expect(attribution.rdtCid).toBe("RDT123");
     expect(attribution.epik).toBe("EPIK123");
     expect(attribution.utmSource).toBe("meta");
     expect(attribution.utmMedium).toBe("paid_social");
     expect(attribution.landingPage).toBe("https://mizoke.com/products/sign?utm_source=meta");
     expect(attribution.consentMarketing).toBe("true");
+    expect(attribution.attributionTimestamp).toBe(1699999999000);
+    expect(attribution.attributionSource).toBe("meta");
+  });
+
+  it("drops stale or future attribution touch metadata without dropping order identifiers", () => {
+    const now = 1700000000000;
+    const stale = buildOrderAttribution({
+      note_attributes: [
+        { name: "_ttclid", value: "TTCLID123" },
+        { name: "_tc_attribution_timestamp", value: String(now - 31 * 24 * 60 * 60 * 1000) },
+        { name: "_tc_attribution_source", value: "tiktok" },
+      ],
+    }, now);
+    const future = buildOrderAttribution({
+      note_attributes: [
+        { name: "_tc_attribution_timestamp", value: String(now + 6 * 60 * 1000) },
+        { name: "_tc_attribution_source", value: "meta" },
+      ],
+    }, now);
+
+    expect(stale.ttclid).toBe("TTCLID123");
+    expect(stale.attributionTimestamp).toBeNull();
+    expect(stale.attributionSource).toBeNull();
+    expect(future.attributionTimestamp).toBeNull();
+    expect(future.attributionSource).toBeNull();
+  });
+
+  it("resolves the newest bounded consent snapshot instead of trusting source order", () => {
+    const now = 1700000000000;
+
+    expect(resolveNewestConsentValue({
+      cartValue: "true",
+      cartTimestamp: now - 2_000,
+      sessionValue: false,
+      sessionTimestamp: now - 1_000,
+      now,
+    })).toBe(false);
+    expect(resolveNewestConsentValue({
+      cartValue: "false",
+      cartTimestamp: now - 1_000,
+      sessionValue: true,
+      sessionTimestamp: now - 2_000,
+      now,
+    })).toBe(false);
+    expect(resolveNewestConsentValue({
+      cartValue: "false",
+      cartTimestamp: now - 25 * 60 * 60 * 1000,
+      sessionValue: true,
+      sessionTimestamp: now - 1_000,
+      now,
+    })).toBe(true);
+    expect(resolveNewestConsentValue({
+      cartValue: "false",
+      cartTimestamp: now - 29 * 24 * 60 * 60 * 1000,
+      now,
+    })).toBe(false);
+    expect(resolveNewestConsentValue({
+      cartValue: "true",
+      cartTimestamp: now + 6 * 60 * 1000,
+      sessionValue: false,
+      sessionTimestamp: now - 25 * 60 * 60 * 1000,
+      now,
+    })).toBe(false);
+  });
+
+  it("keeps a 29-day-old cart denial available to LAX webhook filtering", () => {
+    const now = 1_700_000_000_000;
+    const denialAt = now - 29 * 24 * 60 * 60 * 1000;
+    const attribution = buildOrderAttribution({
+      note_attributes: [
+        { name: "_tc_consent_marketing", value: "false" },
+        { name: "_tc_consent_timestamp", value: String(denialAt) },
+      ],
+    }, now);
+
+    expect(attribution.consentTimestamp).toBe(denialAt);
+    expect(resolveNewestConsentValue({
+      cartValue: attribution.consentMarketing,
+      cartTimestamp: attribution.consentTimestamp,
+      now,
+    })).toBe(false);
   });
 
   it("uses an explicit _fbc attribute when one exists", () => {

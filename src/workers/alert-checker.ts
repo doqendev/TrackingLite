@@ -162,6 +162,7 @@ export const alertWorker = new Worker(
   },
   {
     connection: getAlertConnection() as never,
+    autorun: false,
     concurrency: 1,
     lockDuration: WORKER_LOCK_DURATION_MS,
     stalledInterval: WORKER_STALLED_INTERVAL_MS,

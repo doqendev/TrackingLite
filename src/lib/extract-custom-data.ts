@@ -24,13 +24,40 @@ export function extractCustomData(
   const rawNumItems = pick("numItems", "num_items");
   const rawOrderId = pick("orderId", "order_id");
 
-  const numValue = rawValue !== undefined && rawValue !== null ? Number(rawValue) : null;
-  const numItems = rawNumItems !== undefined && rawNumItems !== null ? Number(rawNumItems) : null;
+  const finiteNumber = (value: unknown): number | null => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (
+      !trimmed ||
+      !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)
+    ) {
+      return null;
+    }
+    const numeric = Number(trimmed);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+
+  const scalarString = (value: unknown): string | null => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed || null;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    return null;
+  };
+
+  const numValue = finiteNumber(rawValue);
+  const numItems = finiteNumber(rawNumItems);
+  const currency =
+    typeof rawCurrency === "string" && /^[A-Za-z]{3}$/.test(rawCurrency.trim())
+      ? rawCurrency.trim().toUpperCase()
+      : null;
 
   return {
-    value: numValue !== null && !isNaN(numValue) ? numValue : null,
-    currency: rawCurrency ? String(rawCurrency) : null,
-    numItems: numItems !== null && !isNaN(numItems) ? numItems : null,
-    orderId: rawOrderId ? String(rawOrderId) : null,
+    value: numValue,
+    currency,
+    numItems: numItems !== null && Number.isInteger(numItems) ? numItems : null,
+    orderId: scalarString(rawOrderId),
   };
 }

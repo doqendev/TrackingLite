@@ -15,6 +15,7 @@ const globalForPrisma = globalThis as unknown as {
 // Skip in test environments — vitest uses uncaughtException internally, and process.exit kills workers
 const isTestEnv = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const isVercel = !!process.env.VERCEL;
+const workerOwnsShutdown = process.env.TRACKCLEAR_WORKER_OWNS_SHUTDOWN === "true";
 if (!globalForPrisma.__diagRegistered && !isTestEnv && !isVercel) {
   globalForPrisma.__diagRegistered = true;
 
@@ -49,7 +50,7 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv && !isVercel) {
   });
 
   // SIGTERM: Railway sends this before SIGKILL. Single handler here (instrumentation.ts defers to us).
-  process.on("SIGTERM", () => {
+  if (!workerOwnsShutdown) process.on("SIGTERM", () => {
     syncLog(`[SIGNAL] SIGTERM at ${new Date().toISOString()} uptime=${Math.round(process.uptime())}s — shutting down`);
     if (globalForPrisma.prisma) {
       globalForPrisma.prisma.$disconnect().catch(() => {}).finally(() => process.exit(0));
@@ -58,7 +59,7 @@ if (!globalForPrisma.__diagRegistered && !isTestEnv && !isVercel) {
     }
   });
 
-  process.on("SIGINT", () => {
+  if (!workerOwnsShutdown) process.on("SIGINT", () => {
     syncLog(`[SIGNAL] SIGINT at ${new Date().toISOString()} uptime=${Math.round(process.uptime())}s`);
     process.exit(0);
   });

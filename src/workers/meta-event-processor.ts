@@ -1,13 +1,19 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, UnrecoverableError } from "bullmq";
 import IORedis from "ioredis";
 import { decrypt } from "@/lib/encryption";
 import { normalizeToMetaCapiEvent } from "@/lib/event-normalizer";
 import { sendToMetaCapi, MetaCapiError } from "@/lib/meta-capi";
-import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
-import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import {
+  isCircuitClosed,
+  recordSuccess,
+  recordFailure,
+  shouldRecordCircuitFailure,
+  shouldRetryDeliveryFailure,
+  CircuitOpenError,
+} from "@/lib/circuit-breaker";
 import {
   DESTINATION_WORKER_CONCURRENCY,
   WORKER_LOCK_DURATION_MS,
@@ -16,9 +22,21 @@ import {
 } from "./worker-options";
 import type { MetaEventJob } from "@/lib/queue";
 import type { SnippetEventPayload } from "@/types/events";
+import {
+  claimEventDelivery,
+  completeEventDeliveryClaim,
+  failEventDeliveryClaim,
+  isEventDeliverySuperseded,
+  markEventDeliveryAccepted,
+  type EventDeliveryClaim,
+} from "@/lib/event-delivery-guard";
 
 async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
-  const { workspaceId, event, eventLogId } = job.data;
+  const { workspaceId, event: queuedEvent, eventLogId } = job.data;
+  let event = queuedEvent;
+  let deliveryClaim: EventDeliveryClaim | null = null;
+  let outboundStarted = false;
+  let outboundAccepted = false;
 
   const log = createLogger({
     component: "meta-worker",
@@ -29,6 +47,10 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
   });
 
   try {
+    if (await isEventDeliverySuperseded(eventLogId)) {
+      log.info("Skipping superseded delivery", { eventLogId });
+      return;
+    }
     const startTime = Date.now();
 
     // 1. Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
@@ -64,6 +86,21 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       testEventCode = (workspace.metaTestEventCode as string) || undefined;
     }
 
+    // Avoid taking a DB delivery lease while this workspace is circuit-blocked.
+    const circuitOk = await isCircuitClosed("META", workspaceId);
+    if (!circuitOk) {
+      throw new CircuitOpenError("META", workspaceId);
+    }
+
+    // The durable claim is the final ownership election before outbound I/O.
+    const ownership = await claimEventDelivery(eventLogId);
+    if (ownership.action === "skip") {
+      log.info("Skipping delivery owned by a canonical or terminal EventLog", { eventLogId });
+      return;
+    }
+    deliveryClaim = ownership.claim;
+    event = (ownership.event ?? queuedEvent) as typeof queuedEvent;
+
     // 2. Build SnippetEventPayload for normalizer
     const payload: SnippetEventPayload = {
       eventName: event.eventName,
@@ -88,30 +125,19 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
     );
 
     // 4. Send to Meta Conversions API
-    // Circuit breaker check
-    const circuitOk = await isCircuitClosed("META");
-    if (!circuitOk) {
-      throw new CircuitOpenError("META");
-    }
-
+    outboundStarted = true;
     const response = await sendToMetaCapi(
       pixelId,
       decryptedToken,
       [metaCapiEvent],
       testEventCode || undefined
     );
-    await recordSuccess("META").catch(() => {});
+    outboundAccepted = true;
+    await markEventDeliveryAccepted(deliveryClaim, response);
+    await recordSuccess("META", workspaceId).catch(() => {});
 
-    // 5. Update EventLog to SENT (skip for fire-and-forget events)
-    if (eventLogId) {
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: {
-          status: "SENT",
-          metaResponse: response as any,
-        },
-      });
-    }
+    // 5. Commit only if this worker still owns the durable claim.
+    await completeEventDeliveryClaim(deliveryClaim, response);
 
     log.info("Job completed", {
       eventId: event.eventId,
@@ -133,8 +159,17 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       log.warn("Event missing fbp/fbc - poor Meta match quality", { eventId: event.eventId });
     }
   } catch (error) {
-    if (!(error instanceof CircuitOpenError)) {
-      await recordFailure("META").catch(() => {});
+    const circuitFailure = shouldRecordCircuitFailure(error);
+    const transientFailure = shouldRetryDeliveryFailure(error);
+    const terminalDestinationRejection =
+      outboundStarted &&
+      error instanceof MetaCapiError &&
+      !transientFailure;
+    const definitiveFailure =
+      !outboundStarted ||
+      terminalDestinationRejection;
+    if (circuitFailure) {
+      await recordFailure("META", workspaceId).catch(() => {});
     }
     // Update EventLog to FAILED
     const errorMessage =
@@ -144,20 +179,31 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
         ? error.message
         : "Unknown error";
 
-    if (eventLogId) {
-      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
-      await db.eventLog
-        .update({
-          where: { id: eventLogId },
-          data: {
-            status: willRetry ? "RETRYING" : "FAILED",
-            errorMessage,
-            retryCount: { increment: 1 },
-          },
+    if (eventLogId && !outboundAccepted) {
+      const willRetry =
+        !terminalDestinationRejection &&
+        ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
+      const failedAt = new Date();
+      await failEventDeliveryClaim({
+          eventLogId,
+          claim: deliveryClaim,
+          outcome: definitiveFailure
+            ? "DEFINITELY_NOT_DELIVERED"
+            : "DELIVERY_AMBIGUOUS",
+          status: willRetry ? "RETRYING" : "FAILED",
+          errorMessage,
+          failedAt,
+          nextRetryAt: !willRetry && transientFailure
+            ? new Date(failedAt.getTime() + 15 * 60 * 1000)
+            : null,
         })
         .catch((dbErr) => {
           log.error("Failed to update EventLog", { eventLogId, error: dbErr });
         });
+    }
+
+    if (terminalDestinationRejection) {
+      throw new UnrecoverableError(errorMessage);
     }
 
     // Re-throw so BullMQ can retry with exponential backoff
@@ -178,6 +224,7 @@ export const worker = new Worker<MetaEventJob>(
   processMetaEvent,
   {
     connection: connection as never,
+    autorun: false,
     concurrency: DESTINATION_WORKER_CONCURRENCY,
     lockDuration: WORKER_LOCK_DURATION_MS,
     stalledInterval: WORKER_STALLED_INTERVAL_MS,

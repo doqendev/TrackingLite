@@ -65,6 +65,7 @@ export function buildEventLogPayload(input: {
   gbraid?: string | null;
   wbraid?: string | null;
   ttclid?: string | null;
+  ttp?: string | null;
   rdtCid?: string | null;
   epik?: string | null;
   gclid?: string | null;
@@ -92,6 +93,7 @@ export function buildEventLogPayload(input: {
       hasGbraid: hasValue(input.gbraid),
       hasWbraid: hasValue(input.wbraid),
       hasTtclid: hasValue(input.ttclid),
+      hasTtp: hasValue(input.ttp),
       hasRdtCid: hasValue(input.rdtCid),
       hasEpik: hasValue(input.epik),
       hasGclid: hasValue(input.gclid),

@@ -1,17 +1,59 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-05-23 (checkout-path QA preparation)
+Last updated: 2026-07-27 (own-store tracking hardening, branch only)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
-| Build (`pnpm build`) | Compiles clean |
-| Tests (`pnpm test -- --run`) | 443/443 passing (41 files) |
-| Migrations | `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, and `20260522_add_custom_ingest_domain` applied in production |
+| Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
+| Unit tests | 666/666 passing (57 files) on local Node 22; release CI repeats on Node 20 and 24 |
+| Integration tests | 62/62 passing (7 files) with isolated PostgreSQL 17.5/Redis locally; release CI repeats on PostgreSQL 16/Redis 7 with Node 20 and 24 |
+| Migrations | Eleven-file branch chain; populated upgrade, all-16 greenfield rebuild, guarded-secret recovery, zero schema drift, and interrupted-index recovery rehearsed locally; not applied to production |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production branch | GitHub default branch is `main`; Vercel production and Railway worker deploy from `main` |
+| Production branch | GitHub default branch is `main`; Vercel Git deployment is disabled in tracked config and Railway autodeploy must be disabled/verified in provider settings before cutover |
+
+## 2026-07-27 Own-Store Tracking Hardening
+
+**Release state:** implemented on `codex/own-store-tracking-hardening`; not deployed. No production database, store configuration, Dirava repository, or Mizoke repository was modified.
+
+- **Durable Shopify intake:** signed webhook bodies are encrypted and inserted into `ShopifyWebhookInbox` before Shopify receives a success acknowledgement. The live request then returns immediately; the one-minute inbox worker owns processing, compare-and-set replay, and bounded backoff. Successful processing erases the payload.
+- **Verified webhook gate:** saving a secret is configuration only. Browser Meta Purchase suppression and the server fallback grace period activate only after Track Clear verifies a signed `orders/paid` delivery. Domain or secret changes reset that proof.
+- **Atomic delivery outbox:** ingest persists every eligible destination EventLog in one transaction before queueing. Every job uses the deterministic ID `event-<EventLog.id>`, including manual and automatic replay.
+- **Purchase race protection:** normalized order-name/order-ID/checkout/cart aliases reconcile webhook-first and browser-first paths per destination. Canonical takeover uses `SUPERSEDED`, a 90-second verified-store fallback grace period (longer than one inbox scan), and a final database delivery claim immediately before external I/O. A canonical Meta row cannot suppress a required TikTok fallback.
+- **Lossless Custom Pixel startup:** the generated `bridge-v1` loader synchronously subscribes to all seven Shopify events before requesting the remote tracker, holds at most 100 early events in one ordered FIFO, and activates only after every handler is registered. The versioned loader URL bypasses stale generated-script cache during repaste rollout.
+- **Identity parity:** generated pixel and legacy scripts include `checkout.orderName` in both the browser event ID and ingest custom data, preventing pre-verification browser/server ID divergence.
+- **Retry fidelity:** an AES-256-GCM retry envelope preserves the original event for at most 72 hours, is cleared on success/expiry/terminal skip, and lets replay retain click IDs and customer match fields without placing raw PII in the normal EventLog payload.
+- **Delivery resilience:** circuit breakers are workspace-and-destination scoped; only transient network/408/425/429/5xx failures count; terminal configuration errors stop automatic retry; scheduled PENDING/RETRYING/FAILED recovery is deterministic and bounded.
+- **Consent and attribution:** generated pixels subscribe to Shopify consent updates; explicit denial purges browser/cookie/cart ad identifiers and uses one fail-closed Redis operation to write false consent plus timestamped tombstones across every linked hashed alias. After API-key authentication and strict bounded validation, privacy-minimized no-destination revocations require a session/checkout/cart anchor and pass isolated 120/minute plus 5,000/day workspace budgets before persisting ahead of workspace-active, destination-credential, and generic delivery-rate gates. The fast path uses one opaque anchor, never a predictable order alias, and returns without outbox or queue work; a 429 remains in the client retry queue. Headless clients generate and reuse a fallback session anchor. Custom Pixel, legacy, and headless clients persist at most 20 revocations for 30 days and replay them from 5 seconds up to 5 minutes; dual storage is merged independently and generation-safe settlement prevents an old replay from deleting a newer denial. A stable `trackclear-consent-revocation-v1` Web Lock serializes cross-tab sends where supported; without Web Locks, per-client serialization remains but cross-tab ordering is best-effort. Webhook Purchase chooses the newest bounded cart-or-session consent snapshot, and explicit denial remains authoritative for the full 30-day server-context window instead of aging into LAX allow. Browser/headless latest-touch context is capped at 90 days, and the headless SDK canonicalizes alias consent keys with event-level precedence before sending.
+- **Optional browser parity:** Meta and TikTok browser SDK ownership is persisted separately from server destination delivery and is off by default. An enabled owner loads only after consent, emits the exact server `event_id`, supports later revoke/grant, and does not auto-fire TikTok PageView.
+- **Duplicate usage safety:** normalized Purchase identities use an atomic Redis reservation so concurrent identical ingests cannot consume usage twice or create a false 402. Hourly reconciliation rebuilds transitive workspace-scoped alias groups, count floors, and every hashed marker (including FREE users without a Subscription row) without lowering concurrent live usage. Purchase abuse throttling runs before the reservation.
+- **Privacy disclosure:** the privacy page now documents the short-lived encrypted retry envelope and lossless encrypted webhook intake.
+- **Release safety:** concurrent EventLog indexes are each isolated in a one-statement migration, a strict 11-index verifier checks definitions/readiness, missing historical schema is repaired forward-only, and integration tests reset only a loopback `_test` database before applying the committed migrations. Vercel Git deployment is disabled; the Vercel-specific build requires recognized provider environment metadata, prebuilt production deployment is prohibited, and production-mode Edge runtime fails closed even when every Vercel marker is absent. Production still requires the exact approved full SHA. Vercel and Railway require runtime/direct URLs to identify the same writable PostgreSQL database/schema/cluster and match operator-pinned production identity values; Railway additionally requires the exact production environment and runs migrate/status/index/drift checks before activation. `/api/health` returns 503 unless release approval, PostgreSQL identity, required migrations/indexes, and Redis are ready. All 11 BullMQ listeners use `autorun: false`; required recovery schedules register before `run()`, every listener passes `waitUntilReady()`, and a startup latch gates `/health`. Startup failure, fatal process errors, and signals close listeners, their supplied Redis connections, shared Redis, and Prisma through one path with readiness dropped immediately. The 30-second outbound ceiling has a 45-second application drain and 60-second Railway drain. PR gates cover Node 20/24 plus PostgreSQL 16/Redis 7.
+
+### Rehearsal Evidence
+
+- The original eight-file hardening chain upgraded a disposable baseline-shaped PostgreSQL 17.5 database with 50,000 EventLogs and 10,000 Purchases in 3.856 seconds, retaining every row, backfilling every Purchase alias, and leaving historical FAILED deliveries unscheduled.
+- The final 16-migration history upgraded a populated baseline with 20,000 EventLogs and 5,000 Purchases in 1.281 seconds, retained all rows and expected backfills, verified 11/11 indexes, and produced no Prisma schema difference. A full empty-database reset through all 16 migrations also finished current with 11/11 indexes and zero drift.
+- The guarded plaintext-secret migration rejected an unsafe legacy row, then completed only after a full encrypted replacement was present. A concurrent-index backend was also intentionally terminated; recovery dropped only the exact invalid index, resolved only its failed migration, and redeployed cleanly.
+- The integration harness now force-resets only a loopback database ending in `_test`, flushes only loopback Redis DB 1-15 (default 15), truncates all application tables dynamically, and clears shared Redis clients. This prevents a test command from flushing development or production Redis DB 0.
+- Local runtime gates passed on Node 20.20.2 and Node 24.18.0. The PostgreSQL 16/Redis 7 workflow is committed but must pass on the published PR before production.
+
+### Release Gates Still Open
+
+- Require both Node runtime jobs, the Node 20 worker-container health smoke, and the PostgreSQL 16 migration rehearsal to pass on the draft PR before production.
+- Resolve the Railway account's current past-due deployment warning before attempting a production release.
+- Verify both provider database URLs identify the intended production cluster/database/schema, pin the verified name/schema/system identifier on both providers, then apply the eleven branch migrations and verify all eleven expected indexes before deploying code.
+- Fully drain and replace old Railway workers before enabling `SUPERSEDED` takeover semantics; mixed worker versions are unsafe.
+- Confirm Vercel Git deployment is disabled, disable Railway GitHub autodeploy in the dashboard, and verify Railway actually uses `/railway.worker.toml` plus `/Dockerfile.worker`; repository files cannot prove provider state. The backend is shared and cannot be canaried to one store with the current architecture.
+- Verify Railway Redis has persistent storage and a current backup before relying on Redis consent tombstones or delivery queues across a service restart.
+- After the coordinated web/worker release, repaste `bridge-v1` into Dirava only, run the controlled order, observe it for 30-60 minutes, then expand store by store.
+- Run controlled Dirava regression orders for normal cart, buy-now/direct checkout, returning visitor, and delayed checkout; verify exactly one Meta and one TikTok Purchase per order plus cart-helper attribution.
+- Keep both Track Clear browser ownership flags off until every Shopify app/theme/tag-manager pixel targeting the same Meta dataset or TikTok Pixel ID is removed. After changing owners, wait at least the 30-second shared-cache TTL and start a fresh browser session before enabling the replacement; then prove exactly one browser send plus one deduplicated server send for every supported event.
+- Verify Meta/TikTok Events Manager UI receipt/dedup and live non-default catalog modes. Existing pending QA templates remain templates, not pass evidence.
+
+Known low-frequency billing caveat: an order reserved immediately before UTC month rollover whose canonical webhook row is first written just after rollover can consume one unit in both months during reconciliation. Correct repair requires durable billing-period ownership, not a risky counter decrement. This is a billing edge rather than a delivery/dedup loss path, and remains intentionally documented because commercial redesign is outside this tracking-only release.
 
 ## Production QA Evidence
 
@@ -56,8 +98,8 @@ Last updated: 2026-05-23 (checkout-path QA preparation)
 | `/api/auth/reset-password` | POST | - | Working | Validates token, updates password |
 | `/api/auth/verify-email` | GET | - | Working | Token-based email verification, sets emailVerified on User |
 | `/api/diagnostics` | GET | Session | Working | Internal diagnostics data filtered through workspace destination allowlist |
-| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Multi-destination fan-out pipeline with CORS, X-Request-ID header, server-proxy shopper IP/UA headers, fbclid-derived fbc, multi-key session enrichment |
-| `/api/workspaces` | GET, POST | Session | Working | Unlimited workspaces, encrypts credentials |
+| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Strict bounded validation, atomic multi-destination EventLog outbox, deterministic jobs, idempotent Purchase usage, server-proxy shopper IP/UA, fbclid-derived fbc, multi-key session enrichment |
+| `/api/workspaces` | GET, POST | Session | Working | Plan-limited active workspaces, required store domain, encrypted credentials |
 | `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, destination credentials, product mode/install type read-only from public PATCH, catalog ID settings and custom ingest domain editable |
 | `/api/workspaces/[id]/custom-ingest-domain/verify` | POST | Session | Working | Verifies a saved custom ingest domain by checking the public TrackClear marker route through that host |
 | `/api/workspaces/[id]/rotate-key` | POST | Session | Working | Generates new API key |
@@ -67,17 +109,17 @@ Last updated: 2026-05-23 (checkout-path QA preparation)
 | `/api/user/preferences` | PATCH | Session | Working | Update user display currency and language |
 | `/api/user/account` | DELETE | Session | Working | GDPR account deletion (cancels Stripe, cascades all data) |
 | `/api/alerts/preferences` | GET, PUT | Session | Working | Alert notification preferences CRUD |
-| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates minified JS snippet and uses a verified custom ingest domain as the pixel-loader host when configured |
+| `/api/snippet/[workspaceId]` | GET | Session | Working | Generates the versioned `bridge-v1` loader, synchronously buffers early Shopify events, and uses a verified custom ingest domain as the pixel-loader host when configured |
 | `/api/cart-helper/[workspaceId]` | GET, OPTIONS | Public | Working | Storefront theme helper script for durable cart attribution: writes through same-origin `/cart/update.js`, verifies through `/cart.js`, retries once, and stores local non-PII diagnostics |
-| `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with `_trackclear_session_id`, best-effort cart attribution writer, catalog ID settings, custom ingest URL resolution, bounded `_fbp` validation, and webhook-aware Purchase `fbq` guard |
-| `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with the same session/cart attribution, catalog ID settings, custom ingest URL resolution, and Purchase guard |
+| `/api/pixel/[workspaceId]` | GET, OPTIONS | Public | Working | Public Shopify Custom Pixel JS with bridge activation, 30-second shared cache, `_trackclear_session_id`, catalog settings, consent-gated optional browser SDKs, and webhook-aware Purchase guard |
+| `/api/s/[workspaceId]` | GET | Public | Working | Legacy public pixel JS with 30-second shared cache and the same session/cart attribution, browser ownership, catalog settings, custom ingest URL resolution, and Purchase guard |
 | `/api/custom-ingest-domain/check` | GET | Public | Working | Public no-store marker route used by custom ingest domain verification |
 | `/api/stripe/checkout` | POST | Session | Working | Creates Stripe checkout session |
 | `/api/stripe/portal` | POST | Session | Working | Opens Stripe billing portal |
 | `/api/stripe/webhook` | POST | Stripe sig | Working | Handles 5 Stripe event types |
-| `/api/health` | GET | - | Working | Smart liveness probe: DB + Redis ping with 3s timeout, always returns 200, reports ok/degraded |
+| `/api/health` | GET | - | Working | Fail-closed readiness probe: DB, required migrations/indexes, and Redis with 3s bounds; returns 200 ready or 503 degraded |
 | `/api/status` | GET | Session | Working | Auth-gated deep health check: DB + Redis ping with 3s timeout, uptime |
-| `/api/webhooks/shopify` | POST | HMAC sig | Working | Shopify order webhook: orders/paid + refunds/create, HMAC verification, cart/order attribute attribution, session enrichment, DLQ |
+| `/api/webhooks/shopify` | POST | HMAC sig | Working | HMAC-verified orders/paid + refunds/create; encrypted durable inbox before acknowledgement, verified-Purchase gate, alias reconciliation, cart/session attribution, deferred replay |
 
 ### Multi-Destination Event Pipeline
 
@@ -100,12 +142,15 @@ Each destination has:
 - Encrypted credential storage (AES-256-GCM) -- except Google Ads (public values, plaintext)
 - Settings UI card with enable toggle
 
-### Core Library Modules (26+ files in src/lib/)
+### Core Library Modules
 
 | Module | Status | What it does |
 |--------|--------|-------------|
 | `auth.ts` | Working | NextAuth v5 config (Google + Credentials providers, JWT sessions) |
 | `db.ts` | Working | Prisma singleton with hot-reload safety, connection pool limit (configurable via PRISMA_POOL_SIZE), env-aware logging |
+| `deployment-database-identity.ts` | Working | Requires runtime/direct URLs to identify the same writable primary and match pinned database/schema/system-ID values without logging credentials |
+| `deployment-schema.ts` | Working | Requires the complete hardening migration chain and all 11 valid, ready indexes |
+| `production-release-gate.ts` | Working | Enforces exact provider environment metadata and full approved production SHA |
 | `utils.ts` | Working | `cn()` utility (clsx + tailwind-merge) |
 | `encryption.ts` | Working | AES-256-GCM encrypt/decrypt for all credential storage |
 | `hash-pii.ts` | Working | SHA-256 hashing for all PII fields, E.164 phone via phone-normalizer |
@@ -113,17 +158,20 @@ Each destination has:
 | `consent.ts` | Working | STRICT (require explicit consent) / LAX (send unless opt-out) |
 | `api-key.ts` | Working | Generate `tl_` + 64 hex chars, format validation |
 | `stripe.ts` | Working | Stripe client (API version 2024-12-18.acacia), plan constants |
-| `billing.ts` | Working | Order limit checking, auto-upgrade, Redis counter. Lazy Redis |
+| `billing.ts` | Working | Atomic alias-aware Purchase reservation plus non-decreasing counter/marker reconciliation, plan limits, and auto-upgrade |
 | `constants.ts` | Working | BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP, RATE_LIMIT, QUEUE_CONFIG (7 queues) |
 | `meta-capi.ts` | Working | POST to Meta Graph API, MetaCapiError with status/response |
 | `event-normalizer.ts` | Working | Converts snippet payload to Meta CAPI format, dual camelCase/snake_case, bounded Meta cookie validation |
 | `event-log-payload.ts` | Working | Builds sanitized EventLog payloads with customData, userDataFlags, clickIdFlags, and redacted checkout/cart tokens instead of raw shopper userData |
+| `event-delivery-guard.ts` | Working | Serializable Purchase alias election and token-checked worker attempt/accept/settlement ownership |
+| `event-replay-queue.ts` | Working | Deterministic replay job construction for all destination workers |
+| `event-retry-envelope.ts` | Working | AES-256-GCM short-lived full-fidelity retry payloads with expiry/clear helpers |
 | `purchase-event-id.ts` | Working | Builds deterministic Shopify Purchase event IDs for snippet, generated pixel, ingest, and webhook paths, preferring order name when available for browser/webhook convergence |
 | `content-id.ts` | Working | Normalizes Shopify catalog content IDs across numeric variant/product IDs, GraphQL IDs, SKU, custom templates, rich direct-ingest contents, and workspace catalog settings |
 | `custom-ingest-domain.ts` | Working | Normalizes/validates merchant-owned ingest domains and resolves verified pixel-loader and ingest URLs with safe defaults |
 | `workspace-mode.ts` | Working | Nullable product mode/install type fallback, V1 destination allowlist, `LEGACY_WORKSPACE_IDS` emergency bypass |
 | `diagnostics-audit-fields.ts` | Working | Computes Diagnostics event-audit field visibility and counts: core fields plus captured optional click/UTM fields relevant to allowed destinations |
-| `tracking-health.ts` | Working | Computes operational tracking health checks for normal Shopify V1 readiness, including actionable cart-helper attribution source status; snippet activity is activity-based, not a heartbeat |
+| `tracking-health.ts` | Working | Computes Shopify V1 readiness; duplicate delivery health counts only SENT rows and ignores SUPERSEDED aliases |
 | `queue.ts` | Working | Lazy BullMQ queues (7 destinations), MetaEventJob + DestinationEventJob interfaces |
 | `rate-limit.ts` | Working | Lazy Redis, 100 req/sec/workspace, 2s TTL keys |
 | `analytics.ts` | Working | Dashboard analytics with destination deduplication, currency conversion, health, revenue, event breakdown, billing, conversion accuracy, campaign performance |
@@ -152,16 +200,18 @@ Each destination has:
 | `guide-content.ts` | Working | Setup guide content for all 7 integration platforms + Shopify webhook |
 | `tracking-context.ts` | Working | Shared helper for server-proxy client IP/UA extraction and fbclid -> fbc synthesis |
 | `shopify-webhook-attribution.ts` | Working | Extracts Shopify order/cart/landing-site attribution, normalizes webhook Purchase URLs, and shapes line-item content IDs/contents |
+| `shopify-webhook-inbox.ts` | Working | Encrypted signed-webhook capture, claims, backoff, retention, and inbox/fallback timing constants |
 | `shopify-cart-attribution-helper.ts` | Working | Generates the storefront cart attribution helper and exposes tested extraction/write/verify utilities for Shopify cart attributes |
 | `headless-sdk.ts` | Working | Headless/Hydrogen helper for URL attribution capture, Meta `_fbp`/`_fbc` cookies, `_trackclear_session_id` creation, Shopify cart attributes, and TrackClear ingest calls |
 
-### Workers (10 files in src/workers/)
+### Workers (14 files in src/workers/, including shared options)
 
-All 7 destination workers have circuit breaker integration (5 consecutive failures = 60s cooldown).
+All 7 destination workers have workspace-scoped circuit breakers, deterministic retry, final delivery ownership, and claim-token guarded terminal writes.
 
 | File | Status | What it does |
 |------|--------|-------------|
-| `start-worker.ts` | Working | Entry point, starts all 10 workers, graceful shutdown (30s timeout), Sentry error tracking |
+| `start-worker.ts` | Working | Constructs 11 paused listeners, registers mandatory recovery first, awaits listener readiness, exposes latched health, and drains for 45s inside Railway's 60s window |
+| `worker-health.ts` | Working | Requires the startup latch, all 11 running listeners, PostgreSQL, and Redis before returning healthy |
 | `meta-event-processor.ts` | Working | Meta CAPI worker: circuit breaker, decrypt, normalize, send, update EventLog |
 | `tiktok-event-processor.ts` | Working | TikTok worker: circuit breaker, decrypt, normalize, send, update EventLog |
 | `ga4-event-processor.ts` | Working | GA4 worker: circuit breaker, decrypt API secret, normalize, send, update EventLog |
@@ -170,8 +220,10 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `pinterest-event-processor.ts` | Working | Pinterest worker: circuit breaker, decrypt Bearer token, normalize, send, update EventLog |
 | `google-ads-event-processor.ts` | Working | Google Ads worker: circuit breaker, normalize to pixel params, fire server-side GET, update EventLog |
 | `alert-checker.ts` | Working | Hourly repeatable job: evaluates alerts, sends email notifications |
-| `stale-pending-requeue.ts` | Working | Every 5min: re-queues stale PENDING events; hourly order count reconciliation; DLQ cleanup (30d resolved, 90d unresolved) |
+| `stale-pending-requeue.ts` | Working | Every 5min: deterministic PENDING/RETRYING/FAILED recovery; hourly transitive alias usage reconciliation; DLQ cleanup |
 | `event-log-cleanup.ts` | Working | Hourly: deletes expired EventLogs per plan retention (7d Free/Starter, 30d Growth/Scale) |
+| `shopify-webhook-inbox-worker.ts` | Working | Every minute: processes/replays encrypted signed Shopify deliveries after capture-only live acknowledgement |
+| `worker-options.ts` | Working | Shared concurrency, lock-duration, stalled interval, and stalled-count controls |
 
 ### Dashboard Analytics Components
 
@@ -185,57 +237,22 @@ All 7 destination workers have circuit breaker integration (5 consecutive failur
 | `recent-events.tsx` | Last 10 events mini-table with value column |
 | `campaign-performance.tsx` | Top campaigns by revenue with per-platform tabs (30d) |
 
-### Test Coverage (46 files, 488 tests)
+### Test Coverage
 
-#### Unit Tests (41 files, 443 tests)
+#### Unit Tests (57 files, 666 tests)
 
-| Test File | Tests | Covers |
-|-----------|-------|--------|
-| `shopify-domain-resolver.test.ts` | 28 | Domain resolution, validation, edge cases |
-| `tracking-context.test.ts` | 6 | fbclid-derived fbc synthesis and server-proxy client IP/UA header precedence |
-| `extract-custom-data.test.ts` | 27 | Custom data extraction from event payloads |
-| `encryption.test.ts` | 12 | Round-trip, wrong key/tag/IV, edge cases |
-| `meta-capi.test.ts` | 21 | URL construction, request body, error handling |
-| `hash-pii.test.ts` | 24 | SHA-256 hashing, all PII fields, edge cases |
-| `custom-ingest-domain.test.ts` | 4 | Custom domain normalization, invalid host rejection, verified endpoint resolution, verification URL construction |
-| `custom-ingest-domain-verify-route.test.ts` | 3 | Authenticated custom ingest domain verification success, failure clearing, and missing-domain guard |
-| `snippet-route.test.ts` | 3 | Snippet route uses default app host until a custom domain is verified, then uses the custom pixel-loader host |
-| `cart-helper-route.test.ts` | 3 | Public cart helper route output, CORS, missing workspace handling |
-| `shopify-cart-attribution-helper.test.ts` | 9 | Helper JavaScript generation, attribution extraction, session ID persistence, cart write/verify/retry behavior, and no raw PII attributes |
-| `pixel-route.test.ts` | 5 | Generated pixel scripts: bounded fbp validation, TrackClear session/cart attribution writer, catalog settings, verified custom ingest URL, and webhook-aware Purchase fbq guard |
-| `event-normalizer.test.ts` | 50 | All 5 event types, field mapping, camelCase/snake_case, Meta cookie validation |
-| `event-log-payload.test.ts` | 2 | EventLog payload PII redaction, userDataFlags, clickIdFlags |
-| `purchase-event-id.test.ts` | 8 | Deterministic Shopify Purchase event ID priority, order-name browser/webhook convergence, GraphQL/numeric order convergence, and checkout-token fallback behavior |
-| `content-id.test.ts` | 6 | Shopify catalog content ID normalization for numeric IDs, GIDs, SKU, templates, rich direct-ingest customData, and workspace settings |
-| `workspace-mode.test.ts` | 3 | Null-mode legacy fallback with all destinations, Shopify V1 Meta/TikTok allowlist, env bypass |
-| `workspace-create-mode.test.ts` | 1 | New normal Shopify workspaces default to V1/custom-pixel mode |
-| `workspace-route-mode.test.ts` | 5 | Public workspace PATCH cannot switch normal workspaces to legacy/headless; catalog settings and custom ingest domains can be updated with validation |
-| `events-page-mode.test.ts` | 1 | Events page failed-count/replay visibility respects workspace destination allowlist |
-| `diagnostics-audit-fields.test.ts` | 5 | Mode-aware Diagnostics captured-field visibility for core, optional click IDs, UTM fields, and non-Purchase events |
-| `diagnostics-route-mode.test.ts` | 1 | Diagnostics route returns and queries only destinations allowed by workspace mode |
-| `diagnostics-test-event-route.test.ts` | 2 | Safe AddToCart/InitiateCheckout diagnostic events through ingest, Purchase rejection |
-| `analytics-cache.test.ts` | 7 | Cache hit/miss, Redis errors, Date restoration |
-| `rate-limit.test.ts` | 16 | Allow/reject, Redis key patterns, TTL |
-| `billing.test.ts` | 22 | Order limits (all 4 tiers), auto-upgrade, subscription statuses |
-| `google-ads.test.ts` | 34 | Google Ads normalizer (email normalization, param building, all 4 events), pixel endpoint (URL construction, error handling) |
-| `tiktok.test.ts` | 3 | TikTok external_id hashing, rich contents, and fallback content_ids |
-| `tracking-health.test.ts` | 3 | Cart-helper attribution health status: cart_attributes excellent, session/landing-only warning, no-attribution error |
-| `analytics.test.ts` | 28 | Health status, revenue aggregation, event breakdown, conversion accuracy |
-| `meta-event-processor.test.ts` | 5 | Happy path, Meta error, decrypt failure, test event code |
-| `middleware-public-routes.test.ts` | 1 | Middleware keeps the public cart helper route unauthenticated |
-| `consent.test.ts` | 29 | STRICT/LAX mode, per-destination marketing/analytics mapping, webhook bypass, edge cases |
-| `ingest-attribution.test.ts` | 8 | Ingest route uses X-TL-Client headers and resolved fbc in EventLog, stores sanitized payload, queue job, multi-key session enrichment, V1 destination filtering, legacy onlyDestinations preservation, deterministic Purchase IDs, SKU/custom catalog IDs |
-| `session-enrichment.test.ts` | 2 | Redis session context storage/lookup across TrackClear session ID, checkout token, cart token, order identifiers, and email |
-| `api-key.test.ts` | 12 | Generation, format validation, uniqueness |
-| `shopify-webhook-attribution.test.ts` | 12 | Shopify order/landing attribution extraction, absolute landing URL normalization, fbc synthesis, catalog-aware content IDs, Purchase contents |
-| `phone-normalizer.test.ts` | 16 | US/UK/DE/FR/AU, E.164, edge cases |
-| `shopify-webhook.test.ts` | 6 | HMAC verification, replay protection, header extraction |
-| `shopify-webhook-route-mode.test.ts` | 4 | Shopify webhook fan-out filters V1 to Meta/TikTok, preserves legacy env-bypass behavior, and applies SKU/product catalog settings |
-| `headless-sdk.test.ts` | 6 | Headless attribution capture, Meta cookie synthesis, TrackClear session ID creation, Shopify cart attributes, TrackClear ingest client |
+Run with `pnpm vitest run`. Hardening-specific suites cover encrypted webhook
+capture/replay, delivery claims across every destination, canonical Purchase
+alias election, deterministic retry jobs, retry-envelope privacy, consent
+tombstones, browser ownership, bounded ingest validation, and billing identity
+reconciliation. The executable Vitest result is authoritative for individual
+file counts.
 
-#### Integration Tests (5 files, 45 tests)
+#### Integration Tests (7 files, 62 tests)
 
-Run with: `pnpm test:integration` (requires Docker postgres + redis)
+Run with `pnpm test:integration`. The harness requires isolated loopback
+PostgreSQL and a non-zero Redis database; defaults are `trackinglite_test` and
+Redis DB 15. It refuses unsafe reset targets.
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
@@ -243,23 +260,25 @@ Run with: `pnpm test:integration` (requires Docker postgres + redis)
 | `workspaces.test.ts` | 15 | Workspace CRUD: list, create, get, update, delete, rotate-key |
 | `stripe-webhook.test.ts` | 8 | Stripe webhooks: invalid sig, checkout, subscription events |
 | `signup.test.ts` | 5 | Signup: creates user, duplicate email, validation |
-| `health.test.ts` | 2 | Health check: 200 with DB connected, response shape |
+| `health.test.ts` | 3 | HTTP 200 with approved exact provider SHA and pinned DB identity when schema/Redis are ready, and HTTP 503 when a required gate is degraded |
+| `workspace-uniqueness.test.ts` | 9 | Global Shopify-domain uniqueness, plan-aware setup, soft-delete reuse |
+| `tracking-hardening.test.ts` | 7 | Real PostgreSQL/Redis/BullMQ webhook durability, atomic consent denial, 30-day denial retention, serializable Purchase election, alias billing, compensation, and deterministic job reuse |
 
 ### Database Schema
 
-**11 models:** User, Account, Session, VerificationToken, PasswordResetToken, Workspace, EventLog, Subscription, AlertPreference, AlertLog, WebhookDeadLetter
+**12 models:** User, Account, Session, VerificationToken, PasswordResetToken, Workspace, EventLog, ShopifyWebhookInbox, Subscription, AlertPreference, AlertLog, WebhookDeadLetter
 
-**10 enums:** Platform, WorkspaceProductMode, WorkspaceInstallType, CatalogIdMode, EventName (5 events + Refund), EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS)
+**11 enums:** Platform, WorkspaceProductMode, WorkspaceInstallType, CatalogIdMode, EventName (5 events + Refund), EventStatus, ConsentMode, BillingPlan, SubscriptionStatus, Destination (META/TIKTOK/GA4/KLAVIYO/REDDIT/PINTEREST/GOOGLE_ADS), ShopifyWebhookInboxStatus
 
-**Workspace tracking fields:** product mode/install type, catalog ID mode/prefix/suffix/template, and optional custom ingest domain with verified/last-check/last-error metadata.
+**Workspace tracking fields:** product mode/install type, signed Shopify webhook verification/last-received timestamps, explicit-off-by-default Meta/TikTok browser ownership flags, catalog ID mode/prefix/suffix/template, and optional custom ingest domain with verified/last-check/last-error metadata.
 
-**Key indexes:** Workspace on `[userId]`, `[apiKey]`, unique `[customIngestDomain]`. EventLog on `[workspaceId, createdAt]`, `[workspaceId, eventName]`, `[workspaceId, destination]`, `[workspaceId, utmSource, utmCampaign]`, `[workspaceId, status, createdAt]`, `[workspaceId, eventName, destination, createdAt]`, `[eventId]`, `[status, createdAt]`. AlertLog on `[userId, alertType, sentAt]`. WebhookDeadLetter on `[shopDomain, topic, createdAt]`, `[resolvedAt, createdAt]`.
+**Key indexes:** Existing workspace/event indexes plus EventLog retry schedule, delivery-claim, order-name, checkout-token, and cart-token indexes; ShopifyWebhookInbox unique delivery identity plus status/next-attempt and workspace/created indexes. New EventLog indexes are created concurrently in the hardening migration.
 
 ---
 
 ## Known Bugs
 
-None currently tracked.
+- A Purchase reserved just before a UTC month boundary whose canonical webhook row is first written after rollover can consume one usage unit in both months. Destination delivery remains single-owner and lossless; a correct billing fix needs durable billing-period ownership.
 
 ---
 
@@ -341,7 +360,7 @@ None currently tracked.
 - Only **Purchase** events count toward limits. All other events are free and unlimited.
 - Free plan: no credit card required. Purchase forwarding blocked at limit.
 - Paid plans: auto-upgrade to next tier via Stripe subscription update when limit exceeded.
-- Unlimited workspaces on all plans, shared order pool per user.
+- Active workspace limits are 1/3/5/unlimited for Free/Starter/Growth/Scale; the order pool remains shared per user.
 
 ### Phase 8: Production Readiness (2026-02-21)
 1. **Content-Security-Policy** - CSP header added to next.config.mjs (script-src, connect-src for all 6 platforms + Stripe)
@@ -354,7 +373,7 @@ None currently tracked.
 8. **Env Validation** - Extended to validate NEXTAUTH_SECRET, warn for optional vars (Stripe, Resend, App URL)
 
 ### Phase 9: Production Hardening (2026-02-23)
-1. **Smart Health Check** - `/api/health` now checks DB + Redis with 3s timeouts, always returns HTTP 200 (prevents Railway restart loops), reports `ok`/`degraded` status for monitoring
+1. **Smart Health Check** - `/api/health` checks DB, the required migration/index set, and Redis with bounded probes; current release behavior returns HTTP 200 only when ready and HTTP 503 when degraded
 2. **Auth-Gated Status Endpoint** - `/api/status` for authenticated deep health checks, uses shared Redis (no per-request connection)
 3. **Sentry Worker Integration** - `@sentry/node` added to worker process (start-worker.ts) with conditional init, exception capture in uncaughtException/unhandledRejection handlers, flush on shutdown
 4. **Redis Connection Consolidation** - Eliminated 4 remaining IORedis singletons (stripe/webhook, stripe/checkout, currency.ts, status route) — all web app modules now use shared `getSharedRedis()` from `src/lib/redis.ts`
@@ -369,7 +388,7 @@ None currently tracked.
 3. **Refund Support** - `Refund` added to EventName enum. GA4 receives refund events. Refund amount stored on EventLog. Billing gives back order count on refund.
 4. **Dead-Letter Queue** - Postgres-backed WebhookDeadLetter table for failed webhook processing. PII redacted before storage. 30d/90d retention policy.
 5. **Webhook Rate Limiting** - Atomic Redis Lua script rate limiter (100 req/min per shop domain), placed after HMAC verification to prevent unauthenticated DoS.
-6. **Session Enrichment Store** - Redis hash per workspace+email bridges browser pixel context to server-side webhooks. 24h TTL with per-field staleness tracking.
+6. **Session Enrichment Store** - Redis hashes linked across session/checkout/cart/order/email identifiers bridge browser context to webhooks. Context is retained for at most 30 days with per-field bounds; consent grants expire after 24 hours and explicit denials remain authoritative for 30 days.
 7. **PayPal Order Fix** - Added `paypal` to ALLOWED_SOURCES (PayPal orders were silently dropped by source filter).
 8. **Billing Order Fix** - Moved billing INCR in ingest route to after dedup/toggle/consent checks (prevented phantom billing where orders counted but no EventLog created).
 9. **Revenue Status Fix** - Revenue aggregation now includes PENDING/RETRYING events (not just SENT), so revenue appears immediately on ingest.

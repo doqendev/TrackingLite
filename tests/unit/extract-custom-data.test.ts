@@ -98,14 +98,27 @@ describe("extractCustomData", () => {
       expect(result.numItems).toBe(3);
     });
 
-    it("coerces string currency to string (no-op)", () => {
+    it("rejects a non-string currency instead of coercing it", () => {
       const result = extractCustomData({ currency: 123 as unknown as string });
-      expect(result.currency).toBe("123");
+      expect(result.currency).toBeNull();
     });
 
     it("coerces numeric orderId to string", () => {
       const result = extractCustomData({ orderId: 9876 as unknown as string });
       expect(result.orderId).toBe("9876");
+    });
+
+    it("does not coerce booleans, arrays, objects, or blank strings", () => {
+      expect(extractCustomData({ value: true }).value).toBeNull();
+      expect(extractCustomData({ value: [] }).value).toBeNull();
+      expect(extractCustomData({ numItems: false }).numItems).toBeNull();
+      expect(extractCustomData({ currency: ["USD"] }).currency).toBeNull();
+      expect(extractCustomData({ orderId: { id: 1 } }).orderId).toBeNull();
+      expect(extractCustomData({ value: "   " }).value).toBeNull();
+    });
+
+    it("normalizes valid currency strings to uppercase", () => {
+      expect(extractCustomData({ currency: " eur " }).currency).toBe("EUR");
     });
   });
 

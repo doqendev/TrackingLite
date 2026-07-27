@@ -1,46 +1,60 @@
 import { execSync } from "child_process";
+import IORedis from "ioredis";
+import {
+  getSafeIntegrationDatabaseUrl,
+  getSafeIntegrationRedisUrl,
+} from "./safety";
 
 const TEST_DB = "trackinglite_test";
 
+async function flushTestRedis(redisUrl: string) {
+  const redis = new IORedis(redisUrl, { maxRetriesPerRequest: 1 });
+  try {
+    await redis.flushdb();
+  } finally {
+    await redis.quit();
+  }
+}
+
 export async function setup() {
+  const databaseUrl = getSafeIntegrationDatabaseUrl();
+  const redisUrl = getSafeIntegrationRedisUrl();
+  const workspaceRoot = process.env.INIT_CWD || process.cwd();
+
   console.log("[Integration] Creating test database...");
 
   try {
     execSync(
-      `docker compose exec -T postgres psql -U trackinglite -d trackinglite -c "CREATE DATABASE ${TEST_DB}"`,
-      { stdio: "pipe", cwd: process.env.INIT_CWD || process.cwd() }
+      `docker compose exec -T postgres psql -U trackclear -d trackclear -c "CREATE DATABASE ${TEST_DB}"`,
+      { stdio: "pipe", cwd: workspaceRoot }
     );
   } catch {
-    // DB might already exist
+    // An externally managed test database may already exist. The schema reset
+    // below is the authoritative connectivity and permission check.
   }
 
-  console.log("[Integration] Pushing schema to test database...");
-  execSync("npx prisma db push --skip-generate --accept-data-loss", {
-    stdio: "pipe",
-    cwd: process.env.INIT_CWD || process.cwd(),
-    env: {
-      ...process.env,
-      DATABASE_URL: `postgresql://trackinglite:localdev@localhost:5433/${TEST_DB}`,
-      DIRECT_DATABASE_URL: `postgresql://trackinglite:localdev@localhost:5433/${TEST_DB}`,
-    },
-  });
+  console.log(
+    "[Integration] Resetting schema and applying committed migrations in isolated test database..."
+  );
+  execSync(
+    "pnpm exec prisma migrate reset --force --skip-seed --skip-generate",
+    {
+      stdio: "pipe",
+      cwd: workspaceRoot,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseUrl,
+        DIRECT_DATABASE_URL: databaseUrl,
+      },
+    }
+  );
+
+  await flushTestRedis(redisUrl);
 
   console.log("[Integration] Test database ready.");
 }
 
 export async function teardown() {
-  console.log("[Integration] Dropping test database...");
-  try {
-    // Terminate existing connections first
-    execSync(
-      `docker compose exec -T postgres psql -U trackinglite -d trackinglite -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${TEST_DB}' AND pid <> pg_backend_pid()"`,
-      { stdio: "pipe", cwd: process.env.INIT_CWD || process.cwd() }
-    );
-    execSync(
-      `docker compose exec -T postgres psql -U trackinglite -d trackinglite -c "DROP DATABASE IF EXISTS ${TEST_DB}"`,
-      { stdio: "pipe", cwd: process.env.INIT_CWD || process.cwd() }
-    );
-  } catch {
-    console.warn("[Integration] Could not drop test database");
-  }
+  await flushTestRedis(getSafeIntegrationRedisUrl());
+  console.log("[Integration] Isolated Redis database cleared.");
 }

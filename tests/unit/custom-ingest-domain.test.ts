@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   customIngestVerificationUrl,
+  defaultIngestUrl,
   getWorkspaceIngestUrl,
   getWorkspacePixelUrl,
   normalizeCustomIngestDomainInput,
@@ -49,10 +50,15 @@ describe("custom ingest domain helpers", () => {
     );
   });
 
+  it("falls back to the live TrackClear ingest endpoint when the environment is unset", () => {
+    vi.stubEnv("NEXT_PUBLIC_INGEST_URL", "");
+
+    expect(defaultIngestUrl()).toBe("https://www.trackclear.io/api/events/ingest");
+  });
+
   it("builds the public verification check URL", () => {
     expect(customIngestVerificationUrl("t.dirava.com", "ws_123")).toBe(
       "https://t.dirava.com/api/custom-ingest-domain/check?workspaceId=ws_123"
     );
   });
 });
-

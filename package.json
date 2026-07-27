@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "build:vercel": "prisma generate && tsx scripts/assert-vercel-production-schema.ts && next build",
     "build:railway": "STANDALONE=true prisma generate && STANDALONE=true next build && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && cp -r messages .next/standalone/messages",
     "postinstall": "prisma generate",
     "start": "node .next/standalone/server.js",
@@ -13,6 +14,9 @@
     "test:coverage": "vitest run --coverage",
     "prisma": "prisma",
     "db:migrate": "prisma migrate dev",
+    "db:seed-tracking-hardening-rehearsal": "tsx scripts/seed-tracking-hardening-rehearsal.ts",
+    "db:verify-tracking-hardening": "tsx scripts/verify-tracking-hardening-migration.ts",
+    "release:railway-production": "tsx scripts/railway-production-release-gate.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "workspace:set-mode": "tsx scripts/set-workspace-mode.ts",

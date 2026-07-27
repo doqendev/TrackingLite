@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { cleanDatabase, disconnectAll } from "./helpers/db";
-import { createUser, createWorkspace } from "./helpers/factories";
+import {
+  createSubscription,
+  createUser,
+  createWorkspace,
+} from "./helpers/factories";
 import { makeRequest } from "./helpers/request";
 
 // Mock auth for protected routes
@@ -34,6 +38,7 @@ describe("Workspace Shopify Domain Uniqueness", () => {
     mockAuth.mockReset();
     mockResolveShopifyDomain.mockReset();
     user = await createUser();
+    await createSubscription(user.id, { plan: "STARTER" });
     mockAuth.mockResolvedValue({ user: { id: user.id } });
   });
 

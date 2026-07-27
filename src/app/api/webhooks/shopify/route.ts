@@ -14,7 +14,12 @@ import {
   getGoogleAdsQueue,
 } from "@/lib/queue";
 import type { MetaEventJob, DestinationEventJob } from "@/lib/queue";
-import { checkOrderLimits, decrementOrderCount } from "@/lib/billing";
+import {
+  checkOrderLimits,
+  decrementOrderCount,
+  recoverPurchaseBillingReservationAfterOutboxFailure,
+  type PurchaseBillingReservation,
+} from "@/lib/billing";
 import { lookupSessionContextByIdentifiers, type SessionContext } from "@/lib/session-enrichment";
 import { getSharedRedis } from "@/lib/redis";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
@@ -24,11 +29,40 @@ import {
   buildOrderAttribution,
   extractLandingSiteAttribution,
   normalizeLandingPageUrl,
+  resolveNewestConsentValue,
 } from "@/lib/shopify-webhook-attribution";
 import { filterDestinationsForWorkspace } from "@/lib/workspace-mode";
-import { buildPurchaseEventId } from "@/lib/purchase-event-id";
+import {
+  buildPurchaseBillingAliases,
+  buildPurchaseEventId,
+  normalizePurchaseIdentifier,
+} from "@/lib/purchase-event-id";
 import { contentIdOptionsFromWorkspace } from "@/lib/content-id";
 import type { Queue } from "bullmq";
+import {
+  clearedEventRetryEnvelope,
+  encryptEventRetryEnvelope,
+} from "@/lib/event-retry-envelope";
+import {
+  enqueueReplayJob,
+  eventReplayJobId,
+} from "@/lib/event-replay-queue";
+import { shouldSendToDestination } from "@/lib/consent";
+import {
+  clearedEventDeliveryClaim,
+  reserveEventDeliveriesForWebhook,
+} from "@/lib/event-delivery-guard";
+import {
+  buildShopifyWebhookDeliveryId,
+  captureVerifiedShopifyWebhook,
+  claimShopifyWebhookInbox,
+  completeShopifyWebhookInbox,
+  deferShopifyWebhookInbox,
+  getShopifyWebhookOccurredAt,
+  sanitizeWebhookProcessingError,
+  type CapturedShopifyWebhook,
+  type ShopifyWebhookInboxClaim,
+} from "@/lib/shopify-webhook-inbox";
 
 const log = createLogger({ component: "shopify-webhook" });
 
@@ -46,12 +80,29 @@ function hasAnyValue(values: Array<string | null | undefined>): boolean {
   return values.some((value) => typeof value === "string" && value.trim().length > 0);
 }
 
-function parseConsentValue(value: string | null | undefined): boolean | null {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim().toLowerCase();
-  if (["true", "1", "yes"].includes(normalized)) return true;
-  if (["false", "0", "no"].includes(normalized)) return false;
-  return null;
+function preserveUsefulEventLogColumns(
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  // Canonical commerce fields must replace browser estimates, including an
+  // intentional null. Optional identity/context fields only replace a reused
+  // snippet row when the webhook actually recovered a useful value.
+  const canonicalFields = new Set([
+    "payload",
+    "value",
+    "currency",
+    "numItems",
+    "orderId",
+    "source",
+    "paymentGateway",
+    "pageUrl",
+  ]);
+  return Object.fromEntries(
+    Object.entries(input).filter(([key, value]) => {
+      if (canonicalFields.has(key)) return true;
+      if (value === null || value === undefined || value === "") return false;
+      return true;
+    })
+  );
 }
 
 function attributionSourcesForPurchase(input: {
@@ -70,6 +121,7 @@ function attributionSourcesForPurchase(input: {
       input.orderAttribution.gbraid,
       input.orderAttribution.wbraid,
       input.orderAttribution.ttclid,
+      input.orderAttribution.ttp,
       input.orderAttribution.rdtCid,
       input.orderAttribution.epik,
       input.orderAttribution.utmSource,
@@ -106,67 +158,13 @@ function attributionSourcesForPurchase(input: {
   return sources.length > 0 ? sources : ["none"];
 }
 
-function redactPii(rawPayload: string): string {
-  try {
-    const data = JSON.parse(rawPayload);
-    // Redact customer PII fields from Shopify order payload
-    const piiFields = ["email", "phone", "first_name", "last_name", "name", "address1", "address2", "zip", "city", "province", "company"];
-    const redact = (obj: Record<string, unknown>) => {
-      for (const key of Object.keys(obj)) {
-        if (piiFields.includes(key) && typeof obj[key] === "string") {
-          obj[key] = "[REDACTED]";
-        } else if (typeof obj[key] === "object" && obj[key] !== null) {
-          redact(obj[key] as Record<string, unknown>);
-        }
-      }
-    };
-    redact(data);
-    return JSON.stringify(data);
-  } catch {
-    return "[UNPARSEABLE]";
-  }
-}
-
-async function writeToDLQ(
-  topic: string,
-  shopDomain: string,
-  rawBody: Buffer | null,
-  headers: Record<string, string>,
-  error: string,
-  requestId: string
-) {
-  try {
-    await db.webhookDeadLetter.create({
-      data: {
-        topic,
-        shopDomain,
-        payload: rawBody ? redactPii(rawBody.toString("utf-8")) : "",
-        headers: JSON.stringify(headers),
-        error,
-        requestId,
-      },
-    });
-  } catch (dlqErr) {
-    console.error(JSON.stringify({
-      level: "error",
-      msg: "Failed to write to DLQ",
-      requestId,
-      dlqError: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
-    }));
-  }
-}
-
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
   const reqLog = log.child({ requestId });
 
-  let rawBody: Buffer | undefined;
-
   try {
-    // 1. Read raw body for HMAC verification
-    rawBody = Buffer.from(await request.arrayBuffer());
+    const rawBody = Buffer.from(await request.arrayBuffer());
 
-    // Fix 4: Payload size guard (512KB)
     if (rawBody.length > 524288) {
       return NextResponse.json({ error: "Payload too large" }, { status: 413 });
     }
@@ -180,13 +178,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing headers" }, { status: 400 });
     }
 
-    // We only handle orders/paid and refunds/create
     if (topic !== "orders/paid" && topic !== "refunds/create") {
       reqLog.info("Ignoring unhandled topic", { topic });
       return NextResponse.json({ ok: true });
     }
 
-    // 2. Parse the JSON body (shared by both handlers)
     let bodyData: Record<string, unknown>;
     try {
       bodyData = JSON.parse(rawBody.toString("utf-8"));
@@ -195,35 +191,190 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    // 3. Route to the appropriate handler
-    // rateLimitChecked is passed by reference so the per-workspace loop can set it once
-    const rateLimitChecked = { value: false };
-    if (topic === "orders/paid") {
-      return handleOrderPaid(bodyData, rawBody, hmacHeader, shopDomain, reqLog, requestId, request, rateLimitChecked);
-    }
-    return handleRefundCreated(bodyData, rawBody, hmacHeader, shopDomain, reqLog, requestId, rateLimitChecked);
-  } catch (error) {
-    reqLog.error("Webhook processing error", {
-      error: error instanceof Error ? error.message : String(error),
+    const isInboxReplay = request.headers.get("x-trackclear-inbox-replay") === "1";
+    const replayWorkspaceId = isInboxReplay
+      ? request.headers.get("x-trackclear-inbox-workspace")
+      : null;
+    const candidates = await db.workspace.findMany({
+      where: {
+        ...(replayWorkspaceId ? { id: replayWorkspaceId } : {}),
+        shopifyDomain: shopDomain,
+        isActive: true,
+        shopifyWebhookSecretEncrypted: { not: null },
+      },
+      select: {
+        id: true,
+        shopifyWebhookSecretEncrypted: true,
+        shopifyWebhookSecretIv: true,
+        shopifyWebhookSecretTag: true,
+      },
     });
 
-    // Dead-letter: persist failed webhook for manual reprocessing
-    await writeToDLQ(
-      request.headers.get("x-shopify-topic") ?? "unknown",
-      request.headers.get("x-shopify-shop-domain") ?? "unknown",
-      rawBody ?? null,
-      {
-        "x-shopify-topic": request.headers.get("x-shopify-topic") ?? "",
-        "x-shopify-shop-domain": request.headers.get("x-shopify-shop-domain") ?? "",
-        "x-shopify-hmac-sha256": request.headers.get("x-shopify-hmac-sha256") ?? "",
-      },
-      error instanceof Error ? error.message : String(error),
-      requestId
-    );
-    reqLog.warn("Webhook saved to dead-letter queue");
+    if (candidates.length === 0) {
+      reqLog.warn("No matching workspaces for domain", { shopDomain });
+      return NextResponse.json({ ok: true });
+    }
 
-    // Still return 200 to prevent Shopify from retrying (we log the error)
-    return NextResponse.json({ ok: true });
+    const verifiedWorkspaceIds: string[] = [];
+    for (const workspace of candidates) {
+      try {
+        const webhookSecret = decrypt(
+          workspace.shopifyWebhookSecretEncrypted!,
+          workspace.shopifyWebhookSecretIv!,
+          workspace.shopifyWebhookSecretTag!
+        ).trim();
+        if (verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
+          verifiedWorkspaceIds.push(workspace.id);
+        }
+      } catch (error) {
+        reqLog.error("Unable to verify configured webhook secret", {
+          workspaceId: workspace.id,
+          error: sanitizeWebhookProcessingError(error),
+        });
+      }
+    }
+
+    if (verifiedWorkspaceIds.length === 0) {
+      reqLog.warn("Shopify webhook HMAC verification failed", { shopDomain });
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const deliveryId = buildShopifyWebhookDeliveryId({
+      shopifyWebhookId: request.headers.get("x-shopify-webhook-id"),
+      topic,
+      shopDomain,
+      rawBody,
+    });
+    const occurredAt = getShopifyWebhookOccurredAt(topic, bodyData);
+
+    let captured: CapturedShopifyWebhook[];
+    try {
+      captured = await captureVerifiedShopifyWebhook({
+        workspaceIds: verifiedWorkspaceIds,
+        deliveryId,
+        topic,
+        shopDomain,
+        rawBody,
+        occurredAt,
+        recordReceipt: !isInboxReplay,
+      });
+    } catch (error) {
+      // Do not acknowledge unless the verified delivery is durable. Shopify can
+      // retry this response without creating duplicates because deliveryId is unique.
+      reqLog.error("Durable Shopify webhook capture failed", {
+        shopDomain,
+        topic,
+        error: sanitizeWebhookProcessingError(error),
+      });
+      return NextResponse.json({ error: "Webhook capture unavailable" }, { status: 503 });
+    }
+
+    // Shopify's live webhook deadline is an acknowledgement deadline, not a
+    // processing budget. Once the HMAC-verified body is durably encrypted in
+    // the inbox, return immediately; the one-minute inbox worker owns all
+    // downstream processing and retry. Never start unawaited work in Vercel.
+    if (!isInboxReplay) {
+      return NextResponse.json({ ok: true, captured: captured.length });
+    }
+
+    const rateLimitChecked = { value: false };
+    let deferred = false;
+    for (const inbox of captured) {
+      const processed = await processCapturedShopifyWebhook({
+        inbox,
+        bodyData,
+        rawBody,
+        hmacHeader,
+        shopDomain,
+        reqLog,
+        requestId,
+        rateLimitChecked,
+      });
+      deferred ||= !processed;
+    }
+
+    return NextResponse.json({ ok: true, deferred });
+  } catch (error) {
+    // Any unexpected failure before durable capture must remain retryable by Shopify.
+    reqLog.error("Webhook request failed before acknowledgement", {
+      error: sanitizeWebhookProcessingError(error),
+    });
+    return NextResponse.json({ error: "Webhook processing unavailable" }, { status: 500 });
+  }
+}
+
+async function processCapturedShopifyWebhook(input: {
+  inbox: CapturedShopifyWebhook;
+  bodyData: Record<string, unknown>;
+  rawBody: Buffer;
+  hmacHeader: string;
+  shopDomain: string;
+  reqLog: ReturnType<typeof log.child>;
+  requestId: string;
+  rateLimitChecked: { value: boolean };
+}): Promise<boolean> {
+  let claim: ShopifyWebhookInboxClaim | null = null;
+
+  try {
+    claim = await claimShopifyWebhookInbox(input.inbox.id);
+    if (!claim) {
+      // Already processed or currently owned by another request/worker.
+      return input.inbox.status === "PROCESSED";
+    }
+
+    const response = input.inbox.topic === "orders/paid"
+      ? await handleOrderPaid(
+          input.bodyData,
+          input.rawBody,
+          input.hmacHeader,
+          input.shopDomain,
+          input.reqLog,
+          input.requestId,
+          input.rateLimitChecked,
+          input.inbox.workspaceId,
+          true,
+          input.inbox.occurredAt,
+          claim.attempts > 1
+        )
+      : await handleRefundCreated(
+          input.bodyData,
+          input.rawBody,
+          input.hmacHeader,
+          input.shopDomain,
+          input.reqLog,
+          input.requestId,
+          input.rateLimitChecked,
+          input.inbox.workspaceId,
+          true,
+          input.inbox.occurredAt
+        );
+
+    if (response.status >= 400) {
+      throw new Error(`Webhook downstream processing returned HTTP ${response.status}`);
+    }
+
+    await completeShopifyWebhookInbox(claim);
+    return true;
+  } catch (error) {
+    input.reqLog.error("Shopify webhook deferred for durable replay", {
+      inboxId: input.inbox.id,
+      workspaceId: input.inbox.workspaceId,
+      topic: input.inbox.topic,
+      error: sanitizeWebhookProcessingError(error),
+    });
+
+    if (claim) {
+      try {
+        await deferShopifyWebhookInbox(claim, error);
+      } catch (deferError) {
+        // The PROCESSING claim becomes stale after five minutes and is reclaimable.
+        input.reqLog.error("Unable to update deferred Shopify webhook", {
+          inboxId: input.inbox.id,
+          error: sanitizeWebhookProcessingError(deferError),
+        });
+      }
+    }
+    return false;
   }
 }
 
@@ -238,12 +389,16 @@ async function handleOrderPaid(
   shopDomain: string,
   reqLog: ReturnType<typeof log.child>,
   requestId: string,
-  request: NextRequest,
-  rateLimitChecked: { value: boolean }
+  rateLimitChecked: { value: boolean },
+  targetWorkspaceId?: string,
+  hmacAlreadyVerified = false,
+  occurredAt: Date | null = null,
+  durableReplay = false
 ): Promise<NextResponse> {
   // Find ALL active workspaces matching this shop domain
   const matchingWorkspaces = await db.workspace.findMany({
     where: {
+      ...(targetWorkspaceId ? { id: targetWorkspaceId } : {}),
       shopifyDomain: shopDomain,
       isActive: true,
       shopifyWebhookSecretEncrypted: { not: null },
@@ -331,7 +486,8 @@ async function handleOrderPaid(
       sum + (Number(item.quantity) || 0),
     0
   );
-  const orderAttribution = buildOrderAttribution(orderData);
+  const orderReferenceTime = occurredAt?.getTime() ?? Date.now();
+  const orderAttribution = buildOrderAttribution(orderData, orderReferenceTime);
 
   // Extract browser context directly from Shopify order payload (fallback for session enrichment)
   const landingSite = orderData.landing_site ? String(orderData.landing_site) : null;
@@ -339,7 +495,11 @@ async function handleOrderPaid(
   const orderBrowserIp = (orderData.browser_ip as string) || (clientDetails?.browser_ip as string) || null;
   const orderUserAgent = (clientDetails?.user_agent as string) || null;
 
-  const landingAttribution = extractLandingSiteAttribution(landingSite, shopDomain);
+  const landingAttribution = extractLandingSiteAttribution(
+    landingSite,
+    shopDomain,
+    orderReferenceTime
+  );
 
   // Filter out non-web orders (POS, draft, subscription, manual, bulk)
   // Use a denylist so unknown/new source types (including Shopify test notifications) pass through
@@ -363,12 +523,12 @@ async function handleOrderPaid(
     const wsLog = reqLog.child({ workspaceId: workspace.id });
 
     // Decrypt webhook secret and verify HMAC
-    const webhookSecret = decrypt(
+    const webhookSecret = hmacAlreadyVerified ? null : decrypt(
       workspace.shopifyWebhookSecretEncrypted!,
       workspace.shopifyWebhookSecretIv!,
       workspace.shopifyWebhookSecretTag!
     ).trim();
-    if (!verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
+    if (webhookSecret && !verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
       // Log diagnostic info (no secrets, just lengths and prefixes)
       const computed = require("crypto").createHmac("sha256", webhookSecret).update(rawBody).digest("base64");
       wsLog.warn("HMAC verification failed", {
@@ -414,11 +574,23 @@ async function handleOrderPaid(
     // Look up stored browser context by durable checkout identifiers. Email is
     // still used, but cart/checkout/session/order keys keep attribution alive
     // when Shopify withholds email or session enrichment happens before email.
+    const checkoutToken = firstString(orderData, [
+      "checkout_token",
+      "checkoutToken",
+      "checkout_id",
+      "checkoutId",
+    ]);
+    const cartToken = firstString(orderData, [
+      "cart_token",
+      "cartToken",
+      "cart_id",
+      "cartId",
+    ]);
     const sessionContext = await lookupSessionContextByIdentifiers(workspace.id, {
       email,
       trackclearSessionId: orderAttribution.trackclearSessionId,
-      checkoutToken: firstString(orderData, ["checkout_token", "checkoutToken", "checkout_id", "checkoutId"]),
-      cartToken: firstString(orderData, ["cart_token", "cartToken", "cart_id", "cartId"]),
+      checkoutToken,
+      cartToken,
       orderId,
       orderName,
     });
@@ -438,6 +610,15 @@ async function handleOrderPaid(
       sessionContext,
       landingAttribution,
     });
+    const finalAttributionTimestamp =
+      orderAttribution.attributionTimestamp ??
+      sessionContext?.attributionTimestamp ??
+      null;
+    const finalAttributionSource = orderAttribution.attributionTimestamp
+      ? orderAttribution.attributionSource
+      : sessionContext?.attributionTimestamp
+        ? sessionContext.attributionSource ?? null
+        : null;
 
     // Build destination list (before billing -- don't charge for consent-blocked events)
     const destinations: Array<{
@@ -509,14 +690,34 @@ async function handleOrderPaid(
     }
 
     const modeFilteredDestinations = filterDestinationsForWorkspace(workspace, destinations);
+    const customerConsent = {
+      analytics: resolveNewestConsentValue({
+        cartValue: orderAttribution.consentAnalytics,
+        cartTimestamp: orderAttribution.consentTimestamp,
+        sessionValue: sessionContext?.consent?.analytics,
+        sessionTimestamp: sessionContext?.consentTimestamps?.analytics,
+        now: orderReferenceTime,
+      }),
+      marketing: resolveNewestConsentValue({
+        cartValue: orderAttribution.consentMarketing,
+        cartTimestamp: orderAttribution.consentTimestamp,
+        sessionValue: sessionContext?.consent?.marketing,
+        sessionTimestamp: sessionContext?.consentTimestamps?.marketing,
+        now: orderReferenceTime,
+      }),
+    };
+    const consentFilteredDestinations = modeFilteredDestinations.filter((dest) =>
+      shouldSendToDestination(workspace.consentMode, customerConsent, dest.destination)
+    );
 
-    if (modeFilteredDestinations.length === 0) {
-      wsLog.info("No destinations configured");
+    if (consentFilteredDestinations.length === 0) {
+      wsLog.info("No eligible destinations after configuration and consent checks", {
+        configuredDestinations: modeFilteredDestinations.map((dest) => dest.destination),
+        consentMode: workspace.consentMode,
+        consent: customerConsent,
+      });
       continue;
     }
-
-    // Fix 3: Webhook events are server-side financial transactions triggered by Shopify,
-    // not browser behavioral tracking. Consent filtering does not apply.
 
     // Deterministic eventId for browser/server Purchase dedup.
     const webhookEventId = buildPurchaseEventId({
@@ -525,44 +726,215 @@ async function handleOrderPaid(
       orderName,
     });
 
-    // Atomic orderId dedup lock (prevents race between snippet and webhook)
-    const dedupLockKey = `dedup:purchase:${workspace.id}:${orderId || orderName}`;
-    const lockAcquired = await getSharedRedis().set(dedupLockKey, "webhook", "EX", 300, "NX").catch(() => "OK");
-    if (!lockAcquired) {
-      reqLog.info("Purchase already being processed by another path", { orderId, orderName });
+    const normalizedOrderId = normalizePurchaseIdentifier(orderId);
+    const normalizedOrderName = normalizePurchaseIdentifier(orderName);
+    const dedupOrderIds = Array.from(new Set(
+      [orderId, normalizedOrderId].filter((value): value is string => !!value)
+    ));
+    const dedupOrderNames = Array.from(new Set(
+      [orderName, normalizedOrderName].filter((value): value is string => !!value)
+    ));
+    const relatedEventIds = [webhookEventId];
+    if (orderId) {
+      // Custom Pixel checkout payloads can expose only order.id/GID while the
+      // webhook also has order.name. Alias that order-ID-only deterministic ID
+      // so the canonical name-first webhook can reconcile the same Purchase.
+      relatedEventIds.push(buildPurchaseEventId({
+        workspaceId: workspace.id,
+        shopifyOrderId: orderId,
+      }));
+    }
+    if (checkoutToken) {
+      relatedEventIds.push(buildPurchaseEventId({
+        workspaceId: workspace.id,
+        checkoutToken,
+      }));
+    }
+    if (cartToken) {
+      relatedEventIds.push(buildPurchaseEventId({
+        workspaceId: workspace.id,
+        cartToken,
+      }));
+    }
+    const dedupLockKey = `dedup:purchase:${workspace.id}:${orderId || orderName || webhookEventId}`;
+    const lockAcquired = durableReplay
+      ? "OK"
+      : await getSharedRedis()
+          .set(dedupLockKey, "webhook", "EX", 300, "NX")
+          .catch(() => "OK");
+
+    // Reconcile prior browser/webhook rows per destination. Lock contention by
+    // itself is never proof that an event is durable: the competing request may
+    // have crashed before creating an EventLog.
+    const priorPurchaseRows = await db.eventLog.findMany({
+          where: {
+            workspaceId: workspace.id,
+            eventName: "Purchase",
+            OR: [
+              { eventId: { in: Array.from(new Set(relatedEventIds)) } },
+              ...(dedupOrderIds.length > 0
+                ? [{ orderId: { in: dedupOrderIds } }]
+                : []),
+              ...(dedupOrderNames.length > 0
+                ? [{ orderName: { in: dedupOrderNames } }]
+                : []),
+              ...(checkoutToken ? [{ checkoutToken }] : []),
+              ...(cartToken ? [{ cartToken }] : []),
+            ] as any,
+          },
+          select: {
+            id: true,
+            eventId: true,
+            destination: true,
+            status: true,
+            orderId: true,
+            source: true,
+          },
+        });
+
+    if (!lockAcquired && priorPurchaseRows.length === 0) {
+      throw new Error("Purchase dedup lock is held without a durable EventLog owner");
+    }
+
+    const alreadySentDestinations = new Set<string>(
+      priorPurchaseRows
+        .filter((row) => row.eventId !== webhookEventId && row.status === "SENT")
+        .map((row) => row.destination)
+    );
+    const rowsBehindSentOwner = priorPurchaseRows.filter(
+      (row) =>
+        alreadySentDestinations.has(row.destination) &&
+        (row.status === "PENDING" ||
+          row.status === "RETRYING" ||
+          row.status === "FAILED")
+    );
+    const sentOwnerReservation = await reserveEventDeliveriesForWebhook(
+      rowsBehindSentOwner.map((row) => row.id)
+    );
+    for (const row of rowsBehindSentOwner) {
+      const suppressed = await db.eventLog.updateMany({
+        where: {
+          id: row.id,
+          status: { in: ["PENDING", "RETRYING", "FAILED"] },
+          deliveryClaimToken: sentOwnerReservation.token,
+          deliveryClaimOwner: "SHOPIFY_WEBHOOK",
+        },
+        data: {
+          status: "SUPERSEDED",
+          errorMessage: "Suppressed because an alias-matched fallback was already sent",
+          nextRetryAt: null,
+          ...clearedEventRetryEnvelope(),
+          ...clearedEventDeliveryClaim(),
+        },
+      });
+      if (suppressed.count !== 1) {
+        throw new Error(
+          `Purchase ${row.destination} changed state while suppressing duplicate aliases`
+        );
+      }
+    }
+    const canonicalDestinations = consentFilteredDestinations.filter(
+      (dest) => !alreadySentDestinations.has(dest.destination)
+    );
+    if (canonicalDestinations.length === 0) {
+      wsLog.info("Purchase already delivered for every eligible destination", {
+        orderId: orderId || orderName,
+        destinations: Array.from(alreadySentDestinations),
+      });
       continue;
     }
 
-    // Check orderId dedup: if Purchase with this orderId already exists, skip
-    const dedupIds = [orderId, orderName].filter(Boolean) as string[];
-    if (dedupIds.length > 0) {
-      const existing = await db.eventLog.findFirst({
-        where: {
+    const purchaseAlreadyCounted = priorPurchaseRows.length > 0;
+
+    // A replay that failed before writing any EventLog still needs a usage
+    // reservation. The Redis marker set is idempotent across all overlapping
+    // checkout/order/cart aliases, so replaying this call cannot count twice.
+    let purchaseBillingReservation: PurchaseBillingReservation | undefined;
+    if (!purchaseAlreadyCounted) {
+      const billing = await checkOrderLimits(workspace.userId, "Purchase", {
+        workspaceId: workspace.id,
+        eventId: webhookEventId,
+        aliases: buildPurchaseBillingAliases({
           workspaceId: workspace.id,
-          orderId: { in: dedupIds },
-          eventName: "Purchase",
-          status: { in: ["SENT", "PENDING", "RETRYING"] },
-          createdAt: { gte: new Date(Date.now() - 2 * 60 * 60 * 1000) }, // 2h window
-        },
+          shopifyOrderId: orderId,
+          orderName,
+          checkoutToken,
+          cartToken,
+        }),
       });
-      if (existing) {
-        wsLog.info("Purchase already delivered via snippet, skipping", {
-          orderId: orderId || orderName,
-          matchedOrderId: existing.orderId,
-          matchedStatus: existing.status,
+      if (!billing.allowed) {
+        wsLog.warn("Order limit reached", {
+          limit: billing.limit,
+          used: billing.used,
         });
         continue;
       }
+      purchaseBillingReservation = billing.reservation;
     }
 
-    // Check order limits AFTER dedup — billing increment must only happen for new orders
-    const billing = await checkOrderLimits(workspace.userId, "Purchase");
-    if (!billing.allowed) {
-      wsLog.warn("Order limit reached", {
-        limit: billing.limit,
-        used: billing.used,
+    const canonicalDestinationNames = new Set(
+      canonicalDestinations.map((destination) => destination.destination)
+    );
+    const ownershipRows = priorPurchaseRows.filter(
+      (row) =>
+        canonicalDestinationNames.has(row.destination) &&
+        (row.status === "PENDING" ||
+          row.status === "RETRYING" ||
+          row.status === "FAILED")
+    );
+
+    // This DB reservation is the synchronization point shared with every
+    // destination worker's final pre-I/O claim. A worker claim makes this
+    // transaction fail and leaves the durable webhook inbox pending. If this
+    // reservation wins, a different-ID fallback is terminal before its worker
+    // can claim; a same-ID row is upgraded below and then released with a fresh
+    // encrypted canonical envelope.
+    const deliveryReservation = await reserveEventDeliveriesForWebhook(
+      ownershipRows.map((row) => row.id)
+    );
+    const initiallyReservedIds = new Set(deliveryReservation.eventLogIds);
+    const fallbackRowsToSupersede = ownershipRows.filter(
+      (row) => row.eventId !== webhookEventId
+    );
+    for (const row of fallbackRowsToSupersede) {
+      const superseded = await db.eventLog.updateMany({
+        where: {
+          id: row.id,
+          eventId: row.eventId,
+          status: { in: ["PENDING", "RETRYING", "FAILED"] },
+          deliveryClaimToken: deliveryReservation.token,
+          deliveryClaimOwner: "SHOPIFY_WEBHOOK",
+        },
+        data: {
+          status: "SUPERSEDED",
+          errorMessage: "Superseded by canonical Shopify webhook Purchase",
+          nextRetryAt: null,
+          ...clearedEventRetryEnvelope(),
+          ...clearedEventDeliveryClaim(),
+        },
       });
-      continue;
+      if (superseded.count !== 1) {
+        throw new Error(
+          `Purchase ${row.destination} changed state during claimed canonical takeover`
+        );
+      }
+
+      // Rolling deploy protection for a worker build that predates DB claims.
+      // Current workers will see SUPERSEDED before I/O; an already-active old
+      // worker is allowed to settle and the inbox reconciles its durable result.
+      const destination = canonicalDestinations.find(
+        (candidate) => candidate.destination === row.destination
+      );
+      if (!destination) {
+        throw new Error(`Purchase destination ${row.destination} is unavailable for takeover`);
+      }
+      const retainedJob = await destination.queue.getJob(eventReplayJobId(row.id));
+      const retainedState = retainedJob ? await retainedJob.getState() : "unknown";
+      if (retainedState === "active" || retainedState === "completed") {
+        throw new Error(
+          `Purchase destination ${row.destination} is settling under another event ID`
+        );
+      }
     }
 
     // Create EventLog entries with dedup
@@ -578,6 +950,9 @@ async function handleOrderPaid(
           currency,
           num_items: numItems,
           order_id: orderName || orderId,
+          order_name: orderName,
+          checkout_token: checkoutToken,
+          cart_token: cartToken,
           content_type: "product",
           content_ids: contentIds,
           contents,
@@ -585,10 +960,13 @@ async function handleOrderPaid(
         hasUserData: !!(email || phone),
         attributionSource: attributionSources[0],
         attributionSources,
+        attributionTimestamp: finalAttributionTimestamp,
+        attributionTouchSource: finalAttributionSource,
+        hasTtp: !!(orderAttribution.ttp ?? sessionContext?.ttp),
         trackclearSessionIdPresent: !!orderAttribution.trackclearSessionId,
         consent: {
-          analytics: parseConsentValue(orderAttribution.consentAnalytics) ?? sessionContext?.consent?.analytics ?? null,
-          marketing: parseConsentValue(orderAttribution.consentMarketing) ?? sessionContext?.consent?.marketing ?? null,
+          analytics: customerConsent.analytics ?? null,
+          marketing: customerConsent.marketing ?? null,
           source: orderAttribution.consentSource ?? (sessionContext?.consent ? "session_enrichment" : null),
           timestamp: orderAttribution.consentTimestamp ?? null,
         },
@@ -602,7 +980,10 @@ async function handleOrderPaid(
       value: totalPrice ?? null,
       currency: currency ?? null,
       numItems: numItems || null,
-      orderId: orderId || null,
+      orderId: normalizedOrderId,
+      orderName: normalizedOrderName,
+      checkoutToken,
+      cartToken,
       source: "webhook",
       paymentGateway,
       utmSource: orderAttribution.utmSource ?? sessionContext?.utmSource ?? landingAttribution.utmSource,
@@ -619,27 +1000,77 @@ async function handleOrderPaid(
       epik: orderAttribution.epik ?? sessionContext?.epik ?? landingAttribution.epik,
     };
 
-    const eventLogEntries = await Promise.all(
-      modeFilteredDestinations.map(async (dest) => {
-        try {
-          return await db.eventLog.create({
-            data: {
-              ...eventLogBaseData,
-              destination: dest.destination as any, // eslint-disable-line
-            },
+    const eventLogResults = await (async () => {
+      try {
+        const settledResults = await Promise.allSettled(
+          canonicalDestinations.map(async (dest) => {
+            try {
+              const entry = await db.eventLog.create({
+                data: {
+                  ...eventLogBaseData,
+                  destination: dest.destination as any, // eslint-disable-line
+                },
+              });
+              return { entry, created: true };
+            } catch (err: any) { // eslint-disable-line
+              if (err?.code === "P2002") {
+                const existing = await db.eventLog.findUnique({
+                  where: {
+                    workspaceId_eventId_destination: {
+                      workspaceId: workspace.id,
+                      eventId: webhookEventId,
+                      destination: dest.destination as any, // eslint-disable-line
+                    },
+                  },
+                  select: { id: true, status: true },
+                });
+                return existing?.status === "SENT"
+                  ? null
+                  : existing
+                    ? { entry: existing, created: false }
+                    : null;
+              }
+              throw err;
+            }
+          })
+        );
+        const failedResult = settledResults.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected"
+        );
+        if (failedResult) throw failedResult.reason;
+        return settledResults.map((result) => {
+          if (result.status === "rejected") throw result.reason;
+          return result.value;
+        });
+      } catch (error) {
+        if (purchaseBillingReservation) {
+          const recovery =
+            await recoverPurchaseBillingReservationAfterOutboxFailure(
+              purchaseBillingReservation,
+              {
+                workspaceId: workspace.id,
+                eventId: webhookEventId,
+                orderId: normalizedOrderId,
+                orderName: normalizedOrderName,
+                checkoutToken,
+                cartToken,
+              }
+            );
+          wsLog.warn("Webhook Purchase outbox write failed after billing reservation", {
+            billingRecovery: recovery,
           });
-        } catch (err: any) { // eslint-disable-line
-          if (err?.code === "P2002") return null; // duplicate
-          throw err;
         }
-      })
-    );
+        throw error;
+      }
+    })();
 
-    const validEntries = eventLogEntries.filter(
-      (e): e is NonNullable<typeof e> => e !== null
+    const validResults = eventLogResults.filter(
+      (result): result is NonNullable<typeof result> => result !== null
     );
-    const validDests = modeFilteredDestinations.filter(
-      (_, idx) => eventLogEntries[idx] !== null
+    const validEntries = validResults.map((result) => result.entry);
+    const validDests = canonicalDestinations.filter(
+      (_, idx) => eventLogResults[idx] !== null
     );
 
     if (validEntries.length === 0) {
@@ -647,11 +1078,24 @@ async function handleOrderPaid(
       continue;
     }
 
+    // The initial alias snapshot is not an ownership boundary: a same-ID
+    // snippet row can commit and acquire a worker claim between that read and
+    // this create's P2002. Reserve every newly discovered reused row before
+    // touching canonical fields. Never clear an active claim we do not own.
+    const lateReusedIds = validResults
+      .filter(
+        (result) =>
+          !result.created && !initiallyReservedIds.has(result.entry.id)
+      )
+      .map((result) => result.entry.id);
+    const lateReservation = await reserveEventDeliveriesForWebhook(lateReusedIds);
+    const lateReservedIds = new Set(lateReservation.eventLogIds);
+
     // Build event data for workers
     const eventData = {
       eventName: "Purchase",
       eventId: webhookEventId,
-      timestamp: Date.now(),
+      timestamp: occurredAt?.getTime() ?? Date.now(),
       url: purchasePageUrl,
       referrer: "",
       fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
@@ -681,6 +1125,9 @@ async function handleOrderPaid(
         currency,
         num_items: numItems,
         order_id: orderName || orderId,
+        order_name: orderName,
+        checkout_token: checkoutToken,
+        cart_token: cartToken,
         content_type: "product",
         content_ids: contentIds,
         contents,
@@ -689,39 +1136,105 @@ async function handleOrderPaid(
       userAgent: sessionContext?.userAgent ?? orderUserAgent ?? "",
     };
 
-    // Queue jobs
+    const destinationEventData = {
+      ...eventData,
+      ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? landingAttribution.ttclid ?? null,
+      ttp: orderAttribution.ttp ?? sessionContext?.ttp ?? landingAttribution.ttp ?? null,
+      gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? landingAttribution.gclid ?? null,
+      rdtCid: orderAttribution.rdtCid ?? sessionContext?.rdtCid ?? landingAttribution.rdtCid ?? null,
+      epik: orderAttribution.epik ?? sessionContext?.epik ?? landingAttribution.epik ?? null,
+      gaClientId: sessionContext?.gaClientId ?? null,
+    };
+    const retryEnvelope = encryptEventRetryEnvelope({
+      version: 1,
+      event: destinationEventData,
+    });
+
+    const {
+      workspaceId: _workspaceId,
+      eventName: _eventName,
+      eventId: _eventId,
+      status: _status,
+      ...candidateEventLogData
+    } = eventLogBaseData;
+    const authoritativeEventLogData = preserveUsefulEventLogColumns(
+      candidateEventLogData
+    );
+
+    // Upgrade reused snippet rows with canonical Shopify value/order/attribution
+    // fields as well as the short-lived encrypted worker payload. This also
+    // normalizes GraphQL order IDs to the webhook's numeric ID for refunds and
+    // diagnostics.
     await Promise.all(
+      validResults.map(async (result) => {
+        const reservationToken = initiallyReservedIds.has(result.entry.id)
+          ? deliveryReservation.token
+          : lateReservedIds.has(result.entry.id)
+            ? lateReservation.token
+            : null;
+        const updated = await db.eventLog.updateMany({
+          where: {
+            id: result.entry.id,
+            status: { in: ["PENDING", "RETRYING", "FAILED"] },
+            ...(result.created
+              ? { deliveryClaimToken: null }
+              : {
+                  deliveryClaimToken: reservationToken,
+                  deliveryClaimOwner: "SHOPIFY_WEBHOOK",
+                }),
+          },
+          data: {
+            ...authoritativeEventLogData,
+            ...retryEnvelope,
+            ...clearedEventDeliveryClaim(),
+          },
+        });
+        if (updated.count !== 1) {
+          throw new Error(
+            `Canonical Purchase ${result.entry.id} changed before authoritative update`
+          );
+        }
+      })
+    );
+
+    // Queue jobs
+    const enqueueResults = await Promise.all(
       validDests.map((dest, idx) => {
         const eventLogId = validEntries[idx].id;
 
         if (dest.destination === "META") {
-          return dest.queue.add(dest.jobName, {
-            workspaceId: workspace.id,
-            requestId,
-            event: eventData,
+          return enqueueReplayJob(
+            dest.queue,
+            dest.jobName,
             eventLogId,
-          } satisfies MetaEventJob);
+            {
+              workspaceId: workspace.id,
+              requestId,
+              event: eventData,
+              eventLogId,
+            } satisfies MetaEventJob,
+            { preferReplayData: true }
+          );
         } else {
-          return dest.queue.add(dest.jobName, {
-            workspaceId: workspace.id,
-            destination: dest.destination,
-            requestId,
+          return enqueueReplayJob(
+            dest.queue,
+            dest.jobName,
             eventLogId,
-            event: {
-              ...eventData,
-              fbclid: finalFbclid,
-              gbraid: orderAttribution.gbraid ?? sessionContext?.gbraid ?? null,
-              wbraid: orderAttribution.wbraid ?? sessionContext?.wbraid ?? null,
-              ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? landingAttribution.ttclid ?? null,
-              gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? landingAttribution.gclid ?? null,
-              rdtCid: orderAttribution.rdtCid ?? sessionContext?.rdtCid ?? landingAttribution.rdtCid ?? null,
-              epik: orderAttribution.epik ?? sessionContext?.epik ?? landingAttribution.epik ?? null,
-              gaClientId: sessionContext?.gaClientId ?? null,
-            },
-          } satisfies DestinationEventJob);
+            {
+              workspaceId: workspace.id,
+              destination: dest.destination,
+              requestId,
+              eventLogId,
+              event: destinationEventData,
+            } satisfies DestinationEventJob,
+            { preferReplayData: true }
+          );
         }
       })
     );
+    if (enqueueResults.includes("active")) {
+      throw new Error("Canonical webhook is waiting for an active Purchase delivery to settle");
+    }
 
     wsLog.info("Purchase queued from webhook", {
       orderId: orderId || orderName,
@@ -745,7 +1258,10 @@ async function handleRefundCreated(
   shopDomain: string,
   reqLog: ReturnType<typeof log.child>,
   requestId: string,
-  rateLimitChecked: { value: boolean }
+  rateLimitChecked: { value: boolean },
+  targetWorkspaceId?: string,
+  hmacAlreadyVerified = false,
+  occurredAt: Date | null = null
 ): Promise<NextResponse> {
   const refundId = refundData.id ? String(refundData.id) : null;
   const shopifyOrderId = refundData.order_id ? String(refundData.order_id) : null;
@@ -770,6 +1286,7 @@ async function handleRefundCreated(
   // Find matching workspaces (only GA4 fields needed -- Meta has no standard refund event)
   const matchingWorkspaces = await db.workspace.findMany({
     where: {
+      ...(targetWorkspaceId ? { id: targetWorkspaceId } : {}),
       shopifyDomain: shopDomain,
       isActive: true,
       shopifyWebhookSecretEncrypted: { not: null },
@@ -795,12 +1312,12 @@ async function handleRefundCreated(
     const wsLog = reqLog.child({ workspaceId: workspace.id });
 
     // Decrypt webhook secret and verify HMAC
-    const webhookSecret = decrypt(
+    const webhookSecret = hmacAlreadyVerified ? null : decrypt(
       workspace.shopifyWebhookSecretEncrypted!,
       workspace.shopifyWebhookSecretIv!,
       workspace.shopifyWebhookSecretTag!
     ).trim();
-    if (!verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
+    if (webhookSecret && !verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
       wsLog.warn("HMAC verification failed for refund");
       continue;
     }
@@ -877,7 +1394,7 @@ async function handleRefundCreated(
     const eventData = {
       eventName: "Refund",
       eventId: refundEventId,
-      timestamp: Date.now(),
+      timestamp: occurredAt?.getTime() ?? Date.now(),
       url: originalPurchase?.pageUrl ?? "",
       referrer: "",
       fbp: originalPurchase?.fbp ?? null,
@@ -891,6 +1408,17 @@ async function handleRefundCreated(
       clientIp: originalPurchase?.customerIp ?? "",
       userAgent: originalPurchase?.userAgent ?? "",
     };
+    const refundRetryEnvelope = encryptEventRetryEnvelope({
+      version: 1,
+      event: {
+        ...eventData,
+        ttclid: null,
+        gclid: null,
+        rdtCid: null,
+        epik: null,
+        gaClientId: null,
+      },
+    });
 
     // Create EventLog entries
     const eventLogEntries = await Promise.all(
@@ -913,6 +1441,7 @@ async function handleRefundCreated(
               userAgent: originalPurchase?.userAgent ?? null,
               fbp: originalPurchase?.fbp ?? null,
               fbc: originalPurchase?.fbc ?? null,
+              ...refundRetryEnvelope,
               payload: {
                 eventName: "Refund",
                 refundId,
@@ -940,18 +1469,27 @@ async function handleRefundCreated(
     }
 
     // Queue jobs (GA4 only for refunds)
-    await Promise.all(
+    const refundEnqueueResults = await Promise.all(
       validDests.map((dest, idx) => {
         const eventLogId = validEntries[idx].id;
-        return dest.queue.add(dest.jobName, {
-          workspaceId: workspace.id,
-          destination: dest.destination,
-          requestId,
+        return enqueueReplayJob(
+          dest.queue,
+          dest.jobName,
           eventLogId,
-          event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null, gaClientId: null },
-        } satisfies DestinationEventJob);
+          {
+            workspaceId: workspace.id,
+            destination: dest.destination,
+            requestId,
+            eventLogId,
+            event: { ...eventData, ttclid: null, gclid: null, rdtCid: null, epik: null, gaClientId: null },
+          } satisfies DestinationEventJob,
+          { preferReplayData: true }
+        );
       })
     );
+    if (refundEnqueueResults.includes("active")) {
+      throw new Error("Canonical webhook is waiting for an active Refund delivery to settle");
+    }
 
     wsLog.info("Refund queued", {
       refundId,

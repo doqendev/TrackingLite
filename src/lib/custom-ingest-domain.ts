@@ -1,7 +1,7 @@
 import { isIP } from "node:net";
 
 const DEFAULT_APP_URL = "https://trackclear.io";
-const DEFAULT_INGEST_URL = "https://api.trackclear.io/api/events/ingest";
+const DEFAULT_INGEST_URL = "https://www.trackclear.io/api/events/ingest";
 const VERIFY_PATH = "/api/custom-ingest-domain/check";
 const OWNED_TRACKCLEAR_HOSTS = new Set([
   "trackclear.io",

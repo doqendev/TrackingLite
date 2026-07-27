@@ -1,6 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import {
+  assertRailwayProductionRuntimeReleaseApproved,
+  assertVercelProductionRuntimeReleaseApproved,
+  shouldAssertRailwayProductionRelease,
+  shouldAssertVercelProductionSchema,
+} from "@/lib/production-release-gate";
 
 // In-memory sliding window for auth rate limiting.
 // Middleware runs in Edge runtime where ioredis is not available.
@@ -35,6 +41,56 @@ function cleanupStaleEntries() {
 }
 
 export default async function middleware(req: NextRequest) {
+  // Keep these as direct references so Next/Vercel includes the required
+  // server-side environment variables in the Edge middleware bundle.
+  const vercelReleaseEnvironment = {
+    VERCEL: process.env.VERCEL,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA,
+    TRACKCLEAR_PRODUCTION_RELEASE_SHA:
+      process.env.TRACKCLEAR_PRODUCTION_RELEASE_SHA,
+  };
+  const railwayReleaseEnvironment = {
+    RAILWAY_PROJECT_ID: process.env.RAILWAY_PROJECT_ID,
+    RAILWAY_SERVICE_ID: process.env.RAILWAY_SERVICE_ID,
+    RAILWAY_ENVIRONMENT_ID: process.env.RAILWAY_ENVIRONMENT_ID,
+    RAILWAY_GIT_COMMIT_SHA: process.env.RAILWAY_GIT_COMMIT_SHA,
+    TRACKCLEAR_PRODUCTION_RAILWAY_ENVIRONMENT_ID:
+      process.env.TRACKCLEAR_PRODUCTION_RAILWAY_ENVIRONMENT_ID,
+    TRACKCLEAR_PRODUCTION_RELEASE_SHA:
+      process.env.TRACKCLEAR_PRODUCTION_RELEASE_SHA,
+  };
+  try {
+    const isRailwayRuntime = shouldAssertRailwayProductionRelease(
+      railwayReleaseEnvironment
+    );
+    const mustEvaluateVercelRelease =
+      process.env.NODE_ENV === "production" ||
+      Boolean(vercelReleaseEnvironment.VERCEL?.trim()) ||
+      Boolean(vercelReleaseEnvironment.VERCEL_ENV?.trim());
+    if (isRailwayRuntime) {
+      assertRailwayProductionRuntimeReleaseApproved(
+        railwayReleaseEnvironment
+      );
+    } else if (
+      mustEvaluateVercelRelease &&
+      shouldAssertVercelProductionSchema(vercelReleaseEnvironment)
+    ) {
+      assertVercelProductionRuntimeReleaseApproved(vercelReleaseEnvironment);
+    }
+  } catch {
+    return NextResponse.json(
+      { error: "Service temporarily unavailable" },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Retry-After": "60",
+        },
+      }
+    );
+  }
+
   cleanupStaleEntries();
 
   // Rate limit the credentials login endpoint

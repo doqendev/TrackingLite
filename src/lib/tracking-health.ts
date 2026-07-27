@@ -128,6 +128,8 @@ export async function getTrackingHealth(
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
       shopifyWebhookSecretEncrypted: true,
+      shopifyWebhookVerifiedAt: true,
+      shopifyWebhookLastReceivedAt: true,
       shopifyDomain: true,
     },
   });
@@ -158,6 +160,7 @@ export async function getTrackingHealth(
     latestPurchase,
     recentWebhookPurchases,
     recentDlqEntry,
+    retryingWebhookInbox,
   ] = await Promise.all([
     db.eventLog.findFirst({
       where: { workspaceId, source: "snippet", createdAt: { gte: since24h } },
@@ -165,17 +168,30 @@ export async function getTrackingHealth(
       select: { createdAt: true },
     }),
     db.eventLog.findFirst({
-      where: { workspaceId, source: "webhook", eventName: "Purchase" },
+      where: {
+        workspaceId,
+        source: "webhook",
+        eventName: "Purchase",
+        status: { not: "SUPERSEDED" },
+      },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true, status: true },
     }),
     db.eventLog.findFirst({
-      where: { workspaceId, destination: "META" },
+      where: {
+        workspaceId,
+        destination: "META",
+        status: { not: "SUPERSEDED" },
+      },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true, status: true, errorMessage: true },
     }),
     db.eventLog.findFirst({
-      where: { workspaceId, destination: "TIKTOK" },
+      where: {
+        workspaceId,
+        destination: "TIKTOK",
+        status: { not: "SUPERSEDED" },
+      },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true, status: true, errorMessage: true },
     }),
@@ -202,6 +218,7 @@ export async function getTrackingHealth(
       where: {
         workspaceId,
         eventName: "Purchase",
+        status: "SENT",
         orderId: { not: null },
         destination: { in: ["META", "TIKTOK"] },
         createdAt: { gte: since7d },
@@ -213,6 +230,7 @@ export async function getTrackingHealth(
         workspaceId,
         source: "webhook",
         eventName: "Purchase",
+        status: { not: "SUPERSEDED" },
         destination: { in: ["META", "TIKTOK"] },
         OR: [
           { fbp: { not: null } },
@@ -229,6 +247,7 @@ export async function getTrackingHealth(
         workspaceId,
         source: "webhook",
         eventName: "Purchase",
+        status: { not: "SUPERSEDED" },
         destination: { in: ["META", "TIKTOK"] },
       },
       orderBy: { createdAt: "desc" },
@@ -239,6 +258,7 @@ export async function getTrackingHealth(
         workspaceId,
         source: "webhook",
         eventName: "Purchase",
+        status: { not: "SUPERSEDED" },
         destination: { in: ["META", "TIKTOK"] },
         createdAt: { gte: since7d },
       },
@@ -257,6 +277,20 @@ export async function getTrackingHealth(
           select: { createdAt: true, error: true },
         })
       : Promise.resolve(null),
+    db.shopifyWebhookInbox.findFirst({
+      where: {
+        workspaceId,
+        status: { in: ["PENDING", "PROCESSING"] },
+        attempts: { gt: 0 },
+      },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        updatedAt: true,
+        topic: true,
+        attempts: true,
+        lastError: true,
+      },
+    }),
   ]);
 
   const metaConfigured = !!(
@@ -270,6 +304,7 @@ export async function getTrackingHealth(
     workspace.tiktokAccessTokenEncrypted
   );
   const webhookConfigured = !!workspace.shopifyWebhookSecretEncrypted;
+  const webhookVerified = !!workspace.shopifyWebhookVerifiedAt;
   const attributionCounts = recentWebhookPurchases.reduce<Record<string, number>>((counts, purchase) => {
     for (const source of attributionSourcesFromPayload(purchase.payload)) {
       counts[source] = (counts[source] ?? 0) + 1;
@@ -296,13 +331,22 @@ export async function getTrackingHealth(
     {
       key: "webhook",
       label: "Webhook active",
-      severity: !webhookConfigured ? "error" : lastWebhookPurchase ? "ok" : "warning",
+      severity: !webhookConfigured || !webhookVerified || retryingWebhookInbox ? "error" : "ok",
       detail: !webhookConfigured
         ? "Shopify webhook signing secret is not configured."
-        : lastWebhookPurchase
-          ? `Last webhook Purchase was ${lastWebhookPurchase.status} ${formatAge(lastWebhookPurchase.createdAt)}.`
-          : "Webhook secret is saved, but no webhook Purchase has been logged yet.",
-      timestamp: lastWebhookPurchase?.createdAt ?? null,
+        : !webhookVerified
+          ? "Webhook secret is saved, but Track Clear has not verified a signed Shopify delivery. Snippet Purchase remains enabled as a safety fallback."
+          : retryingWebhookInbox
+            ? `A ${retryingWebhookInbox.topic} webhook is retrying after ${retryingWebhookInbox.attempts} attempt(s): ${retryingWebhookInbox.lastError ?? "processing failed"}`
+            : lastWebhookPurchase
+              ? `Last webhook Purchase was ${lastWebhookPurchase.status} ${formatAge(lastWebhookPurchase.createdAt)}.`
+              : `Signed webhook verified ${formatAge(workspace.shopifyWebhookVerifiedAt!)}; waiting for the first Purchase.`,
+      timestamp:
+        retryingWebhookInbox?.updatedAt ??
+        lastWebhookPurchase?.createdAt ??
+        workspace.shopifyWebhookLastReceivedAt ??
+        workspace.shopifyWebhookVerifiedAt ??
+        null,
     },
     {
       key: "meta",
@@ -347,8 +391,10 @@ export async function getTrackingHealth(
     {
       key: "errors",
       label: "Last error",
-      severity: recentFailedCount > 0 || recentDlqEntry ? "error" : "ok",
-      detail: recentDlqEntry
+      severity: recentFailedCount > 0 || recentDlqEntry || retryingWebhookInbox ? "error" : "ok",
+      detail: retryingWebhookInbox
+        ? `Webhook inbox retrying ${retryingWebhookInbox.topic}: ${retryingWebhookInbox.lastError ?? "processing failed"}`
+        : recentDlqEntry
         ? `Webhook dead-letter entry ${formatAge(recentDlqEntry.createdAt)}: ${recentDlqEntry.error}`
         : lastFailedEvent
           ? `${recentFailedCount} Meta/TikTok failure(s) in 24h. Latest ${lastFailedEvent.destination}: ${lastFailedEvent.errorMessage ?? "Unknown error"}`

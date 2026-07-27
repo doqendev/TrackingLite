@@ -12,6 +12,7 @@ export interface TikTokEvent {
     phone?: string; // SHA-256 hashed
     external_id?: string; // SHA-256 hashed
     ttclid?: string;
+    ttp?: string;
     ip?: string;
     user_agent?: string;
   };
@@ -57,6 +58,7 @@ export function normalizeToTikTokEvent(
     clientIp: string;
     userAgent: string;
     ttclid?: string | null;
+    ttp?: string | null;
   }
 ): TikTokEvent | null {
   const tiktokEventName =
@@ -82,6 +84,9 @@ export function normalizeToTikTokEvent(
   }
   if (eventData.ttclid) {
     user.ttclid = eventData.ttclid;
+  }
+  if (eventData.ttp) {
+    user.ttp = eventData.ttp;
   }
   if (eventData.clientIp) {
     user.ip = eventData.clientIp;

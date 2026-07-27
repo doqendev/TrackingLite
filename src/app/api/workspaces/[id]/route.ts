@@ -20,6 +20,7 @@ const UpdateWorkspaceSchema = z.object({
   metaAccessToken: z.string().optional().nullable(),
   metaTestEventCode: z.string().optional().nullable(),
   enableMeta: z.boolean().optional(),
+  metaBrowserTrackingEnabled: z.boolean().optional(),
   consentMode: z.enum(["STRICT", "LAX"]).optional(),
   catalogIdMode: z.enum([
     "VARIANT_NUMERIC_ID",
@@ -51,6 +52,7 @@ const UpdateWorkspaceSchema = z.object({
   tiktokPixelId: z.string().regex(/^[A-Za-z0-9_-]+$/, "Invalid Pixel ID format").optional().nullable(),
   tiktokAccessToken: z.string().optional().nullable(),
   enableTikTok: z.boolean().optional(),
+  tiktokBrowserTrackingEnabled: z.boolean().optional(),
   // GA4
   ga4MeasurementId: z.string().regex(/^G-[A-Za-z0-9]+$/, "Must be format G-XXXXXXX").optional().nullable(),
   ga4ApiSecret: z.string().optional().nullable(),
@@ -135,6 +137,7 @@ export async function GET(
         metaAccessTokenEncrypted: true,
         metaTestEventCode: true,
         enableMeta: true,
+        metaBrowserTrackingEnabled: true,
         consentMode: true,
         enablePageView: true,
         enableViewContent: true,
@@ -147,6 +150,7 @@ export async function GET(
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
         enableTikTok: true,
+        tiktokBrowserTrackingEnabled: true,
         // GA4
         ga4MeasurementId: true,
         ga4ApiSecretEncrypted: true,
@@ -243,6 +247,14 @@ export async function PATCH(
     }
 
     const data = UpdateWorkspaceSchema.parse(body);
+    if (data.enableMeta === false || data.metaPixelId === null) {
+      // A browser pixel cannot remain an implicit owner after its Meta
+      // destination or dataset ID is removed.
+      data.metaBrowserTrackingEnabled = false;
+    }
+    if (data.enableTikTok === false || data.tiktokPixelId === null) {
+      data.tiktokBrowserTrackingEnabled = false;
+    }
     const nextCatalogMode = data.catalogIdMode ?? workspace.catalogIdMode ?? "VARIANT_NUMERIC_ID";
     const nextCatalogTemplate =
       data.catalogIdTemplate !== undefined
@@ -251,6 +263,35 @@ export async function PATCH(
     if (nextCatalogMode === "CUSTOM" && !nextCatalogTemplate?.trim()) {
       return NextResponse.json(
         { error: "Custom catalog ID mode requires a template." },
+        { status: 422 }
+      );
+    }
+
+    const nextMetaBrowserTrackingEnabled =
+      data.metaBrowserTrackingEnabled ?? workspace.metaBrowserTrackingEnabled ?? false;
+    const nextMetaEnabled = data.enableMeta ?? workspace.enableMeta;
+    const nextMetaPixelId =
+      data.metaPixelId !== undefined ? data.metaPixelId : workspace.metaPixelId;
+    if (nextMetaBrowserTrackingEnabled && (!nextMetaEnabled || !nextMetaPixelId)) {
+      return NextResponse.json(
+        {
+          error:
+            "TrackClear-owned Meta browser tracking requires an enabled Meta integration and Pixel ID.",
+        },
+        { status: 422 }
+      );
+    }
+    const nextTikTokBrowserTrackingEnabled =
+      data.tiktokBrowserTrackingEnabled ?? workspace.tiktokBrowserTrackingEnabled ?? false;
+    const nextTikTokEnabled = data.enableTikTok ?? workspace.enableTikTok;
+    const nextTikTokPixelId =
+      data.tiktokPixelId !== undefined ? data.tiktokPixelId : workspace.tiktokPixelId;
+    if (nextTikTokBrowserTrackingEnabled && (!nextTikTokEnabled || !nextTikTokPixelId)) {
+      return NextResponse.json(
+        {
+          error:
+            "TrackClear-owned TikTok browser tracking requires an enabled TikTok integration and Pixel ID.",
+        },
         { status: 422 }
       );
     }
@@ -343,12 +384,27 @@ export async function PATCH(
     // Add server-computed shopifyDomain if domain was updated
     if (resolvedShopifyDomain !== undefined) {
       updateData.shopifyDomain = resolvedShopifyDomain;
+      if (resolvedShopifyDomain !== (workspace.shopifyDomain ?? null)) {
+        // Webhook proof belongs to one exact store domain. Keeping it after a
+        // domain change could suppress the browser fallback for an unverified
+        // orders/paid route on the replacement store.
+        updateData.shopifyWebhookVerifiedAt = null;
+        updateData.shopifyWebhookLastReceivedAt = null;
+      }
     }
 
     // Handle encryption for each sensitive field
     for (const [inputName, encField, ivField, tagField] of ENCRYPTED_FIELDS) {
       const value = sensitiveValues[inputName];
       if (value === undefined) continue;
+
+      if (inputName === "shopifyWebhookSecret") {
+        // Verification belongs to the exact secret that authenticated a real
+        // Shopify delivery. Replacing or clearing it must re-enable the safe
+        // snippet Purchase fallback until the new secret is proven.
+        updateData.shopifyWebhookVerifiedAt = null;
+        updateData.shopifyWebhookLastReceivedAt = null;
+      }
 
       if (value === null) {
         // Clear the encrypted fields
@@ -400,6 +456,7 @@ export async function PATCH(
         metaAccessTokenEncrypted: true,
         metaTestEventCode: true,
         enableMeta: true,
+        metaBrowserTrackingEnabled: true,
         consentMode: true,
         enablePageView: true,
         enableViewContent: true,
@@ -412,6 +469,7 @@ export async function PATCH(
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
         enableTikTok: true,
+        tiktokBrowserTrackingEnabled: true,
         // GA4
         ga4MeasurementId: true,
         ga4ApiSecretEncrypted: true,
@@ -435,8 +493,10 @@ export async function PATCH(
         googleAdsLabelViewContent: true,
         enableGoogleAds: true,
         // Shopify webhook
-        shopifyDomain: true,
-        shopifyWebhookSecretEncrypted: true,
+         shopifyDomain: true,
+         shopifyWebhookSecretEncrypted: true,
+         shopifyWebhookVerifiedAt: true,
+         shopifyWebhookLastReceivedAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -453,8 +513,10 @@ export async function PATCH(
       klaviyoApiKeyEncrypted,
       redditAccessTokenEncrypted,
       pinterestConversionTokenEncrypted,
-      shopifyWebhookSecretEncrypted: updatedShopifyWebhookSecretEncrypted,
-      ...rest
+       shopifyWebhookSecretEncrypted: updatedShopifyWebhookSecretEncrypted,
+       shopifyWebhookVerifiedAt,
+       shopifyWebhookLastReceivedAt,
+       ...rest
     } = updated;
 
     return NextResponse.json({
@@ -465,7 +527,9 @@ export async function PATCH(
       hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
       hasRedditAccessToken: redditAccessTokenEncrypted !== null,
       hasPinterestConversionToken: pinterestConversionTokenEncrypted !== null,
-      hasShopifyWebhookSecret: updatedShopifyWebhookSecretEncrypted !== null,
+       hasShopifyWebhookSecret: updatedShopifyWebhookSecretEncrypted !== null,
+       isShopifyWebhookVerified: shopifyWebhookVerifiedAt !== null,
+       shopifyWebhookLastReceivedAt,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

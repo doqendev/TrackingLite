@@ -27,6 +27,9 @@ export interface SnippetEventPayload {
     marketingAllowed?: boolean;
   };
   ttclid?: string | null;
+  ttp?: string | null;
+  attributionTimestamp?: number | null;
+  attributionSource?: string | null;
   rdtCid?: string | null;
   epik?: string | null;
   utmSource?: string | null;

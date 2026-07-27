@@ -18,7 +18,7 @@ model User {
   name                String?
   email               String               @unique
   emailVerified       DateTime?
-  hashedPassword      String?              // null if signed up via Google OAuth
+  hashedPassword      String? // null if signed up via Google OAuth
   image               String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -84,89 +84,94 @@ model PasswordResetToken {
 // ============================================================
 
 model Workspace {
-  id                        String          @id @default(cuid())
-  userId                    String
-  user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name                      String          // e.g., "My Shopify Store"
-  domain                    String?         // e.g., "mystore.myshopify.com" (optional, for display)
-  platform                  Platform        @default(SHOPIFY)
-  productMode               WorkspaceProductMode?
-  installType               WorkspaceInstallType?
-  catalogIdMode             CatalogIdMode   @default(VARIANT_NUMERIC_ID)
-  catalogIdPrefix           String?
-  catalogIdSuffix           String?
-  catalogIdTemplate         String?
-  customIngestDomain        String?         @unique
-  customIngestDomainVerifiedAt DateTime?
+  id                              String                @id @default(cuid())
+  userId                          String
+  user                            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                            String // e.g., "My Shopify Store"
+  domain                          String? // e.g., "mystore.myshopify.com" (optional, for display)
+  platform                        Platform              @default(SHOPIFY)
+  productMode                     WorkspaceProductMode?
+  installType                     WorkspaceInstallType?
+  catalogIdMode                   CatalogIdMode         @default(VARIANT_NUMERIC_ID)
+  catalogIdPrefix                 String?
+  catalogIdSuffix                 String?
+  catalogIdTemplate               String?
+  customIngestDomain              String?               @unique
+  customIngestDomainVerifiedAt    DateTime?
   customIngestDomainLastCheckedAt DateTime?
-  customIngestDomainLastError String?
-  apiKey                    String          @unique // Unique API key for this workspace (used in JS snippet)
-  metaPixelId               String?         // Meta Pixel ID
-  metaAccessTokenEncrypted  String?         // AES-256-GCM encrypted
-  metaAccessTokenIv         String?         // IV for decryption
-  metaAccessTokenTag        String?         // Auth tag for decryption
-  metaTestEventCode         String?         // For testing in Meta Events Manager
-  enableMeta                Boolean   @default(true)
+  customIngestDomainLastError     String?
+  apiKey                          String                @unique // Unique API key for this workspace (used in JS snippet)
+  metaPixelId                     String? // Meta Pixel ID
+  metaAccessTokenEncrypted        String? // AES-256-GCM encrypted
+  metaAccessTokenIv               String? // IV for decryption
+  metaAccessTokenTag              String? // Auth tag for decryption
+  metaTestEventCode               String? // For testing in Meta Events Manager
+  enableMeta                      Boolean               @default(true)
+  metaBrowserTrackingEnabled      Boolean               @default(false)
 
   // TikTok fields
-  tiktokPixelId               String?
-  tiktokAccessTokenEncrypted  String?
-  tiktokAccessTokenIv         String?
-  tiktokAccessTokenTag        String?
-  enableTikTok                Boolean   @default(false)
+  tiktokPixelId                String?
+  tiktokAccessTokenEncrypted   String?
+  tiktokAccessTokenIv          String?
+  tiktokAccessTokenTag         String?
+  enableTikTok                 Boolean @default(false)
+  tiktokBrowserTrackingEnabled Boolean @default(false)
 
   // GA4 fields
-  ga4MeasurementId            String?
-  ga4ApiSecretEncrypted       String?
-  ga4ApiSecretIv              String?
-  ga4ApiSecretTag             String?
-  enableGA4                   Boolean   @default(false)
+  ga4MeasurementId      String?
+  ga4ApiSecretEncrypted String?
+  ga4ApiSecretIv        String?
+  ga4ApiSecretTag       String?
+  enableGA4             Boolean @default(false)
 
   // Klaviyo fields
-  klaviyoApiKeyEncrypted      String?
-  klaviyoApiKeyIv             String?
-  klaviyoApiKeyTag            String?
-  enableKlaviyo               Boolean   @default(false)
+  klaviyoApiKeyEncrypted String?
+  klaviyoApiKeyIv        String?
+  klaviyoApiKeyTag       String?
+  enableKlaviyo          Boolean @default(false)
 
   // Reddit fields
-  redditAccountId                 String?
-  redditAccessTokenEncrypted      String?
-  redditAccessTokenIv             String?
-  redditAccessTokenTag            String?
-  enableReddit                    Boolean   @default(false)
+  redditAccountId            String?
+  redditAccessTokenEncrypted String?
+  redditAccessTokenIv        String?
+  redditAccessTokenTag       String?
+  enableReddit               Boolean @default(false)
 
   // Pinterest fields
-  pinterestAdAccountId                  String?
-  pinterestConversionTokenEncrypted     String?
-  pinterestConversionTokenIv            String?
-  pinterestConversionTokenTag           String?
-  enablePinterest                       Boolean   @default(false)
+  pinterestAdAccountId              String?
+  pinterestConversionTokenEncrypted String?
+  pinterestConversionTokenIv        String?
+  pinterestConversionTokenTag       String?
+  enablePinterest                   Boolean @default(false)
 
   // Google Ads fields (no encryption needed -- Conversion ID and Labels are public values)
-  googleAdsConversionId               String?   // e.g. "1234567890" (the AW- number)
-  googleAdsLabelPurchase              String?   // e.g. "AbCdEfGhIjKl"
-  googleAdsLabelAddToCart             String?
-  googleAdsLabelInitiateCheckout      String?
-  googleAdsLabelViewContent           String?
-  enableGoogleAds                     Boolean   @default(false)
+  googleAdsConversionId          String? // e.g. "1234567890" (the AW- number)
+  googleAdsLabelPurchase         String? // e.g. "AbCdEfGhIjKl"
+  googleAdsLabelAddToCart        String?
+  googleAdsLabelInitiateCheckout String?
+  googleAdsLabelViewContent      String?
+  enableGoogleAds                Boolean @default(false)
 
   // Shopify webhook fields
-  shopifyWebhookSecretEncrypted String?   // AES-256-GCM encrypted
-  shopifyWebhookSecretIv        String?   // IV for decryption
-  shopifyWebhookSecretTag       String?   // Auth tag for decryption
-  shopifyDomain         String?   // e.g., "mystore.myshopify.com"
+  shopifyWebhookSecretEncrypted String? // AES-256-GCM encrypted
+  shopifyWebhookSecretIv        String? // IV for decryption
+  shopifyWebhookSecretTag       String? // Auth tag for decryption
+  shopifyDomain                 String? // e.g., "mystore.myshopify.com"
+  shopifyWebhookVerifiedAt      DateTime?
+  shopifyWebhookLastReceivedAt  DateTime?
 
-  consentMode               ConsentMode     @default(STRICT)
-  isActive                  Boolean         @default(true)
-  enablePageView            Boolean         @default(true)
-  enableViewContent         Boolean         @default(true)
-  enableAddToCart           Boolean         @default(true)
-  enableInitiateCheckout    Boolean         @default(true)
-  enablePurchase            Boolean         @default(true)
-  eventsForwardedCount      Int             @default(0)
-  createdAt                 DateTime        @default(now())
-  updatedAt                 DateTime        @updatedAt
-  events                    EventLog[]
+  consentMode            ConsentMode           @default(STRICT)
+  isActive               Boolean               @default(true)
+  enablePageView         Boolean               @default(true)
+  enableViewContent      Boolean               @default(true)
+  enableAddToCart        Boolean               @default(true)
+  enableInitiateCheckout Boolean               @default(true)
+  enablePurchase         Boolean               @default(true)
+  eventsForwardedCount   Int                   @default(0)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  events                 EventLog[]
+  shopifyWebhookInboxes  ShopifyWebhookInbox[]
 
   @@index([userId])
   @@index([apiKey])
@@ -174,51 +179,71 @@ model Workspace {
 }
 
 model EventLog {
-  id             String      @id @default(cuid())
-  workspaceId    String
-  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  eventName      EventName
-  eventId        String      // dedup event_id (UUID from JS snippet)
-  status         EventStatus @default(PENDING)
-  metaResponse   Json?       // Raw Meta CAPI response
-  errorMessage   String?
-  retryCount     Int         @default(0)
-  payload        Json?       // Sanitized payload (no raw PII)
-  customerIp     String?
-  userAgent      String?
-  fbp            String?     // _fbp cookie value
-  fbc            String?     // _fbc cookie value
-  pageUrl        String?     // URL where event occurred
-  value          Float?      // monetary value (e.g., cart total, purchase amount)
-  currency       String?     // ISO 4217 currency code (e.g., "USD", "BRL")
-  numItems       Int?        // number of items in cart/order
-  orderId        String?     // Shopify order ID (for dedup)
-  utmSource      String?
-  utmMedium      String?
-  utmCampaign    String?
-  utmContent     String?
-  utmTerm        String?
-  gclid          String?
-  ttclid         String?
-  rdtCid         String?
-  epik           String?
-  refundId       String?
-  refundAmount   Float?
-  destination    Destination  @default(META)
-  source         String?     @default("snippet")  // "snippet" | "webhook"
-  paymentGateway String?     // e.g. "paypal", "shopify_payments", "klarna" (webhook only)
-  createdAt      DateTime    @default(now())
+  id                     String      @id @default(cuid())
+  workspaceId            String
+  workspace              Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventName              EventName
+  eventId                String // dedup event_id (UUID from JS snippet)
+  status                 EventStatus @default(PENDING)
+  metaResponse           Json? // Raw Meta CAPI response
+  errorMessage           String?
+  retryCount             Int         @default(0)
+  payload                Json? // Sanitized payload (no raw PII)
+  customerIp             String?
+  userAgent              String?
+  fbp                    String? // _fbp cookie value
+  fbc                    String? // _fbc cookie value
+  pageUrl                String? // URL where event occurred
+  value                  Float? // monetary value (e.g., cart total, purchase amount)
+  currency               String? // ISO 4217 currency code (e.g., "USD", "BRL")
+  numItems               Int? // number of items in cart/order
+  orderId                String? // Shopify order ID (for dedup)
+  orderName              String? // Normalized Shopify order name alias
+  checkoutToken          String? // Durable browser/webhook Purchase alias
+  cartToken              String? // Durable browser/webhook Purchase alias
+  utmSource              String?
+  utmMedium              String?
+  utmCampaign            String?
+  utmContent             String?
+  utmTerm                String?
+  gclid                  String?
+  ttclid                 String?
+  rdtCid                 String?
+  epik                   String?
+  refundId               String?
+  refundAmount           Float?
+  destination            Destination @default(META)
+  source                 String?     @default("snippet") // "snippet" | "webhook"
+  paymentGateway         String? // e.g. "paypal", "shopify_payments", "klarna" (webhook only)
+  retryPayloadEncrypted  String?     @db.Text // Short-lived AES-256-GCM retry envelope
+  retryPayloadIv         String?
+  retryPayloadTag        String?
+  retryPayloadExpiresAt  DateTime?
+  lastAttemptAt          DateTime? // Last worker/replay claim time for crash recovery
+  nextRetryAt            DateTime? // Earliest automatic retry time for transient failures
+  deliveryClaimToken     String? // Durable worker/webhook delivery ownership token
+  deliveryClaimOwner     String? // "WORKER" (rolling) | "WORKER_ATTEMPTING" | "WORKER_ACCEPTED" | "SHOPIFY_WEBHOOK"
+  deliveryClaimedAt      DateTime?
+  deliveryClaimExpiresAt DateTime?
+  createdAt              DateTime    @default(now())
 
+  @@unique([workspaceId, eventId, destination])
   @@index([workspaceId, createdAt])
   @@index([workspaceId, eventName])
   @@index([workspaceId, destination])
   @@index([workspaceId, utmSource, utmCampaign])
   @@index([eventId])
-  @@unique([workspaceId, eventId, destination])
   @@index([status, createdAt])
+  @@index([status, nextRetryAt])
+  @@index([status, lastAttemptAt])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, eventName, destination, createdAt])
   @@index([workspaceId, refundId])
+  @@index([workspaceId, orderId])
+  @@index([workspaceId, orderName])
+  @@index([workspaceId, checkoutToken])
+  @@index([workspaceId, cartToken])
+  @@index([deliveryClaimToken])
 }
 
 model Subscription {
@@ -238,15 +263,15 @@ model Subscription {
 }
 
 model AlertPreference {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Alert types - which alerts are enabled
-  trackingDown      Boolean @default(true)   // success rate < 80%
-  highErrorRate     Boolean @default(true)   // >10% errors in last hour
-  orderLimitWarning Boolean @default(true)   // 80% and 95% of monthly limit
-  orderLimitReached Boolean @default(true)   // 100% of limit
+  trackingDown      Boolean @default(true) // success rate < 80%
+  highErrorRate     Boolean @default(true) // >10% errors in last hour
+  orderLimitWarning Boolean @default(true) // 80% and 95% of monthly limit
+  orderLimitReached Boolean @default(true) // 100% of limit
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -257,7 +282,7 @@ model AlertPreference {
 model AlertLog {
   id        String   @id @default(cuid())
   userId    String
-  alertType String   // "tracking_down", "high_error_rate", "order_limit_warning", "order_limit_reached"
+  alertType String // "tracking_down", "high_error_rate", "order_limit_warning", "order_limit_reached"
   message   String
   sentAt    DateTime @default(now())
 
@@ -290,6 +315,31 @@ enum Platform {
   WOOCOMMERCE
   BIGCOMMERCE
   CUSTOM
+}
+
+model ShopifyWebhookInbox {
+  id               String                    @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveryId       String
+  topic            String
+  shopDomain       String
+  payloadEncrypted String?                   @db.Text
+  payloadIv        String?
+  payloadTag       String?
+  occurredAt       DateTime?
+  status           ShopifyWebhookInboxStatus @default(PENDING)
+  attempts         Int                       @default(0)
+  nextAttemptAt    DateTime                  @default(now())
+  lockedAt         DateTime?
+  processedAt      DateTime?
+  lastError        String?                   @db.Text
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@unique([workspaceId, deliveryId])
+  @@index([status, nextAttemptAt])
+  @@index([workspaceId, createdAt])
 }
 
 enum WorkspaceProductMode {
@@ -325,6 +375,7 @@ enum EventStatus {
   SENT
   FAILED
   RETRYING
+  SUPERSEDED
 }
 
 enum ConsentMode {
@@ -355,4 +406,11 @@ enum Destination {
   REDDIT
   PINTEREST
   GOOGLE_ADS
+}
+
+enum ShopifyWebhookInboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  EXPIRED
 }

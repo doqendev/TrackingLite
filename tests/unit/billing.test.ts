@@ -5,6 +5,7 @@ const mockGet = vi.fn();
 const mockIncr = vi.fn();
 const mockDecr = vi.fn();
 const mockExpire = vi.fn();
+const mockEval = vi.fn();
 const mockPipelineExec = vi.fn();
 
 vi.mock("ioredis", () => {
@@ -13,6 +14,7 @@ vi.mock("ioredis", () => {
     this.incr = mockIncr;
     this.decr = mockDecr;
     this.expire = mockExpire;
+    this.eval = mockEval;
     this.set = vi.fn();
     this.on = vi.fn();
     this.pipeline = () => ({
@@ -46,7 +48,13 @@ vi.mock("@/lib/stripe", () => ({
   },
 }));
 
-import { checkOrderLimits, incrementOrderCount, getOrderCount } from "@/lib/billing";
+import {
+  checkOrderLimits,
+  getOrderCount,
+  incrementOrderCount,
+  reconcilePurchaseBillingState,
+  rollbackPurchaseBillingReservation,
+} from "@/lib/billing";
 
 const USER_ID = "user_test_123";
 
@@ -57,6 +65,7 @@ describe("checkOrderLimits", () => {
     mockIncr.mockResolvedValue(1);
     mockDecr.mockResolvedValue(0);
     mockExpire.mockResolvedValue(1);
+    mockEval.mockResolvedValue([1, 1]);
     mockPipelineExec.mockResolvedValue([[null, 1], [null, 1]]);
   });
 
@@ -202,6 +211,81 @@ describe("checkOrderLimits", () => {
     // The new INCR-first pattern uses r.incr (not r.get) to check the count
     expect(mockIncr).toHaveBeenCalledWith(expect.stringMatching(expectedKeyPattern));
   });
+
+  it("reserves the same normalized Purchase identity only once", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockEval
+      .mockResolvedValueOnce([1, 31])
+      .mockResolvedValueOnce([0, 31]);
+    const identity = {
+      workspaceId: "ws-1",
+      eventId: "shopify-purchase:ws-1:1001",
+      aliases: ["checkout:checkout-token-1", "order:1001"],
+    };
+
+    const first = await checkOrderLimits(USER_ID, "Purchase", identity);
+    const duplicate = await checkOrderLimits(USER_ID, "Purchase", identity);
+
+    expect(first.allowed).toBe(true);
+    expect(first.reservation?.counterKey).toMatch(/^orders:user_test_123:\d{4}-\d{2}$/);
+    expect(first.reservation?.seenKeys).toHaveLength(3);
+    expect(first.reservation?.seenKeys).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^orders:seen:user_test_123:\d{4}-\d{2}:[a-f0-9]{64}$/),
+      ])
+    );
+    expect(duplicate).toMatchObject({ allowed: true, used: 31, limit: 50 });
+    expect(duplicate.reservation).toBeUndefined();
+    expect(mockEval).toHaveBeenCalledTimes(2);
+    expect(mockEval.mock.calls[0][1]).toBe(4);
+    expect(mockIncr).not.toHaveBeenCalled();
+    expect(JSON.stringify(mockEval.mock.calls)).not.toContain(identity.eventId);
+    expect(JSON.stringify(mockEval.mock.calls)).not.toContain("checkout-token-1");
+  });
+
+  it("rolls back a newly-created reservation idempotently without raw identity", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockEval.mockResolvedValueOnce([1, 31]).mockResolvedValueOnce(1);
+    const result = await checkOrderLimits(USER_ID, "Purchase", {
+      workspaceId: "ws-1",
+      eventId: "shopify-purchase:ws-1:1001",
+    });
+
+    await expect(rollbackPurchaseBillingReservation(result.reservation!)).resolves.toBe(true);
+    expect(mockEval).toHaveBeenLastCalledWith(
+      expect.stringContaining('removed = removed + redis.call("DEL", KEYS[keyIndex])'),
+      2,
+      result.reservation!.counterKey,
+      ...result.reservation!.seenKeys
+    );
+    expect(JSON.stringify(result.reservation)).not.toContain("shopify-purchase");
+  });
+
+  it("blocks a new reserved identity at the limit without decrementing twice", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockEval.mockResolvedValue([-1, 50]);
+
+    const result = await checkOrderLimits(USER_ID, "Purchase", {
+      workspaceId: "ws-1",
+      eventId: "shopify-purchase:ws-1:1002",
+    });
+
+    expect(result).toMatchObject({ allowed: false, used: 50, limit: 50 });
+    expect(mockDecr).not.toHaveBeenCalled();
+  });
+
+  it("allows an already-seen identity at the plan limit without a false 402", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockEval.mockResolvedValue([0, 50]);
+
+    const result = await checkOrderLimits(USER_ID, "Purchase", {
+      workspaceId: "ws-1",
+      eventId: "shopify-purchase:ws-1:1001",
+    });
+
+    expect(result).toMatchObject({ allowed: true, used: 50, limit: 50 });
+    expect(mockDecr).not.toHaveBeenCalled();
+  });
 });
 
 describe("incrementOrderCount", () => {
@@ -227,6 +311,58 @@ describe("incrementOrderCount", () => {
   it("should execute pipeline", async () => {
     await incrementOrderCount(USER_ID);
     expect(mockPipelineExec).toHaveBeenCalledOnce();
+  });
+});
+
+describe("reconcilePurchaseBillingState", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEval.mockResolvedValue([2, 3, 7]);
+  });
+
+  it("atomically restores the count floor and every hashed connected alias marker", async () => {
+    const result = await reconcilePurchaseBillingState(USER_ID, "2026-07", [
+      {
+        workspaceId: "ws-1",
+        eventId: "browser-event",
+        aliases: ["webhook-event", "checkout:token-1", "order:1001"],
+      },
+      {
+        workspaceId: "ws-2",
+        eventId: "another-store-event",
+        aliases: ["order:1001"],
+      },
+      {
+        workspaceId: "ws-1",
+        eventId: "third-order",
+      },
+    ]);
+
+    expect(result).toEqual({ previousCount: 2, reconciledCount: 3, markerCount: 7 });
+    expect(mockEval).toHaveBeenCalledOnce();
+    const call = mockEval.mock.calls[0];
+    expect(call[0]).toContain("if durableFloor > current then");
+    expect(call[0]).not.toContain("DECR");
+    expect(call[1]).toBe(8); // counter + seven unique identity markers
+    expect(call[2]).toBe(`orders:${USER_ID}:2026-07`);
+    expect(call.slice(3, 10)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^orders:seen:user_test_123:2026-07:[a-f0-9]{64}$/),
+      ])
+    );
+    expect(call.at(-2)).toBe("3");
+    expect(call.at(-1)).toBe(String(35 * 24 * 60 * 60));
+    expect(JSON.stringify(call)).not.toContain("browser-event");
+    expect(JSON.stringify(call)).not.toContain("token-1");
+  });
+
+  it("rejects malformed Redis reconciliation responses", async () => {
+    mockEval.mockResolvedValueOnce([1, 2]);
+    await expect(
+      reconcilePurchaseBillingState(USER_ID, "2026-07", [
+        { workspaceId: "ws-1", eventId: "purchase-1" },
+      ])
+    ).rejects.toThrow("Invalid purchase billing reconciliation response");
   });
 });
 

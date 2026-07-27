@@ -1,4 +1,4 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, UnrecoverableError } from "bullmq";
 import IORedis from "ioredis";
 import { decrypt } from "@/lib/encryption";
 import {
@@ -6,11 +6,17 @@ import {
   sendToKlaviyo,
   KlaviyoApiError,
 } from "@/lib/destinations/klaviyo";
-import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
-import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import {
+  isCircuitClosed,
+  recordSuccess,
+  recordFailure,
+  shouldRecordCircuitFailure,
+  shouldRetryDeliveryFailure,
+  CircuitOpenError,
+} from "@/lib/circuit-breaker";
 import {
   DESTINATION_WORKER_CONCURRENCY,
   WORKER_LOCK_DURATION_MS,
@@ -18,9 +24,21 @@ import {
   WORKER_STALLED_INTERVAL_MS,
 } from "./worker-options";
 import type { DestinationEventJob } from "@/lib/queue";
+import {
+  claimEventDelivery,
+  completeEventDeliveryClaim,
+  failEventDeliveryClaim,
+  isEventDeliverySuperseded,
+  markEventDeliveryAccepted,
+  type EventDeliveryClaim,
+} from "@/lib/event-delivery-guard";
 
 async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event } = job.data;
+  const { workspaceId, eventLogId, event: queuedEvent } = job.data;
+  let event = queuedEvent;
+  let deliveryClaim: EventDeliveryClaim | null = null;
+  let outboundStarted = false;
+  let outboundAccepted = false;
 
   const log = createLogger({
     component: "klaviyo-worker",
@@ -31,6 +49,10 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
   });
 
   try {
+    if (await isEventDeliverySuperseded(eventLogId)) {
+      log.info("Skipping superseded delivery", { eventLogId });
+      return;
+    }
     const startTime = Date.now();
 
     // Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
@@ -57,6 +79,19 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
       );
     }
 
+    const circuitOk = await isCircuitClosed("KLAVIYO", workspaceId);
+    if (!circuitOk) {
+      throw new CircuitOpenError("KLAVIYO", workspaceId);
+    }
+
+    const ownership = await claimEventDelivery(eventLogId);
+    if (ownership.action === "skip") {
+      log.info("Skipping delivery owned by a canonical or terminal EventLog", { eventLogId });
+      return;
+    }
+    deliveryClaim = ownership.claim;
+    event = (ownership.event ?? queuedEvent) as typeof queuedEvent;
+
     // Normalize event to Klaviyo format
     const klaviyoEvent = normalizeToKlaviyoEvent(event.eventName, {
       eventId: event.eventId,
@@ -67,36 +102,22 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
 
     if (!klaviyoEvent) {
       // Event type not supported — skip (PageView is skipped at ingest level, but guard here too)
-      if (eventLogId) {
-        await db.eventLog.update({
-          where: { id: eventLogId },
-          data: {
-            status: "SENT",
-            metaResponse: { skipped: true, reason: "Event type not supported by Klaviyo" } as any,
-          },
-        });
-      }
+      await completeEventDeliveryClaim(deliveryClaim, {
+        skipped: true,
+        reason: "Event type not supported by Klaviyo",
+      });
       log.info("Job skipped: event type not tracked by Klaviyo");
       return;
     }
 
     // Send to Klaviyo Events API
-    // Circuit breaker check
-    const circuitOk = await isCircuitClosed("KLAVIYO");
-    if (!circuitOk) {
-      throw new CircuitOpenError("KLAVIYO");
-    }
-
+    outboundStarted = true;
     const response = await sendToKlaviyo(apiKey, klaviyoEvent);
-    await recordSuccess("KLAVIYO").catch(() => {});
+    outboundAccepted = true;
+    await markEventDeliveryAccepted(deliveryClaim, response);
+    await recordSuccess("KLAVIYO", workspaceId).catch(() => {});
 
-    // Update EventLog to SENT (skip for fire-and-forget events)
-    if (eventLogId) {
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: { status: "SENT", metaResponse: response as any },
-      });
-    }
+    await completeEventDeliveryClaim(deliveryClaim, response);
 
     log.info("Job completed", {
       eventId: event.eventId,
@@ -111,8 +132,17 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    if (!(error instanceof CircuitOpenError)) {
-      await recordFailure("KLAVIYO").catch(() => {});
+    const circuitFailure = shouldRecordCircuitFailure(error);
+    const transientFailure = shouldRetryDeliveryFailure(error);
+    const terminalDestinationRejection =
+      outboundStarted &&
+      error instanceof KlaviyoApiError &&
+      !transientFailure;
+    const definitiveFailure =
+      !outboundStarted ||
+      terminalDestinationRejection;
+    if (circuitFailure) {
+      await recordFailure("KLAVIYO", workspaceId).catch(() => {});
     }
     const errorMessage =
       error instanceof KlaviyoApiError
@@ -121,20 +151,31 @@ async function processKlaviyoEvent(job: Job<DestinationEventJob>): Promise<void>
         ? error.message
         : "Unknown error";
 
-    if (eventLogId) {
-      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
-      await db.eventLog
-        .update({
-          where: { id: eventLogId },
-          data: {
-            status: willRetry ? "RETRYING" : "FAILED",
-            errorMessage,
-            retryCount: { increment: 1 },
-          },
+    if (eventLogId && !outboundAccepted) {
+      const willRetry =
+        !terminalDestinationRejection &&
+        ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
+      const failedAt = new Date();
+      await failEventDeliveryClaim({
+          eventLogId,
+          claim: deliveryClaim,
+          outcome: definitiveFailure
+            ? "DEFINITELY_NOT_DELIVERED"
+            : "DELIVERY_AMBIGUOUS",
+          status: willRetry ? "RETRYING" : "FAILED",
+          errorMessage,
+          failedAt,
+          nextRetryAt: !willRetry && transientFailure
+            ? new Date(failedAt.getTime() + 15 * 60 * 1000)
+            : null,
         })
         .catch((dbErr) => {
           log.error("Failed to update EventLog", { eventLogId, error: dbErr });
         });
+    }
+
+    if (terminalDestinationRejection) {
+      throw new UnrecoverableError(errorMessage);
     }
 
     // Re-throw so BullMQ can retry with exponential backoff
@@ -154,6 +195,7 @@ export const klaviyoWorker = new Worker<DestinationEventJob>(
   processKlaviyoEvent,
   {
     connection: connection as never,
+    autorun: false,
     concurrency: DESTINATION_WORKER_CONCURRENCY,
     lockDuration: WORKER_LOCK_DURATION_MS,
     stalledInterval: WORKER_STALLED_INTERVAL_MS,

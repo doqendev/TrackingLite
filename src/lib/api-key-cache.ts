@@ -67,6 +67,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
       googleAdsLabelViewContent: true,
       // Shopify webhook
       shopifyWebhookSecretEncrypted: true,
+      shopifyWebhookVerifiedAt: true,
       // Event toggles and consent
       consentMode: true,
       enablePageView: true,
@@ -91,6 +92,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     redditAccessTokenEncrypted,
     pinterestConversionTokenEncrypted,
     shopifyWebhookSecretEncrypted,
+    shopifyWebhookVerifiedAt,
     ...rest
   } = workspace;
 
@@ -104,6 +106,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     hasPinterestCredentials: !!(workspace.enablePinterest && pinterestConversionTokenEncrypted),
     hasGoogleAdsCredentials: !!(workspace.enableGoogleAds && workspace.googleAdsConversionId),
     hasShopifyWebhookSecret: !!shopifyWebhookSecretEncrypted,
+    hasVerifiedShopifyWebhook: !!shopifyWebhookVerifiedAt,
   };
 
   try {

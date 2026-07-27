@@ -1,4 +1,4 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, UnrecoverableError } from "bullmq";
 import IORedis from "ioredis";
 import { decrypt } from "@/lib/encryption";
 import {
@@ -6,11 +6,17 @@ import {
   sendToReddit,
   RedditApiError,
 } from "@/lib/destinations/reddit";
-import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
-import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import {
+  isCircuitClosed,
+  recordSuccess,
+  recordFailure,
+  shouldRecordCircuitFailure,
+  shouldRetryDeliveryFailure,
+  CircuitOpenError,
+} from "@/lib/circuit-breaker";
 import {
   DESTINATION_WORKER_CONCURRENCY,
   WORKER_LOCK_DURATION_MS,
@@ -18,9 +24,21 @@ import {
   WORKER_STALLED_INTERVAL_MS,
 } from "./worker-options";
 import type { DestinationEventJob } from "@/lib/queue";
+import {
+  claimEventDelivery,
+  completeEventDeliveryClaim,
+  failEventDeliveryClaim,
+  isEventDeliverySuperseded,
+  markEventDeliveryAccepted,
+  type EventDeliveryClaim,
+} from "@/lib/event-delivery-guard";
 
 async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event } = job.data;
+  const { workspaceId, eventLogId, event: queuedEvent } = job.data;
+  let event = queuedEvent;
+  let deliveryClaim: EventDeliveryClaim | null = null;
+  let outboundStarted = false;
+  let outboundAccepted = false;
 
   const log = createLogger({
     component: "reddit-worker",
@@ -31,6 +49,10 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
   });
 
   try {
+    if (await isEventDeliverySuperseded(eventLogId)) {
+      log.info("Skipping superseded delivery", { eventLogId });
+      return;
+    }
     const startTime = Date.now();
 
     const workspace = await getWorkspaceForDestination(workspaceId, "REDDIT");
@@ -48,6 +70,19 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
     );
     const accountId = (workspace.redditAccountId as string) || "";
 
+    const circuitOk = await isCircuitClosed("REDDIT", workspaceId);
+    if (!circuitOk) {
+      throw new CircuitOpenError("REDDIT", workspaceId);
+    }
+
+    const ownership = await claimEventDelivery(eventLogId);
+    if (ownership.action === "skip") {
+      log.info("Skipping delivery owned by a canonical or terminal EventLog", { eventLogId });
+      return;
+    }
+    deliveryClaim = ownership.claim;
+    event = (ownership.event ?? queuedEvent) as typeof queuedEvent;
+
     const redditEvent = normalizeToRedditEvent(event.eventName, {
       eventId: event.eventId,
       timestamp: event.timestamp,
@@ -62,34 +97,21 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
 
     if (!redditEvent) {
       // Event type not supported — skip
-      if (eventLogId) {
-        await db.eventLog.update({
-          where: { id: eventLogId },
-          data: {
-            status: "SENT",
-            metaResponse: { skipped: true, reason: "Event type not supported" } as any,
-          },
-        });
-      }
+      await completeEventDeliveryClaim(deliveryClaim, {
+        skipped: true,
+        reason: "Event type not supported",
+      });
       log.info("Job skipped: event type not tracked by Reddit");
       return;
     }
 
-    // Circuit breaker check
-    const circuitOk = await isCircuitClosed("REDDIT");
-    if (!circuitOk) {
-      throw new CircuitOpenError("REDDIT");
-    }
-
+    outboundStarted = true;
     const response = await sendToReddit(accountId, accessToken, [redditEvent]);
-    await recordSuccess("REDDIT").catch(() => {});
+    outboundAccepted = true;
+    await markEventDeliveryAccepted(deliveryClaim, response);
+    await recordSuccess("REDDIT", workspaceId).catch(() => {});
 
-    if (eventLogId) {
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: { status: "SENT", metaResponse: response as any },
-      });
-    }
+    await completeEventDeliveryClaim(deliveryClaim, response);
 
     log.info("Job completed", {
       eventId: event.eventId,
@@ -106,8 +128,17 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    if (!(error instanceof CircuitOpenError)) {
-      await recordFailure("REDDIT").catch(() => {});
+    const circuitFailure = shouldRecordCircuitFailure(error);
+    const transientFailure = shouldRetryDeliveryFailure(error);
+    const terminalDestinationRejection =
+      outboundStarted &&
+      error instanceof RedditApiError &&
+      !transientFailure;
+    const definitiveFailure =
+      !outboundStarted ||
+      terminalDestinationRejection;
+    if (circuitFailure) {
+      await recordFailure("REDDIT", workspaceId).catch(() => {});
     }
     const errorMessage =
       error instanceof RedditApiError
@@ -116,16 +147,23 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
         ? error.message
         : "Unknown error";
 
-    if (eventLogId) {
-      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
-      await db.eventLog
-        .update({
-          where: { id: eventLogId },
-          data: {
-            status: willRetry ? "RETRYING" : "FAILED",
-            errorMessage,
-            retryCount: { increment: 1 },
-          },
+    if (eventLogId && !outboundAccepted) {
+      const willRetry =
+        !terminalDestinationRejection &&
+        ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
+      const failedAt = new Date();
+      await failEventDeliveryClaim({
+          eventLogId,
+          claim: deliveryClaim,
+          outcome: definitiveFailure
+            ? "DEFINITELY_NOT_DELIVERED"
+            : "DELIVERY_AMBIGUOUS",
+          status: willRetry ? "RETRYING" : "FAILED",
+          errorMessage,
+          failedAt,
+          nextRetryAt: !willRetry && transientFailure
+            ? new Date(failedAt.getTime() + 15 * 60 * 1000)
+            : null,
         })
         .catch((dbErr) => {
           log.error("Failed to update EventLog", {
@@ -133,6 +171,10 @@ async function processRedditEvent(job: Job<DestinationEventJob>): Promise<void> 
             error: dbErr,
           });
         });
+    }
+
+    if (terminalDestinationRejection) {
+      throw new UnrecoverableError(errorMessage);
     }
 
     // Re-throw so BullMQ can retry with exponential backoff
@@ -152,6 +194,7 @@ export const redditWorker = new Worker<DestinationEventJob>(
   processRedditEvent,
   {
     connection: connection as never,
+    autorun: false,
     concurrency: DESTINATION_WORKER_CONCURRENCY,
     lockDuration: WORKER_LOCK_DURATION_MS,
     stalledInterval: WORKER_STALLED_INTERVAL_MS,

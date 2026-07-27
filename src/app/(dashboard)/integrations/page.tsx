@@ -33,10 +33,12 @@ export default async function IntegrationsPage() {
         metaTestEventCode: true,
         metaAccessTokenEncrypted: true,
         enableMeta: true,
+        metaBrowserTrackingEnabled: true,
         // TikTok
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
         enableTikTok: true,
+        tiktokBrowserTrackingEnabled: true,
         // GA4
         ga4MeasurementId: true,
         ga4ApiSecretEncrypted: true,
@@ -59,8 +61,10 @@ export default async function IntegrationsPage() {
         googleAdsLabelInitiateCheckout: true,
         googleAdsLabelViewContent: true,
         enableGoogleAds: true,
-        // Shopify Webhook
-        shopifyWebhookSecretEncrypted: true,
+         // Shopify Webhook
+         shopifyWebhookSecretEncrypted: true,
+         shopifyWebhookVerifiedAt: true,
+         shopifyWebhookLastReceivedAt: true,
       },
     });
   } catch (error) {
@@ -87,10 +91,12 @@ export default async function IntegrationsPage() {
     metaTestEventCode: workspace.metaTestEventCode,
     hasAccessToken: !!workspace.metaAccessTokenEncrypted,
     enableMeta: workspace.enableMeta,
+    metaBrowserTrackingEnabled: workspace.metaBrowserTrackingEnabled,
     // TikTok
     tiktokPixelId: workspace.tiktokPixelId,
     hasTiktokAccessToken: !!workspace.tiktokAccessTokenEncrypted,
     enableTikTok: workspace.enableTikTok,
+    tiktokBrowserTrackingEnabled: workspace.tiktokBrowserTrackingEnabled,
     // GA4
     ga4MeasurementId: workspace.ga4MeasurementId,
     hasGA4ApiSecret: !!workspace.ga4ApiSecretEncrypted,
@@ -115,6 +121,8 @@ export default async function IntegrationsPage() {
     enableGoogleAds: workspace.enableGoogleAds,
     // Shopify Webhook
     hasShopifyWebhookSecret: !!workspace.shopifyWebhookSecretEncrypted,
+    isShopifyWebhookVerified: !!workspace.shopifyWebhookVerifiedAt,
+    shopifyWebhookLastReceivedAt: workspace.shopifyWebhookLastReceivedAt?.toISOString() ?? null,
   };
 
   return (

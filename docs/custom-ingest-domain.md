@@ -29,8 +29,8 @@ domain only after `Workspace.customIngestDomainVerifiedAt` is set.
 ## Runtime Behavior
 
 - Loader snippet:
-  - verified domain: `https://<custom-domain>/api/pixel/<workspaceId>`
-  - otherwise: `NEXT_PUBLIC_APP_URL/api/pixel/<workspaceId>`
+  - verified domain: `https://<custom-domain>/api/pixel/<workspaceId>?loader=bridge-v1`
+  - otherwise: `NEXT_PUBLIC_APP_URL/api/pixel/<workspaceId>?loader=bridge-v1`
 - Pixel ingest URL:
   - verified domain: `https://<custom-domain>/api/events/ingest`
   - otherwise: `NEXT_PUBLIC_INGEST_URL`
@@ -44,5 +44,8 @@ domain only after `Workspace.customIngestDomainVerifiedAt` is set.
   deploying code that reads these fields.
 - Do not replace the default TrackClear ingest endpoint globally. This feature
   is per workspace and opt-in.
-- Because generated pixel scripts are cached for 5 minutes, endpoint changes
-  may take up to 5 minutes to appear on already-cached public pixel responses.
+- Public pixel responses require browser revalidation and use a 30-second shared
+  cache (`max-age=0, s-maxage=30`). Allow at least 30 seconds and start a fresh
+  browser session after endpoint or browser-owner changes. The first deployment
+  can still encounter an older five-minute CDN entry for an unversioned URL;
+  repasting `bridge-v1` uses a versioned URL and bypasses that transition cache.

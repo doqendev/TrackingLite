@@ -45,6 +45,7 @@ export async function RecentEvents({ workspaceId, allowedDestinations }: RecentE
     SENT: { label: t("sent"), className: "bg-green-500/10 text-green-400" },
     FAILED: { label: t("failed"), className: "bg-red-500/10 text-red-400" },
     RETRYING: { label: t("retrying"), className: "bg-orange-500/10 text-orange-400" },
+    SUPERSEDED: { label: t("superseded"), className: "bg-slate-500/10 text-slate-400" },
   };
 
   type EventRow = {

@@ -8,7 +8,7 @@ type PurchaseEventIdInput = {
   fallbackId?: string | null;
 };
 
-function normalizeSegment(value: unknown): string | null {
+export function normalizePurchaseIdentifier(value: unknown): string | null {
   if (value === null || value === undefined) return null;
 
   let text = String(value).trim();
@@ -34,18 +34,53 @@ function randomEventId(): string {
 }
 
 export function buildPurchaseEventId(input: PurchaseEventIdInput): string {
-  const scope = normalizeSegment(input.workspaceId ?? input.storeId) ?? "unknown";
+  const scope = normalizePurchaseIdentifier(input.workspaceId ?? input.storeId) ?? "unknown";
   const identifier =
-    normalizeSegment(input.orderName) ??
-    normalizeSegment(input.shopifyOrderId) ??
-    normalizeSegment(input.checkoutToken) ??
-    normalizeSegment(input.cartToken);
+    normalizePurchaseIdentifier(input.orderName) ??
+    normalizePurchaseIdentifier(input.shopifyOrderId) ??
+    normalizePurchaseIdentifier(input.checkoutToken) ??
+    normalizePurchaseIdentifier(input.cartToken);
 
   if (!identifier) {
     return input.fallbackId?.trim() || randomEventId();
   }
 
   return `shopify-purchase:${scope}:${identifier}`;
+}
+
+/**
+ * Billing uses the checkout token before the final order identity because that
+ * token is shared by Shopify's checkout_completed event and orders/paid
+ * webhook. Delivery IDs remain order-first for destination deduplication, but
+ * this correlation key prevents the browser fallback and canonical webhook
+ * from consuming two usage units while they race.
+ */
+export function buildPurchaseBillingIdentityKey(input: PurchaseEventIdInput): string {
+  const scope = normalizePurchaseIdentifier(input.workspaceId ?? input.storeId) ?? "unknown";
+  const identifier =
+    normalizePurchaseIdentifier(input.checkoutToken) ??
+    normalizePurchaseIdentifier(input.shopifyOrderId) ??
+    normalizePurchaseIdentifier(input.orderName) ??
+    normalizePurchaseIdentifier(input.cartToken);
+  const fallback = input.fallbackId?.trim();
+  return identifier
+    ? `shopify-billing:${scope}:${identifier}`
+    : fallback || randomEventId();
+}
+
+/** Return every stable cross-source alias so billing dedup can match any overlap. */
+export function buildPurchaseBillingAliases(input: PurchaseEventIdInput): string[] {
+  const aliases = [
+    ["checkout", normalizePurchaseIdentifier(input.checkoutToken)],
+    ["order", normalizePurchaseIdentifier(input.shopifyOrderId)],
+    ["name", normalizePurchaseIdentifier(input.orderName)],
+    ["cart", normalizePurchaseIdentifier(input.cartToken)],
+  ] as const;
+  return Array.from(
+    new Set(
+      aliases.flatMap(([kind, value]) => (value === null ? [] : [`${kind}:${value}`]))
+    )
+  );
 }
 
 function pickString(source: Record<string, unknown>, keys: string[]): string | null {

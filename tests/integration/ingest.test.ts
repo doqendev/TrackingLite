@@ -85,8 +85,8 @@ describe("POST /api/events/ingest", () => {
     expect(response.status).toBe(403);
   });
 
-  // 4. No Meta credentials configured
-  it("returns 422 when Meta credentials not configured", async () => {
+  // 4. No destination credentials configured
+  it("returns 422 when destination credentials are not configured", async () => {
     const noMetaWs = await createWorkspace(user.id, {
       metaPixelId: null,
       metaAccessToken: null,
@@ -101,7 +101,7 @@ describe("POST /api/events/ingest", () => {
     const response = await POST(request);
     expect(response.status).toBe(422);
     const data = await response.json();
-    expect(data.error).toContain("Meta credentials");
+    expect(data.error).toContain("No destination credentials");
   });
 
   // 5. Valid PageView (happy path)
@@ -320,15 +320,20 @@ describe("POST /api/events/ingest", () => {
       "send-meta-event",
       expect.objectContaining({
         workspaceId: workspace.id,
-        pixelId: workspace.metaPixelId,
         eventLogId: expect.any(String),
+        requestId: expect.any(String),
         event: expect.objectContaining({
           eventName: "Purchase",
           eventId: payload.eventId,
           clientIp: "1.2.3.4",
           userAgent: "TestAgent/1.0",
         }),
-      })
+      }),
+      { jobId: expect.stringMatching(/^event-/) }
     );
+
+    const queuedJob = mockQueueAdd.mock.calls[0][1];
+    expect(queuedJob).not.toHaveProperty("pixelId");
+    expect(queuedJob).not.toHaveProperty("accessToken");
   });
 });

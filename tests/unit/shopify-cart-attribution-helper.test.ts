@@ -38,7 +38,7 @@ function memoryCookies(initial: Record<string, string> = {}) {
 
 describe("Shopify cart attribution helper", () => {
   it("generates helper JavaScript with cart write, cart verification, and attribution fields", () => {
-    const js = generateShopifyCartAttributionHelperCode("ws_123");
+    const js = generateShopifyCartAttributionHelperCode("ws_123", "STRICT");
 
     expect(() => new Function(js)).not.toThrow();
     expect(js).toContain("_trackclear_session_id");
@@ -51,13 +51,20 @@ describe("Shopify cart attribution helper", () => {
     expect(js).toContain("_gbraid");
     expect(js).toContain("_wbraid");
     expect(js).toContain("_ttclid");
+    expect(js).toContain("_ttp");
     expect(js).toContain("_utm_source");
     expect(js).toContain("_utm_campaign");
     expect(js).toContain("_landing_page");
+    expect(js).toContain("_tc_attribution_timestamp");
+    expect(js).toContain("_tc_attribution_source");
     expect(js).toContain("_tc_consent_analytics");
     expect(js).toContain("_tc_consent_marketing");
     expect(js).toContain("trackclear_debug");
     expect(js).toContain("retrying cart update");
+    expect(js).toContain("visitorConsentCollected");
+    expect(js).toContain('M="STRICT"');
+    expect(js).toContain('M==="STRICT"?cn.marketingAllowed===true');
+    expect(js).toContain('max-age=0');
 
     for (const key of TRACKCLEAR_CART_ATTRIBUTE_KEYS) {
       expect(js).toContain(key);
@@ -87,6 +94,91 @@ describe("Shopify cart attribution helper", () => {
     expect(result.attributes._fbc).toBe("fb.1.1710000000000.FB123");
     expect(result.attributes._fbp).toBe("fb.1.1710000000000.1234567890");
     expect(result.attributes._landing_page).toContain("https://dirava.com/products/test");
+    expect(result.attributes._tc_attribution_timestamp).toBe("1710000000000");
+    expect(result.attributes._tc_attribution_source).toBe("meta");
+  });
+
+  it("replaces stale cross-channel URL context and captures an existing TikTok cookie", () => {
+    const { storage } = memoryStorage({
+      _tc_cart_attr_context: JSON.stringify({
+        fbclid: "OLD_META_CLICK",
+        utmSource: "facebook",
+        utmCampaign: "old_campaign",
+        capturedAt: "1709999999000",
+      }),
+    });
+    const { cookies } = memoryCookies({ _ttp: "TTP123" });
+
+    const result = extractShopifyCartAttribution({
+      url: "https://dirava.com/products/test?ttclid=NEW_TIKTOK_CLICK&utm_source=tiktok",
+      now: 1710000000000,
+      storage,
+      cookies,
+      generateId: () => "session_123",
+      generateFbpRandom: () => "1234567890",
+    });
+
+    expect(result.attributes._fbclid).toBe("");
+    expect(result.attributes._ttclid).toBe("NEW_TIKTOK_CLICK");
+    expect(result.attributes._ttp).toBe("TTP123");
+    expect(result.attributes._utm_source).toBe("tiktok");
+    expect(result.attributes._utm_campaign).toBe("");
+    expect(result.attributes._tc_attribution_source).toBe("tiktok");
+  });
+
+  it("does not create or retain advertising identifiers after explicit marketing denial", () => {
+    const { storage, store: storageStore } = memoryStorage({
+      _fbp: "fb.1.1710000000000.1234567890",
+      _tc_cart_attr_context: JSON.stringify({
+        fbclid: "OLD_CLICK",
+        ttclid: "OLD_TT",
+        capturedAt: "1709999999000",
+        source: "meta",
+      }),
+    });
+    const { cookies, store } = memoryCookies({
+      _fbp: "fb.1.1710000000000.1234567890",
+      _ttp: "TTP123",
+    });
+
+    const result = extractShopifyCartAttribution({
+      url: "https://dirava.com/products/test?fbclid=FB123",
+      now: 1710000000000,
+      storage,
+      cookies,
+      consent: { marketingAllowed: false },
+      generateId: () => "session_123",
+    });
+
+    expect(result.attributes._fbp).toBe("");
+    expect(result.attributes._fbc).toBe("");
+    expect(result.attributes._fbclid).toBe("");
+    expect(result.attributes._ttp).toBe("");
+    expect(store._fbp).toBe("");
+    expect(store._ttp).toBe("");
+    expect(store._fbc).toBe("");
+    const storedContext = JSON.parse(storageStore._tc_cart_attr_context);
+    expect(storedContext).not.toHaveProperty("fbclid");
+    expect(storedContext).not.toHaveProperty("ttclid");
+    expect(storedContext).not.toHaveProperty("source");
+  });
+
+  it("requires explicit marketing opt-in in strict helper mode", () => {
+    const { storage } = memoryStorage();
+    const { cookies } = memoryCookies();
+
+    const result = extractShopifyCartAttribution({
+      url: "https://dirava.com/products/test?fbclid=FB123",
+      now: 1710000000000,
+      storage,
+      cookies,
+      consentMode: "STRICT",
+      consent: {},
+      generateId: () => "session_123",
+    });
+
+    expect(result.attributes._fbp).toBe("");
+    expect(result.attributes._fbclid).toBe("");
   });
 
   it("reuses an existing TrackClear session ID", () => {
@@ -136,6 +228,13 @@ describe("Shopify cart attribution helper", () => {
       "_trackclear_session_id",
       "_utm_campaign",
     ]);
+  });
+
+  it("writes and verifies empty values so stale cart attribution can be cleared", () => {
+    const attributes = { _fbclid: "", _ttclid: "NEW_CLICK" };
+
+    expect(buildCartUpdateBody(attributes)).toContain("attributes%5B_fbclid%5D=");
+    expect(verifyCartAttributes(attributes, { _ttclid: "NEW_CLICK" })).toEqual([]);
   });
 
   it("posts attributes and verifies them through /cart.js", async () => {

@@ -21,6 +21,7 @@ describe("event-log-payload", () => {
       fbc: "fb.1.1700000000000.CLICK123",
       fbclid: "CLICK123",
       ttclid: "TT123",
+      ttp: "tt.1.1234567890.abcdef",
     });
 
     expect(payload).toMatchObject({
@@ -38,6 +39,7 @@ describe("event-log-payload", () => {
         hasFbc: true,
         hasFbclid: true,
         hasTtclid: true,
+        hasTtp: true,
       },
     });
     expect(JSON.stringify(payload)).not.toContain("buyer@example.com");

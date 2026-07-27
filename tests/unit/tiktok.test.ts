@@ -12,6 +12,7 @@ const baseEventData = {
   clientIp: "203.0.113.10",
   userAgent: "Mozilla/5.0",
   ttclid: "TTCLID123",
+  ttp: "TTP123",
 };
 
 describe("TikTok normalizer", () => {
@@ -28,6 +29,8 @@ describe("TikTok normalizer", () => {
     });
 
     expect(event?.user.external_id).toBe(hashPii("gid://shopify/Customer/123"));
+    expect(event?.user.ttclid).toBe("TTCLID123");
+    expect(event?.user.ttp).toBe("TTP123");
   });
 
   it("prefers rich contents over contentIds so quantity and price are preserved", () => {

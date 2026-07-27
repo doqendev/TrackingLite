@@ -9,6 +9,10 @@ vi.mock("@/lib/auth", () => ({
   auth: () => mockAuth(),
 }));
 
+vi.mock("@/lib/shopify-domain-resolver", () => ({
+  resolveShopifyDomain: vi.fn().mockResolvedValue(null),
+}));
+
 import { GET, POST } from "@/app/api/workspaces/route";
 import {
   GET as GET_BY_ID,
@@ -81,7 +85,7 @@ describe("Workspace API", () => {
     it("creates a workspace with valid data", async () => {
       const request = makeRequest("/api/workspaces", {
         method: "POST",
-        body: { name: "My Store" },
+        body: { name: "My Store", domain: "my-store.myshopify.com" },
       });
 
       const response = await POST(request);
@@ -103,6 +107,7 @@ describe("Workspace API", () => {
         method: "POST",
         body: {
           name: "Meta Store",
+          domain: "meta-store.myshopify.com",
           metaPixelId: "123456",
           metaAccessToken: "EAAtest123",
         },

@@ -25,7 +25,7 @@ describe("GET /api/cart-helper/[workspaceId]", () => {
   });
 
   it("serves the storefront cart attribution helper for an active workspace", async () => {
-    mockFindFirst.mockResolvedValue({ id: "ws_123" });
+    mockFindFirst.mockResolvedValue({ id: "ws_123", consentMode: "STRICT" });
 
     const response = await getCartHelper(new Request("http://localhost/api/cart-helper/ws_123"), {
       params: Promise.resolve({ workspaceId: "ws_123" }),
@@ -48,6 +48,7 @@ describe("GET /api/cart-helper/[workspaceId]", () => {
     expect(js).toContain("_landing_page");
     expect(js).toContain("_tc_consent_analytics");
     expect(js).toContain("_tc_consent_marketing");
+    expect(js).toContain('M="STRICT"');
   });
 
   it("returns 404 for missing workspaces", async () => {

@@ -19,7 +19,7 @@ export async function GET(
 
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, isActive: true },
-    select: { id: true },
+    select: { id: true, consentMode: true },
   });
 
   if (!workspace) {
@@ -29,12 +29,15 @@ export async function GET(
     });
   }
 
-  return new Response(generateShopifyCartAttributionHelperCode(workspace.id), {
-    status: 200,
-    headers: {
-      "Content-Type": "text/javascript",
-      "Cache-Control": "public, max-age=300, s-maxage=300",
-      ...corsHeaders,
-    },
-  });
+  return new Response(
+    generateShopifyCartAttributionHelperCode(workspace.id, workspace.consentMode),
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "text/javascript",
+        "Cache-Control": "public, max-age=300, s-maxage=300",
+        ...corsHeaders,
+      },
+    }
+  );
 }

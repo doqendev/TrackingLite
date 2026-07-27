@@ -1,4 +1,4 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, UnrecoverableError } from "bullmq";
 import IORedis from "ioredis";
 import { decrypt } from "@/lib/encryption";
 import {
@@ -6,12 +6,18 @@ import {
   sendToGA4,
   GA4ApiError,
 } from "@/lib/destinations/ga4";
-import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
 import { hashPii } from "@/lib/hash-pii";
-import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import {
+  isCircuitClosed,
+  recordSuccess,
+  recordFailure,
+  shouldRecordCircuitFailure,
+  shouldRetryDeliveryFailure,
+  CircuitOpenError,
+} from "@/lib/circuit-breaker";
 import {
   DESTINATION_WORKER_CONCURRENCY,
   WORKER_LOCK_DURATION_MS,
@@ -19,9 +25,21 @@ import {
   WORKER_STALLED_INTERVAL_MS,
 } from "./worker-options";
 import type { DestinationEventJob } from "@/lib/queue";
+import {
+  claimEventDelivery,
+  completeEventDeliveryClaim,
+  failEventDeliveryClaim,
+  isEventDeliverySuperseded,
+  markEventDeliveryAccepted,
+  type EventDeliveryClaim,
+} from "@/lib/event-delivery-guard";
 
 async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event } = job.data;
+  const { workspaceId, eventLogId, event: queuedEvent } = job.data;
+  let event = queuedEvent;
+  let deliveryClaim: EventDeliveryClaim | null = null;
+  let outboundStarted = false;
+  let outboundAccepted = false;
 
   const log = createLogger({
     component: "ga4-worker",
@@ -32,6 +50,10 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
   });
 
   try {
+    if (await isEventDeliverySuperseded(eventLogId)) {
+      log.info("Skipping superseded delivery", { eventLogId });
+      return;
+    }
     const startTime = Date.now();
 
     // Resolve credentials: backward compat for old-format jobs, otherwise DB lookup
@@ -61,6 +83,19 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       measurementId = (workspace.ga4MeasurementId as string) || "";
     }
 
+    const circuitOk = await isCircuitClosed("GA4", workspaceId);
+    if (!circuitOk) {
+      throw new CircuitOpenError("GA4", workspaceId);
+    }
+
+    const ownership = await claimEventDelivery(eventLogId);
+    if (ownership.action === "skip") {
+      log.info("Skipping delivery owned by a canonical or terminal EventLog", { eventLogId });
+      return;
+    }
+    deliveryClaim = ownership.claim;
+    event = (ownership.event ?? queuedEvent) as typeof queuedEvent;
+
     // Normalize event to GA4 Measurement Protocol format
     const ga4Event = normalizeToGA4Event(event.eventName, {
       eventId: event.eventId,
@@ -75,15 +110,10 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
 
     if (!ga4Event) {
       // Event type not supported — skip
-      if (eventLogId) {
-        await db.eventLog.update({
-          where: { id: eventLogId },
-          data: {
-            status: "SENT",
-            metaResponse: { skipped: true, reason: "Event type not supported" } as any,
-          },
-        });
-      }
+      await completeEventDeliveryClaim(deliveryClaim, {
+        skipped: true,
+        reason: "Event type not supported",
+      });
       log.info("Job skipped: event type not tracked by GA4");
       return;
     }
@@ -95,27 +125,18 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       event.eventId;
 
     // Send to GA4 Measurement Protocol
-    // Circuit breaker check
-    const circuitOk = await isCircuitClosed("GA4");
-    if (!circuitOk) {
-      throw new CircuitOpenError("GA4");
-    }
-
+    outboundStarted = true;
     const response = await sendToGA4(
       measurementId,
       apiSecret,
       clientId,
       [ga4Event]
     );
-    await recordSuccess("GA4").catch(() => {});
+    outboundAccepted = true;
+    await markEventDeliveryAccepted(deliveryClaim, response);
+    await recordSuccess("GA4", workspaceId).catch(() => {});
 
-    // Update EventLog to SENT (skip for fire-and-forget events)
-    if (eventLogId) {
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: { status: "SENT", metaResponse: response as any },
-      });
-    }
+    await completeEventDeliveryClaim(deliveryClaim, response);
 
     log.info("Job completed", {
       eventId: event.eventId,
@@ -131,8 +152,17 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    if (!(error instanceof CircuitOpenError)) {
-      await recordFailure("GA4").catch(() => {});
+    const circuitFailure = shouldRecordCircuitFailure(error);
+    const transientFailure = shouldRetryDeliveryFailure(error);
+    const terminalDestinationRejection =
+      outboundStarted &&
+      error instanceof GA4ApiError &&
+      !transientFailure;
+    const definitiveFailure =
+      !outboundStarted ||
+      terminalDestinationRejection;
+    if (circuitFailure) {
+      await recordFailure("GA4", workspaceId).catch(() => {});
     }
     const errorMessage =
       error instanceof GA4ApiError
@@ -141,20 +171,31 @@ async function processGA4Event(job: Job<DestinationEventJob>): Promise<void> {
         ? error.message
         : "Unknown error";
 
-    if (eventLogId) {
-      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
-      await db.eventLog
-        .update({
-          where: { id: eventLogId },
-          data: {
-            status: willRetry ? "RETRYING" : "FAILED",
-            errorMessage,
-            retryCount: { increment: 1 },
-          },
+    if (eventLogId && !outboundAccepted) {
+      const willRetry =
+        !terminalDestinationRejection &&
+        ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
+      const failedAt = new Date();
+      await failEventDeliveryClaim({
+          eventLogId,
+          claim: deliveryClaim,
+          outcome: definitiveFailure
+            ? "DEFINITELY_NOT_DELIVERED"
+            : "DELIVERY_AMBIGUOUS",
+          status: willRetry ? "RETRYING" : "FAILED",
+          errorMessage,
+          failedAt,
+          nextRetryAt: !willRetry && transientFailure
+            ? new Date(failedAt.getTime() + 15 * 60 * 1000)
+            : null,
         })
         .catch((dbErr) => {
           log.error("Failed to update EventLog", { eventLogId, error: dbErr });
         });
+    }
+
+    if (terminalDestinationRejection) {
+      throw new UnrecoverableError(errorMessage);
     }
 
     // Re-throw so BullMQ can retry with exponential backoff
@@ -174,6 +215,7 @@ export const ga4Worker = new Worker<DestinationEventJob>(
   processGA4Event,
   {
     connection: connection as never,
+    autorun: false,
     concurrency: DESTINATION_WORKER_CONCURRENCY,
     lockDuration: WORKER_LOCK_DURATION_MS,
     stalledInterval: WORKER_STALLED_INTERVAL_MS,

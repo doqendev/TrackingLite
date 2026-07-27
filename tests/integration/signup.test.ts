@@ -1,12 +1,22 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+
+vi.mock("@/lib/email", () => ({
+  sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { POST } from "@/app/api/auth/signup/route";
 import { makeRequest } from "./helpers/request";
-import { cleanDatabase, disconnectAll } from "./helpers/db";
+import {
+  cleanDatabase,
+  cleanRedis,
+  disconnectAll,
+} from "./helpers/db";
 import { db } from "@/lib/db";
 
 describe("POST /api/auth/signup", () => {
   beforeEach(async () => {
     await cleanDatabase();
+    await cleanRedis();
   });
 
   afterAll(async () => {
@@ -19,7 +29,7 @@ describe("POST /api/auth/signup", () => {
       body: {
         name: "John Doe",
         email: "john@example.com",
-        password: "password123",
+        password: "Password123",
       },
     });
 
@@ -35,7 +45,7 @@ describe("POST /api/auth/signup", () => {
     const user = await db.user.findUnique({ where: { email: "john@example.com" } });
     expect(user).toBeTruthy();
     expect(user!.hashedPassword).toBeDefined();
-    expect(user!.hashedPassword).not.toBe("password123");
+    expect(user!.hashedPassword).not.toBe("Password123");
   });
 
   it("returns 422 for missing name", async () => {
@@ -62,7 +72,7 @@ describe("POST /api/auth/signup", () => {
     const body = {
       name: "John",
       email: "john@example.com",
-      password: "password123",
+      password: "Password123",
     };
 
     await POST(makeRequest("/api/auth/signup", { method: "POST", body }));
@@ -76,7 +86,7 @@ describe("POST /api/auth/signup", () => {
   it("returns 422 for invalid email", async () => {
     const request = makeRequest("/api/auth/signup", {
       method: "POST",
-      body: { name: "John", email: "not-an-email", password: "password123" },
+      body: { name: "John", email: "not-an-email", password: "Password123" },
     });
 
     const response = await POST(request);

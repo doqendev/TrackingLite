@@ -1,15 +1,21 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, UnrecoverableError } from "bullmq";
 import IORedis from "ioredis";
 import {
   normalizeToGoogleAdsParams,
   sendToGoogleAds,
   GoogleAdsApiError,
 } from "@/lib/destinations/google-ads";
-import { db } from "@/lib/db";
 import { QUEUE_CONFIG } from "@/lib/constants";
 import { createLogger } from "@/lib/logger";
 import { getWorkspaceForDestination } from "@/lib/workspace-cache";
-import { isCircuitClosed, recordSuccess, recordFailure, CircuitOpenError } from "@/lib/circuit-breaker";
+import {
+  isCircuitClosed,
+  recordSuccess,
+  recordFailure,
+  shouldRecordCircuitFailure,
+  shouldRetryDeliveryFailure,
+  CircuitOpenError,
+} from "@/lib/circuit-breaker";
 import {
   DESTINATION_WORKER_CONCURRENCY,
   WORKER_LOCK_DURATION_MS,
@@ -17,9 +23,21 @@ import {
   WORKER_STALLED_INTERVAL_MS,
 } from "./worker-options";
 import type { DestinationEventJob } from "@/lib/queue";
+import {
+  claimEventDelivery,
+  completeEventDeliveryClaim,
+  failEventDeliveryClaim,
+  isEventDeliverySuperseded,
+  markEventDeliveryAccepted,
+  type EventDeliveryClaim,
+} from "@/lib/event-delivery-guard";
 
 async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<void> {
-  const { workspaceId, eventLogId, event } = job.data;
+  const { workspaceId, eventLogId, event: queuedEvent } = job.data;
+  let event = queuedEvent;
+  let deliveryClaim: EventDeliveryClaim | null = null;
+  let outboundStarted = false;
+  let outboundAccepted = false;
 
   const log = createLogger({
     component: "google-ads-worker",
@@ -30,6 +48,10 @@ async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<voi
   });
 
   try {
+    if (await isEventDeliverySuperseded(eventLogId)) {
+      log.info("Skipping superseded delivery", { eventLogId });
+      return;
+    }
     const startTime = Date.now();
 
     const workspace = await getWorkspaceForDestination(workspaceId, "GOOGLE_ADS");
@@ -39,6 +61,19 @@ async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<voi
     if (!workspace.googleAdsConversionId) {
       throw new Error(`Google Ads credentials not configured for workspace ${workspaceId}`);
     }
+
+    const circuitOk = await isCircuitClosed("GOOGLE_ADS", workspaceId);
+    if (!circuitOk) {
+      throw new CircuitOpenError("GOOGLE_ADS", workspaceId);
+    }
+
+    const ownership = await claimEventDelivery(eventLogId);
+    if (ownership.action === "skip") {
+      log.info("Skipping delivery owned by a canonical or terminal EventLog", { eventLogId });
+      return;
+    }
+    deliveryClaim = ownership.claim;
+    event = (ownership.event ?? queuedEvent) as typeof queuedEvent;
 
     // No decryption needed -- Conversion ID and Labels are public values
     const params = normalizeToGoogleAdsParams(event.eventName, {
@@ -61,34 +96,21 @@ async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<voi
 
     if (!params) {
       // Event type not supported or no label configured -- skip
-      if (eventLogId) {
-        await db.eventLog.update({
-          where: { id: eventLogId },
-          data: {
-            status: "SENT",
-            metaResponse: { skipped: true, reason: "Event type not supported or no label configured" } as any,
-          },
-        });
-      }
+      await completeEventDeliveryClaim(deliveryClaim, {
+        skipped: true,
+        reason: "Event type not supported or no label configured",
+      });
       log.info("Job skipped: event type not tracked by Google Ads or label missing");
       return;
     }
 
-    // Circuit breaker check
-    const circuitOk = await isCircuitClosed("GOOGLE_ADS");
-    if (!circuitOk) {
-      throw new CircuitOpenError("GOOGLE_ADS");
-    }
-
+    outboundStarted = true;
     const response = await sendToGoogleAds(params);
-    await recordSuccess("GOOGLE_ADS").catch(() => {});
+    outboundAccepted = true;
+    await markEventDeliveryAccepted(deliveryClaim, response);
+    await recordSuccess("GOOGLE_ADS", workspaceId).catch(() => {});
 
-    if (eventLogId) {
-      await db.eventLog.update({
-        where: { id: eventLogId },
-        data: { status: "SENT", metaResponse: response as any },
-      });
-    }
+    await completeEventDeliveryClaim(deliveryClaim, response);
 
     log.info("Job completed", {
       eventId: event.eventId,
@@ -103,8 +125,17 @@ async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<voi
       log.warn("Purchase event missing value/currency", { eventId: event.eventId });
     }
   } catch (error) {
-    if (!(error instanceof CircuitOpenError)) {
-      await recordFailure("GOOGLE_ADS").catch(() => {});
+    const circuitFailure = shouldRecordCircuitFailure(error);
+    const transientFailure = shouldRetryDeliveryFailure(error);
+    const terminalDestinationRejection =
+      outboundStarted &&
+      error instanceof GoogleAdsApiError &&
+      !transientFailure;
+    const definitiveFailure =
+      !outboundStarted ||
+      terminalDestinationRejection;
+    if (circuitFailure) {
+      await recordFailure("GOOGLE_ADS", workspaceId).catch(() => {});
     }
     const errorMessage =
       error instanceof GoogleAdsApiError
@@ -113,16 +144,23 @@ async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<voi
         ? error.message
         : "Unknown error";
 
-    if (eventLogId) {
-      const willRetry = ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
-      await db.eventLog
-        .update({
-          where: { id: eventLogId },
-          data: {
-            status: willRetry ? "RETRYING" : "FAILED",
-            errorMessage,
-            retryCount: { increment: 1 },
-          },
+    if (eventLogId && !outboundAccepted) {
+      const willRetry =
+        !terminalDestinationRejection &&
+        ((job.attemptsMade ?? 0) + 1) < (job.opts?.attempts ?? 3);
+      const failedAt = new Date();
+      await failEventDeliveryClaim({
+          eventLogId,
+          claim: deliveryClaim,
+          outcome: definitiveFailure
+            ? "DEFINITELY_NOT_DELIVERED"
+            : "DELIVERY_AMBIGUOUS",
+          status: willRetry ? "RETRYING" : "FAILED",
+          errorMessage,
+          failedAt,
+          nextRetryAt: !willRetry && transientFailure
+            ? new Date(failedAt.getTime() + 15 * 60 * 1000)
+            : null,
         })
         .catch((dbErr) => {
           log.error("Failed to update EventLog", {
@@ -130,6 +168,10 @@ async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<voi
             error: dbErr,
           });
         });
+    }
+
+    if (terminalDestinationRejection) {
+      throw new UnrecoverableError(errorMessage);
     }
 
     // Re-throw so BullMQ can retry with exponential backoff
@@ -149,6 +191,7 @@ export const googleAdsWorker = new Worker<DestinationEventJob>(
   processGoogleAdsEvent,
   {
     connection: connection as never,
+    autorun: false,
     concurrency: DESTINATION_WORKER_CONCURRENCY,
     lockDuration: WORKER_LOCK_DURATION_MS,
     stalledInterval: WORKER_STALLED_INTERVAL_MS,

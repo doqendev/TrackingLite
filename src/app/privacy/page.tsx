@@ -106,6 +106,12 @@ export default function PrivacyPage() {
                 customer profile matching. When a merchant has Klaviyo enabled, the raw email address
                 is transmitted to Klaviyo&apos;s servers.
               </p>
+              <p className="mt-3 text-muted-foreground leading-relaxed">
+                To recover from temporary destination failures, Track Clear may keep the original event
+                delivery data in an AES-256-GCM encrypted retry envelope for up to 72 hours. The envelope
+                is removed after successful delivery or when it expires; the normal event-log payload
+                remains sanitized and does not store raw customer identity fields.
+              </p>
 
               <h3 className="text-base font-semibold text-foreground mt-4 mb-2">3.2 Phone Number Normalization</h3>
               <p className="text-muted-foreground leading-relaxed">
@@ -194,9 +200,17 @@ export default function PrivacyPage() {
                 <li><strong className="text-foreground">Growth and Scale plans:</strong> 30 days</li>
               </ul>
               <p className="mt-3 text-muted-foreground leading-relaxed">
-                IP addresses and browser information collected during event processing are automatically
-                anonymized after 48 hours and permanently deleted according to your plan&apos;s retention
-                period (7-30 days).
+                IP addresses and browser information in normal event-log columns are automatically
+                anonymized after 48 hours. Encrypted retry envelopes can retain the original delivery
+                values for up to 72 hours, and short-lived browser-to-webhook enrichment context can be
+                retained for up to 30 days so delayed Shopify checkouts can be matched accurately.
+              </p>
+              <p className="mt-3 text-muted-foreground leading-relaxed">
+                Encrypted retry envelopes expire after no more than 72 hours and are cleared earlier on
+                successful delivery. Verified Shopify webhook bodies are encrypted before acknowledgement,
+                erased after processing. A delivery that remains unprocessable is retried for up to 30
+                days, after which its encrypted body is erased and only a payload-free terminal receipt
+                remains for the cleanup window.
               </p>
               <p className="mt-3 text-muted-foreground leading-relaxed">
                 Merchant account data (profile, workspace configuration) is retained for the duration of

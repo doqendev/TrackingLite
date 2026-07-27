@@ -3,6 +3,15 @@ import { createLogger } from "./logger";
 import { getSharedRedis } from "@/lib/redis";
 
 const log = createLogger({ component: "rate-limit" });
+const CONSENT_REVOCATION_RATE_LIMIT_SCRIPT = `
+local minuteCount = redis.call("INCR", KEYS[1])
+if minuteCount == 1 then redis.call("EXPIRE", KEYS[1], tonumber(ARGV[1])) end
+local dayCount = redis.call("INCR", KEYS[2])
+if dayCount == 1 then redis.call("EXPIRE", KEYS[2], tonumber(ARGV[2])) end
+return { minuteCount, dayCount }
+`;
+const MINUTE_MS = 60 * 1_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
 
 export async function checkAuthRateLimit(
   ip: string,
@@ -52,6 +61,59 @@ export async function checkRateLimit(workspaceId: string): Promise<{ allowed: bo
       allowed: true,
       remaining: RATE_LIMIT.INGEST_PER_SECOND_PER_WORKSPACE,
     };
+  }
+}
+
+/**
+ * Consent deletion traffic has its own bounded budget. It must not compete
+ * with commerce-event delivery, but the public pixel API key must not permit
+ * unbounded creation of long-lived Redis tombstones.
+ */
+export async function checkConsentRevocationRateLimit(
+  workspaceId: string
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const now = Date.now();
+  const minute = Math.floor(now / MINUTE_MS);
+  const day = Math.floor(now / DAY_MS);
+  const minuteKey = `ratelimit:consent-revocation:minute:${workspaceId}:${minute}`;
+  const dayKey = `ratelimit:consent-revocation:day:${workspaceId}:${day}`;
+
+  try {
+    const result = await getSharedRedis().eval(
+      CONSENT_REVOCATION_RATE_LIMIT_SCRIPT,
+      2,
+      minuteKey,
+      dayKey,
+      "120",
+      "172800"
+    );
+    if (!Array.isArray(result) || result.length !== 2) {
+      throw new Error("invalid consent revocation rate-limit result");
+    }
+    const minuteCount = Number(result[0]);
+    const dayCount = Number(result[1]);
+    if (!Number.isFinite(minuteCount) || !Number.isFinite(dayCount)) {
+      throw new Error("invalid consent revocation rate-limit counters");
+    }
+    if (dayCount > RATE_LIMIT.CONSENT_REVOCATIONS_PER_DAY_PER_WORKSPACE) {
+      return {
+        allowed: false,
+        retryAfter: Math.max(1, Math.ceil((DAY_MS - (now % DAY_MS)) / 1_000)),
+      };
+    }
+    if (minuteCount > RATE_LIMIT.CONSENT_REVOCATIONS_PER_MINUTE_PER_WORKSPACE) {
+      return {
+        allowed: false,
+        retryAfter: Math.max(1, Math.ceil((MINUTE_MS - (now % MINUTE_MS)) / 1_000)),
+      };
+    }
+    return { allowed: true };
+  } catch {
+    // The deletion operation also depends on Redis. Fail closed so the client
+    // retains its durable revocation and retries instead of receiving a false
+    // acknowledgement while abuse controls are unavailable.
+    log.warn("Consent revocation rate limiter unavailable; failing closed");
+    throw new Error("Consent revocation rate limiter unavailable");
   }
 }
 

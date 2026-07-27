@@ -12,11 +12,18 @@ vi.mock("ioredis", () => {
 
 // Mock bullmq Worker to prevent Redis connection at module level
 // Must use a real constructor function (not an arrow) because the processor does `new Worker(...)`
+class MockUnrecoverableError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = "UnrecoverableError";
+  }
+}
 vi.mock("bullmq", () => ({
   Worker: vi.fn(function (this: Record<string, unknown>) {
     this.on = vi.fn();
     this.close = vi.fn();
   }),
+  UnrecoverableError: MockUnrecoverableError,
 }));
 
 // Mock workspace-cache (must be before imports)
@@ -52,11 +59,23 @@ vi.mock("@/lib/meta-capi", () => ({
   MetaCapiError: MockMetaCapiError,
 }));
 
-const mockEventLogUpdate = vi.fn();
-vi.mock("@/lib/db", () => ({
-  db: {
-    eventLog: { update: (...args: unknown[]) => mockEventLogUpdate(...args) },
-  },
+const mockClaimEventDelivery = vi.fn();
+const mockCompleteEventDeliveryClaim = vi.fn();
+const mockFailEventDeliveryClaim = vi.fn();
+const mockMarkEventDeliveryAccepted = vi.fn();
+class MockEventDeliveryOwnershipError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EventDeliveryOwnershipError";
+  }
+}
+vi.mock("@/lib/event-delivery-guard", () => ({
+  isEventDeliverySuperseded: vi.fn().mockResolvedValue(false),
+  claimEventDelivery: (...args: unknown[]) => mockClaimEventDelivery(...args),
+  completeEventDeliveryClaim: (...args: unknown[]) => mockCompleteEventDeliveryClaim(...args),
+  failEventDeliveryClaim: (...args: unknown[]) => mockFailEventDeliveryClaim(...args),
+  markEventDeliveryAccepted: (...args: unknown[]) => mockMarkEventDeliveryAccepted(...args),
+  EventDeliveryOwnershipError: MockEventDeliveryOwnershipError,
 }));
 
 vi.mock("@/lib/constants", () => ({
@@ -114,7 +133,14 @@ describe("processMetaEvent", () => {
     mockDecrypt.mockReturnValue("decrypted-access-token");
     mockNormalize.mockReturnValue({ event_name: "PageView", event_time: 1700000000 });
     mockSendToMetaCapi.mockResolvedValue({ events_received: 1 });
-    mockEventLogUpdate.mockResolvedValue({});
+    mockClaimEventDelivery.mockResolvedValue({
+      action: "deliver",
+      claim: { eventLogId: "log-001", token: "claim-token" },
+      event: null,
+    });
+    mockCompleteEventDeliveryClaim.mockResolvedValue(undefined);
+    mockFailEventDeliveryClaim.mockResolvedValue(undefined);
+    mockMarkEventDeliveryAccepted.mockResolvedValue(undefined);
   });
 
   it("should look up workspace, decrypt token, normalize event, send to Meta, and update EventLog to SENT", async () => {
@@ -142,14 +168,25 @@ describe("processMetaEvent", () => {
       undefined
     );
 
-    // Verify EventLog updated to SENT
-    expect(mockEventLogUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "log-001" },
-        data: expect.objectContaining({ status: "SENT" }),
-      })
+    expect(mockCompleteEventDeliveryClaim).toHaveBeenCalledWith(
+      { eventLogId: "log-001", token: "claim-token" },
+      { events_received: 1 }
+    );
+    expect(mockMarkEventDeliveryAccepted).toHaveBeenCalledWith(
+      { eventLogId: "log-001", token: "claim-token" },
+      { events_received: 1 }
     );
 
+  });
+
+  it("does not call Meta when the final delivery guard finds a canonical webhook owner", async () => {
+    mockClaimEventDelivery.mockResolvedValue({ action: "skip" });
+
+    await processMetaEvent(createMockJob());
+
+    expect(mockClaimEventDelivery).toHaveBeenCalledWith("log-001");
+    expect(mockSendToMetaCapi).not.toHaveBeenCalled();
+    expect(mockCompleteEventDeliveryClaim).not.toHaveBeenCalled();
   });
 
   it("should update EventLog to FAILED and re-throw on Meta CAPI error", async () => {
@@ -157,18 +194,60 @@ describe("processMetaEvent", () => {
     mockSendToMetaCapi.mockRejectedValue(metaError);
 
     const job = createMockJob();
-    await expect(processMetaEvent(job)).rejects.toThrow(metaError);
+    const failure = await processMetaEvent(job).catch((error: unknown) => error);
+    expect(failure).toBe(metaError);
+    expect(failure).not.toBeInstanceOf(MockUnrecoverableError);
 
     // Verify EventLog updated to RETRYING (attemptsMade=0, will retry)
-    expect(mockEventLogUpdate).toHaveBeenCalledWith(
+    expect(mockFailEventDeliveryClaim).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "log-001" },
-        data: expect.objectContaining({
-          status: "RETRYING",
-          errorMessage: "Meta CAPI 429: Rate limited",
-        }),
+        eventLogId: "log-001",
+        claim: { eventLogId: "log-001", token: "claim-token" },
+        outcome: "DELIVERY_AMBIGUOUS",
+        status: "RETRYING",
+        errorMessage: "Meta CAPI 429: Rate limited",
       })
     );
+  });
+
+  it("releases delivery identity when Meta explicitly rejects the request", async () => {
+    const metaError = new MockMetaCapiError("Invalid payload", 400, {
+      error: { message: "Invalid payload" },
+    });
+    mockSendToMetaCapi.mockRejectedValue(metaError);
+
+    const failure = await processMetaEvent(createMockJob()).catch(
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(MockUnrecoverableError);
+    expect(failure).toMatchObject({
+      name: "UnrecoverableError",
+      message: "Meta CAPI 400: Invalid payload",
+    });
+
+    expect(mockFailEventDeliveryClaim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        claim: { eventLogId: "log-001", token: "claim-token" },
+        outcome: "DEFINITELY_NOT_DELIVERED",
+        status: "FAILED",
+        nextRetryAt: null,
+      })
+    );
+  });
+
+  it("does not release identity ownership when SENT completion fails after acceptance", async () => {
+    mockCompleteEventDeliveryClaim.mockRejectedValue(
+      new MockEventDeliveryOwnershipError("Unable to commit delivery completion")
+    );
+
+    await expect(processMetaEvent(createMockJob())).rejects.toThrow(
+      "Unable to commit delivery completion"
+    );
+
+    expect(mockSendToMetaCapi).toHaveBeenCalledTimes(1);
+    expect(mockMarkEventDeliveryAccepted).toHaveBeenCalledTimes(1);
+    expect(mockFailEventDeliveryClaim).not.toHaveBeenCalled();
   });
 
   it("should update EventLog to FAILED and re-throw on decrypt failure", async () => {
@@ -178,12 +257,13 @@ describe("processMetaEvent", () => {
     await expect(processMetaEvent(job)).rejects.toThrow("Invalid auth tag");
 
     // Verify EventLog updated to RETRYING (attemptsMade=0, will retry)
-    expect(mockEventLogUpdate).toHaveBeenCalledWith(
+    expect(mockFailEventDeliveryClaim).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          status: "RETRYING",
-          errorMessage: "Invalid auth tag",
-        }),
+        eventLogId: "log-001",
+        claim: null,
+        outcome: "DEFINITELY_NOT_DELIVERED",
+        status: "RETRYING",
+        errorMessage: "Invalid auth tag",
       })
     );
 
@@ -194,7 +274,7 @@ describe("processMetaEvent", () => {
   it("should still re-throw original error even if EventLog update fails", async () => {
     const capiError = new Error("Network timeout");
     mockSendToMetaCapi.mockRejectedValue(capiError);
-    mockEventLogUpdate.mockRejectedValue(new Error("DB connection lost"));
+    mockFailEventDeliveryClaim.mockRejectedValue(new Error("DB connection lost"));
 
     const job = createMockJob();
     // The console.error for the DB failure is caught internally,

@@ -812,6 +812,7 @@ function StatusBadge({ status }: { status: string }) {
     FAILED: "bg-red-900/50 text-red-400 border-red-800",
     PENDING: "bg-yellow-900/50 text-yellow-400 border-yellow-800",
     RETRYING: "bg-orange-900/50 text-orange-400 border-orange-800",
+    SUPERSEDED: "bg-slate-900/50 text-slate-400 border-slate-800",
   };
   return (
     <Badge className={`${colors[status] ?? "bg-zinc-800 text-zinc-400 border-zinc-700"} text-xs`}>

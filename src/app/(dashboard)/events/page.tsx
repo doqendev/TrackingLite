@@ -66,6 +66,7 @@ export default async function EventsPage({
     SENT: { label: t("sent"), className: "bg-green-500/10 text-green-400" },
     FAILED: { label: t("failed"), className: "bg-red-500/10 text-red-400" },
     RETRYING: { label: t("retrying"), className: "bg-orange-500/10 text-orange-400" },
+    SUPERSEDED: { label: t("superseded"), className: "bg-slate-500/10 text-slate-400" },
   };
 
   const params = searchParams;
@@ -221,7 +222,7 @@ export default async function EventsPage({
                 {tc("all")}
               </Link>
             </Button>
-            {(["SENT", "PENDING", "FAILED", "RETRYING"] as EventStatus[]).map((s) => {
+            {(["SENT", "PENDING", "FAILED", "RETRYING", "SUPERSEDED"] as EventStatus[]).map((s) => {
               const cfg = statusConfig[s];
               return (
                 <Button

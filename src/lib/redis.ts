@@ -20,3 +20,8 @@ export function getSharedRedis(): IORedis {
   }
   return redis;
 }
+
+export function closeSharedRedis(): void {
+  redis?.disconnect();
+  redis = null;
+}

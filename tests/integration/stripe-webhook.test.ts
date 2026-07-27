@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
-import { cleanDatabase, disconnectAll } from "./helpers/db";
+import {
+  cleanDatabase,
+  cleanRedis,
+  disconnectAll,
+} from "./helpers/db";
 import { createUser, createSubscription } from "./helpers/factories";
 
 // Mock Stripe SDK
@@ -8,7 +12,7 @@ const mockSubscriptionsRetrieve = vi.fn();
 const mockSubscriptionsUpdate = vi.fn();
 
 vi.mock("@/lib/stripe", () => ({
-  stripe: {
+  getStripe: () => ({
     webhooks: {
       constructEvent: (...args: any[]) => mockConstructEvent(...args),
     },
@@ -16,7 +20,7 @@ vi.mock("@/lib/stripe", () => ({
       retrieve: (...args: any[]) => mockSubscriptionsRetrieve(...args),
       update: (...args: any[]) => mockSubscriptionsUpdate(...args),
     },
-  },
+  }),
 }));
 
 import { POST } from "@/app/api/stripe/webhook/route";
@@ -39,6 +43,7 @@ describe("POST /api/stripe/webhook", () => {
 
   beforeEach(async () => {
     await cleanDatabase();
+    await cleanRedis();
     mockConstructEvent.mockReset();
     mockSubscriptionsRetrieve.mockReset();
     mockSubscriptionsUpdate.mockReset();
@@ -69,6 +74,7 @@ describe("POST /api/stripe/webhook", () => {
     const stripeCusId = "cus_checkout_123";
 
     mockConstructEvent.mockReturnValue({
+      id: "evt_checkout_completed",
       type: "checkout.session.completed",
       data: {
         object: {
@@ -111,6 +117,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     mockConstructEvent.mockReturnValue({
+      id: "evt_subscription_updated_plan",
       type: "customer.subscription.updated",
       data: {
         object: {
@@ -144,6 +151,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     mockConstructEvent.mockReturnValue({
+      id: "evt_subscription_updated_status",
       type: "customer.subscription.updated",
       data: {
         object: {
@@ -177,6 +185,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     mockConstructEvent.mockReturnValue({
+      id: "evt_subscription_deleted",
       type: "customer.subscription.deleted",
       data: {
         object: { id: "sub_delete_123" },
@@ -202,6 +211,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     mockConstructEvent.mockReturnValue({
+      id: "evt_invoice_payment_failed",
       type: "invoice.payment_failed",
       data: {
         object: { subscription: "sub_fail_123" },
@@ -228,6 +238,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     mockConstructEvent.mockReturnValue({
+      id: "evt_invoice_paid",
       type: "invoice.paid",
       data: {
         object: { subscription: "sub_paid_123" },
@@ -248,6 +259,7 @@ describe("POST /api/stripe/webhook", () => {
   // 8. Unknown event → 200, no-op
   it("returns 200 for unknown event type", async () => {
     mockConstructEvent.mockReturnValue({
+      id: "evt_unknown",
       type: "some.unknown.event",
       data: { object: {} },
     });

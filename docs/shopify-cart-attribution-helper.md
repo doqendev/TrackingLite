@@ -24,7 +24,12 @@ installed and verified:
 
 ## Install
 
-Keep the existing TrackClear Shopify Custom Pixel snippet installed.
+Install the latest workspace-specific TrackClear Shopify Custom Pixel snippet.
+For the 2026-07 tracking-hardening rollout, existing stores must repaste it even
+if a TrackClear snippet is already present. The pasted first line identifies
+`bridge-v1`; this loader subscribes to Shopify events synchronously and buffers
+early events while the remote tracker initializes. Updating `/api/pixel` alone
+cannot add that bridge to an older pasted loader.
 
 Then add this helper script to the Shopify theme:
 
@@ -68,6 +73,41 @@ IDs/cookies/UTMs, and writes these Shopify cart attributes when available:
 
 It does not write raw email, phone, name, address, customer ID, or other raw
 customer PII to cart attributes.
+
+The generated Custom Pixel and legacy pixel also persist explicit consent
+revocations under `_trackclear_pending_consent_v1` before sending them. A
+failed revocation is retried after reload, on later events, and with bounded
+in-page backoff. The bounded 30-day queue stores no shopper PII or advertising
+identifiers and marks replay requests as no-destination, so replay updates
+consent state without creating an ad or analytics event. Local and session
+storage are parsed independently and merged, and each denial has an immutable
+generation so an older replay cannot remove a newer same-identity denial. The
+server clears attribution from every linked Redis identity and writes the
+explicit false consent values in one atomic operation before acknowledging
+the request.
+Explicit false values remain authoritative for the full 30-day server context
+window; short-lived grants still require a fresh Shopify consent snapshot.
+
+## Browser Pixel Ownership
+
+TrackClear's optional Meta browser mode is disabled by default; Meta CAPI
+continues to work server-side without it. If TrackClear browser mode is enabled
+for a workspace, TrackClear must be the only browser integration sending to
+that Meta dataset. Disable the Shopify Facebook & Instagram app pixel, theme
+pixel code, tag-manager Meta tag, or any other browser pixel that uses the same
+dataset first. Running two browser owners against one dataset duplicates
+browser events; sharing an event ID with TrackClear CAPI does not deduplicate
+two independent browser sends. After disabling TrackClear or another owner,
+wait at least 30 seconds for the shared script cache and start a fresh browser
+session before enabling the replacement.
+
+The same rule applies to TrackClear's optional TikTok browser mode. Before
+enabling it, remove or disable every other TikTok Pixel installation that uses
+the same Pixel ID (Shopify app, theme code, tag manager, or another custom
+pixel). TikTok Events API remains available server-side while browser mode is
+off. TrackClear browser events and Events API events share the same event ID;
+that pairing cannot repair duplicates created by a second browser owner. Use
+the same 30-second wait and fresh-session cutover rule.
 
 ## Timing
 

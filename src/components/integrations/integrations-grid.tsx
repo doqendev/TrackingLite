@@ -21,10 +21,12 @@ export interface IntegrationWorkspace {
   metaTestEventCode: string | null;
   hasAccessToken: boolean;
   enableMeta: boolean;
+  metaBrowserTrackingEnabled: boolean;
   // TikTok
   tiktokPixelId: string | null;
   hasTiktokAccessToken: boolean;
   enableTikTok: boolean;
+  tiktokBrowserTrackingEnabled: boolean;
   // GA4
   ga4MeasurementId: string | null;
   hasGA4ApiSecret: boolean;
@@ -49,6 +51,8 @@ export interface IntegrationWorkspace {
   enableGoogleAds: boolean;
   // Shopify Webhook
   hasShopifyWebhookSecret: boolean;
+  isShopifyWebhookVerified: boolean;
+  shopifyWebhookLastReceivedAt: string | null;
 }
 
 interface IntegrationsGridProps {
@@ -102,6 +106,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
     workspace.metaTestEventCode ?? ""
   );
   const [metaEnabled, setMetaEnabled] = useState(workspace.enableMeta);
+  const [metaBrowserTrackingEnabled, setMetaBrowserTrackingEnabled] = useState(
+    workspace.metaBrowserTrackingEnabled
+  );
   const [savingMeta, setSavingMeta] = useState(false);
 
   // TikTok state
@@ -110,6 +117,9 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   );
   const [tiktokAccessToken, setTiktokAccessToken] = useState("");
   const [tiktokEnabled, setTiktokEnabled] = useState(workspace.enableTikTok);
+  const [tiktokBrowserTrackingEnabled, setTiktokBrowserTrackingEnabled] = useState(
+    workspace.tiktokBrowserTrackingEnabled
+  );
   const [savingTiktok, setSavingTiktok] = useState(false);
 
   // GA4 state
@@ -150,6 +160,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [webhookConnected, setWebhookConnected] = useState(workspace.hasShopifyWebhookSecret);
+  const [webhookVerified, setWebhookVerified] = useState(workspace.isShopifyWebhookVerified);
   const [webhookUrlCopied, setWebhookUrlCopied] = useState(false);
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.trackclear.io"}/api/webhooks/shopify`;
@@ -191,6 +202,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
         metaPixelId: metaPixelId || null,
         metaTestEventCode: metaTestEventCode || null,
         enableMeta: metaEnabled,
+        metaBrowserTrackingEnabled,
       };
       if (metaAccessToken) body.metaAccessToken = metaAccessToken;
 
@@ -215,6 +227,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       const body: Record<string, string | boolean | null> = {
         tiktokPixelId: tiktokPixelId || null,
         enableTikTok: tiktokEnabled,
+        tiktokBrowserTrackingEnabled,
       };
       if (tiktokAccessToken) body.tiktokAccessToken = tiktokAccessToken;
 
@@ -373,6 +386,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
       toast.success(t("webhookSaved"));
       setWebhookSecret("");
       setWebhookConnected(true);
+      setWebhookVerified(false);
     } catch {
       toast.error(t("failedToSave", { platform: "Shopify Webhook" }));
     } finally {
@@ -417,9 +431,13 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <StatusBadge
-                  connected={webhookConnected}
+                  connected={webhookVerified}
                   connectedLabel={t("shopifyWebhookConnected")}
-                  notConnectedLabel={t("shopifyWebhookNotConfigured")}
+                  notConnectedLabel={
+                    webhookConnected
+                      ? t("shopifyWebhookPendingVerification")
+                      : t("shopifyWebhookNotConfigured")
+                  }
                 />
                 <ChevronDown
                   className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
@@ -519,6 +537,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               checked={metaEnabled}
               onCheckedChange={(val) => {
                 setMetaEnabled(val);
+                if (!val) setMetaBrowserTrackingEnabled(false);
                 handleToggle("meta", val, "Meta");
               }}
               onClick={(e) => e.stopPropagation()}
@@ -545,7 +564,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                 <Input
                   id="meta-pixel-id"
                   value={metaPixelId}
-                  onChange={(e) => setMetaPixelId(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setMetaPixelId(value);
+                    if (!value.trim()) setMetaBrowserTrackingEnabled(false);
+                  }}
                   placeholder="e.g. 1234567890"
                 />
               </div>
@@ -579,6 +602,23 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                   onChange={(e) => setMetaTestEventCode(e.target.value)}
                   placeholder="e.g. TEST12345"
                 />
+              </div>
+              <div className="rounded-md border border-amber-500/25 bg-amber-500/[0.06] p-3 space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="meta-browser-owner" className="text-xs font-medium">
+                    {t("metaBrowserOwnerTitle")}
+                  </Label>
+                  <Switch
+                    id="meta-browser-owner"
+                    checked={metaBrowserTrackingEnabled}
+                    onCheckedChange={setMetaBrowserTrackingEnabled}
+                    disabled={!metaEnabled || !metaPixelId}
+                    className="scale-90"
+                  />
+                </div>
+                <p className="text-[11px] leading-relaxed text-amber-200/80">
+                  {t("metaBrowserOwnerWarning")}
+                </p>
               </div>
               <div className="flex justify-end pt-2">
                 <Button
@@ -617,6 +657,7 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
               checked={tiktokEnabled}
               onCheckedChange={(val) => {
                 setTiktokEnabled(val);
+                if (!val) setTiktokBrowserTrackingEnabled(false);
                 handleToggle("tiktok", val, "TikTok");
               }}
               onClick={(e) => e.stopPropagation()}
@@ -643,7 +684,11 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                 <Input
                   id="tiktok-pixel-id"
                   value={tiktokPixelId}
-                  onChange={(e) => setTiktokPixelId(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTiktokPixelId(value);
+                    if (!value.trim()) setTiktokBrowserTrackingEnabled(false);
+                  }}
                   placeholder="e.g. CKXXXXXXXXXXXXXX"
                 />
               </div>
@@ -665,6 +710,23 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
                       : "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                   }
                 />
+              </div>
+              <div className="rounded-md border border-amber-500/25 bg-amber-500/[0.06] p-3 space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="tiktok-browser-owner" className="text-xs font-medium">
+                    {t("tiktokBrowserOwnerTitle")}
+                  </Label>
+                  <Switch
+                    id="tiktok-browser-owner"
+                    checked={tiktokBrowserTrackingEnabled}
+                    onCheckedChange={setTiktokBrowserTrackingEnabled}
+                    disabled={!tiktokEnabled || !tiktokPixelId}
+                    className="scale-90"
+                  />
+                </div>
+                <p className="text-[11px] leading-relaxed text-amber-200/80">
+                  {t("tiktokBrowserOwnerWarning")}
+                </p>
               </div>
               <div className="flex justify-end pt-2">
                 <Button

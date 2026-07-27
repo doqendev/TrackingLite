@@ -1,0 +1,307 @@
+name: Release gates
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    name: Node ${{ matrix.node }} runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 24]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: trackinglite_test
+          POSTGRES_USER: trackclear
+          POSTGRES_PASSWORD: localdev
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U trackclear -d trackinglite_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://trackclear:localdev@localhost:5433/trackinglite_test
+      TEST_REDIS_URL: redis://localhost:6379/15
+      DATABASE_URL: postgresql://trackclear:localdev@localhost:5433/trackinglite_test
+      DIRECT_DATABASE_URL: postgresql://trackclear:localdev@localhost:5433/trackinglite_test
+      REDIS_URL: redis://localhost:6379/15
+      NEXTAUTH_SECRET: test-secret-at-least-32-characters-long
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      STRIPE_SECRET_KEY: sk_test_fake
+      STRIPE_WEBHOOK_SECRET: whsec_test_fake
+      STRIPE_STARTER_PRICE_ID: price_starter_test
+      STRIPE_GROWTH_PRICE_ID: price_growth_test
+      STRIPE_SCALE_PRICE_ID: price_scale_test
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_INGEST_URL: http://localhost:3000/api/events/ingest
+      STANDALONE: ${{ matrix.node == 20 && 'true' || '' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Unit tests
+        run: pnpm vitest run --reporter=dot --silent
+      - name: Integration tests
+        run: pnpm test:integration -- --reporter=dot --silent
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+      - name: ESLint
+        run: pnpm lint
+      - name: Production build
+        run: pnpm build
+
+  worker-runtime:
+    name: Node 20 worker container
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: trackinglite_test
+          POSTGRES_USER: trackclear
+          POSTGRES_PASSWORD: localdev
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U trackclear -d trackinglite_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://trackclear:localdev@localhost:5433/trackinglite_test
+      DIRECT_DATABASE_URL: postgresql://trackclear:localdev@localhost:5433/trackinglite_test
+      REDIS_URL: redis://localhost:6379/15
+      NEXTAUTH_SECRET: test-secret-at-least-32-characters-long
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      WORKER_IMAGE: trackclear-worker-ci:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build Node 20 worker image
+        run: docker build --file Dockerfile.worker --tag "$WORKER_IMAGE" .
+      - name: Verify worker image runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm "$WORKER_IMAGE" node --version | grep -Eq '^v20\.'
+          docker run --rm --network host \
+            -e DATABASE_URL \
+            -e DIRECT_DATABASE_URL \
+            "$WORKER_IMAGE" \
+            pnpm exec prisma migrate deploy
+      - name: Start worker and verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name trackclear-worker-ci --network host \
+            -e DATABASE_URL \
+            -e DIRECT_DATABASE_URL \
+            -e REDIS_URL \
+            -e NEXTAUTH_SECRET \
+            -e ENCRYPTION_KEY \
+            -e PORT=8080 \
+            -e RAILWAY_GIT_COMMIT_SHA="$GITHUB_SHA" \
+            "$WORKER_IMAGE"
+
+          for attempt in $(seq 1 45); do
+            if [ "$(docker inspect --format '{{.State.Running}}' trackclear-worker-ci)" != "true" ]; then
+              echo "Worker container exited before becoming healthy"
+              exit 1
+            fi
+
+            if health_json="$(curl --fail --silent http://127.0.0.1:8080/health)"; then
+              echo "$health_json" | jq --exit-status --arg commit "$GITHUB_SHA" \
+                '.status == "ok"
+                  and .commit == $commit
+                  and .database == "connected"
+                  and .redis == "connected"
+                  and .startupReady == true
+                  and .workers == 11
+                  and .listenersReady == 11' >/dev/null
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          echo "Worker health endpoint did not become ready"
+          exit 1
+      - name: Show worker logs on failure
+        if: failure()
+        run: docker logs trackclear-worker-ci || true
+      - name: Stop worker container
+        if: always()
+        run: docker rm --force trackclear-worker-ci || true
+
+  migration:
+    name: PostgreSQL 16 migration rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: trackinglite_test
+          POSTGRES_USER: trackclear
+          POSTGRES_PASSWORD: localdev
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U trackclear -d trackinglite_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://trackclear:localdev@localhost:5433/trackinglite_test
+      DIRECT_DATABASE_URL: postgresql://trackclear:localdev@localhost:5433/trackinglite_test
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Prisma schema formatting
+        run: pnpm exec prisma format --check
+      - name: Resolve migration baseline
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          zero_sha="0000000000000000000000000000000000000000"
+
+          if [ -n "$PR_BASE_SHA" ]; then
+            base_sha="$PR_BASE_SHA"
+          elif [ -n "$PUSH_BASE_SHA" ] && [ "$PUSH_BASE_SHA" != "$zero_sha" ]; then
+            base_sha="$PUSH_BASE_SHA"
+          else
+            git fetch --no-tags origin main
+            main_sha="$(git rev-parse origin/main)"
+            if [ "$(git rev-parse HEAD)" = "$main_sha" ]; then
+              base_sha="$(git rev-parse HEAD^)"
+            else
+              base_sha="$(git merge-base HEAD "$main_sha")"
+            fi
+          fi
+
+          if ! git cat-file -e "$base_sha^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$base_sha"
+          fi
+
+          echo "BASE_SHA=$base_sha" >> "$GITHUB_ENV"
+      - name: Protect existing migration history
+        shell: bash
+        run: |
+          set -euo pipefail
+          invalid_history=0
+
+          while IFS=$'\t' read -r status path remainder; do
+            [ -z "$status" ] && continue
+
+            if [ "$status" != "A" ]; then
+              echo "Existing migration history changed: $status $path $remainder"
+              invalid_history=1
+              continue
+            fi
+
+            migration_path="${path#prisma/migrations/}"
+            migration_dir="${migration_path%%/*}"
+            if [[ "$migration_path" != */migration.sql ]]; then
+              echo "New migration content must be a migration.sql in a new directory: $path"
+              invalid_history=1
+              continue
+            fi
+            if git cat-file -e "$BASE_SHA:prisma/migrations/$migration_dir" 2>/dev/null; then
+              echo "File added inside existing migration directory: $path"
+              invalid_history=1
+            fi
+          done < <(git diff --name-status --find-renames "$BASE_SHA" HEAD -- prisma/migrations)
+
+          if [ "$invalid_history" -ne 0 ]; then
+            exit 1
+          fi
+      - name: Recreate the pull request base schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show "$BASE_SHA:prisma/schema.prisma" > "$RUNNER_TEMP/baseline.prisma"
+          pnpm exec prisma db push --schema "$RUNNER_TEMP/baseline.prisma" --force-reset --skip-generate
+          while IFS= read -r migration; do
+            pnpm exec prisma migrate resolve --applied "$migration"
+          done < <(git ls-tree -d --name-only "$BASE_SHA:prisma/migrations")
+
+          if grep -q 'shopifyWebhookVerifiedAt' "$RUNNER_TEMP/baseline.prisma"; then
+            echo "TRACKING_HARDENING_REHEARSAL=0" >> "$GITHUB_ENV"
+          else
+            echo "TRACKING_HARDENING_REHEARSAL=1" >> "$GITHUB_ENV"
+          fi
+      - name: Seed populated tracking-hardening baseline
+        if: env.TRACKING_HARDENING_REHEARSAL == '1'
+        run: pnpm db:seed-tracking-hardening-rehearsal
+      - name: Apply candidate migrations
+        run: pnpm exec prisma migrate deploy
+      - name: Verify migration state and indexes
+        run: |
+          pnpm exec prisma migrate status
+          pnpm db:verify-tracking-hardening
+          pnpm exec prisma migrate diff --from-url "$DIRECT_DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+      - name: Verify greenfield migration history
+        env:
+          TRACKING_HARDENING_REHEARSAL: "0"
+        run: |
+          pnpm exec prisma migrate reset --force --skip-seed
+          pnpm exec prisma migrate status
+          pnpm db:verify-tracking-hardening
+          pnpm exec prisma migrate diff --from-url "$DIRECT_DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code

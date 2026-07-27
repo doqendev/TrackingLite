@@ -1,10 +1,10 @@
 [build]
-watchPatterns = ["src/**", "messages/**", "prisma/**", "public/**", "next.config.mjs", "package.json", "server.js", "Dockerfile"]
+watchPatterns = ["src/**", "scripts/**", "messages/**", "prisma/**", "public/**", "next.config.mjs", "package.json", "pnpm-lock.yaml", "server.js", "Dockerfile", "railway.web.toml"]
 
 [deploy]
-preDeployCommand = "npx prisma migrate deploy"
+preDeployCommand = "pnpm release:railway-production"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ALWAYS"
 restartPolicyMaxRetries = 10
-drainingSeconds = 10
+drainingSeconds = 45

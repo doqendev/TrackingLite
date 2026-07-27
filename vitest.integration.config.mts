@@ -4,6 +4,19 @@ import path from "path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const integrationDatabaseUrl =
+  process.env.TEST_DATABASE_URL ??
+  "postgresql://trackclear:localdev@localhost:5433/trackinglite_test";
+const integrationRedisUrl =
+  process.env.TEST_REDIS_URL ?? "redis://localhost:6379/15";
+
+// Global setup runs before Vitest applies test.env in every context. Populate
+// this process as well so destructive test cleanup can validate its target.
+process.env.INTEGRATION_TEST_RUN = "1";
+process.env.DATABASE_URL = integrationDatabaseUrl;
+process.env.DIRECT_DATABASE_URL = integrationDatabaseUrl;
+process.env.REDIS_URL = integrationRedisUrl;
+
 export default defineConfig({
   test: {
     globals: true,
@@ -14,11 +27,10 @@ export default defineConfig({
     hookTimeout: 30000,
     globalSetup: ["tests/integration/helpers/setup.ts"],
     env: {
-      DATABASE_URL:
-        "postgresql://trackinglite:localdev@localhost:5433/trackinglite_test",
-      DIRECT_DATABASE_URL:
-        "postgresql://trackinglite:localdev@localhost:5433/trackinglite_test",
-      REDIS_URL: "redis://localhost:6379",
+      INTEGRATION_TEST_RUN: "1",
+      DATABASE_URL: integrationDatabaseUrl,
+      DIRECT_DATABASE_URL: integrationDatabaseUrl,
+      REDIS_URL: integrationRedisUrl,
       NEXTAUTH_SECRET: "test-secret-at-least-32-characters-long",
       ENCRYPTION_KEY:
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

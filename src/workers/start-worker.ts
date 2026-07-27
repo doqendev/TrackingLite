@@ -1,139 +1,433 @@
 import "dotenv/config";
-import * as Sentry from "@sentry/node";
 
-if (process.env.SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    tracesSampleRate: 0.1,
-    environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? "development",
-  });
+interface ManagedWorker {
+  close(force?: boolean): Promise<void>;
+  disconnect(): Promise<void>;
+  isRunning(): boolean;
+  run(): Promise<void>;
+  waitUntilReady(): Promise<unknown>;
 }
 
-import { validateEnv } from "@/lib/env-validation";
+interface RuntimeLogger {
+  info(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown>): void;
+}
 
-// Validate early — log the exact error so Railway logs show what's missing
-try {
-  validateEnv("worker");
-} catch (err) {
-  const serializedError = err instanceof Error
-    ? { name: err.name, message: err.message, stack: err.stack }
-    : { message: String(err) };
+const OUTBOUND_REQUEST_TIMEOUT_MS = 30_000;
+const WORKER_SHUTDOWN_TIMEOUT_MS = 45_000;
 
-  // logger.ts uses only console.error/console.log internally, safe to inline here
-  // before the dynamic imports below so Railway logs capture the failure reason
+let managedWorkers: ManagedWorker[] = [];
+let runtimeLogger: RuntimeLogger | null = null;
+let runtimeHealthServer: import("node:http").Server | null = null;
+let runtimeDatabaseDisconnect: (() => Promise<void>) | null = null;
+let runtimeRedisDisconnect: (() => void) | null = null;
+let runtimeSentryFlush: ((timeoutMs: number) => Promise<boolean>) | null = null;
+let runtimeMemoryInterval: ReturnType<typeof setInterval> | null = null;
+let runtimeListenersReady = false;
+let shutdownStarted = false;
+let shutdownPromise: Promise<void> | null = null;
+
+function serializeError(error: unknown) {
+  return error instanceof Error
+    ? { name: error.name, message: error.message, stack: error.stack }
+    : { message: String(error) };
+}
+
+function writeStartupError(message: string, error: unknown) {
   process.stderr.write(
     JSON.stringify({
       level: "error",
       component: "worker-startup",
-      msg: "Worker startup failed: environment validation",
-      error: serializedError,
+      msg: message,
+      error: serializeError(error),
       timestamp: new Date().toISOString(),
     }) + "\n"
   );
-  process.exit(1);
 }
 
-process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
-process.env.MSGPACKR_NATIVE_ACCELERATION_DISABLED ??= "true";
+async function closeHealthServer(): Promise<void> {
+  const server = runtimeHealthServer;
+  runtimeHealthServer = null;
+  if (!server?.listening) return;
 
-import { worker as metaWorker } from "./meta-event-processor";
-import { redditWorker } from "./reddit-event-processor";
-import { pinterestWorker } from "./pinterest-event-processor";
-import { tiktokWorker } from "./tiktok-event-processor";
-import { ga4Worker } from "./ga4-event-processor";
-import { klaviyoWorker } from "./klaviyo-event-processor";
-import { googleAdsWorker } from "./google-ads-event-processor";
-import { alertWorker, scheduleAlertChecks } from "./alert-checker";
-import { staleRequeueWorker, scheduleStaleRequeue } from "./stale-pending-requeue";
-import { cleanupWorker, scheduleEventLogCleanup } from "./event-log-cleanup";
-import { createLogger } from "@/lib/logger";
-import { createServer } from "http";
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
 
-const log = createLogger({ component: "worker-main" });
+function logCloseFailures(
+  resource: string,
+  results: PromiseSettledResult<unknown>[]
+): void {
+  const failures = results.filter(
+    (result): result is PromiseRejectedResult => result.status === "rejected"
+  );
+  if (failures.length > 0) {
+    runtimeLogger?.error(`One or more ${resource} failed to close cleanly`, {
+      failures: failures.map((result) => serializeError(result.reason)),
+    });
+  }
+}
 
-process.on("uncaughtException", (err) => {
-  log.error("Uncaught exception", { error: err });
-  Sentry.captureException(err);
+async function shutdownRuntime(signal: string, exitCode: number): Promise<void> {
+  if (shutdownPromise) return shutdownPromise;
+
+  shutdownStarted = true;
+  runtimeListenersReady = false;
+  shutdownPromise = (async () => {
+    runtimeLogger?.info("Received shutdown request", { signal, exitCode });
+    const timeout = setTimeout(() => {
+      const error = new Error(
+        `Worker shutdown exceeded ${WORKER_SHUTDOWN_TIMEOUT_MS}ms`
+      );
+      if (runtimeLogger) {
+        runtimeLogger.error("Worker shutdown timed out; forcing exit", {
+          error: serializeError(error),
+        });
+      } else {
+        writeStartupError("Worker shutdown timed out; forcing exit", error);
+      }
+      process.exit(1);
+    }, WORKER_SHUTDOWN_TIMEOUT_MS);
+
+    try {
+      if (runtimeMemoryInterval) {
+        clearInterval(runtimeMemoryInterval);
+        runtimeMemoryInterval = null;
+      }
+
+      await closeHealthServer().catch((error) => {
+        runtimeLogger?.error("Failed to close worker health server", { error });
+      });
+
+      // close() stops acquisition and waits for active processors to settle.
+      const closeResults = await Promise.allSettled(
+        managedWorkers.map((worker) => worker.close())
+      );
+      logCloseFailures("workers", closeResults);
+
+      // Every worker is constructed with an explicit shared IORedis instance.
+      // BullMQ intentionally leaves those supplied clients open after close().
+      const disconnectResults = await Promise.allSettled(
+        managedWorkers.map((worker) => worker.disconnect())
+      );
+      logCloseFailures("worker Redis connections", disconnectResults);
+
+      if (runtimeDatabaseDisconnect) {
+        await runtimeDatabaseDisconnect().catch((error) => {
+          runtimeLogger?.error("Failed to disconnect worker database", { error });
+        });
+      }
+      runtimeRedisDisconnect?.();
+
+      if (runtimeSentryFlush) {
+        await runtimeSentryFlush(2_000).catch(() => false);
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    process.exit(exitCode);
+  })();
+
+  return shutdownPromise;
+}
+
+// Signal ownership is installed before any asynchronous imports can construct a
+// BullMQ listener. A startup-time signal therefore uses the same cleanup path as
+// a steady-state shutdown instead of allowing Node's default immediate exit.
+process.once("SIGTERM", () => {
+  void shutdownRuntime("SIGTERM", 0);
+});
+process.once("SIGINT", () => {
+  void shutdownRuntime("SIGINT", 0);
 });
 
-process.on("unhandledRejection", (reason) => {
-  log.error("Unhandled rejection", { reason });
-  Sentry.captureException(reason);
-});
+async function startWorkerRuntime() {
+  const { validateEnv } = await import("@/lib/env-validation");
+  validateEnv("worker");
 
-process.on("beforeExit", (code) => {
-  log.warn("Worker process beforeExit", { code });
-});
+  process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
+  process.env.MSGPACKR_NATIVE_ACCELERATION_DISABLED ??= "true";
+  // db.ts owns process signals for web/CLI runtimes. The worker must drain all
+  // BullMQ listeners before exiting, so it is the sole shutdown owner here.
+  process.env.TRACKCLEAR_WORKER_OWNS_SHUTDOWN = "true";
 
-process.on("exit", (code) => {
-  log.warn("Worker process exit", { code });
-});
+  const Sentry = await import("@sentry/node");
+  runtimeSentryFlush = (timeoutMs) => Sentry.flush(timeoutMs);
+  if (process.env.SENTRY_DSN) {
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      tracesSampleRate: 0.1,
+      environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? "development",
+    });
+  }
 
-const workers = [metaWorker, tiktokWorker, ga4Worker, klaviyoWorker, redditWorker, pinterestWorker, googleAdsWorker, alertWorker, staleRequeueWorker, cleanupWorker];
+  // Import sequentially and register each closeable immediately. If a later
+  // import or setup operation fails, the startup-failure path can still stop
+  // every listener that was successfully constructed before it.
+  const { createLogger } = await import("@/lib/logger");
+  const { createServer } = await import("node:http");
+  const { db } = await import("@/lib/db");
+  runtimeDatabaseDisconnect = () => db.$disconnect();
+  const {
+    assertRailwayProductionReleaseApproved,
+    shouldAssertRailwayProductionRelease,
+  } = await import(
+    "@/lib/production-release-gate"
+  );
+  const isRailwayRuntime = shouldAssertRailwayProductionRelease(process.env);
+  if (isRailwayRuntime) {
+    assertRailwayProductionReleaseApproved(process.env);
+    const {
+      assertDeploymentDatabaseIdentityMatchesExpected,
+      readDeploymentDatabaseIdentity,
+      readExpectedDeploymentDatabaseIdentity,
+    } = await import("@/lib/deployment-database-identity");
+    assertDeploymentDatabaseIdentityMatchesExpected(
+      await readDeploymentDatabaseIdentity(db),
+      readExpectedDeploymentDatabaseIdentity(process.env)
+    );
+  }
+  const { assertTrackingDeploymentSchemaReady } = await import(
+    "@/lib/deployment-schema"
+  );
+  await assertTrackingDeploymentSchemaReady(db);
+  const { getSharedRedis, closeSharedRedis } = await import("@/lib/redis");
+  runtimeRedisDisconnect = closeSharedRedis;
+  const { evaluateWorkerHealth, EXPECTED_WORKER_COUNT } = await import(
+    "./worker-health"
+  );
 
-log.info("Starting event processors", { workerCount: workers.length, pid: process.pid });
-log.info("Redis configured", { redisUrl: (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/\/\/.*@/, "//***@") });
-log.info("Listening for jobs", { queues: ["meta-events", "tiktok-events", "ga4-events", "klaviyo-events", "reddit-events", "pinterest-events", "google-ads-events", "alert-checks", "stale-pending-requeue", "event-log-cleanup"] });
+  const { worker: metaWorker } = await import("./meta-event-processor");
+  managedWorkers.push(metaWorker);
+  const { tiktokWorker } = await import("./tiktok-event-processor");
+  managedWorkers.push(tiktokWorker);
+  const { ga4Worker } = await import("./ga4-event-processor");
+  managedWorkers.push(ga4Worker);
+  const { klaviyoWorker } = await import("./klaviyo-event-processor");
+  managedWorkers.push(klaviyoWorker);
+  const { redditWorker } = await import("./reddit-event-processor");
+  managedWorkers.push(redditWorker);
+  const { pinterestWorker } = await import("./pinterest-event-processor");
+  managedWorkers.push(pinterestWorker);
+  const { googleAdsWorker } = await import("./google-ads-event-processor");
+  managedWorkers.push(googleAdsWorker);
+  const { alertWorker, scheduleAlertChecks } = await import("./alert-checker");
+  managedWorkers.push(alertWorker);
+  const { staleRequeueWorker, scheduleStaleRequeue } = await import(
+    "./stale-pending-requeue"
+  );
+  managedWorkers.push(staleRequeueWorker);
+  const { cleanupWorker, scheduleEventLogCleanup } = await import(
+    "./event-log-cleanup"
+  );
+  managedWorkers.push(cleanupWorker);
+  const { shopifyWebhookInboxWorker, scheduleShopifyWebhookInboxReplay } =
+    await import("./shopify-webhook-inbox-worker");
+  managedWorkers.push(shopifyWebhookInboxWorker);
 
-// Minimal HTTP health check for Railway
-const healthPort = parseInt(process.env.PORT || process.env.WORKER_HEALTH_PORT || "8080", 10);
-const healthServer = createServer((req, res) => {
-  if ((req.url === "/health" || req.url === "/api/health") && req.method === "GET") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok", workers: workers.length, uptime: process.uptime() }));
-  } else {
+  const log = createLogger({ component: "worker-main" });
+  runtimeLogger = log;
+
+  process.on("uncaughtException", (error) => {
+    log.error("Uncaught exception", { error });
+    Sentry.captureException(error);
+    void shutdownRuntime("UNCAUGHT_EXCEPTION", 1);
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    log.error("Unhandled rejection", { reason });
+    Sentry.captureException(reason);
+    void shutdownRuntime("UNHANDLED_REJECTION", 1);
+  });
+
+  process.on("beforeExit", (code) => {
+    log.warn("Worker process beforeExit", { code });
+  });
+
+  process.on("exit", (code) => {
+    log.warn("Worker process exit", { code });
+  });
+
+  if (managedWorkers.length !== EXPECTED_WORKER_COUNT) {
+    throw new Error(
+      `Worker listener count mismatch: expected ${EXPECTED_WORKER_COUNT}, constructed ${managedWorkers.length}`
+    );
+  }
+
+  log.info("Worker listeners constructed in paused state", {
+    workerCount: managedWorkers.length,
+    pid: process.pid,
+  });
+  log.info("Redis configured", {
+    redisUrl: (process.env.REDIS_URL ?? "redis://localhost:6379").replace(
+      /\/\/.*@/,
+      "//***@"
+    ),
+  });
+
+  // These recovery producers are part of tracking readiness. Because every
+  // listener is autorun:false, no outbound job can be claimed before both
+  // schedules are durably registered.
+  await scheduleStaleRequeue();
+  await scheduleShopifyWebhookInboxReplay();
+  log.info("Required delivery recovery schedules registered", {
+    staleRequeueInterval: "5min",
+    shopifyInboxInterval: "1min",
+  });
+
+  if (shutdownStarted) {
+    throw new Error("Worker startup interrupted by shutdown");
+  }
+
+  let rejectListenerStartup: ((error: Error) => void) | null = null;
+  const listenerStartupFailure = new Promise<never>((_, reject) => {
+    rejectListenerStartup = reject;
+  });
+
+  for (let index = 0; index < managedWorkers.length; index++) {
+    const worker = managedWorkers[index];
+    void worker.run().then(
+      () => {
+        if (shutdownStarted) return;
+        runtimeListenersReady = false;
+        const error = new Error(`Worker listener ${index + 1} stopped unexpectedly`);
+        if (rejectListenerStartup) {
+          const reject = rejectListenerStartup;
+          rejectListenerStartup = null;
+          reject(error);
+        } else {
+          log.error("Worker listener stopped unexpectedly", {
+            listener: index + 1,
+          });
+          void shutdownRuntime("WORKER_LISTENER_STOPPED", 1);
+        }
+      },
+      (error: unknown) => {
+        if (shutdownStarted) return;
+        runtimeListenersReady = false;
+        const listenerError =
+          error instanceof Error
+            ? error
+            : new Error(`Worker listener ${index + 1} failed: ${String(error)}`);
+        if (rejectListenerStartup) {
+          const reject = rejectListenerStartup;
+          rejectListenerStartup = null;
+          reject(listenerError);
+        } else {
+          log.error("Worker listener failed unexpectedly", {
+            listener: index + 1,
+            error: listenerError,
+          });
+          void shutdownRuntime("WORKER_LISTENER_FAILED", 1);
+        }
+      }
+    );
+  }
+
+  await Promise.race([
+    Promise.all(managedWorkers.map((worker) => worker.waitUntilReady())),
+    listenerStartupFailure,
+  ]);
+  rejectListenerStartup = null;
+
+  if (shutdownStarted) {
+    throw new Error("Worker startup interrupted by shutdown");
+  }
+  runtimeListenersReady = true;
+
+  const healthPort = Number.parseInt(
+    process.env.PORT || process.env.WORKER_HEALTH_PORT || "8080",
+    10
+  );
+  const healthServer = createServer(async (req, res) => {
+    if (
+      (req.url === "/health" || req.url === "/api/health") &&
+      req.method === "GET"
+    ) {
+      const health = await evaluateWorkerHealth({
+        workers: managedWorkers,
+        startupReady: runtimeListenersReady,
+        checkDatabase: async () => {
+          await assertTrackingDeploymentSchemaReady(db);
+          return db.$queryRaw`SELECT 1`;
+        },
+        checkRedis: () => getSharedRedis().ping(),
+        commit:
+          process.env.RAILWAY_GIT_COMMIT_SHA ??
+          process.env.GIT_COMMIT_SHA ??
+          null,
+        uptime: process.uptime(),
+      });
+
+      res.writeHead(health.status === "ok" ? 200 : 503, {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      });
+      res.end(JSON.stringify(health));
+      return;
+    }
+
     res.writeHead(404);
     res.end();
-  }
-});
-healthServer.listen(healthPort, () => {
-  log.info("Worker health check listening", { port: healthPort });
-});
-
-// Log memory usage every 5 minutes
-setInterval(() => {
-  const mem = process.memoryUsage();
-  log.info("Memory usage", {
-    rss: Math.round(mem.rss / 1024 / 1024),
-    heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
-    heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
-    external: Math.round(mem.external / 1024 / 1024),
   });
-}, 5 * 60 * 1000);
+  runtimeHealthServer = healthServer;
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) => reject(error);
+    healthServer.once("error", onError);
+    healthServer.listen(healthPort, () => {
+      healthServer.off("error", onError);
+      resolve();
+    });
+  });
 
-// Schedule the hourly alert-check repeatable job
-scheduleAlertChecks().catch((err) => {
-  log.error("Failed to schedule alert checks", { error: err });
-});
+  log.info("All worker listeners ready", {
+    queues: [
+      "meta-events",
+      "tiktok-events",
+      "ga4-events",
+      "klaviyo-events",
+      "reddit-events",
+      "pinterest-events",
+      "google-ads-events",
+      "alert-checks",
+      "stale-pending-requeue",
+      "event-log-cleanup",
+      "shopify-webhook-inbox",
+    ],
+    listenersReady: managedWorkers.length,
+    port: healthPort,
+  });
 
-// Schedule the stale-pending requeue job (every 5 minutes)
-scheduleStaleRequeue().catch((err) => {
-  log.error("Failed to schedule stale requeue", { error: err });
-});
+  runtimeMemoryInterval = setInterval(() => {
+    const memory = process.memoryUsage();
+    log.info("Memory usage", {
+      rss: Math.round(memory.rss / 1024 / 1024),
+      heapUsed: Math.round(memory.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(memory.heapTotal / 1024 / 1024),
+      external: Math.round(memory.external / 1024 / 1024),
+    });
+  }, 5 * 60 * 1000);
 
-// Schedule the event-log cleanup job (hourly)
-scheduleEventLogCleanup().catch((err) => {
-  log.error("Failed to schedule event log cleanup", { error: err });
-});
+  scheduleAlertChecks().catch((error) => {
+    log.error("Failed to schedule alert checks", { error });
+  });
 
-// Graceful shutdown
-async function shutdown(signal: string) {
-  log.info("Received signal, shutting down", { signal });
-  const timeout = setTimeout(() => {
-    log.error("Shutdown timed out after 30s, forcing exit");
-    process.exit(1);
-  }, 30000);
-  try {
-    healthServer.close();
-    await Promise.all(workers.map(w => w.close()));
-    log.info("All workers stopped");
-  } catch (err) {
-    log.error("Error during shutdown", { error: err });
-  }
-  clearTimeout(timeout);
-  await Sentry.flush(2000).catch(() => null);
-  process.exit(0);
+  scheduleEventLogCleanup().catch((error) => {
+    log.error("Failed to schedule event log cleanup", { error });
+  });
 }
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+if (WORKER_SHUTDOWN_TIMEOUT_MS <= OUTBOUND_REQUEST_TIMEOUT_MS) {
+  throw new Error("Worker shutdown timeout must exceed outbound request timeout");
+}
+
+startWorkerRuntime().catch(async (error) => {
+  writeStartupError("Worker startup failed: runtime initialization", error);
+  await shutdownRuntime("STARTUP_FAILURE", 1);
+});
