@@ -22,13 +22,12 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-**The deployed `main` baseline remains live; the 2026-07-27 own-store tracking hardening is isolated on `codex/own-store-tracking-hardening` and is not deployed.** Current branch state:
+**The 2026-07-27 own-store tracking hardening is live in production at exact release SHA `a4628c9bd3760fd3e902a8df5680002ced759651`.** The candidate was fast-forwarded to `main`, then deployed through a controlled Vercel/Railway cutover with destination queues paused until both runtimes were ready. Current state:
 - Build: compiles cleanly on local Node 22; the release workflow enforces Node 20 standalone and Node 24 builds; lint passes with pre-existing `<img>` optimization warnings
 - Unit suite: 666/666 passing across 57 files on local Node 22; release CI repeats it on Node 20 and 24
 - Integration suite: 62/62 passing across 7 files against isolated PostgreSQL 17.5/Redis locally; release CI repeats it on PostgreSQL 16/Redis 7 with Node 20 and 24
 - TypeScript and Prisma schema validation pass cleanly
-- Production migrations already applied: `20260521_add_workspace_product_mode`, `20260522_add_catalog_id_settings`, `20260522_add_custom_ingest_domain`
-- Branch-only migration chain: base `20260727_add_shopify_webhook_inbox`, seven one-statement concurrent-index migrations, two schema-history catch-up migrations, and one concurrent refund-index migration; all 16 repository migrations rebuild cleanly from empty and upgrade a populated baseline, but remain unapplied to production
+- All 16 repository migrations are applied in production. The 20260727 hardening chain includes the webhook inbox, seven one-statement concurrent EventLog indexes, two schema-history catch-up migrations, and one concurrent refund index; production verification reports 11/11 required indexes valid and zero Prisma drift.
 - 7 destination codepaths retained for legacy/custom workspaces: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
 - Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, required storefront cart attribution helper, Shopify webhook, Meta CAPI, TikTok Events API, actionable tracking health
 - Dashboard: mode-aware destination visibility, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
@@ -38,7 +37,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 - Tracking hardening: synchronous bounded `bridge-v1` startup FIFO, lossless encrypted webhook inbox with capture-only acknowledgement, atomic destination outbox, verified-webhook gating, cross-source Purchase alias reconciliation, final delivery claims, encrypted 72-hour retry envelopes, scoped circuit breakers, deterministic retries, timestamped consent tombstones, opt-in Meta/TikTok browser ownership, latest-touch browser identity, and alias-aware Purchase usage reservation/reconciliation
 - Worker lifecycle: all 11 BullMQ listeners are constructed with `autorun: false`; required recovery schedules register first, every listener must pass `waitUntilReady()`, and only then does the latched `/health` readiness gate open. Startup failure and signals use one cleanup path. Outbound requests are capped at 30 seconds, application drain at 45 seconds, and Railway drain at 60 seconds.
 - Hosting: web app on Vercel (serverless), workers on Railway, Postgres + Redis on Railway with public TCP proxies
-- Branching: GitHub default/source branch is `main`; Vercel Git deployment is disabled for the controlled release, and Railway autodeploy/config-path state must be verified in the provider before cutover
+- Release control: GitHub default/source branch is `main`; Vercel Git deployment and Railway autodeploy remain disabled. Vercel production deployment `E6FSrYAScp7CayAbatpcNsXTgcwE` and Railway deployment `84d5ef69-3822-44f8-be54-0d8f967c1342` run the approved SHA. Railway uses `/railway.worker.toml` and `/Dockerfile.worker` with a 60-second drain.
 
 See `STATUS.md` for the full audit and remaining work.
 

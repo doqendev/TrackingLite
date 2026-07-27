@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-07-27 (own-store tracking hardening, branch only)
+Last updated: 2026-07-27 (controlled production release complete)
 
 ## Build Health
 
@@ -9,14 +9,14 @@ Last updated: 2026-07-27 (own-store tracking hardening, branch only)
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
 | Unit tests | 666/666 passing (57 files) on local Node 22; release CI repeats on Node 20 and 24 |
 | Integration tests | 62/62 passing (7 files) with isolated PostgreSQL 17.5/Redis locally; release CI repeats on PostgreSQL 16/Redis 7 with Node 20 and 24 |
-| Migrations | Eleven-file branch chain; populated upgrade, all-16 greenfield rebuild, guarded-secret recovery, zero schema drift, and interrupted-index recovery rehearsed locally; not applied to production |
+| Migrations | All 16 repository migrations applied in production; migration status current, 11/11 required indexes valid, zero Prisma drift |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production branch | GitHub default branch is `main`; Vercel Git deployment is disabled in tracked config and Railway autodeploy must be disabled/verified in provider settings before cutover |
+| Production release | Approved SHA `a4628c9bd3760fd3e902a8df5680002ced759651`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
 
 ## 2026-07-27 Own-Store Tracking Hardening
 
-**Release state:** implemented on `codex/own-store-tracking-hardening`; not deployed. No production database, store configuration, Dirava repository, or Mizoke repository was modified.
+**Release state:** live in production at exact SHA `a4628c9bd3760fd3e902a8df5680002ced759651`. The database was backed up before migration, old workers were fully removed, all 11 queues were paused during the web/worker transition, and delivery resumed only after both runtimes passed their production gates.
 
 - **Durable Shopify intake:** signed webhook bodies are encrypted and inserted into `ShopifyWebhookInbox` before Shopify receives a success acknowledgement. The live request then returns immediately; the one-minute inbox worker owns processing, compare-and-set replay, and bounded backoff. Successful processing erases the payload.
 - **Verified webhook gate:** saving a secret is configuration only. Browser Meta Purchase suppression and the server fallback grace period activate only after Track Clear verifies a signed `orders/paid` delivery. Domain or secret changes reset that proof.
@@ -38,17 +38,21 @@ Last updated: 2026-07-27 (own-store tracking hardening, branch only)
 - The final 16-migration history upgraded a populated baseline with 20,000 EventLogs and 5,000 Purchases in 1.281 seconds, retained all rows and expected backfills, verified 11/11 indexes, and produced no Prisma schema difference. A full empty-database reset through all 16 migrations also finished current with 11/11 indexes and zero drift.
 - The guarded plaintext-secret migration rejected an unsafe legacy row, then completed only after a full encrypted replacement was present. A concurrent-index backend was also intentionally terminated; recovery dropped only the exact invalid index, resolved only its failed migration, and redeployed cleanly.
 - The integration harness now force-resets only a loopback database ending in `_test`, flushes only loopback Redis DB 1-15 (default 15), truncates all application tables dynamically, and clears shared Redis clients. This prevents a test command from flushing development or production Redis DB 0.
-- Local runtime gates passed on Node 20.20.2 and Node 24.18.0. The PostgreSQL 16/Redis 7 workflow is committed but must pass on the published PR before production.
+- Local runtime gates passed on Node 20.20.2 and Node 24.18.0. The published PR also passed the Node 20/24, PostgreSQL 16, Redis 7, and worker-container release gates before production.
 
-### Release Gates Still Open
+### Controlled Production Cutover Evidence
 
-- Require both Node runtime jobs, the Node 20 worker-container health smoke, and the PostgreSQL 16 migration rehearsal to pass on the draft PR before production.
-- Resolve the Railway account's current past-due deployment warning before attempting a production release.
-- Verify both provider database URLs identify the intended production cluster/database/schema, pin the verified name/schema/system identifier on both providers, then apply the eleven branch migrations and verify all eleven expected indexes before deploying code.
-- Fully drain and replace old Railway workers before enabling `SUPERSEDED` takeover semantics; mixed worker versions are unsafe.
-- Confirm Vercel Git deployment is disabled, disable Railway GitHub autodeploy in the dashboard, and verify Railway actually uses `/railway.worker.toml` plus `/Dockerfile.worker`; repository files cannot prove provider state. The backend is shared and cannot be canaried to one store with the current architecture.
-- Verify Railway Redis has persistent storage and a current backup before relying on Redis consent tombstones or delivery queues across a service restart.
-- After the coordinated web/worker release, repaste `bridge-v1` into Dirava only, run the controlled order, observe it for 30-60 minutes, then expand store by store.
+- PR checks passed on Node 20/24, PostgreSQL 16, and Redis 7 before `main` was fast-forwarded to the approved SHA.
+- The encrypted pre-release PostgreSQL/Redis backup is `E:\backups\trackclear\2026-07-27-a4628c9-pre-release\trackclear-production-pre-release.7z` with SHA-256 `39A20800B6610373A7D82DAAA0AC01CB8216C4CF8A6C8A299E79F2FF12C51AF3`; the archive password is protected separately with Windows DPAPI and plaintext temporary files were removed.
+- Railway production deployment `84d5ef69-3822-44f8-be54-0d8f967c1342` passed the exact-environment/SHA gate, applied all migrations, verified 11/11 indexes and zero drift, then started all 11 listeners only after recovery schedules registered and `waitUntilReady()` completed.
+- Vercel production deployment `E6FSrYAScp7CayAbatpcNsXTgcwE` passed the exact-SHA/database gate and aliased to `www.trackclear.io`. Live `/api/health` returned HTTP 200 with database, schema, Redis, and release ready at the approved SHA.
+- After the bounded drain, all 11 queues were confirmed paused with zero active jobs, then resumed. Mizoke live AddToCart and InitiateCheckout diagnostics both reached Meta and returned to 100% success with zero pending/failed events.
+- Dirava publicly serves the required workspace-specific Cart Attribution Helper on the homepage and product page. Its generated production pixel reports Meta/TikTok browser ownership off, verified-webhook gating on, and `VARIANT_NUMERIC_ID` catalog mode.
+
+### Post-Release Store QA Still Open
+
+- Repaste `bridge-v1` into Dirava only, then run the safe non-Purchase canary. The current Chrome/Track Clear identity is Mizoke-only and has no Dirava Shopify permission, so this requires an authorized Dirava admin session.
+- After the repaste canary, run one explicitly approved controlled paid Dirava order and observe it for 30-60 minutes before expanding store by store.
 - Run controlled Dirava regression orders for normal cart, buy-now/direct checkout, returning visitor, and delayed checkout; verify exactly one Meta and one TikTok Purchase per order plus cart-helper attribution.
 - Keep both Track Clear browser ownership flags off until every Shopify app/theme/tag-manager pixel targeting the same Meta dataset or TikTok Pixel ID is removed. After changing owners, wait at least the 30-second shared-cache TTL and start a fresh browser session before enabling the replacement; then prove exactly one browser send plus one deduplicated server send for every supported event.
 - Verify Meta/TikTok Events Manager UI receipt/dedup and live non-default catalog modes. Existing pending QA templates remain templates, not pass evidence.
