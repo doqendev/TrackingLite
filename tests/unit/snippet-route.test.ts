@@ -79,6 +79,19 @@ describe("GET /api/snippet/[workspaceId]", () => {
     });
     const data = await response.json();
 
+    for (const eventName of [
+      "page_viewed",
+      "product_viewed",
+      "product_added_to_cart",
+      "checkout_started",
+      "checkout_contact_info_submitted",
+      "checkout_address_info_submitted",
+      "checkout_completed",
+    ]) {
+      expect(data.snippet).toContain(`analytics.subscribe("${eventName}"`);
+    }
+    expect(data.snippet).not.toContain("analytics.subscribe(name");
+
     const subscriptions = new Map<string, (event: unknown) => void>();
     const analytics = {
       subscribe: vi.fn((name: string, callback: (event: unknown) => void) => {

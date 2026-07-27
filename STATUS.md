@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-07-27 (controlled production release complete)
+Last updated: 2026-07-27 (controlled production release and Dirava bridge rollout complete)
 
 ## Build Health
 
@@ -22,7 +22,7 @@ Last updated: 2026-07-27 (controlled production release complete)
 - **Verified webhook gate:** saving a secret is configuration only. Browser Meta Purchase suppression and the server fallback grace period activate only after Track Clear verifies a signed `orders/paid` delivery. Domain or secret changes reset that proof.
 - **Atomic delivery outbox:** ingest persists every eligible destination EventLog in one transaction before queueing. Every job uses the deterministic ID `event-<EventLog.id>`, including manual and automatic replay.
 - **Purchase race protection:** normalized order-name/order-ID/checkout/cart aliases reconcile webhook-first and browser-first paths per destination. Canonical takeover uses `SUPERSEDED`, a 90-second verified-store fallback grace period (longer than one inbox scan), and a final database delivery claim immediately before external I/O. A canonical Meta row cannot suppress a required TikTok fallback.
-- **Lossless Custom Pixel startup:** the generated `bridge-v1` loader synchronously subscribes to all seven Shopify events before requesting the remote tracker, holds at most 100 early events in one ordered FIFO, and activates only after every handler is registered. The versioned loader URL bypasses stale generated-script cache during repaste rollout.
+- **Lossless Custom Pixel startup:** the generated `bridge-v1` loader uses seven literal Shopify event subscriptions before requesting the remote tracker, holds at most 100 early events in one ordered FIFO, and activates only after every handler is registered. Literal event names are required for Shopify's Custom Pixel editor to validate the subscriptions. The versioned loader URL bypasses stale generated-script cache during repaste rollout.
 - **Identity parity:** generated pixel and legacy scripts include `checkout.orderName` in both the browser event ID and ingest custom data, preventing pre-verification browser/server ID divergence.
 - **Retry fidelity:** an AES-256-GCM retry envelope preserves the original event for at most 72 hours, is cleared on success/expiry/terminal skip, and lets replay retain click IDs and customer match fields without placing raw PII in the normal EventLog payload.
 - **Delivery resilience:** circuit breakers are workspace-and-destination scoped; only transient network/408/425/429/5xx failures count; terminal configuration errors stop automatic retry; scheduled PENDING/RETRYING/FAILED recovery is deterministic and bounded.
@@ -48,11 +48,13 @@ Last updated: 2026-07-27 (controlled production release complete)
 - Vercel production deployment `E6FSrYAScp7CayAbatpcNsXTgcwE` passed the exact-SHA/database gate and aliased to `www.trackclear.io`. Live `/api/health` returned HTTP 200 with database, schema, Redis, and release ready at the approved SHA.
 - After the bounded drain, all 11 queues were confirmed paused with zero active jobs, then resumed. Mizoke live AddToCart and InitiateCheckout diagnostics both reached Meta and returned to 100% success with zero pending/failed events.
 - Dirava publicly serves the required workspace-specific Cart Attribution Helper on the homepage and product page. Its generated production pixel reports Meta/TikTok browser ownership off, verified-webhook gating on, and `VARIANT_NUMERIC_ID` catalog mode.
+- Dirava Shopify custom pixel `325222664` was repasted and remains connected. Shopify accepted the corrected loader with no validation error or no-subscription warning; Pixel Helper reported the pixel loaded and received `page_viewed` plus `product_viewed` on the live Harry Potter-inspired product page. The attempted AddToCart did not change the cart, so no AddToCart pass is claimed.
 
 ### Post-Release Store QA Still Open
 
-- Repaste `bridge-v1` into Dirava only, then run the safe non-Purchase canary. The current Chrome/Track Clear identity is Mizoke-only and has no Dirava Shopify permission, so this requires an authorized Dirava admin session.
-- After the repaste canary, run one explicitly approved controlled paid Dirava order and observe it for 30-60 minutes before expanding store by store.
+- Ship the Shopify-validator-compatible literal-subscription generator correction in the next controlled Vercel release. Dirava's saved Custom Pixel is already corrected manually; automatic deployment remains disabled.
+- Run a safe Dirava AddToCart canary on a product whose cart submission succeeds, then verify the Track Clear destination result. The first attempted product remained out of the cart, so it produced no valid AddToCart test event.
+- Run one explicitly approved controlled paid Dirava order and observe it for 30-60 minutes before expanding store by store.
 - Run controlled Dirava regression orders for normal cart, buy-now/direct checkout, returning visitor, and delayed checkout; verify exactly one Meta and one TikTok Purchase per order plus cart-helper attribution.
 - Keep both Track Clear browser ownership flags off until every Shopify app/theme/tag-manager pixel targeting the same Meta dataset or TikTok Pixel ID is removed. After changing owners, wait at least the 30-second shared-cache TTL and start a fresh browser session before enabling the replacement; then prove exactly one browser send plus one deduplicated server send for every supported event.
 - Verify Meta/TikTok Events Manager UI receipt/dedup and live non-default catalog modes. Existing pending QA templates remain templates, not pass evidence.

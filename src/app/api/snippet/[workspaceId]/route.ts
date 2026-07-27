@@ -11,12 +11,19 @@ function generateLoaderSnippet(pixelUrl: string): string {
   // Subscribe before the external script request. Shopify does not document
   // replaying standard events to late subscribers, so a bounded bridge keeps
   // the first page/checkout event until the generated tracker is ready.
-  var eventNames=["page_viewed","product_viewed","product_added_to_cart","checkout_started","checkout_contact_info_submitted","checkout_address_info_submitted","checkout_completed"];
   var eventQueue=[],eventHandlers={},eventBridgeActive=false,eventQueueLimit=100;
   function deliverBufferedEvent(item){
     var handler=eventHandlers[item.name];
     if(!handler)return;
     try{var result=handler(item.event);if(result&&typeof result.catch==="function")result.catch(function(){})}catch(e){}
+  }
+  function bufferEvent(name,event){
+    var item={name:name,event:event};
+    if(eventBridgeActive)deliverBufferedEvent(item);
+    else{if(eventQueue.length>=eventQueueLimit)eventQueue.shift();eventQueue.push(item)}
+  }
+  function ignoreSubscriptionError(subscription){
+    if(subscription&&typeof subscription.catch==="function")subscription.catch(function(){})
   }
   window.__tcAnalytics={subscribe:function(name,callback){
     if(typeof callback!=="function")return Promise.resolve();
@@ -28,16 +35,15 @@ function generateLoaderSnippet(pixelUrl: string): string {
     var buffered=eventQueue;eventQueue=[];
     for(var i=0;i<buffered.length;i++)deliverBufferedEvent(buffered[i]);
   }};
-  for(var i=0;i<eventNames.length;i++)(function(name){
-    try{
-      var subscription=analytics.subscribe(name,function(event){
-        var item={name:name,event:event};
-        if(eventBridgeActive)deliverBufferedEvent(item);
-        else{if(eventQueue.length>=eventQueueLimit)eventQueue.shift();eventQueue.push(item)}
-      });
-      if(subscription&&typeof subscription.catch==="function")subscription.catch(function(){})
-    }catch(e){}
-  })(eventNames[i]);
+  // Shopify's Custom Pixel validator requires literal standard-event names.
+  // Keep each subscription explicit so the editor recognizes and accepts all seven.
+  try{ignoreSubscriptionError(analytics.subscribe("page_viewed",function(event){bufferEvent("page_viewed",event)}))}catch(e){}
+  try{ignoreSubscriptionError(analytics.subscribe("product_viewed",function(event){bufferEvent("product_viewed",event)}))}catch(e){}
+  try{ignoreSubscriptionError(analytics.subscribe("product_added_to_cart",function(event){bufferEvent("product_added_to_cart",event)}))}catch(e){}
+  try{ignoreSubscriptionError(analytics.subscribe("checkout_started",function(event){bufferEvent("checkout_started",event)}))}catch(e){}
+  try{ignoreSubscriptionError(analytics.subscribe("checkout_contact_info_submitted",function(event){bufferEvent("checkout_contact_info_submitted",event)}))}catch(e){}
+  try{ignoreSubscriptionError(analytics.subscribe("checkout_address_info_submitted",function(event){bufferEvent("checkout_address_info_submitted",event)}))}catch(e){}
+  try{ignoreSubscriptionError(analytics.subscribe("checkout_completed",function(event){bufferEvent("checkout_completed",event)}))}catch(e){}
   window.__tcBrowser=browser;
   window.__tcInit=init;
   window.__tcCustomerPrivacy=(typeof api!=="undefined"&&api.customerPrivacy)?api.customerPrivacy:(typeof customerPrivacy!=="undefined"?customerPrivacy:null);
