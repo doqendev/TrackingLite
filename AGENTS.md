@@ -34,10 +34,11 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
 - Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages, server-proxy attribution hardening, verified custom ingest domains
-- Tracking hardening: synchronous bounded `bridge-v1` startup FIFO, lossless encrypted webhook inbox with capture-only acknowledgement, atomic destination outbox, verified-webhook gating, cross-source Purchase alias reconciliation, final delivery claims, encrypted 72-hour retry envelopes, scoped circuit breakers, deterministic retries, timestamped consent tombstones, opt-in Meta/TikTok browser ownership, latest-touch browser identity, and alias-aware Purchase usage reservation/reconciliation
+- Tracking hardening: synchronous bounded `bridge-v1` startup FIFO with seven Shopify-validator-compatible literal event subscriptions, lossless encrypted webhook inbox with capture-only acknowledgement, atomic destination outbox, verified-webhook gating, cross-source Purchase alias reconciliation, final delivery claims, encrypted 72-hour retry envelopes, scoped circuit breakers, deterministic retries, timestamped consent tombstones, opt-in Meta/TikTok browser ownership, latest-touch browser identity, and alias-aware Purchase usage reservation/reconciliation
 - Worker lifecycle: all 11 BullMQ listeners are constructed with `autorun: false`; required recovery schedules register first, every listener must pass `waitUntilReady()`, and only then does the latched `/health` readiness gate open. Startup failure and signals use one cleanup path. Outbound requests are capped at 30 seconds, application drain at 45 seconds, and Railway drain at 60 seconds.
 - Hosting: web app on Vercel (serverless), workers on Railway, Postgres + Redis on Railway with public TCP proxies
 - Release control: GitHub default/source branch is `main`; Vercel Git deployment and Railway autodeploy remain disabled. Vercel production deployment `E6FSrYAScp7CayAbatpcNsXTgcwE` and Railway deployment `84d5ef69-3822-44f8-be54-0d8f967c1342` run the approved SHA. Railway uses `/railway.worker.toml` and `/Dockerfile.worker` with a 60-second drain.
+- Dirava bridge rollout: Shopify custom pixel `325222664` is connected with the corrected `bridge-v1` loader. Shopify accepted the seven literal subscriptions with no editor error or no-subscription warning, and Pixel Helper observed `page_viewed` plus `product_viewed` on a real product page. The attempted product AddToCart did not change the cart, so it is not counted as AddToCart proof.
 
 See `STATUS.md` for the full audit and remaining work.
 
@@ -68,7 +69,7 @@ See `STATUS.md` for the full audit and remaining work.
 4. Gets a unique **JS snippet** with embedded API key
 5. Pastes snippet into Shopify Admin > Settings > Customer Events > Add Custom Pixel
 6. Adds the required Cart Attribution Helper script to the Shopify theme (`theme.liquid` before `</head>` or Custom Liquid/theme app block equivalent) for durable cart attributes
-7. The pasted `bridge-v1` snippet subscribes synchronously through Shopify's `analytics.subscribe()` API, buffers at most 100 early events in order, and activates the remote tracker after all handlers register
+7. The pasted `bridge-v1` snippet uses seven explicit literal `analytics.subscribe()` calls accepted by Shopify's Custom Pixel validator, buffers at most 100 early events in order, and activates the remote tracker after all handlers register
 8. Snippet sends event data + `event_id` to `/api/events/ingest` with `X-TL-API-Key` header, using a verified workspace custom ingest domain when configured
 9. Vercel serverless function validates, checks billing/rate limits/consent, creates EventLog, queues BullMQ job
 10. Railway worker decrypts token, hashes PII (SHA-256), normalizes phone (E.164), sends to Meta CAPI
@@ -535,7 +536,7 @@ Header: Content-Type: application/json
 ## Key Design Decisions
 
 - **Standalone SaaS, NOT Shopify app:** Own auth, own billing (Stripe), own dashboard. No `@shopify/*` packages.
-- **JS snippet approach:** Merchant pastes `bridge-v1` into Shopify Custom Pixel. It subscribes to all seven used Shopify events synchronously, preserves up to 100 early events in one FIFO, then activates the versioned remote tracker after all handlers register. Remote tracker changes auto-update; loader-bridge changes require repasting every store.
+- **JS snippet approach:** Merchant pastes `bridge-v1` into Shopify Custom Pixel. It uses a literal `analytics.subscribe("event_name", ...)` call for each of the seven used Shopify events so Shopify's editor can validate the subscriptions, preserves up to 100 early events in one FIFO, then activates the versioned remote tracker after all handlers register. Remote tracker changes auto-update; loader-bridge changes require repasting every store.
 - **Server-side CAPI:** All Meta CAPI calls happen server-to-server. The snippet bridges browser context (cookies, IP, UA) to our server.
 - **E.164 phone normalization:** Country code inferred from billing address (55-country map) before SHA-256 hashing.
 - **Token encryption:** Meta access tokens encrypted at rest using AES-256-GCM.
@@ -590,7 +591,7 @@ Header: Content-Type: application/json
 
 ## Known Issues
 
-See `STATUS.md` for the full list. Current tracking-quality gaps are operational: the branch/PR and PostgreSQL 16 CI gates are pending, Railway currently reports a past-due deployment warning, production migration/cutover is not run, every own store must eventually repaste `bridge-v1`, and buy-now/direct checkout, returning visitor, delayed checkout, catalog mode, headless, custom-ingest DNS, and Meta/TikTok Events Manager proof remain open. The documented UTC month-boundary billing-unit edge remains outside this tracking-only release.
+See `STATUS.md` for the full list. Current tracking-quality gaps are operational: the literal-subscription generator correction is source-only until the next controlled web release; stores other than Dirava still need the corrected `bridge-v1` repaste; Dirava AddToCart destination proof, buy-now/direct checkout, returning visitor, delayed checkout, catalog mode, headless, custom-ingest DNS, and Meta/TikTok Events Manager proof remain open. The documented UTC month-boundary billing-unit edge remains outside this tracking-only release.
 
 Note: `pnpm build` previously hung on Windows but this is no longer an issue — the Vercel build command is `prisma generate && next build` (no standalone output). A `build:railway` script exists for Railway/Docker deployments that sets `STANDALONE=true` before building.
 
