@@ -1,34 +1,37 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-07-30 (privacy-minimized internal attribution candidate complete; not deployed)
+Last updated: 2026-07-30 (privacy-minimized internal attribution live at exact SHA `d09cf963177ccb69e63f59711483c61945587b0b`)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 677/677 passing (58 files) on local Node 22; release CI must repeat on Node 20 and 24 |
-| Integration tests | Latest production baseline is 62/62 passing (7 files). The 2026-07-30 candidate rerun was unavailable because local PostgreSQL on 5433 and Redis were not running; CI remains required before release |
-| Migrations | All 16 production migrations remain applied. The repository now has a 17th additive migration, `20260730_add_internal_analytics_destination`, which is source-only and must run before this candidate can deploy; the existing 11/11 required indexes remain unchanged |
+| Unit tests | 677/677 passing (58 files) on local Node 22; release CI passed the Node 20 and Node 24 gates |
+| Integration tests | 62/62 passing (7 files) in release CI against PostgreSQL 16/Redis 7; the local rerun remained unavailable after the workstation restart |
+| Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production release | Approved SHA `a4628c9bd3760fd3e902a8df5680002ced759651`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
+| Production release | Approved SHA `d09cf963177ccb69e63f59711483c61945587b0b`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
 
 ## 2026-07-30 Privacy-Minimized Internal Attribution
 
-**Release state:** complete on branch `codex/own-store-tracking-hardening`, but not deployed. Production remains on exact SHA `a4628c9bd3760fd3e902a8df5680002ced759651` and does not have the `INTERNAL` destination enum yet.
+**Release state:** live in production at exact SHA `d09cf963177ccb69e63f59711483c61945587b0b`. PR #4 passed all four release gates, was merged to `main`, and was deployed through a drained exact-SHA cutover.
 
 - When analytics consent is allowed and marketing consent is denied, Track Clear now records an `INTERNAL` EventLog instead of silently losing the event when no analytics destination is eligible. If analytics is also denied, it records nothing.
 - Internal rows are terminal first-party records only: no Meta/TikTok or other destination queue, no browser-platform send, no Purchase billing reservation, no retry envelope, and no delivery claim.
 - Stored reporting data is limited to sanitized UTM source/medium/campaign/content/term, external referrer hostname, a query-free and identifier-redacted landing path/URL, value, currency, and item count. Raw event/order/session/cart/checkout IDs are represented only by a workspace-scoped SHA-256 event key; email, phone, IP, user agent, ad click IDs, cookies, and payment gateway are null or absent.
 - Browser ingest and the canonical signed Shopify webhook both support the internal path. A later consented platform delivery supersedes a matching internal record, and dashboard funnel/campaign queries exclude that superseded row to prevent double-counting.
 - Dashboard revenue, funnel, campaigns, Events, and Recent Events include `Internal analytics`. Platform health, conversion accuracy, failure alerts, replay, recovery, and Purchase usage reconciliation explicitly exclude it.
-- The additive PostgreSQL enum migration is included in the fail-closed deployment-schema gate. It must be applied before either runtime serving this code is activated.
-- Validation completed on local Node 22: `pnpm build`, `pnpm exec tsc --noEmit`, Prisma validation, 677/677 unit tests across 58 files, and ESLint with only the existing `<img>` warnings. The isolated integration suite could not start because PostgreSQL/Redis were unavailable after the PC restart; no integration pass is claimed for this candidate.
+- The additive PostgreSQL enum migration is included in the fail-closed deployment-schema gate and is now applied in production as migration 17/17.
+- Validation completed on local Node 22: `pnpm build`, `pnpm exec tsc --noEmit`, Prisma validation, 677/677 unit tests across 58 files, and ESLint with only the existing `<img>` warnings. Release CI passed its Node 20/24, PostgreSQL 16/Redis 7, worker-container, and full migration-rehearsal gates, including the 62/62 integration baseline.
+- Fresh encrypted pre-release PostgreSQL/Redis backup: `E:\backups\trackclear\2026-07-30-d09cf96-pre-release\trackclear-production-pre-release.7z`, SHA-256 `DDBFC42F62C64A16D90CD41CC440B5817FFB52100988488EA58910CAC1F40050`; the password is separately DPAPI-protected and plaintext working files were moved to the Windows Recycle Bin after archive verification.
+- Vercel deployment `FVQiW8qX8533PaXSGNpV3qqLkScb` serves `www.trackclear.io`; `/api/health` returned HTTP 200 with release approved, database/schema/Redis ready, and the exact full SHA. Railway deployment `e97087a8-6abd-4b74-a817-b5508ca84baf` passed 17/17 migration status, 11/11 index verification, zero drift, `/health`, and started all 11 listeners.
+- Live bounded QA created one anonymous Mizoke AddToCart with `analytics=true` and `marketing=false`. It persisted exactly one `INTERNAL`/`SENT` row with sanitized TikTok campaign attribution, null IP/UA/fbp/fbc/ttclid, and zero platform rows. No Purchase was created and no ad-platform call was attempted.
 
 ## 2026-07-27 Own-Store Tracking Hardening
 
-**Release state:** live in production at exact SHA `a4628c9bd3760fd3e902a8df5680002ced759651`. The database was backed up before migration, old workers were fully removed, all 11 queues were paused during the web/worker transition, and delivery resumed only after both runtimes passed their production gates.
+**Historical release state:** the exact SHA `a4628c9bd3760fd3e902a8df5680002ced759651` release was superseded by the 2026-07-30 release above after a second controlled cutover. Its QA remains the regression baseline.
 
 - **Durable Shopify intake:** signed webhook bodies are encrypted and inserted into `ShopifyWebhookInbox` before Shopify receives a success acknowledgement. The live request then returns immediately; the one-minute inbox worker owns processing, compare-and-set replay, and bounded backoff. Successful processing erases the payload.
 - **Verified webhook gate:** saving a secret is configuration only. Browser Meta Purchase suppression and the server fallback grace period activate only after Track Clear verifies a signed `orders/paid` delivery. Domain or secret changes reset that proof.
@@ -64,7 +67,7 @@ Last updated: 2026-07-30 (privacy-minimized internal attribution candidate compl
 
 ### Post-Release Store QA Still Open
 
-- Ship the Shopify-validator-compatible literal-subscription generator correction in the next controlled Vercel release. Dirava's saved Custom Pixel is already corrected manually; automatic deployment remains disabled.
+- Repaste the now-live Shopify-validator-compatible literal-subscription loader in stores other than Dirava. Dirava's saved Custom Pixel is already corrected; automatic deployment remains disabled.
 - Run a safe Dirava AddToCart canary on a product whose cart submission succeeds, then verify the Track Clear destination result. The first attempted product remained out of the cart, so it produced no valid AddToCart test event.
 - Run one explicitly approved controlled paid Dirava order and observe it for 30-60 minutes before expanding store by store.
 - Run controlled Dirava regression orders for normal cart, buy-now/direct checkout, returning visitor, and delayed checkout; verify exactly one Meta and one TikTok Purchase per order plus cart-helper attribution.
@@ -257,7 +260,7 @@ All 7 destination workers have workspace-scoped circuit breakers, deterministic 
 
 ### Test Coverage
 
-#### Unit Tests (57 files, 666 tests)
+#### Unit Tests (58 files, 677 tests)
 
 Run with `pnpm vitest run`. Hardening-specific suites cover encrypted webhook
 capture/replay, delivery claims across every destination, canonical Purchase

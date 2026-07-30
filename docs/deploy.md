@@ -1,6 +1,6 @@
 # Deployment Runbook
 
-## 2026-07-27 Tracking Hardening Release and 2026-07-30 Candidate
+## 2026-07-27 Tracking Hardening and 2026-07-30 Internal Attribution Releases
 
 This release is schema-first and mixed-version-sensitive. The database changes
 are additive, but old destination workers do not understand delivery claims or
@@ -33,8 +33,9 @@ the concurrent builds with blocking indexes.
 The 2026-07-30 migration is one additive `ALTER TYPE` statement that adds the
 `INTERNAL` EventLog destination used for privacy-minimized first-party analytics.
 The deployment-schema gate requires it. Apply it before activating a web or
-worker build that contains the new Prisma enum; production remains on the
-16-migration 2026-07-27 release until a separately approved controlled cutover.
+worker build that contains the new Prisma enum. It was applied during the
+2026-07-30 controlled cutover and production now reports 17/17 migrations,
+11/11 required indexes, and zero Prisma drift.
 
 Before touching production, require an active Vercel/Railway account, a current
 database restore point, recorded web/worker deployment IDs, and explicit
@@ -218,12 +219,16 @@ Rollback safety:
 - If worker health is uncertain, stop outbound workers while keeping webhook
   intake available; the encrypted inbox preserves signed deliveries for replay.
 
-The migration is rehearsed locally but remains unapplied to production. Branch
-publication, PostgreSQL 16 CI, effective Railway config-path verification,
-provider deployment control, production backup, the drained cutover, and the
-controlled Dirava order are still mandatory. There is no backend per-store
-canary: Dirava becomes store-scoped only when its `bridge-v1` snippet is
-repasted after the shared backend release.
+The 2026-07-30 release completed the required production controls. PR #4 passed
+Node 20/24, PostgreSQL 16/Redis 7, worker-container, and migration-rehearsal
+gates. A verified encrypted restore point was created at
+`E:\backups\trackclear\2026-07-30-d09cf96-pre-release`, the old worker was
+stopped, Vercel deployment `FVQiW8qX8533PaXSGNpV3qqLkScb` was activated and
+health-checked at exact SHA `d09cf963177ccb69e63f59711483c61945587b0b`, then
+Railway deployment `e97087a8-6abd-4b74-a817-b5508ca84baf` passed its guarded
+predeploy and started 11/11 listeners. Automatic Vercel and Railway deployments
+remain disabled. Store-specific `bridge-v1` loader changes still require a
+repaste in each Shopify Custom Pixel.
 
 Known billing-only edge: an order reserved immediately before a UTC month
 boundary can be reconstructed into the next month if its canonical webhook row
@@ -259,9 +264,10 @@ This release includes:
 - `20260727_schema_history_catch_up`
 - `20260727_schema_history_catch_up_drop_plaintext_secret`
 - `20260727_schema_history_catch_up_idx01_workspace_refund_id`
+- `20260730_add_internal_analytics_destination`
 
-All eleven 2026-07-27 branch migrations remain pending until the guarded
-production release explicitly deploys them.
+All 17 repository migrations are applied in production. Every future release
+must still run the guarded migration/status/index/drift checks before activation.
 
 Protect existing headless/custom Shopify workspaces before or during rollout:
 
