@@ -63,6 +63,10 @@ import {
   type CapturedShopifyWebhook,
   type ShopifyWebhookInboxClaim,
 } from "@/lib/shopify-webhook-inbox";
+import {
+  persistInternalAttributionEvent,
+  supersedeInternalAttributionEvent,
+} from "@/lib/internal-attribution";
 
 const log = createLogger({ component: "shopify-webhook" });
 
@@ -710,7 +714,59 @@ async function handleOrderPaid(
       shouldSendToDestination(workspace.consentMode, customerConsent, dest.destination)
     );
 
+    // Deterministic eventId for browser/server Purchase dedup. Keep the raw
+    // Shopify aliases in memory only when the event is internal analytics.
+    const webhookEventId = buildPurchaseEventId({
+      workspaceId: workspace.id,
+      shopifyOrderId: orderId,
+      orderName,
+    });
+    const normalizedOrderId = normalizePurchaseIdentifier(orderId);
+    const normalizedOrderName = normalizePurchaseIdentifier(orderName);
     if (consentFilteredDestinations.length === 0) {
+      if (
+        customerConsent?.analytics === true &&
+        customerConsent.marketing === false
+      ) {
+        await persistInternalAttributionEvent({
+          workspaceId: workspace.id,
+          eventName: "Purchase",
+          eventId: webhookEventId,
+          dedupKey: normalizedOrderName ?? normalizedOrderId ?? webhookEventId,
+          url: orderLandingPageUrl ?? landingAttribution.pageUrl ?? purchasePageUrl,
+          referrer: orderData.referring_site
+            ? String(orderData.referring_site)
+            : null,
+          utmSource:
+            orderAttribution.utmSource ??
+            sessionContext?.utmSource ??
+            landingAttribution.utmSource,
+          utmMedium:
+            orderAttribution.utmMedium ??
+            sessionContext?.utmMedium ??
+            landingAttribution.utmMedium,
+          utmCampaign:
+            orderAttribution.utmCampaign ??
+            sessionContext?.utmCampaign ??
+            landingAttribution.utmCampaign,
+          utmContent:
+            orderAttribution.utmContent ??
+            sessionContext?.utmContent ??
+            landingAttribution.utmContent,
+          utmTerm:
+            orderAttribution.utmTerm ??
+            sessionContext?.utmTerm ??
+            landingAttribution.utmTerm,
+          value: totalPrice,
+          currency,
+          numItems,
+        });
+        wsLog.info("Recorded privacy-minimized internal Purchase attribution", {
+          consentMode: workspace.consentMode,
+        });
+        continue;
+      }
+
       wsLog.info("No eligible destinations after configuration and consent checks", {
         configuredDestinations: modeFilteredDestinations.map((dest) => dest.destination),
         consentMode: workspace.consentMode,
@@ -718,16 +774,6 @@ async function handleOrderPaid(
       });
       continue;
     }
-
-    // Deterministic eventId for browser/server Purchase dedup.
-    const webhookEventId = buildPurchaseEventId({
-      workspaceId: workspace.id,
-      shopifyOrderId: orderId,
-      orderName,
-    });
-
-    const normalizedOrderId = normalizePurchaseIdentifier(orderId);
-    const normalizedOrderName = normalizePurchaseIdentifier(orderName);
     const dedupOrderIds = Array.from(new Set(
       [orderId, normalizedOrderId].filter((value): value is string => !!value)
     ));
@@ -770,6 +816,7 @@ async function handleOrderPaid(
           where: {
             workspaceId: workspace.id,
             eventName: "Purchase",
+            destination: { not: "INTERNAL" },
             OR: [
               { eventId: { in: Array.from(new Set(relatedEventIds)) } },
               ...(dedupOrderIds.length > 0
@@ -1235,6 +1282,13 @@ async function handleOrderPaid(
     if (enqueueResults.includes("active")) {
       throw new Error("Canonical webhook is waiting for an active Purchase delivery to settle");
     }
+
+    await supersedeInternalAttributionEvent({
+      workspaceId: workspace.id,
+      eventName: "Purchase",
+      eventId: webhookEventId,
+      dedupKey: normalizedOrderName ?? normalizedOrderId ?? webhookEventId,
+    });
 
     wsLog.info("Purchase queued from webhook", {
       orderId: orderId || orderName,

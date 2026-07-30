@@ -1,5 +1,14 @@
 # MEMORY.md
 
+## 2026-07-30 - Privacy-Minimized Internal Attribution Candidate
+
+- Source branch `codex/own-store-tracking-hardening` now records a distinct `INTERNAL` EventLog only when analytics consent is allowed, marketing consent is denied, and no eligible external analytics destination will receive the event. Both-denied consent records nothing.
+- The internal record is never queued to Meta, TikTok, or another destination and never consumes a Purchase billing unit. It keeps only sanitized UTMs, external referrer hostname, query-free identifier-redacted landing path/URL, value, currency, and item count. Raw shopper/browser/order/session/click identifiers, IP, user agent, cookies, retry data, and delivery claims are absent; its event ID is a workspace-scoped SHA-256 key.
+- Browser ingest and signed Shopify Purchase webhooks share this path. A later consented external delivery supersedes its matching internal row; revenue/funnel/campaign reporting excludes the superseded copy so consent transitions do not double-count.
+- Dashboard reporting and event lists include `Internal analytics`, while delivery health, conversion accuracy, alerts, replay/recovery, and Purchase billing reconciliation exclude it.
+- Migration `20260730_add_internal_analytics_destination` adds the enum value and is included in the runtime schema gate. Production still runs exact SHA `a4628c9bd3760fd3e902a8df5680002ced759651` with 16 migrations; this candidate and its 17th migration are not live.
+- Local validation passed: production build, TypeScript, Prisma validation, ESLint with existing image warnings, and 677/677 unit tests across 58 files. The integration suite was not rerun because local PostgreSQL 5433 and Redis were unavailable after restart; the latest full baseline remains 62/62 and CI is required before release.
+
 ## 2026-07-27 - Own-Store Tracking Hardening and Controlled Production Release
 
 - Release SHA `a4628c9bd3760fd3e902a8df5680002ced759651` is live on Vercel and Railway after a controlled cutover. The candidate was fast-forwarded to `main`; Vercel Git deployment and Railway autodeploy remain disabled so later source changes cannot bypass the exact-SHA gates.

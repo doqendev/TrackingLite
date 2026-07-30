@@ -55,7 +55,7 @@ describe("deployment schema readiness", () => {
       );
     await expect(
       assertTrackingDeploymentSchemaReady(missingClient)
-    ).rejects.toThrow("11 migrations");
+    ).rejects.toThrow("12 migrations");
 
     await expect(
       assertTrackingDeploymentSchemaReady(

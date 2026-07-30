@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { Destination, EventName, EventStatus } from "@prisma/client";
+import { Destination, EventName, EventStatus, Prisma } from "@prisma/client";
 import { BILLING_PLANS } from "@/lib/constants";
 import { getOrderCount } from "@/lib/billing";
 import { getExchangeRate } from "@/lib/currency";
@@ -55,7 +55,9 @@ async function getCanonicalDestination(
   const first = await db.eventLog.findFirst({
     where: {
       workspaceId,
-      ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+      destination: allowedDestinations
+        ? { in: [...allowedDestinations] }
+        : { not: Destination.INTERNAL },
     },
     select: { destination: true },
     orderBy: { createdAt: "asc" },
@@ -63,16 +65,32 @@ async function getCanonicalDestination(
   return first?.destination ?? null;
 }
 
-function destFilter(destination?: Destination | null) {
-  return destination ? { destination } : {};
+type DestinationWhere = Pick<Prisma.EventLogWhereInput, "destination">;
+
+function externalDestFilter(
+  destination?: Destination | null,
+  allowedDestinations?: readonly Destination[]
+): DestinationWhere {
+  if (destination && destination !== Destination.INTERNAL) return { destination };
+  if (allowedDestinations) {
+    return { destination: { in: [...allowedDestinations] } };
+  }
+  return { destination: { not: Destination.INTERNAL } };
+}
+
+function reportingDestFilter(
+  destination?: Destination | null
+): DestinationWhere {
+  return destination && destination !== Destination.INTERNAL
+    ? { destination: { in: [destination, Destination.INTERNAL] } }
+    : { destination: Destination.INTERNAL };
 }
 
 async function queryHealthMetrics(
   workspaceId: string,
   since24h: Date,
-  destination?: Destination | null
+  df: DestinationWhere
 ): Promise<HealthMetrics> {
-  const df = destFilter(destination);
   const [totalEvents24h, sentEvents24h, failedEvents24h, lastEvent] =
     await Promise.all([
       db.eventLog.count({
@@ -149,9 +167,8 @@ async function queryRevenueMetrics(
   yesterdayStart: Date,
   now: Date,
   displayCurrency: string,
-  destination?: Destination | null
+  df: DestinationWhere
 ): Promise<RevenueMetrics> {
-  const df = destFilter(destination);
   const revenueEventTypes: EventName[] = [
     "AddToCart",
     "InitiateCheckout",
@@ -295,14 +312,14 @@ async function queryEventBreakdown(
   todayStart: Date,
   yesterdayStart: Date,
   now: Date,
-  destination?: Destination | null
+  df: DestinationWhere
 ): Promise<EventBreakdown> {
-  const df = destFilter(destination);
   const [todayGroups, yesterdayGroups] = await Promise.all([
     db.eventLog.groupBy({
       by: ["eventName"],
       where: {
         workspaceId,
+        status: { not: EventStatus.SUPERSEDED },
         createdAt: { gte: todayStart, lte: now },
         ...df,
       },
@@ -312,6 +329,7 @@ async function queryEventBreakdown(
       by: ["eventName"],
       where: {
         workspaceId,
+        status: { not: EventStatus.SUPERSEDED },
         createdAt: { gte: yesterdayStart, lt: todayStart },
         ...df,
       },
@@ -339,9 +357,8 @@ async function queryEventBreakdown(
 
 async function queryConversionAccuracy(
   workspaceId: string,
-  destination?: Destination | null
+  df: DestinationWhere
 ): Promise<ConversionAccuracy> {
-  const df = destFilter(destination);
   const now = new Date();
   const since7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -412,22 +429,18 @@ async function queryConversionAccuracy(
 async function queryCampaignPerformance(
   workspaceId: string,
   displayCurrency: string,
-  destination?: Destination | null,
-  allowedDestinations?: readonly Destination[]
+  df: DestinationWhere
 ): Promise<CampaignRow[]> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-  // Use provided destination or find canonical to avoid duplicate counting
-  const filterDest =
-    destination ?? (await getCanonicalDestination(workspaceId, allowedDestinations));
 
   const rows = await db.eventLog.groupBy({
     by: ["utmSource", "utmCampaign", "currency"],
     where: {
       workspaceId,
       createdAt: { gte: thirtyDaysAgo },
+      status: { not: EventStatus.SUPERSEDED },
       utmSource: { not: null },
-      ...(filterDest ? { destination: filterDest } : {}),
+      ...df,
     },
     _count: true,
     _sum: { value: true },
@@ -466,7 +479,9 @@ async function queryDestinationDelivery(
     where: {
       workspaceId,
       createdAt: { gte: since24h },
-      ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+      destination: allowedDestinations
+        ? { in: [...allowedDestinations] }
+        : { not: Destination.INTERNAL },
     },
     _count: true,
   });
@@ -578,10 +593,12 @@ export async function computeDashboardAnalytics(
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
   // Always use canonical destination to deduplicate multi-dest fan-out
-  const filterDest = await safeQuery(
+  const canonicalDestination = await safeQuery(
     () => getCanonicalDestination(workspaceId, allowedDestinations),
     null
   );
+  const externalDf = externalDestFilter(canonicalDestination, allowedDestinations);
+  const reportingDf = reportingDestFilter(canonicalDestination);
 
   const targetCurrency = displayCurrency || "USD";
 
@@ -600,14 +617,16 @@ export async function computeDashboardAnalytics(
   // Batch 1: Health + event breakdown + delivery + enabled dests (~8 peak connections)
   const [health, eventBreakdown, destinationDelivery, enabledDests] =
     await Promise.all([
-      safeQuery(() => queryHealthMetrics(workspaceId, since24h, filterDest), DEFAULT_HEALTH),
-      safeQuery(() => queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, filterDest), DEFAULT_EVENT_BREAKDOWN),
+      safeQuery(() => queryHealthMetrics(workspaceId, since24h, externalDf), DEFAULT_HEALTH),
+      safeQuery(() => queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, reportingDf), DEFAULT_EVENT_BREAKDOWN),
       safeQuery(() => queryDestinationDelivery(workspaceId, since24h, allowedDestinations), [] as DestinationDeliveryRow[]),
       db.eventLog.groupBy({
         by: ["destination"],
         where: {
           workspaceId,
-          ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+          destination: allowedDestinations
+            ? { in: [...allowedDestinations] }
+            : { not: Destination.INTERNAL },
         },
         _count: true,
       }).catch((error) => {
@@ -618,20 +637,20 @@ export async function computeDashboardAnalytics(
 
   // Batch 2: Revenue queries alone (~9 peak connections internally)
   const revenue = await safeQuery(
-    () => queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, filterDest),
+    () => queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, reportingDf),
     defaultRevenue
   );
 
   // Batch 3: Conversion accuracy alone (~6 peak connections internally)
   const conversionAccuracy = await safeQuery(
-    () => queryConversionAccuracy(workspaceId, filterDest),
+    () => queryConversionAccuracy(workspaceId, externalDf),
     DEFAULT_CONVERSION_ACCURACY
   );
 
   // Batch 4: Lightweight remaining queries (~3 peak connections)
   const [billing, campaigns] = await Promise.all([
     safeQuery(() => queryBillingUsage(userId), DEFAULT_BILLING),
-    safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, filterDest, allowedDestinations), [] as CampaignRow[]),
+    safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, reportingDf), [] as CampaignRow[]),
   ]);
 
   const planConfig =

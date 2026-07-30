@@ -24,21 +24,22 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 **The 2026-07-27 own-store tracking hardening is live in production at exact release SHA `a4628c9bd3760fd3e902a8df5680002ced759651`.** The candidate was fast-forwarded to `main`, then deployed through a controlled Vercel/Railway cutover with destination queues paused until both runtimes were ready. Current state:
 - Build: compiles cleanly on local Node 22; the release workflow enforces Node 20 standalone and Node 24 builds; lint passes with pre-existing `<img>` optimization warnings
-- Unit suite: 666/666 passing across 57 files on local Node 22; release CI repeats it on Node 20 and 24
-- Integration suite: 62/62 passing across 7 files against isolated PostgreSQL 17.5/Redis locally; release CI repeats it on PostgreSQL 16/Redis 7 with Node 20 and 24
+- Unit suite: 677/677 passing across 58 files on local Node 22; release CI must repeat it on Node 20 and 24
+- Integration suite: the latest complete baseline is 62/62 across 7 files against isolated PostgreSQL 17.5/Redis. The 2026-07-30 candidate rerun was unavailable because local PostgreSQL/Redis were not running, so CI remains required before release
 - TypeScript and Prisma schema validation pass cleanly
-- All 16 repository migrations are applied in production. The 20260727 hardening chain includes the webhook inbox, seven one-statement concurrent EventLog indexes, two schema-history catch-up migrations, and one concurrent refund index; production verification reports 11/11 required indexes valid and zero Prisma drift.
+- All 16 production migrations remain applied. The source branch has a 17th additive migration, `20260730_add_internal_analytics_destination`, which is not deployed and is required by the fail-closed schema gate before this candidate can activate. The existing production verification remains 11/11 required indexes valid with zero Prisma drift.
 - 7 destination codepaths retained for legacy/custom workspaces: Meta CAPI, TikTok, GA4, Klaviyo, Reddit, Pinterest, Google Ads
 - Shopify Meta+TikTok V1 mode for new normal Shopify workspaces: Custom Pixel, required storefront cart attribution helper, Shopify webhook, Meta CAPI, TikTok Events API, actionable tracking health
 - Dashboard: mode-aware destination visibility, analytics deduplication, revenue cards with currency conversion, event funnel, delivery stats, campaign performance
 - i18n: 6 languages (EN, PT, ES, FR, DE, IT) via next-intl v4
 - Security: CSP header, email verification, GDPR account deletion, circuit breaker, env validation
 - Extras: event replay, password reset, email alerts (4 alert types), UTM/gclid capture, stale pending auto-requeue, privacy/terms pages, server-proxy attribution hardening, verified custom ingest domains
-- Tracking hardening: synchronous bounded `bridge-v1` startup FIFO with seven Shopify-validator-compatible literal event subscriptions, lossless encrypted webhook inbox with capture-only acknowledgement, atomic destination outbox, verified-webhook gating, cross-source Purchase alias reconciliation, final delivery claims, encrypted 72-hour retry envelopes, scoped circuit breakers, deterministic retries, timestamped consent tombstones, opt-in Meta/TikTok browser ownership, latest-touch browser identity, and alias-aware Purchase usage reservation/reconciliation
+- Tracking hardening: synchronous bounded `bridge-v1` startup FIFO with seven Shopify-validator-compatible literal event subscriptions, lossless encrypted webhook inbox with capture-only acknowledgement, atomic destination outbox, verified-webhook gating, cross-source Purchase alias reconciliation, final delivery claims, encrypted 72-hour retry envelopes, scoped circuit breakers, deterministic retries, timestamped consent tombstones, opt-in Meta/TikTok browser ownership, latest-touch browser identity, alias-aware Purchase usage reservation/reconciliation, and source-only privacy-minimized `INTERNAL` attribution for analytics-allowed/marketing-denied events
 - Worker lifecycle: all 11 BullMQ listeners are constructed with `autorun: false`; required recovery schedules register first, every listener must pass `waitUntilReady()`, and only then does the latched `/health` readiness gate open. Startup failure and signals use one cleanup path. Outbound requests are capped at 30 seconds, application drain at 45 seconds, and Railway drain at 60 seconds.
 - Hosting: web app on Vercel (serverless), workers on Railway, Postgres + Redis on Railway with public TCP proxies
 - Release control: GitHub default/source branch is `main`; Vercel Git deployment and Railway autodeploy remain disabled. Vercel production deployment `E6FSrYAScp7CayAbatpcNsXTgcwE` and Railway deployment `84d5ef69-3822-44f8-be54-0d8f967c1342` run the approved SHA. Railway uses `/railway.worker.toml` and `/Dockerfile.worker` with a 60-second drain.
 - Dirava bridge rollout: Shopify custom pixel `325222664` is connected with the corrected `bridge-v1` loader. Shopify accepted the seven literal subscriptions with no editor error or no-subscription warning, and Pixel Helper observed `page_viewed` plus `product_viewed` on a real product page. The attempted product AddToCart did not change the cart, so it is not counted as AddToCart proof.
+- 2026-07-30 candidate: internal attribution is implemented and locally validated but is not live. Production behavior remains the 2026-07-27 release until the new enum migration and both runtimes pass a controlled release.
 
 See `STATUS.md` for the full audit and remaining work.
 
@@ -91,6 +92,7 @@ JS Snippet (browser) --> POST /api/events/ingest (X-TL-API-Key header)
   |-- Store browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email when available
   |-- Check per-event toggle (enablePageView, etc.)
   |-- Check consent (STRICT/LAX mode)
+  |-- If analytics=true, marketing=false, and no eligible external analytics destination: persist one privacy-minimized INTERNAL row and return without billing or queue work
   |-- Fan-out: atomically persist one EventLog per enabled destination (status: PENDING)
   |-- For Shopify Meta+TikTok V1 workspaces, filter fan-out to META/TIKTOK only
   |-- Queue deterministic event-<EventLog.id> BullMQ jobs per destination
@@ -101,6 +103,7 @@ Shopify webhook --> verify HMAC before any state change
   |-- Only signed orders/paid marks the workspace webhook as verified
   |-- Return the live acknowledgement immediately after durable capture
   |-- One-minute inbox worker processes canonical Purchase/refund and defers with backoff on failure
+  |-- Analytics-allowed/marketing-denied Purchase persists only sanitized INTERNAL attribution; both-denied persists nothing
   |-- Erase payload after successful processing; retain payload-free receipt
 
 Workers (separate process) --> Dequeue from per-destination queues
@@ -135,6 +138,7 @@ Shopify Inbox Recovery (every 1 minute)
 - When one of those browser modes is enabled, the generated script loads that platform SDK only after consent permits it and sends the same `event_id` used by TrackClear's server event. TrackClear must be the only browser owner for that dataset/Pixel ID; browser/server deduplication cannot repair two independent browser integrations.
 - Purchase events normalize to `shopify-purchase:<workspaceId>:<order|checkout|cart>`. Order name wins when available; numeric and GraphQL IDs converge; generated scripts include `checkout.orderName` in both browser and server identity inputs.
 - Different deterministic IDs are reconciled through normalized order name/ID plus checkout/cart aliases per destination. Canonical Shopify webhook rows reserve SENT/PENDING/RETRYING/FAILED ownership; obsolete browser rows become `SUPERSEDED` and cannot be resurrected by retained jobs.
+- `INTERNAL` attribution uses a workspace-scoped SHA-256 event key instead of retaining raw event/order/session aliases. If a consented external row already exists, the internal duplicate is not created; if external delivery becomes eligible later, the matching internal row becomes `SUPERSEDED` and reporting excludes it.
 - Verified-webhook browser fallbacks are delayed 90 seconds, longer than the one-minute inbox scan, then take a final database delivery claim immediately before external I/O. The webhook and worker use complementary ownership checks so whichever path claims first is the only sender; same-ID workers load the newest encrypted canonical envelope after claiming.
 - Generated `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId` scripts always send Track Clear Purchase context. They suppress browser `fbq("track", "Purchase")` only after a signed `orders/paid` webhook has proven the canonical path; a saved secret alone is not proof.
 
@@ -173,7 +177,7 @@ src/
       auth/reset-password/route.ts    # POST: validate token, update password
       auth/verify-email/route.ts      # GET: token-based email verification, sets emailVerified
       diagnostics/route.ts            # GET: internal mode-aware diagnostics data for active workspace debugging
-      events/ingest/route.ts          # POST: multi-destination fan-out pipeline (CORS, X-TL-Client IP/UA, fbclid->fbc, multi-key session enrichment)
+      events/ingest/route.ts          # POST: consent-aware external fan-out plus privacy-minimized internal analytics fallback
       custom-ingest-domain/check/route.ts # GET: public marker route used to verify merchant-owned custom ingest domains
       workspaces/route.ts             # GET/POST: list/create workspaces (unlimited)
       workspaces/[id]/route.ts        # GET/PATCH/DELETE: workspace CRUD; product mode/install type are read-only to client PATCH requests; catalog ID matching and custom ingest domain are merchant-editable
@@ -225,6 +229,7 @@ src/
     meta-capi.ts                      # POST to Meta Graph API, MetaCapiError class
     event-normalizer.ts               # SnippetEventPayload -> MetaCapiEvent (handles camelCase+snake_case and bounded Meta cookie validation)
     event-log-payload.ts              # Sanitized EventLog payload builder (customData + flags, no raw userData)
+    internal-attribution.ts           # Anonymous first-party attribution records for analytics-allowed/marketing-denied events; never queued externally
     event-delivery-guard.ts           # final alias election and token-checked outbound ownership/settlement
     event-replay-queue.ts             # deterministic destination replay job construction
     event-retry-envelope.ts           # short-lived encrypted full-fidelity event envelope
@@ -238,7 +243,7 @@ src/
     diagnostics-audit-fields.ts       # Mode-aware diagnostics field visibility/counts for core vs optional click/UTM data
     tracking-health.ts                # Operational health checks for Shopify V1 readiness, including actionable cart-helper attribution status
     session-enrichment.ts             # Redis browser context store keyed by TrackClear session ID, checkout/cart/order identifiers, and email
-    analytics.ts                      # Dashboard analytics with destination deduplication + currency conversion (parallel Prisma queries)
+    analytics.ts                      # Dashboard analytics with external fan-out deduplication, internal attribution reporting, and currency conversion
     analytics-cache.ts                # Redis caching wrapper for analytics (60s TTL, keyed by destination+currency)
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
     shopify-webhook-attribution.ts    # Shopify order/cart/landing-site attribution extraction + absolute webhook Purchase URL/content helpers
@@ -295,7 +300,7 @@ messages/
 tests/
   unit/
     analytics-cache.test.ts           # 7 tests (Redis analytics cache behavior)
-    analytics.test.ts                 # 28 tests (dashboard analytics)
+    analytics.test.ts                 # 29 tests (dashboard analytics, including internal-reporting/external-health separation)
     api-key.test.ts                   # 12 tests
     billing.test.ts                   # 28 tests (atomic reservations, aliases, reconciliation markers)
     cart-helper-route.test.ts         # 3 tests
@@ -322,7 +327,8 @@ tests/
     google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
     hash-pii.test.ts                  # 24 tests
     headless-sdk.test.ts              # 20 tests (consent, revocation replay/serialization, fallback session anchors, attribution, cookies/session, cart attributes, ingest client)
-    ingest-attribution.test.ts        # 28 tests (outbox, attribution, anchored/rate-limited consent tombstones, gate precedence, billing aliases, fallback delay, checkout enrichment)
+    ingest-attribution.test.ts        # 30 tests (outbox, attribution, explicit internal-only consent path, tombstones, billing aliases, fallback delay, checkout enrichment)
+    internal-attribution.test.ts      # 6 tests (sanitization, hashed identity, no external delivery fields, consent-transition supersession)
     ingest-validation.test.ts         # 9 tests (strict bounded payload validation and minimized revocation exception)
     meta-capi.test.ts                 # 21 tests
     meta-event-processor.test.ts      # 8 tests (delivery ownership, acceptance, errors, retry)
@@ -340,7 +346,7 @@ tests/
     shopify-webhook-attribution.test.ts # 15 tests (order/landing attribution, consent freshness, catalog IDs)
     shopify-webhook-inbox.test.ts     # 12 tests (durable encrypted capture/claim/backoff/retention)
     shopify-webhook-inbox-worker.test.ts # 5 tests (internal replay and failure handling)
-    shopify-webhook-route-mode.test.ts # 19 tests (capture-only ACK, canonical reconciliation, allowlists/catalogs)
+    shopify-webhook-route-mode.test.ts # 21 tests (capture-only ACK, canonical reconciliation, explicit-consent internal attribution, allowlists/catalogs)
     snippet-route.test.ts             # 5 tests (verified host and bounded ordered bridge-v1 startup)
     stale-pending-requeue.test.ts     # 8 tests (deterministic retries and alias-aware usage reconciliation)
     tiktok.test.ts                    # 3 tests (external_id hashing and rich contents)

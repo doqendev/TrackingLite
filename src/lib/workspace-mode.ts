@@ -1,5 +1,7 @@
 import type { Destination } from "@prisma/client";
 
+export type ExternalDestination = Exclude<Destination, "INTERNAL">;
+
 export const SHOPIFY_META_TIKTOK_V1 = "SHOPIFY_META_TIKTOK_V1" as const;
 export const LEGACY_ALL_DESTINATIONS = "LEGACY_ALL_DESTINATIONS" as const;
 export const SHOPIFY_CUSTOM_PIXEL = "SHOPIFY_CUSTOM_PIXEL" as const;
@@ -24,9 +26,9 @@ const ALL_DESTINATIONS = [
   "REDDIT",
   "PINTEREST",
   "GOOGLE_ADS",
-] as const satisfies readonly Destination[];
+] as const satisfies readonly ExternalDestination[];
 
-const DESTINATIONS_BY_PRODUCT_MODE: Record<WorkspaceProductModeValue, readonly Destination[]> = {
+const DESTINATIONS_BY_PRODUCT_MODE: Record<WorkspaceProductModeValue, readonly ExternalDestination[]> = {
   SHOPIFY_META_TIKTOK_V1: ["META", "TIKTOK"],
   LEGACY_ALL_DESTINATIONS: ALL_DESTINATIONS,
 };
@@ -80,7 +82,7 @@ export function isLegacyWorkspace(workspace: WorkspaceModeSource): boolean {
 
 export function getAllowedDestinationsForWorkspace(
   workspace: WorkspaceModeSource
-): readonly Destination[] {
+): readonly ExternalDestination[] {
   return DESTINATIONS_BY_PRODUCT_MODE[resolveWorkspaceProductMode(workspace)];
 }
 
@@ -90,7 +92,7 @@ export function filterDestinationsForWorkspace<T extends { destination: string }
 ): T[] {
   const allowed = new Set(getAllowedDestinationsForWorkspace(workspace));
   return destinations.filter((destination) =>
-    allowed.has(destination.destination as Destination)
+    allowed.has(destination.destination as ExternalDestination)
   );
 }
 
@@ -98,5 +100,7 @@ export function isDestinationAllowedForWorkspace(
   workspace: WorkspaceModeSource,
   destination: Destination
 ): boolean {
-  return getAllowedDestinationsForWorkspace(workspace).includes(destination);
+  return getAllowedDestinationsForWorkspace(workspace).some(
+    (allowed) => allowed === destination
+  );
 }

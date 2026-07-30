@@ -406,6 +406,7 @@ enum Destination {
   REDDIT
   PINTEREST
   GOOGLE_ADS
+  INTERNAL
 }
 
 enum ShopifyWebhookInboxStatus {

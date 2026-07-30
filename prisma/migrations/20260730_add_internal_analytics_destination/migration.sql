@@ -1,0 +1,1 @@
+ALTER TYPE "Destination" ADD VALUE 'INTERNAL';

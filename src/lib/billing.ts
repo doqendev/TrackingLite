@@ -274,6 +274,7 @@ export async function recoverPurchaseBillingReservationAfterOutboxFailure(
       where: {
         workspaceId: identity.workspaceId,
         eventName: "Purchase",
+        destination: { not: "INTERNAL" },
         OR: aliasPredicates,
       },
       select: { id: true },

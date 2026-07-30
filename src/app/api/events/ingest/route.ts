@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { EventName } from "@prisma/client";
 import { createLogger } from "@/lib/logger";
 import { db } from "@/lib/db";
 import { lookupWorkspaceByApiKey } from "@/lib/api-key-cache";
@@ -53,6 +54,10 @@ import {
 } from "@/lib/ingest-validation";
 import { encryptEventRetryEnvelope, type EventRetryEnvelope } from "@/lib/event-retry-envelope";
 import { VERIFIED_WEBHOOK_PURCHASE_GRACE_MS } from "@/lib/shopify-webhook-inbox";
+import {
+  persistInternalAttributionEvent,
+  supersedeInternalAttributionEvent,
+} from "@/lib/internal-attribution";
 import { ZodError } from "zod";
 import type { Queue } from "bullmq";
 
@@ -271,6 +276,9 @@ export async function POST(request: NextRequest) {
       consentForDestinations,
       "META"
     );
+    const internalAnalyticsOnly =
+      payload.consent.analyticsAllowed === true &&
+      payload.consent.marketingAllowed === false;
     const sharedContextAllowed = analyticsContextAllowed || marketingContextAllowed;
     const hasExplicitConsentDecision =
       payload.consent.analyticsAllowed !== undefined ||
@@ -500,13 +508,6 @@ export async function POST(request: NextRequest) {
       )
     );
 
-    if (consentFilteredDestinations.length === 0) {
-      return NextResponse.json(
-        { success: true, eventId: effectiveEventId, skipped: true },
-        { status: 200, headers: corsHeaders }
-      );
-    }
-
     // A verified normal-Shopify webhook is the authoritative Purchase source.
     // Shopify documents order.id on checkout_completed and checkout.token as
     // the cross-system key to the order webhook. If both (plus every other
@@ -535,6 +536,55 @@ export async function POST(request: NextRequest) {
           skipped: true,
           reason: "missing_shopify_purchase_identity",
         },
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
+    if (consentFilteredDestinations.length === 0) {
+      // Shopify classifies attribution under analytics processing. When that
+      // category is allowed but marketing is denied, preserve only anonymous
+      // first-party reporting fields. This row is never queued to a platform,
+      // never consumes a Purchase billing unit, and contains no raw shopper,
+      // click, browser, session, cart, checkout, order, or event identifiers.
+      // Destination-specific follow-up calls are excluded so a Meta/Klaviyo
+      // enrichment request cannot create a second internal funnel event.
+      if (internalAnalyticsOnly && !payload.onlyDestinations?.length) {
+        await persistInternalAttributionEvent({
+          workspaceId: workspace.id,
+          eventName: payload.eventName as EventName,
+          eventId: effectiveEventId,
+          dedupKey:
+            normalizedPurchaseOrderName ??
+            normalizedPurchaseOrderId ??
+            sessionIdentifiers.checkoutToken ??
+            sessionIdentifiers.cartToken ??
+            effectiveEventId,
+          url: payload.url,
+          referrer: payload.referrer,
+          utmSource: payload.utmSource,
+          utmMedium: payload.utmMedium,
+          utmCampaign: payload.utmCampaign,
+          utmContent: payload.utmContent,
+          utmTerm: payload.utmTerm,
+          value: extracted.value,
+          currency: extracted.currency,
+          numItems: extracted.numItems,
+        });
+        return NextResponse.json(
+          {
+            success: true,
+            eventId: effectiveEventId,
+            skipped: true,
+            reason: "internal_analytics_only",
+            internalAnalytics: true,
+            destinations: [],
+          },
+          { status: 200, headers: corsHeaders }
+        );
+      }
+
+      return NextResponse.json(
+        { success: true, eventId: effectiveEventId, skipped: true },
         { status: 200, headers: corsHeaders }
       );
     }
@@ -916,6 +966,20 @@ export async function POST(request: NextRequest) {
         }
       })
     );
+
+    if (!payload.onlyDestinations?.length) {
+      await supersedeInternalAttributionEvent({
+        workspaceId: workspace.id,
+        eventName: payload.eventName as EventName,
+        eventId: effectiveEventId,
+        dedupKey:
+          normalizedPurchaseOrderName ??
+          normalizedPurchaseOrderId ??
+          sessionIdentifiers.checkoutToken ??
+          sessionIdentifiers.cartToken ??
+          effectiveEventId,
+      });
+    }
 
     // 13. Return success
     const response: any = {

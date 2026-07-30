@@ -15,6 +15,8 @@ const mockCheckConsentRevocationRateLimit = vi.fn();
 const mockCheckOrderLimits = vi.fn();
 const mockRecoverPurchaseBillingReservation = vi.fn();
 const mockTransaction = vi.fn();
+const mockPersistInternalAttributionEvent = vi.fn();
+const mockSupersedeInternalAttributionEvent = vi.fn();
 
 vi.mock("@/lib/api-key", () => ({
   isValidApiKeyFormat: () => true,
@@ -67,6 +69,13 @@ vi.mock("@/lib/redis", () => ({
   getSharedRedis: () => ({
     set: (...args: unknown[]) => mockRedisSet(...args),
   }),
+}));
+
+vi.mock("@/lib/internal-attribution", () => ({
+  persistInternalAttributionEvent: (...args: unknown[]) =>
+    mockPersistInternalAttributionEvent(...args),
+  supersedeInternalAttributionEvent: (...args: unknown[]) =>
+    mockSupersedeInternalAttributionEvent(...args),
 }));
 
 let postIngest: typeof import("@/app/api/events/ingest/route").POST;
@@ -129,6 +138,8 @@ describe("ingest attribution handling", () => {
     mockCheckConsentRevocationRateLimit.mockResolvedValue({ allowed: true });
     mockCheckOrderLimits.mockResolvedValue({ allowed: true });
     mockRecoverPurchaseBillingReservation.mockResolvedValue("released");
+    mockPersistInternalAttributionEvent.mockResolvedValue({ id: "internal_event_1" });
+    mockSupersedeInternalAttributionEvent.mockResolvedValue({ count: 0 });
     mockTransaction.mockImplementation(
       (callback: (tx: Record<string, unknown>) => unknown) =>
         callback({
@@ -296,6 +307,94 @@ describe("ingest attribution handling", () => {
       }),
       expect.any(Object)
     );
+  });
+
+  it("records internal attribution without platform delivery when analytics is allowed and marketing is denied", async () => {
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_v1_internal",
+      userId: "user_123",
+      isActive: true,
+      consentMode: "STRICT",
+      productMode: "SHOPIFY_META_TIKTOK_V1",
+      installType: "SHOPIFY_CUSTOM_PIXEL",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: true,
+      hasTikTokCredentials: true,
+      hasGA4Credentials: false,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: false,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: false,
+      hasVerifiedShopifyWebhook: false,
+    });
+
+    const response = await postIngest(makeRequest({
+      eventName: "Purchase",
+      eventId: "raw-purchase-event",
+      timestamp: Date.now(),
+      url: "https://www.mizoke.com/products/sign?ttclid=SECRET",
+      referrer: "https://www.tiktok.com/@creator/video/123",
+      ttclid: "SECRET",
+      ttp: "ttp-secret",
+      trackclearSessionId: "session-secret",
+      consent: { analyticsAllowed: true, marketingAllowed: false },
+      userData: { email: "buyer@example.com", phone: "+351910000000" },
+      utmSource: "tiktok",
+      utmMedium: "paid_social",
+      utmCampaign: "chopper-sign-us",
+      customData: {
+        value: 42.5,
+        currency: "USD",
+        numItems: 1,
+        orderId: "1001",
+        orderName: "#1001",
+      },
+    }, { "X-TL-API-Key": "tl_test" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      skipped: true,
+      reason: "internal_analytics_only",
+      internalAnalytics: true,
+      destinations: [],
+    });
+    expect(mockPersistInternalAttributionEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws_v1_internal",
+        eventName: "Purchase",
+        utmSource: "tiktok",
+        utmCampaign: "chopper-sign-us",
+        value: 42.5,
+        currency: "USD",
+        numItems: 1,
+      })
+    );
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+    expect(mockEventLogCreate).not.toHaveBeenCalled();
+    expect(mockCheckOrderLimits).not.toHaveBeenCalled();
+    expect(mockSupersedeInternalAttributionEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not infer internal analytics consent from LAX mode", async () => {
+    const response = await postIngest(makeRequest({
+      eventName: "AddToCart",
+      eventId: "evt_lax_marketing_denial_only",
+      timestamp: Date.now(),
+      consent: { marketingAllowed: false },
+      customData: { value: 10, currency: "USD" },
+    }, { "X-TL-API-Key": "tl_test" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      skipped: true,
+    });
+    expect(mockPersistInternalAttributionEvent).not.toHaveBeenCalled();
+    expect(mockEventLogCreate).not.toHaveBeenCalled();
+    expect(mockQueueAdd).not.toHaveBeenCalled();
   });
 
   it("writes tombstones only for explicitly false partial consent categories", async () => {

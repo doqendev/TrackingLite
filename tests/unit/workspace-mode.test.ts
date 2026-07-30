@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   filterDestinationsForWorkspace,
   getAllowedDestinationsForWorkspace,
+  isDestinationAllowedForWorkspace,
   isLegacyWorkspace,
   resolveWorkspaceInstallType,
   resolveWorkspaceProductMode,
@@ -37,6 +38,7 @@ describe("workspace-mode", () => {
     };
 
     expect(getAllowedDestinationsForWorkspace(workspace)).toEqual(["META", "TIKTOK"]);
+    expect(isDestinationAllowedForWorkspace(workspace, "INTERNAL")).toBe(false);
     expect(
       filterDestinationsForWorkspace(workspace, [
         { destination: "META" },
