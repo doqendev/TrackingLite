@@ -183,6 +183,26 @@ describe("computeDashboardAnalytics", () => {
     expect(result).toHaveProperty("retentionDays");
   });
 
+  it("includes internal attribution in reporting but excludes it from delivery health", async () => {
+    setupDefaultMocks();
+
+    await computeDashboardAnalytics(WORKSPACE_ID, USER_ID);
+
+    expect(mockCount.mock.calls[0][0].where.destination).toBe("META");
+    expect(mockGroupBy.mock.calls[0][0].where.destination).toEqual({
+      in: ["META", "INTERNAL"],
+    });
+    expect(mockGroupBy.mock.calls[2][0].where.destination).toEqual({
+      not: "INTERNAL",
+    });
+    expect(mockGroupBy.mock.calls[4][0].where.destination).toEqual({
+      in: ["META", "INTERNAL"],
+    });
+    expect(mockGroupBy.mock.calls[11][0].where.destination).toEqual({
+      in: ["META", "INTERNAL"],
+    });
+  });
+
   describe("health metrics", () => {
     it("computes correct success rate and status", async () => {
       setupDefaultMocks();

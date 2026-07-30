@@ -719,6 +719,7 @@ export async function reconcileOrderCounts(): Promise<void> {
   const purchases = await db.eventLog.findMany({
     where: {
       eventName: "Purchase",
+      destination: { not: "INTERNAL" },
       status: { not: "SUPERSEDED" },
       createdAt: { gte: monthStart },
     },

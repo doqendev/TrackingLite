@@ -21,6 +21,8 @@ const mockClaimWebhook = vi.fn();
 const mockCompleteWebhook = vi.fn();
 const mockDeferWebhook = vi.fn();
 const mockReserveEventDeliveriesForWebhook = vi.fn();
+const mockPersistInternalAttributionEvent = vi.fn();
+const mockSupersedeInternalAttributionEvent = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   db: {
@@ -121,6 +123,13 @@ vi.mock("@/lib/redis", () => ({
     eval: (...args: unknown[]) => mockRedisEval(...args),
     set: (...args: unknown[]) => mockRedisSet(...args),
   }),
+}));
+
+vi.mock("@/lib/internal-attribution", () => ({
+  persistInternalAttributionEvent: (...args: unknown[]) =>
+    mockPersistInternalAttributionEvent(...args),
+  supersedeInternalAttributionEvent: (...args: unknown[]) =>
+    mockSupersedeInternalAttributionEvent(...args),
 }));
 
 import { POST } from "@/app/api/webhooks/shopify/route";
@@ -250,6 +259,8 @@ describe("Shopify webhook workspace mode allowlist", () => {
       token: "webhook-reservation-token",
       eventLogIds: [...ids].sort(),
     }));
+    mockPersistInternalAttributionEvent.mockResolvedValue({ id: "internal_event_1" });
+    mockSupersedeInternalAttributionEvent.mockResolvedValue({ count: 0 });
   });
 
   afterEach(() => {
@@ -690,7 +701,57 @@ describe("Shopify webhook workspace mode allowlist", () => {
     );
   });
 
-  it("honors an explicit marketing denial on the canonical webhook Purchase", async () => {
+  it("records only privacy-minimized internal attribution after marketing denial", async () => {
+    const order = makeOrder();
+    order.note_attributes = (order.note_attributes as Array<Record<string, unknown>>)
+      .map((attribute) =>
+        attribute.name === "_tc_consent_marketing"
+          ? { ...attribute, value: "false" }
+          : attribute
+      )
+      .concat({ name: "_tc_consent_analytics", value: "true" });
+
+    const response = await POST(makeShopifyRequest(order));
+
+    expect(response.status).toBe(200);
+    expect(mockEventLogCreate).not.toHaveBeenCalled();
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+    expect(mockCheckOrderLimits).not.toHaveBeenCalled();
+    expect(mockPersistInternalAttributionEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws_v1",
+        eventName: "Purchase",
+        utmSource: "meta",
+        value: 42.5,
+        currency: "USD",
+        numItems: 2,
+      })
+    );
+    expect(mockCompleteWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "inbox_1", attempts: 1 })
+    );
+  });
+
+  it("stores nothing when analytics and marketing are both denied", async () => {
+    const order = makeOrder();
+    order.note_attributes = (order.note_attributes as Array<Record<string, unknown>>)
+      .map((attribute) =>
+        attribute.name === "_tc_consent_marketing"
+          ? { ...attribute, value: "false" }
+          : attribute
+      )
+      .concat({ name: "_tc_consent_analytics", value: "false" });
+
+    const response = await POST(makeShopifyRequest(order));
+
+    expect(response.status).toBe(200);
+    expect(mockPersistInternalAttributionEvent).not.toHaveBeenCalled();
+    expect(mockEventLogCreate).not.toHaveBeenCalled();
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+    expect(mockCheckOrderLimits).not.toHaveBeenCalled();
+  });
+
+  it("does not infer internal analytics consent from LAX webhook defaults", async () => {
     const order = makeOrder();
     order.note_attributes = (order.note_attributes as Array<Record<string, unknown>>)
       .map((attribute) =>
@@ -702,12 +763,10 @@ describe("Shopify webhook workspace mode allowlist", () => {
     const response = await POST(makeShopifyRequest(order));
 
     expect(response.status).toBe(200);
+    expect(mockPersistInternalAttributionEvent).not.toHaveBeenCalled();
     expect(mockEventLogCreate).not.toHaveBeenCalled();
     expect(mockQueueAdd).not.toHaveBeenCalled();
     expect(mockCheckOrderLimits).not.toHaveBeenCalled();
-    expect(mockCompleteWebhook).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "inbox_1", attempts: 1 })
-    );
   });
 
   it("keeps a headless legacy workspace unaffected through LEGACY_WORKSPACE_IDS", async () => {

@@ -1,18 +1,30 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-07-27 (controlled production release and Dirava bridge rollout complete)
+Last updated: 2026-07-30 (privacy-minimized internal attribution candidate complete; not deployed)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 666/666 passing (57 files) on local Node 22; release CI repeats on Node 20 and 24 |
-| Integration tests | 62/62 passing (7 files) with isolated PostgreSQL 17.5/Redis locally; release CI repeats on PostgreSQL 16/Redis 7 with Node 20 and 24 |
-| Migrations | All 16 repository migrations applied in production; migration status current, 11/11 required indexes valid, zero Prisma drift |
+| Unit tests | 677/677 passing (58 files) on local Node 22; release CI must repeat on Node 20 and 24 |
+| Integration tests | Latest production baseline is 62/62 passing (7 files). The 2026-07-30 candidate rerun was unavailable because local PostgreSQL on 5433 and Redis were not running; CI remains required before release |
+| Migrations | All 16 production migrations remain applied. The repository now has a 17th additive migration, `20260730_add_internal_analytics_destination`, which is source-only and must run before this candidate can deploy; the existing 11/11 required indexes remain unchanged |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `a4628c9bd3760fd3e902a8df5680002ced759651`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
+
+## 2026-07-30 Privacy-Minimized Internal Attribution
+
+**Release state:** complete on branch `codex/own-store-tracking-hardening`, but not deployed. Production remains on exact SHA `a4628c9bd3760fd3e902a8df5680002ced759651` and does not have the `INTERNAL` destination enum yet.
+
+- When analytics consent is allowed and marketing consent is denied, Track Clear now records an `INTERNAL` EventLog instead of silently losing the event when no analytics destination is eligible. If analytics is also denied, it records nothing.
+- Internal rows are terminal first-party records only: no Meta/TikTok or other destination queue, no browser-platform send, no Purchase billing reservation, no retry envelope, and no delivery claim.
+- Stored reporting data is limited to sanitized UTM source/medium/campaign/content/term, external referrer hostname, a query-free and identifier-redacted landing path/URL, value, currency, and item count. Raw event/order/session/cart/checkout IDs are represented only by a workspace-scoped SHA-256 event key; email, phone, IP, user agent, ad click IDs, cookies, and payment gateway are null or absent.
+- Browser ingest and the canonical signed Shopify webhook both support the internal path. A later consented platform delivery supersedes a matching internal record, and dashboard funnel/campaign queries exclude that superseded row to prevent double-counting.
+- Dashboard revenue, funnel, campaigns, Events, and Recent Events include `Internal analytics`. Platform health, conversion accuracy, failure alerts, replay, recovery, and Purchase usage reconciliation explicitly exclude it.
+- The additive PostgreSQL enum migration is included in the fail-closed deployment-schema gate. It must be applied before either runtime serving this code is activated.
+- Validation completed on local Node 22: `pnpm build`, `pnpm exec tsc --noEmit`, Prisma validation, 677/677 unit tests across 58 files, and ESLint with only the existing `<img>` warnings. The isolated integration suite could not start because PostgreSQL/Redis were unavailable after the PC restart; no integration pass is claimed for this candidate.
 
 ## 2026-07-27 Own-Store Tracking Hardening
 
@@ -104,7 +116,7 @@ Known low-frequency billing caveat: an order reserved immediately before UTC mon
 | `/api/auth/reset-password` | POST | - | Working | Validates token, updates password |
 | `/api/auth/verify-email` | GET | - | Working | Token-based email verification, sets emailVerified on User |
 | `/api/diagnostics` | GET | Session | Working | Internal diagnostics data filtered through workspace destination allowlist |
-| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Strict bounded validation, atomic multi-destination EventLog outbox, deterministic jobs, idempotent Purchase usage, server-proxy shopper IP/UA, fbclid-derived fbc, multi-key session enrichment |
+| `/api/events/ingest` | POST, OPTIONS | API Key | Working | Strict bounded validation, atomic external outbox, deterministic jobs, idempotent Purchase usage, multi-key session enrichment, and no-queue privacy-minimized internal attribution when analytics is allowed but marketing is denied |
 | `/api/workspaces` | GET, POST | Session | Working | Plan-limited active workspaces, required store domain, encrypted credentials |
 | `/api/workspaces/[id]` | GET, PATCH, DELETE | Session | Working | Ownership verified, soft-delete, destination credentials, product mode/install type read-only from public PATCH, catalog ID settings and custom ingest domain editable |
 | `/api/workspaces/[id]/custom-ingest-domain/verify` | POST | Session | Working | Verifies a saved custom ingest domain by checking the public TrackClear marker route through that host |

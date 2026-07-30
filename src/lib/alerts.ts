@@ -29,11 +29,16 @@ async function checkTrackingDown(
 
   const [total, sent] = await Promise.all([
     db.eventLog.count({
-      where: { workspaceId, createdAt: { gte: since1h } },
+      where: {
+        workspaceId,
+        destination: { not: "INTERNAL" },
+        createdAt: { gte: since1h },
+      },
     }),
     db.eventLog.count({
       where: {
         workspaceId,
+        destination: { not: "INTERNAL" },
         createdAt: { gte: since1h },
         status: EventStatus.SENT,
       },
@@ -64,11 +69,16 @@ async function checkHighErrorRate(
 
   const [total, failed] = await Promise.all([
     db.eventLog.count({
-      where: { workspaceId, createdAt: { gte: since1h } },
+      where: {
+        workspaceId,
+        destination: { not: "INTERNAL" },
+        createdAt: { gte: since1h },
+      },
     }),
     db.eventLog.count({
       where: {
         workspaceId,
+        destination: { not: "INTERNAL" },
         createdAt: { gte: since1h },
         status: EventStatus.FAILED,
       },

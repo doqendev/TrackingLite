@@ -12,6 +12,7 @@ export const REQUIRED_TRACKING_MIGRATIONS = [
   "20260727_schema_history_catch_up",
   "20260727_schema_history_catch_up_drop_plaintext_secret",
   "20260727_schema_history_catch_up_idx01_workspace_refund_id",
+  "20260730_add_internal_analytics_destination",
 ] as const;
 
 export const REQUIRED_TRACKING_INDEXES = [

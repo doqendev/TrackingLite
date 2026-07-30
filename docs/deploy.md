@@ -1,6 +1,6 @@
 # Deployment Runbook
 
-## 2026-07-27 Tracking Hardening Release
+## 2026-07-27 Tracking Hardening Release and 2026-07-30 Candidate
 
 This release is schema-first and mixed-version-sensitive. The database changes
 are additive, but old destination workers do not understand delivery claims or
@@ -19,6 +19,7 @@ Required migration chain:
 - `20260727_schema_history_catch_up`
 - `20260727_schema_history_catch_up_drop_plaintext_secret`
 - `20260727_schema_history_catch_up_idx01_workspace_refund_id`
+- `20260730_add_internal_analytics_destination`
 
 The base migration contains tracking schema changes and targeted backfills. The
 schema-history catch-up adds older model changes that were never represented by
@@ -28,6 +29,12 @@ Each EventLog `CREATE INDEX CONCURRENTLY`, including the refund index, is
 isolated in its own one-statement migration so Prisma 5.22 does not place it in
 a multi-statement implicit transaction. Do not combine these files or replace
 the concurrent builds with blocking indexes.
+
+The 2026-07-30 migration is one additive `ALTER TYPE` statement that adds the
+`INTERNAL` EventLog destination used for privacy-minimized first-party analytics.
+The deployment-schema gate requires it. Apply it before activating a web or
+worker build that contains the new Prisma enum; production remains on the
+16-migration 2026-07-27 release until a separately approved controlled cutover.
 
 Before touching production, require an active Vercel/Railway account, a current
 database restore point, recorded web/worker deployment IDs, and explicit

@@ -63,6 +63,14 @@ describe("Events page workspace mode filtering", () => {
   it("counts failed events only for destinations allowed by the workspace mode", async () => {
     await EventsPage({ searchParams: {} });
 
+    expect(mockEventLogFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          destination: { in: ["META", "TIKTOK", "INTERNAL"] },
+        }),
+      })
+    );
+
     expect(mockEventLogCount).toHaveBeenNthCalledWith(2, {
       where: {
         workspaceId: "ws_v1",

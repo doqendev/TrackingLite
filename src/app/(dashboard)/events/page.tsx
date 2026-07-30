@@ -25,6 +25,7 @@ const destinationLabels: Record<Destination, { label: string; className: string 
   REDDIT: { label: "Reddit", className: "text-orange-400" },
   PINTEREST: { label: "Pinterest", className: "text-red-500" },
   GOOGLE_ADS: { label: "Google Ads", className: "text-yellow-400" },
+  INTERNAL: { label: "Internal analytics", className: "text-cyan-400" },
 };
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;
@@ -86,10 +87,11 @@ export default async function EventsPage({
 
     if (!workspace) redirect("/onboarding");
     const allowedDestinations = getAllowedDestinationsForWorkspace(workspace);
+    const visibleDestinations = [...allowedDestinations, Destination.INTERNAL];
 
     const where = {
       workspaceId: workspace.id,
-      destination: { in: [...allowedDestinations] },
+      destination: { in: visibleDestinations },
       ...(filterEventName && EVENT_NAMES.includes(filterEventName as (typeof EVENT_NAMES)[number])
         ? { eventName: filterEventName }
         : {}),

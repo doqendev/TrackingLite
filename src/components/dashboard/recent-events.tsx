@@ -34,6 +34,7 @@ const destinationLabels: Record<Destination, { label: string; className: string 
   REDDIT: { label: "Reddit", className: "text-orange-400" },
   PINTEREST: { label: "Pinterest", className: "text-red-500" },
   GOOGLE_ADS: { label: "Google Ads", className: "text-yellow-400" },
+  INTERNAL: { label: "Internal analytics", className: "text-cyan-400" },
 };
 
 export async function RecentEvents({ workspaceId, allowedDestinations }: RecentEventsProps) {
@@ -66,7 +67,9 @@ export async function RecentEvents({ workspaceId, allowedDestinations }: RecentE
     events = await db.eventLog.findMany({
       where: {
         workspaceId,
-        ...(allowedDestinations ? { destination: { in: [...allowedDestinations] } } : {}),
+        ...(allowedDestinations
+          ? { destination: { in: [...allowedDestinations, Destination.INTERNAL] } }
+          : {}),
       },
       orderBy: { createdAt: "desc" },
       take: 10,
