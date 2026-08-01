@@ -59,6 +59,7 @@ describe("Shopify cart attribution helper", () => {
     expect(js).toContain("_tc_attribution_source");
     expect(js).toContain("_tc_consent_analytics");
     expect(js).toContain("_tc_consent_marketing");
+    expect(js).toContain("_tc_consent_sale_of_data");
     expect(js).toContain("trackclear_debug");
     expect(js).toContain("retrying cart update");
     expect(js).toContain("visitorConsentCollected");
@@ -179,6 +180,25 @@ describe("Shopify cart attribution helper", () => {
 
     expect(result.attributes._fbp).toBe("");
     expect(result.attributes._fbclid).toBe("");
+  });
+
+  it("clears advertising identifiers after a sale or sharing opt-out", () => {
+    const { storage } = memoryStorage();
+    const { cookies } = memoryCookies({ _fbp: "fb.1.1710000000000.1234567890" });
+
+    const result = extractShopifyCartAttribution({
+      url: "https://dirava.com/products/test?fbclid=FB123",
+      now: 1710000000000,
+      storage,
+      cookies,
+      consent: { marketingAllowed: true, saleOfDataAllowed: false },
+      generateId: () => "session_123",
+    });
+
+    expect(result.attributes._fbp).toBe("");
+    expect(result.attributes._fbclid).toBe("");
+    expect(result.attributes._tc_consent_marketing).toBe("true");
+    expect(result.attributes._tc_consent_sale_of_data).toBe("false");
   });
 
   it("reuses an existing TrackClear session ID", () => {

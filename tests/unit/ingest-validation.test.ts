@@ -159,4 +159,18 @@ describe("IngestPayloadSchema", () => {
     expect(result.ttp).toBe("tt.1.1234567890.abcdef");
     expect(result.attributionSource).toBe("tiktok");
   });
+
+  it("accepts the Shopify sale or sharing consent signal", () => {
+    const result = IngestPayloadSchema.parse(
+      validPayload({
+        consent: {
+          analyticsAllowed: true,
+          marketingAllowed: true,
+          saleOfDataAllowed: false,
+        },
+      })
+    );
+
+    expect(result.consent.saleOfDataAllowed).toBe(false);
+  });
 });

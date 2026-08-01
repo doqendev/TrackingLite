@@ -48,7 +48,11 @@ describe("session-enrichment", () => {
         attributionTimestamp: Date.now() - 60_000,
         attributionSource: "meta",
         observedAt: Date.now(),
-        consent: { analyticsAllowed: true, marketingAllowed: true },
+        consent: {
+          analyticsAllowed: true,
+          marketingAllowed: true,
+          saleOfDataAllowed: true,
+        },
       }
     );
 
@@ -74,6 +78,7 @@ describe("session-enrichment", () => {
       attributionSource: { value: "meta", timestamp: Date.now() - 60_000 },
       "consent:analytics": { value: "true", timestamp: Date.now() },
       "consent:marketing": { value: "true", timestamp: Date.now() },
+      "consent:saleOfData": { value: "true", timestamp: Date.now() },
     });
     expect(mockEval.mock.calls[0][4]).toBe(String(30 * 24 * 60 * 60));
     const aliases = JSON.parse(String(mockEval.mock.calls[0][5]));
@@ -127,6 +132,26 @@ describe("session-enrichment", () => {
     ]));
     expect(String(mockEval.mock.calls[0][0])).toContain("fieldTimestamp <= incoming");
     expect(String(mockEval.mock.calls[0][0])).toContain('category.consentField, "false"');
+  });
+
+  it("writes a sale or sharing tombstone without changing marketing consent", async () => {
+    const denialAt = Date.now() - 60_000;
+
+    await clearSessionContextForIdentifiers(
+      "ws_123",
+      { trackclearSessionId: "tc-session-123" },
+      { saleOfData: true, observedAt: denialAt }
+    );
+
+    const keyCount = Number(mockEval.mock.calls[0][1]);
+    const categories = JSON.parse(String(mockEval.mock.calls[0][2 + keyCount]));
+    expect(categories).toEqual([
+      expect.objectContaining({
+        tombstone: "cleared:saleOfData",
+        consentField: "consent:saleOfData",
+        timestamp: denialAt,
+      }),
+    ]);
   });
 
   it("fails closed when any linked consent-revocation write fails", async () => {

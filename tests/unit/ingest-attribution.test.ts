@@ -309,7 +309,7 @@ describe("ingest attribution handling", () => {
     );
   });
 
-  it("records internal attribution without platform delivery when analytics is allowed and marketing is denied", async () => {
+  it("records internal attribution without platform delivery after a sale or sharing opt-out", async () => {
     mockLookupWorkspaceByApiKey.mockResolvedValue({
       id: "ws_v1_internal",
       userId: "user_123",
@@ -341,7 +341,11 @@ describe("ingest attribution handling", () => {
       ttclid: "SECRET",
       ttp: "ttp-secret",
       trackclearSessionId: "session-secret",
-      consent: { analyticsAllowed: true, marketingAllowed: false },
+      consent: {
+        analyticsAllowed: true,
+        marketingAllowed: true,
+        saleOfDataAllowed: false,
+      },
       userData: { email: "buyer@example.com", phone: "+351910000000" },
       utmSource: "tiktok",
       utmMedium: "paid_social",

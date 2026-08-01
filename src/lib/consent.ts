@@ -4,6 +4,7 @@ export interface CustomerConsent {
   analytics?: boolean;
   marketing?: boolean;
   preferences?: boolean;
+  saleOfData?: boolean;
 }
 
 export type DestinationCategory = "analytics" | "marketing";
@@ -23,7 +24,7 @@ export const DESTINATION_CONSENT_CATEGORY: Record<string, DestinationCategory> =
  * Per-destination consent evaluation.
  *
  * Analytics destinations (GA4) check analyticsAllowed.
- * Marketing destinations (Meta, TikTok, Klaviyo, Reddit, Pinterest) check marketingAllowed.
+ * Marketing destinations check marketingAllowed and an explicit sale/sharing opt-out.
  *
  * Backward compatibility:
  * - If marketingAllowed is undefined/null (not explicitly set), treat as allowed.
@@ -40,6 +41,13 @@ export function shouldSendToDestination(
   const consentField = category === "analytics"
     ? customerConsent?.analytics
     : customerConsent?.marketing;
+
+  // Shopify models sale/sharing separately from general marketing consent.
+  // Keep old clients backward compatible when the field is absent, but an
+  // explicit false is authoritative in both STRICT and LAX modes.
+  if (category === "marketing" && customerConsent?.saleOfData === false) {
+    return false;
+  }
 
   if (consentMode === "LAX") {
     // LAX: block only if explicitly opted out (=== false)

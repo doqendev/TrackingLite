@@ -178,7 +178,11 @@ describe("headless-sdk", () => {
         attributionTimestamp: 1712345678901,
         attributionSource: "meta",
       },
-      consent: { analyticsAllowed: true, marketingAllowed: true },
+      consent: {
+        analyticsAllowed: true,
+        marketingAllowed: true,
+        saleOfDataAllowed: true,
+      },
     });
 
     expect(attributes).toEqual(
@@ -195,6 +199,7 @@ describe("headless-sdk", () => {
         _landing_page: "https://dirava.com/products/test?fbclid=FB123",
         _tc_consent_analytics: "true",
         _tc_consent_marketing: "true",
+        _tc_consent_sale_of_data: "true",
         _tc_consent_source: "headless_storefront",
       })
     );
@@ -220,6 +225,29 @@ describe("headless-sdk", () => {
       _fbclid: "",
       _ttclid: "",
       _tc_consent_marketing: "false",
+    });
+  });
+
+  it("writes blank advertising attributes after a sale or sharing opt-out", () => {
+    const attributes = buildTrackClearCartAttributes({
+      attribution: {
+        fbp: "fb.1.1712345678901.1000000000",
+        fbclid: "FB123",
+        ttclid: "TT123",
+      },
+      consent: {
+        analyticsAllowed: true,
+        marketingAllowed: true,
+        saleOfDataAllowed: false,
+      },
+    });
+
+    expect(attributes).toMatchObject({
+      _fbp: "",
+      _fbclid: "",
+      _ttclid: "",
+      _tc_consent_marketing: "true",
+      _tc_consent_sale_of_data: "false",
     });
   });
 

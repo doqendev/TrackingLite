@@ -39,6 +39,7 @@ describe("shopify-webhook-attribution", () => {
           { name: "_trackclear_session_id", value: "tc-session-123" },
           { name: "_landing_page", value: "https://mizoke.com/products/sign?utm_source=meta" },
           { name: "_tc_consent_marketing", value: "true" },
+          { name: "_tc_consent_sale_of_data", value: "true" },
           { name: "_tc_attribution_timestamp", value: "1699999999000" },
           { name: "_tc_attribution_source", value: "meta" },
         ],
@@ -58,6 +59,7 @@ describe("shopify-webhook-attribution", () => {
     expect(attribution.utmMedium).toBe("paid_social");
     expect(attribution.landingPage).toBe("https://mizoke.com/products/sign?utm_source=meta");
     expect(attribution.consentMarketing).toBe("true");
+    expect(attribution.consentSaleOfData).toBe("true");
     expect(attribution.attributionTimestamp).toBe(1699999999000);
     expect(attribution.attributionSource).toBe("meta");
   });
@@ -139,6 +141,21 @@ describe("shopify-webhook-attribution", () => {
       cartTimestamp: attribution.consentTimestamp,
       now,
     })).toBe(false);
+  });
+
+  it("keeps a sale or sharing denial available to webhook filtering", () => {
+    const now = 1_700_000_000_000;
+    const denialAt = now - 29 * 24 * 60 * 60 * 1000;
+    const attribution = buildOrderAttribution({
+      note_attributes: [
+        { name: "_tc_consent_marketing", value: "true" },
+        { name: "_tc_consent_sale_of_data", value: "false" },
+        { name: "_tc_consent_timestamp", value: String(denialAt) },
+      ],
+    }, now);
+
+    expect(attribution.consentSaleOfData).toBe("false");
+    expect(attribution.consentTimestamp).toBe(denialAt);
   });
 
   it("uses an explicit _fbc attribute when one exists", () => {

@@ -48,6 +48,7 @@ describe("GET /api/cart-helper/[workspaceId]", () => {
     expect(js).toContain("_landing_page");
     expect(js).toContain("_tc_consent_analytics");
     expect(js).toContain("_tc_consent_marketing");
+    expect(js).toContain("_tc_consent_sale_of_data");
     expect(js).toContain('M="STRICT"');
   });
 

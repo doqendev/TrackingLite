@@ -51,7 +51,11 @@ export function isPrivacyMinimizedConsentRevocationEnvelope(
   ) return false;
 
   const consentRecord = consent as Record<string, unknown>;
-  if (consentRecord.analyticsAllowed !== false && consentRecord.marketingAllowed !== false) {
+  if (
+    consentRecord.analyticsAllowed !== false &&
+    consentRecord.marketingAllowed !== false &&
+    consentRecord.saleOfDataAllowed !== false
+  ) {
     return false;
   }
   for (const field of CONSENT_REVOCATION_FORBIDDEN_CONTEXT_FIELDS) {
@@ -305,6 +309,7 @@ export const IngestPayloadSchema = z
       .object({
         analyticsAllowed: z.boolean().optional(),
         marketingAllowed: z.boolean().optional(),
+        saleOfDataAllowed: z.boolean().optional(),
       })
       .strict()
       .optional()

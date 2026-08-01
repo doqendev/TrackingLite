@@ -1,5 +1,15 @@
 # MEMORY.md
 
+## 2026-08-01 - Location-Aware Consent Candidate (Not Deployed)
+
+- Track Clear and Mizoke have a local, undeployed consent candidate that delegates geographic defaults to Shopify Customer Privacy rather than maintaining a country list. A visitor with no stored decision uses Shopify's computed analytics, marketing, sale/sharing, and banner permissions.
+- Eligible opt-out-region visitors can therefore begin with Shopify-permitted tracking enabled, while opt-in regions remain disabled until consent. This does not override an explicit No: Reject All, marketing denial, GPC, or `saleOfDataAllowed=false` blocks Meta/TikTok browser and server delivery.
+- The new `saleOfDataAllowed` field flows through Mizoke events, the Track Clear ingest schema/headless SDK, `_tc_consent_sale_of_data` cart attributes, Redis session enrichment, and signed Shopify webhook reconciliation. Explicit false blocks every marketing destination in STRICT and LAX modes; omission remains backward compatible.
+- Sale/sharing revocation uses an independent timestamped Redis tombstone while clearing the same advertising identity fields as marketing revocation. This prevents delayed aliases/events from hiding or resurrecting the opt-out.
+- Mizoke no longer copies stored click IDs or Meta/TikTok cookies into checkout attribution when advertising is denied. Sanitized UTM context and an opaque first-party session anchor can still support the existing privacy-minimized `INTERNAL` attribution path when analytics is explicitly allowed; analytics denial stores nothing.
+- Local validation: Track Clear production build, TypeScript, lint with existing image warnings, and 685/685 unit tests across 58 files passed. Mizoke production build, TypeScript, lint with zero errors and 25 existing warnings, and 341/341 tests across 82 files passed. Track Clear integration setup could not connect to loopback PostgreSQL port 5433 or Redis after the workstation restart, so no local integration tests ran; the latest release-CI baseline remains 62/62.
+- No migration, commit, push, or deployment was performed. Production remains on exact SHA `d09cf963177ccb69e63f59711483c61945587b0b` with automatic Vercel/Railway deployments disabled; live region/GPC and Purchase verification remains required after an approved controlled release.
+
 ## 2026-07-30 - Privacy-Minimized Internal Attribution Production Release
 
 - Production release SHA `d09cf963177ccb69e63f59711483c61945587b0b` records a distinct `INTERNAL` EventLog only when analytics consent is explicitly allowed, marketing consent is denied, and no eligible external analytics destination will receive the event. Both-denied consent records nothing.

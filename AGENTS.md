@@ -23,8 +23,9 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 ## Current State
 
 **The 2026-07-30 consent-safe internal attribution release is live in production at exact release SHA `d09cf963177ccb69e63f59711483c61945587b0b`.** PR #4 was merged to `main`, then deployed through a controlled Vercel/Railway cutover with the old worker stopped until both runtimes were ready. Current state:
+- **Local, not deployed (2026-08-01):** the working trees for Track Clear and the Mizoke Hydrogen storefront now use Shopify's computed Customer Privacy permissions for location-aware defaults and carry `saleOfDataAllowed` end to end. When Shopify allows tracking before a decision (the eligible US default), Mizoke tracks without forcing an opt-in; where Shopify requires opt-in, it stays off and shows the consent UI. Any explicit rejection, GPC, or sale/sharing opt-out remains authoritative: Meta/TikTok browser and server delivery are blocked, advertising identifiers are removed from cart/session enrichment, and only the existing privacy-minimized `INTERNAL` path may record an event when analytics is explicitly allowed. No migration is required and no provider deployment has occurred.
 - Build: compiles cleanly on local Node 22; the release workflow enforces Node 20 standalone and Node 24 builds; lint passes with pre-existing `<img>` optimization warnings
-- Unit suite: 677/677 passing across 58 files on local Node 22; release CI passed its Node 20 and Node 24 gates
+- Unit suite: current local candidate 685/685 passing across 58 files on Node 22; the live release CI previously passed its Node 20 and Node 24 gates at 677/677
 - Integration suite: 62/62 passing across 7 files in the release CI PostgreSQL 16/Redis 7 gates; the local PostgreSQL/Redis rerun remained unavailable after the workstation restart
 - TypeScript and Prisma schema validation pass cleanly
 - All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`. Production verification reports 11/11 required indexes valid and zero Prisma drift.
@@ -91,8 +92,8 @@ JS Snippet (browser) --> POST /api/events/ingest (X-TL-API-Key header)
   |-- Resolve fbc from fbc or fbclid (fb.1.<timestamp_ms>.<fbclid>)
   |-- Store browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email when available
   |-- Check per-event toggle (enablePageView, etc.)
-  |-- Check consent (STRICT/LAX mode)
-  |-- If analytics=true, marketing=false, and no eligible external analytics destination: persist one privacy-minimized INTERNAL row and return without billing or queue work
+  |-- Check consent (STRICT/LAX mode); explicit sale/sharing opt-out blocks every marketing destination in either mode
+  |-- If analytics=true and advertising is denied by marketing or sale/sharing consent, and no eligible external analytics destination exists: persist one privacy-minimized INTERNAL row and return without billing or queue work
   |-- Fan-out: atomically persist one EventLog per enabled destination (status: PENDING)
   |-- For Shopify Meta+TikTok V1 workspaces, filter fan-out to META/TIKTOK only
   |-- Queue deterministic event-<EventLog.id> BullMQ jobs per destination
@@ -103,7 +104,7 @@ Shopify webhook --> verify HMAC before any state change
   |-- Only signed orders/paid marks the workspace webhook as verified
   |-- Return the live acknowledgement immediately after durable capture
   |-- One-minute inbox worker processes canonical Purchase/refund and defers with backoff on failure
-  |-- Analytics-allowed/marketing-denied Purchase persists only sanitized INTERNAL attribution; both-denied persists nothing
+  |-- Analytics-allowed/advertising-denied Purchase persists only sanitized INTERNAL attribution; analytics-denied persists nothing
   |-- Erase payload after successful processing; retain payload-free receipt
 
 Workers (separate process) --> Dequeue from per-destination queues

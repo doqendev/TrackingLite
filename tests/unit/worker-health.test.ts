@@ -31,7 +31,7 @@ describe("worker health evaluation", () => {
     const workerEntrypoint = readFileSync(
       resolve(process.cwd(), "src/workers/start-worker.ts"),
       "utf8"
-    );
+    ).replace(/\r\n/g, "\n");
     const scheduleIndex = workerEntrypoint.indexOf(
       "await scheduleShopifyWebhookInboxReplay()"
     );
@@ -60,7 +60,7 @@ describe("worker health evaluation", () => {
     const workerEntrypoint = readFileSync(
       resolve(process.cwd(), "src/workers/start-worker.ts"),
       "utf8"
-    );
+    ).replace(/\r\n/g, "\n");
     const databaseModule = readFileSync(
       resolve(process.cwd(), "src/lib/db.ts"),
       "utf8"

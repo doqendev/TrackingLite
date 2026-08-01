@@ -115,6 +115,17 @@ describe("shouldSendToDestination - LAX mode - Marketing destinations", () => {
   it("LAX + consent=undefined -> allow META", () => {
     expect(shouldSendToDestination("LAX", undefined, "META")).toBe(true);
   });
+
+  it("LAX + sale/share opt-out -> block every marketing destination", () => {
+    const consent = { marketing: true, saleOfData: false };
+    for (const destination of ["META", "TIKTOK", "KLAVIYO", "REDDIT", "PINTEREST", "GOOGLE_ADS"]) {
+      expect(shouldSendToDestination("LAX", consent, destination)).toBe(false);
+    }
+  });
+
+  it("LAX + absent sale/share signal preserves backward compatibility", () => {
+    expect(shouldSendToDestination("LAX", { marketing: true }, "META")).toBe(true);
+  });
 });
 
 describe("shouldSendToDestination - LAX mode - Analytics destinations", () => {
@@ -140,5 +151,17 @@ describe("shouldSendToDestination - Unknown destination", () => {
     expect(shouldSendToDestination("STRICT", { marketing: true }, "UNKNOWN")).toBe(true);
     expect(shouldSendToDestination("STRICT", { marketing: false }, "UNKNOWN")).toBe(false);
     expect(shouldSendToDestination("STRICT", {}, "UNKNOWN")).toBe(false);
+  });
+});
+
+describe("shouldSendToDestination - STRICT sale/share boundary", () => {
+  it("blocks marketing even when marketing opt-in is true", () => {
+    expect(
+      shouldSendToDestination(
+        "STRICT",
+        { marketing: true, saleOfData: false },
+        "TIKTOK"
+      )
+    ).toBe(false);
   });
 });
