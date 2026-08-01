@@ -8,8 +8,10 @@ export type TrackClearEventName =
 export type TrackClearConsent = {
   analyticsAllowed?: boolean;
   marketingAllowed?: boolean;
+  saleOfDataAllowed?: boolean;
   analytics?: boolean;
   marketing?: boolean;
+  saleOfData?: boolean;
 };
 
 export type TrackClearAttribution = {
@@ -110,6 +112,7 @@ type TrackClearIngestPayload = Record<string, unknown> & {
 type ServerTrackClearConsent = {
   analyticsAllowed?: boolean;
   marketingAllowed?: boolean;
+  saleOfDataAllowed?: boolean;
 };
 
 type PendingConsentRevocation = {
@@ -146,8 +149,11 @@ function normalizeConsent(
     consentValue(defaultConsent, "analyticsAllowed", "analytics");
   const marketing = consentValue(eventConsent, "marketingAllowed", "marketing") ??
     consentValue(defaultConsent, "marketingAllowed", "marketing");
+  const saleOfData = eventConsent?.saleOfDataAllowed ?? eventConsent?.saleOfData ??
+    defaultConsent?.saleOfDataAllowed ?? defaultConsent?.saleOfData;
   if (typeof analytics === "boolean") normalized.analyticsAllowed = analytics;
   if (typeof marketing === "boolean") normalized.marketingAllowed = marketing;
+  if (typeof saleOfData === "boolean") normalized.saleOfDataAllowed = saleOfData;
   return normalized;
 }
 
@@ -159,12 +165,17 @@ function consentAllowed(
   const value = category === "marketing"
     ? consentValue(consent, "marketingAllowed", "marketing")
     : consentValue(consent, "analyticsAllowed", "analytics");
+  if (
+    category === "marketing" &&
+    (consent?.saleOfDataAllowed ?? consent?.saleOfData) === false
+  ) return false;
   return mode === "STRICT" ? value === true : value !== false;
 }
 
 function hasExplicitConsentRevocation(consent: ServerTrackClearConsent): boolean {
   return consentValue(consent, "analyticsAllowed", "analytics") === false ||
-    consentValue(consent, "marketingAllowed", "marketing") === false;
+    consentValue(consent, "marketingAllowed", "marketing") === false ||
+    consent.saleOfDataAllowed === false;
 }
 
 function consentRevocationPayload(payload: TrackClearIngestPayload): TrackClearIngestPayload {
@@ -499,7 +510,14 @@ export function buildTrackClearCartAttributes({
   if (consent?.marketingAllowed !== undefined || consent?.marketing !== undefined) {
     addAttribute(attributes, "_tc_consent_marketing", String(consent.marketingAllowed ?? consent.marketing));
   }
-  if (attributes._tc_consent_analytics || attributes._tc_consent_marketing) {
+  if (consent?.saleOfDataAllowed !== undefined || consent?.saleOfData !== undefined) {
+    addAttribute(attributes, "_tc_consent_sale_of_data", String(consent.saleOfDataAllowed ?? consent.saleOfData));
+  }
+  if (
+    attributes._tc_consent_analytics ||
+    attributes._tc_consent_marketing ||
+    attributes._tc_consent_sale_of_data
+  ) {
     addAttribute(attributes, "_tc_consent_timestamp", Date.now());
     addAttribute(attributes, "_tc_consent_source", "headless_storefront");
   }

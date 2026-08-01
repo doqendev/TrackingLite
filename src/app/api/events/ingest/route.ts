@@ -151,7 +151,11 @@ export async function POST(request: NextRequest) {
     };
     const explicitlyDeniedAnalytics = payload.consent.analyticsAllowed === false;
     const explicitlyDeniedMarketing = payload.consent.marketingAllowed === false;
-    const hasExplicitConsentDenial = explicitlyDeniedAnalytics || explicitlyDeniedMarketing;
+    const explicitlyDeniedSaleOfData = payload.consent.saleOfDataAllowed === false;
+    const explicitlyDeniedAdvertising =
+      explicitlyDeniedMarketing || explicitlyDeniedSaleOfData;
+    const hasExplicitConsentDenial =
+      explicitlyDeniedAnalytics || explicitlyDeniedAdvertising;
     const consentRevocationIdentifiers = sessionIdentifiers.trackclearSessionId
       ? { trackclearSessionId: sessionIdentifiers.trackclearSessionId }
       : sessionIdentifiers.checkoutToken
@@ -191,8 +195,9 @@ export async function POST(request: NextRequest) {
       // deletion keys; existing Redis alias links propagate the tombstone.
       await clearSessionContextForIdentifiers(workspace.id, consentRevocationIdentifiers!, {
         marketing: explicitlyDeniedMarketing,
+        saleOfData: explicitlyDeniedSaleOfData,
         analytics: explicitlyDeniedAnalytics,
-        shared: explicitlyDeniedMarketing && explicitlyDeniedAnalytics,
+        shared: explicitlyDeniedAdvertising && explicitlyDeniedAnalytics,
         observedAt: payload.timestamp,
       });
       return NextResponse.json(
@@ -265,6 +270,7 @@ export async function POST(request: NextRequest) {
     const consentForDestinations = {
       analytics: payload.consent.analyticsAllowed,
       marketing: payload.consent.marketingAllowed,
+      saleOfData: payload.consent.saleOfDataAllowed,
     };
     const analyticsContextAllowed = shouldSendToDestination(
       workspace.consentMode,
@@ -278,11 +284,12 @@ export async function POST(request: NextRequest) {
     );
     const internalAnalyticsOnly =
       payload.consent.analyticsAllowed === true &&
-      payload.consent.marketingAllowed === false;
+      explicitlyDeniedAdvertising;
     const sharedContextAllowed = analyticsContextAllowed || marketingContextAllowed;
     const hasExplicitConsentDecision =
       payload.consent.analyticsAllowed !== undefined ||
-      payload.consent.marketingAllowed !== undefined;
+      payload.consent.marketingAllowed !== undefined ||
+      payload.consent.saleOfDataAllowed !== undefined;
     // Consent denial is a deletion boundary, not merely a delivery filter.
     // Timestamped tombstones stop older email/cart/order keys from restoring
     // identifiers after a later opt-in. Missing consent categories still fail
@@ -292,8 +299,9 @@ export async function POST(request: NextRequest) {
     if (hasExplicitConsentDenial) {
       await clearSessionContextForIdentifiers(workspace.id, sessionIdentifiers, {
         marketing: explicitlyDeniedMarketing,
+        saleOfData: explicitlyDeniedSaleOfData,
         analytics: explicitlyDeniedAnalytics,
-        shared: explicitlyDeniedMarketing && explicitlyDeniedAnalytics,
+        shared: explicitlyDeniedAdvertising && explicitlyDeniedAnalytics,
         observedAt: payload.timestamp,
       });
     }

@@ -20,6 +20,7 @@ export const TRACKCLEAR_CART_ATTRIBUTE_KEYS = [
   "_tc_attribution_source",
   "_tc_consent_analytics",
   "_tc_consent_marketing",
+  "_tc_consent_sale_of_data",
   "_tc_consent_timestamp",
   "_tc_consent_source",
 ] as const;
@@ -55,6 +56,7 @@ type CookieLike = {
 type ConsentLike = {
   analyticsAllowed?: boolean | null;
   marketingAllowed?: boolean | null;
+  saleOfDataAllowed?: boolean | null;
 };
 
 type EnsureSessionIdOptions = {
@@ -209,9 +211,11 @@ export function extractShopifyCartAttribution({
   const parsedUrl = new URL(url, "https://shop.example");
   let context = readContext(storage, now);
   const { sessionId, generated } = ensureTrackClearSessionId({ storage, cookies, generateId });
-  const marketingAllowed = consentMode === "STRICT"
+  const marketingConsentAllowed = consentMode === "STRICT"
     ? consent?.marketingAllowed === true
     : consent?.marketingAllowed !== false;
+  const marketingAllowed =
+    marketingConsentAllowed && consent?.saleOfDataAllowed !== false;
 
   const captures: Array<[string, string, TrackclearCartAttributeKey]> = [
     ["fbclid", "fbclid", "_fbclid"],
@@ -339,9 +343,13 @@ export function extractShopifyCartAttribution({
   if (consent?.marketingAllowed !== undefined && consent.marketingAllowed !== null) {
     setIfValue(attributes, "_tc_consent_marketing", consent.marketingAllowed);
   }
+  if (consent?.saleOfDataAllowed !== undefined && consent.saleOfDataAllowed !== null) {
+    setIfValue(attributes, "_tc_consent_sale_of_data", consent.saleOfDataAllowed);
+  }
   if (
     (consent?.analyticsAllowed !== undefined && consent.analyticsAllowed !== null) ||
-    (consent?.marketingAllowed !== undefined && consent.marketingAllowed !== null)
+    (consent?.marketingAllowed !== undefined && consent.marketingAllowed !== null) ||
+    (consent?.saleOfDataAllowed !== undefined && consent.saleOfDataAllowed !== null)
   ) {
     setIfValue(attributes, "_tc_consent_timestamp", now);
     setIfValue(attributes, "_tc_consent_source", "shopify_customer_privacy");
@@ -458,10 +466,10 @@ function vf(v){if(!v)return null;var m=v.match(/^fb\\.1\\.(\\d{13})\\..+$/);if(!
 function xf(v){if(!v)return null;var p=v.lastIndexOf(".");return p>0?v.substring(p+1):null}
 function js(v){try{return v?JSON.parse(v):{}}catch(e){return {}}}
 function id(){var x=g(SID)||ls(SID),gen=false;if(!x){gen=true;x=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"."+Math.random().toString(36).slice(2))}s(SID,x);ss(SID,x);log(gen?"session id generated":"session id present/reused",x);return x}
-function cp(){var c={};try{var p=window.Shopify&&Shopify.customerPrivacy;if(p){var a=typeof p.analyticsProcessingAllowed==="function"?p.analyticsProcessingAllowed():p.analyticsProcessingAllowed;var m=typeof p.marketingAllowed==="function"?p.marketingAllowed():p.marketingAllowed;if(a!==undefined)c.analyticsAllowed=a;if(m!==undefined)c.marketingAllowed=m}}catch(e){}return c}
+function cp(){var c={};try{var p=window.Shopify&&Shopify.customerPrivacy;if(p){var a=typeof p.analyticsProcessingAllowed==="function"?p.analyticsProcessingAllowed():p.analyticsProcessingAllowed;var m=typeof p.marketingAllowed==="function"?p.marketingAllowed():p.marketingAllowed;var d=typeof p.saleOfDataAllowed==="function"?p.saleOfDataAllowed():p.saleOfDataAllowed;if(a!==undefined)c.analyticsAllowed=a;if(m!==undefined)c.marketingAllowed=m;if(d!==undefined)c.saleOfDataAllowed=d}}catch(e){}return c}
 function av(o,k,v){if(v!==null&&v!==undefined&&String(v)!=="")o[k]=String(v)}
 function attrs(){
-var n=Date.now(),cn=cp(),mk=M==="STRICT"?cn.marketingAllowed===true:cn.marketingAllowed!==false,c=js(ls(CTX)),ca=parseInt(c.ca||"",10);if(isFinite(ca)&&n-ca>7776000000)c={};else if(!isFinite(ca))c.ca=n;
+var n=Date.now(),cn=cp(),mk=(M==="STRICT"?cn.marketingAllowed===true:cn.marketingAllowed!==false)&&cn.saleOfDataAllowed!==false,c=js(ls(CTX)),ca=parseInt(c.ca||"",10);if(isFinite(ca)&&n-ca>7776000000)c={};else if(!isFinite(ca))c.ca=n;
 var has=false,ps=[["fbclid","fb","_fbclid"],["gclid","gl","_gclid"],["gbraid","gb","_gbraid"],["wbraid","wb","_wbraid"],["ttclid","tt","_ttclid"],["rdt_cid","rd","_rdt_cid"],["epik","ep","_epik"],["utm_source","us","_utm_source"],["utm_medium","um","_utm_medium"],["utm_campaign","uc","_utm_campaign"],["utm_content","un","_utm_content"],["utm_term","ut","_utm_term"]],nv={};
 for(var i=0;i<ps.length;i++){if(!mk&&ps[i][2].indexOf("_utm_")!==0)continue;var v=gp(ps[i][0]);if(v){nv[ps[i][1]]=v;has=true}}
 if(has){c=nv;c.ca=n;c.so=c.fb?"meta":c.tt?"tiktok":(c.gl||c.gb||c.wb)?"google":c.rd?"reddit":c.ep?"pinterest":(c.us||"utm").toLowerCase().slice(0,100)}
@@ -472,7 +480,7 @@ var fbc=mk?vf(g("_fbc")||ls("_fbc")):null;if(mk&&c.fb&&(!fbc||xf(fbc)!==c.fb)){f
 var o={};av(o,"_trackclear_session_id",id());if(mk){av(o,"_fbp",fbp);av(o,"_fbc",fbc);av(o,"_fbclid",c.fb);av(o,"_gclid",c.gl);av(o,"_gbraid",c.gb);av(o,"_wbraid",c.wb);av(o,"_ttclid",c.tt);av(o,"_ttp",g("_ttp"));av(o,"_rdt_cid",c.rd);av(o,"_epik",c.ep)}else{var ak=["_fbp","_fbc","_fbclid","_gclid","_gbraid","_wbraid","_ttclid","_ttp","_rdt_cid","_epik"];for(i=0;i<ak.length;i++)o[ak[i]]=""}
 if(has){for(i=0;i<ps.length;i++){if(mk||ps[i][2].indexOf("_utm_")===0)o[ps[i][2]]=c[ps[i][1]]||""}}
 av(o,"_utm_source",c.us);av(o,"_utm_medium",c.um);av(o,"_utm_campaign",c.uc);av(o,"_utm_content",c.un);av(o,"_utm_term",c.ut);av(o,"_landing_page",c.lp);av(o,"_tc_attribution_timestamp",c.ca);av(o,"_tc_attribution_source",c.so);
-if(cn.analyticsAllowed!==undefined)av(o,"_tc_consent_analytics",cn.analyticsAllowed);if(cn.marketingAllowed!==undefined)av(o,"_tc_consent_marketing",cn.marketingAllowed);if(cn.analyticsAllowed!==undefined||cn.marketingAllowed!==undefined){av(o,"_tc_consent_timestamp",Date.now());av(o,"_tc_consent_source","shopify_customer_privacy")}
+if(cn.analyticsAllowed!==undefined)av(o,"_tc_consent_analytics",cn.analyticsAllowed);if(cn.marketingAllowed!==undefined)av(o,"_tc_consent_marketing",cn.marketingAllowed);if(cn.saleOfDataAllowed!==undefined)av(o,"_tc_consent_sale_of_data",cn.saleOfDataAllowed);if(cn.analyticsAllowed!==undefined||cn.marketingAllowed!==undefined||cn.saleOfDataAllowed!==undefined){av(o,"_tc_consent_timestamp",Date.now());av(o,"_tc_consent_source","shopify_customer_privacy")}
 log("attribution fields found",Object.keys(o));return o}
 function body(o){var b=new URLSearchParams();for(var k in o)b.append("attributes["+k+"]",o[k]);return b.toString()}
 function miss(exp,got){var m=[];got=got||{};for(var k in exp){if(exp[k]!==undefined&&String(got[k]||"")!==String(exp[k]))m.push(k)}return m}

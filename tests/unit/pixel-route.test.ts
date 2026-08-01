@@ -67,6 +67,7 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain("trackclearSessionId:sid");
     expect(js).toContain("gbraid:m?cid.gb:null");
     expect(js).toContain("_tc_consent_marketing");
+    expect(js).toContain("_tc_consent_sale_of_data");
     expect(js).toContain("visitorConsentCollected");
     expect(js).toContain("ttp:m?ttpVal:null");
     expect(js).toContain("attributionTimestamp:_ats");
@@ -578,7 +579,11 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(windowMock.ttq).toBeUndefined();
 
     consentCallback?.({
-      customerPrivacy: { analyticsProcessingAllowed: true, marketingAllowed: true },
+      customerPrivacy: {
+        analyticsProcessingAllowed: true,
+        marketingAllowed: true,
+        saleOfDataAllowed: true,
+      },
     });
     expect(insertedScripts.map((script) => script.src)).toEqual(expect.arrayContaining([
       "https://connect.facebook.net/en_US/fbevents.js",
@@ -589,7 +594,11 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(windowMock.ttq.some((entry: unknown[]) => entry[0] === "grantConsent")).toBe(true);
 
     consentCallback?.({
-      customerPrivacy: { analyticsProcessingAllowed: false, marketingAllowed: false },
+      customerPrivacy: {
+        analyticsProcessingAllowed: true,
+        marketingAllowed: true,
+        saleOfDataAllowed: false,
+      },
     });
     expect(windowMock.fbq.queue.some((entry: IArguments) => Array.from(entry).join(":") === "consent:revoke")).toBe(true);
     expect(windowMock.ttq.some((entry: unknown[]) => entry[0] === "revokeConsent")).toBe(true);
@@ -601,7 +610,11 @@ describe("GET /api/pixel/[workspaceId]", () => {
     });
     const pending = JSON.parse(storage.get("_trackclear_pending_consent_v1")!);
     expect(pending[0].payload).toMatchObject({
-      consent: { analyticsAllowed: false, marketingAllowed: false },
+      consent: {
+        analyticsAllowed: true,
+        marketingAllowed: true,
+        saleOfDataAllowed: false,
+      },
       userData: {},
       customData: {},
       onlyDestinations: [],

@@ -701,15 +701,13 @@ describe("Shopify webhook workspace mode allowlist", () => {
     );
   });
 
-  it("records only privacy-minimized internal attribution after marketing denial", async () => {
+  it("records only privacy-minimized internal attribution after a sale or sharing opt-out", async () => {
     const order = makeOrder();
     order.note_attributes = (order.note_attributes as Array<Record<string, unknown>>)
-      .map((attribute) =>
-        attribute.name === "_tc_consent_marketing"
-          ? { ...attribute, value: "false" }
-          : attribute
-      )
-      .concat({ name: "_tc_consent_analytics", value: "true" });
+      .concat(
+        { name: "_tc_consent_analytics", value: "true" },
+        { name: "_tc_consent_sale_of_data", value: "false" }
+      );
 
     const response = await POST(makeShopifyRequest(order));
 

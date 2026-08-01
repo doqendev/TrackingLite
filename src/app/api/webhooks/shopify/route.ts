@@ -709,6 +709,13 @@ async function handleOrderPaid(
         sessionTimestamp: sessionContext?.consentTimestamps?.marketing,
         now: orderReferenceTime,
       }),
+      saleOfData: resolveNewestConsentValue({
+        cartValue: orderAttribution.consentSaleOfData,
+        cartTimestamp: orderAttribution.consentTimestamp,
+        sessionValue: sessionContext?.consent?.saleOfData,
+        sessionTimestamp: sessionContext?.consentTimestamps?.saleOfData,
+        now: orderReferenceTime,
+      }),
     };
     const consentFilteredDestinations = modeFilteredDestinations.filter((dest) =>
       shouldSendToDestination(workspace.consentMode, customerConsent, dest.destination)
@@ -726,7 +733,8 @@ async function handleOrderPaid(
     if (consentFilteredDestinations.length === 0) {
       if (
         customerConsent?.analytics === true &&
-        customerConsent.marketing === false
+        (customerConsent.marketing === false ||
+          customerConsent.saleOfData === false)
       ) {
         await persistInternalAttributionEvent({
           workspaceId: workspace.id,
@@ -1014,6 +1022,7 @@ async function handleOrderPaid(
         consent: {
           analytics: customerConsent.analytics ?? null,
           marketing: customerConsent.marketing ?? null,
+          saleOfData: customerConsent.saleOfData ?? null,
           source: orderAttribution.consentSource ?? (sessionContext?.consent ? "session_enrichment" : null),
           timestamp: orderAttribution.consentTimestamp ?? null,
         },

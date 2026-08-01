@@ -1,18 +1,32 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-07-30 (privacy-minimized internal attribution live at exact SHA `d09cf963177ccb69e63f59711483c61945587b0b`)
+Last updated: 2026-08-01 (location-aware consent candidate validated locally; production remains at exact SHA `d09cf963177ccb69e63f59711483c61945587b0b`)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 677/677 passing (58 files) on local Node 22; release CI passed the Node 20 and Node 24 gates |
-| Integration tests | 62/62 passing (7 files) in release CI against PostgreSQL 16/Redis 7; the local rerun remained unavailable after the workstation restart |
+| Unit tests | 685/685 passing (58 files) on local Node 22 for the undeployed candidate; live release CI previously passed Node 20 and Node 24 at 677/677 |
+| Integration tests | 62/62 passing (7 files) in live-release CI against PostgreSQL 16/Redis 7; the 2026-08-01 local attempt stopped in setup because loopback PostgreSQL on port 5433 and Redis were unavailable after the workstation restart |
 | Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `d09cf963177ccb69e63f59711483c61945587b0b`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
+
+## 2026-08-01 Location-Aware Consent and Sale/Sharing Enforcement
+
+**Release state:** validated in the local Track Clear and Mizoke working trees only. It is not committed, pushed, or deployed; Vercel, Railway, Oxygen, Shopify, and ad-platform configuration remain unchanged.
+
+- Mizoke now treats Shopify's Customer Privacy API as the authority for location-aware defaults. With no saved decision, the storefront uses `analyticsProcessingAllowed()`, `marketingAllowed()`, `saleOfDataAllowed()`, and `shouldShowBanner()` instead of inferring rules from a hard-coded country list.
+- In regions where Shopify permits tracking before an opt-out, the effective browser state can start enabled without writing a fabricated consent choice. Where Shopify requires opt-in, tracking remains disabled and the custom consent UI appears only when Shopify says a banner is required.
+- Explicit shopper choices still call Shopify `setTrackingConsent()`. Reject All, an explicit marketing denial, GPC, or `saleOfDataAllowed=false` blocks Meta/TikTok browser dispatch, Mizoke's Track Clear proxy, Track Clear marketing fan-out, and marketing identifier persistence in cart/session context.
+- `saleOfDataAllowed` is accepted by bounded ingest validation, normalized by the headless SDK, written as `_tc_consent_sale_of_data` in cart attribution, retained with its own timestamped Redis tombstone, and reconciled between cart and session consent for signed Shopify Purchase webhooks.
+- Backward compatibility is intentional: clients that omit the new field retain the existing STRICT/LAX behavior, but an explicit `false` blocks marketing delivery in both modes.
+- First-party analytics remains separate. When analytics is explicitly allowed but advertising is denied, the existing privacy-minimized `INTERNAL` record may preserve sanitized campaign/landing attribution; it does not queue a platform event, retain click IDs/IP/user agent, or consume Purchase billing. Analytics denial records nothing.
+- The Mizoke checkout helper no longer forwards stored ad click IDs or Meta/TikTok cookies after advertising permission is denied. UTM context and the opaque Track Clear session anchor can remain for allowed first-party analytics.
+- Validation on Node 22: Track Clear TypeScript passed, ESLint passed with only existing image warnings, 685/685 unit tests passed across 58 files, and `pnpm build` succeeded. Mizoke TypeScript passed, ESLint reported zero errors and 25 existing warnings, 341/341 tests passed across 82 files, and the Hydrogen production build succeeded. The Track Clear integration attempt ran no tests because local PostgreSQL/Redis were unavailable during setup; the last release-CI infrastructure result remains 62/62.
+- No database migration is required. No live geographic/GPC browser QA or post-deploy Purchase proof is claimed yet.
 
 ## 2026-07-30 Privacy-Minimized Internal Attribution
 

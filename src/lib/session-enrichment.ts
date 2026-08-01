@@ -36,6 +36,7 @@ const STALENESS_MS: Record<string, number> = {
   // remain authoritative for the full session-context lifetime.
   "consent:analytics": DAY_MS,
   "consent:marketing": DAY_MS,
+  "consent:saleOfData": DAY_MS,
 };
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -68,6 +69,7 @@ const SHARED_CONTEXT_FIELDS = [
   "attributionSource",
 ] as const;
 const MARKETING_CLEARED_AT_FIELD = "cleared:marketing";
+const SALE_OF_DATA_CLEARED_AT_FIELD = "cleared:saleOfData";
 const ANALYTICS_CLEARED_AT_FIELD = "cleared:analytics";
 const SHARED_CLEARED_AT_FIELD = "cleared:shared";
 
@@ -94,6 +96,7 @@ const BROWSER_FIELDS = [
   "attributionSource",
   "consent:analytics",
   "consent:marketing",
+  "consent:saleOfData",
 ] as const;
 
 export interface SessionIdentifiers {
@@ -128,7 +131,11 @@ export interface SessionContextInput {
   attributionSource?: string | null;
   /** Event occurrence time. Delayed requests must not refresh stored identity or consent. */
   observedAt?: number | null;
-  consent?: { analyticsAllowed?: boolean; marketingAllowed?: boolean };
+  consent?: {
+    analyticsAllowed?: boolean;
+    marketingAllowed?: boolean;
+    saleOfDataAllowed?: boolean;
+  };
 }
 
 export interface SessionContext {
@@ -155,10 +162,12 @@ export interface SessionContext {
   consent?: {
     analytics?: boolean;
     marketing?: boolean;
+    saleOfData?: boolean;
   };
   consentTimestamps?: {
     analytics?: number;
     marketing?: number;
+    saleOfData?: number;
   };
   fieldsEnriched: string[];
   oldestTimestamp: number;
@@ -407,12 +416,19 @@ function buildFields(
       timestamp: observedAt,
     };
   }
+  if (context.consent?.saleOfDataAllowed !== undefined) {
+    fields["consent:saleOfData"] = {
+      value: String(context.consent.saleOfDataAllowed),
+      timestamp: observedAt,
+    };
+  }
 
   return fields;
 }
 
 export interface SessionContextClearOptions {
   marketing?: boolean;
+  saleOfData?: boolean;
   analytics?: boolean;
   shared?: boolean;
   /** Event occurrence time used to prevent delayed denials from erasing newer consent. */
@@ -430,14 +446,17 @@ export async function clearSessionContextForIdentifiers(
   options: SessionContextClearOptions
 ): Promise<void> {
   const initialKeys = sessionKeysForIdentifiers(workspaceId, identifiers);
-  if (initialKeys.length === 0 || (!options.marketing && !options.analytics && !options.shared)) return;
+  if (
+    initialKeys.length === 0 ||
+    (!options.marketing && !options.saleOfData && !options.analytics && !options.shared)
+  ) return;
 
   const timestamp = boundedTimestamp(options.observedAt, Date.now());
   const categories: Array<{
     fields: readonly string[];
     tombstone: string;
     timestamp: number;
-    consentField?: "consent:marketing" | "consent:analytics";
+    consentField?: "consent:marketing" | "consent:analytics" | "consent:saleOfData";
   }> = [];
   if (options.marketing) {
     categories.push({
@@ -445,6 +464,14 @@ export async function clearSessionContextForIdentifiers(
       tombstone: MARKETING_CLEARED_AT_FIELD,
       timestamp,
       consentField: "consent:marketing",
+    });
+  }
+  if (options.saleOfData) {
+    categories.push({
+      fields: MARKETING_CONTEXT_FIELDS,
+      tombstone: SALE_OF_DATA_CLEARED_AT_FIELD,
+      timestamp,
+      consentField: "consent:saleOfData",
     });
   }
   if (options.analytics) {
@@ -575,14 +602,17 @@ export async function lookupSessionContextByIdentifiers(
     };
     for (const data of storedContexts) {
       if (!data) continue;
-      for (const [category, field] of [
-        ["marketing", MARKETING_CLEARED_AT_FIELD],
-        ["analytics", ANALYTICS_CLEARED_AT_FIELD],
-        ["shared", SHARED_CLEARED_AT_FIELD],
+      for (const [categories, field] of [
+        [["marketing"], MARKETING_CLEARED_AT_FIELD],
+        [["marketing"], SALE_OF_DATA_CLEARED_AT_FIELD],
+        [["analytics"], ANALYTICS_CLEARED_AT_FIELD],
+        [["shared"], SHARED_CLEARED_AT_FIELD],
       ] as const) {
         const timestamp = Number(data[field]);
-        if (Number.isFinite(timestamp) && timestamp > latestClearAt[category]) {
-          latestClearAt[category] = timestamp;
+        for (const category of categories) {
+          if (Number.isFinite(timestamp) && timestamp > latestClearAt[category]) {
+            latestClearAt[category] = timestamp;
+          }
         }
       }
     }
@@ -598,7 +628,9 @@ export async function lookupSessionContextByIdentifiers(
         const ts = Number(tsStr);
         if (!Number.isFinite(ts)) continue;
         const maxAge =
-          (field === "consent:analytics" || field === "consent:marketing") && value === "false"
+          (field === "consent:analytics" ||
+            field === "consent:marketing" ||
+            field === "consent:saleOfData") && value === "false"
             ? CONSENT_DENIAL_STALENESS_MS
             : STALENESS_MS[field] ?? 24 * 60 * 60 * 1000;
         if (now - ts > maxAge) continue;
@@ -628,13 +660,20 @@ export async function lookupSessionContextByIdentifiers(
     }
 
     let consent: SessionContext["consent"];
-    if (result["consent:analytics"] || result["consent:marketing"]) {
+    if (
+      result["consent:analytics"] ||
+      result["consent:marketing"] ||
+      result["consent:saleOfData"]
+    ) {
       consent = {};
       if (result["consent:analytics"]) {
         consent.analytics = result["consent:analytics"].value === "true";
       }
       if (result["consent:marketing"]) {
         consent.marketing = result["consent:marketing"].value === "true";
+      }
+      if (result["consent:saleOfData"]) {
+        consent.saleOfData = result["consent:saleOfData"].value === "true";
       }
     }
 
@@ -666,6 +705,7 @@ export async function lookupSessionContextByIdentifiers(
         ? {
             analytics: result["consent:analytics"]?.ts,
             marketing: result["consent:marketing"]?.ts,
+            saleOfData: result["consent:saleOfData"]?.ts,
           }
         : undefined,
       fieldsEnriched: Array.from(enrichedFields),

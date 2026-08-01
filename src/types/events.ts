@@ -25,6 +25,7 @@ export interface SnippetEventPayload {
   consent?: {
     analyticsAllowed?: boolean;
     marketingAllowed?: boolean;
+    saleOfDataAllowed?: boolean;
   };
   ttclid?: string | null;
   ttp?: string | null;

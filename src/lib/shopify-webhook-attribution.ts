@@ -25,6 +25,7 @@ export interface OrderAttribution {
   attributionSource: string | null;
   consentAnalytics: string | null;
   consentMarketing: string | null;
+  consentSaleOfData: string | null;
   consentTimestamp: number | null;
   consentSource: string | null;
 }
@@ -201,8 +202,13 @@ export function buildOrderAttribution(
     synthesizeFbcFromFbclid(fbclid, attributionTimestamp ?? now);
   const consentAnalytics = readOrderAttribute(attrs, ["_tc_consent_analytics", "tc_consent_analytics"]);
   const consentMarketing = readOrderAttribute(attrs, ["_tc_consent_marketing", "tc_consent_marketing"]);
+  const consentSaleOfData = readOrderAttribute(attrs, [
+    "_tc_consent_sale_of_data",
+    "tc_consent_sale_of_data",
+  ]);
   const hasExplicitDenial = parseConsentValue(consentAnalytics) === false ||
-    parseConsentValue(consentMarketing) === false;
+    parseConsentValue(consentMarketing) === false ||
+    parseConsentValue(consentSaleOfData) === false;
   const consentTimestamp = boundedConsentTimestamp(
     readOrderAttribute(attrs, ["_tc_consent_timestamp", "tc_consent_timestamp"]),
     now,
@@ -233,6 +239,7 @@ export function buildOrderAttribution(
       : null,
     consentAnalytics,
     consentMarketing,
+    consentSaleOfData,
     consentTimestamp,
     consentSource: readOrderAttribute(attrs, ["_tc_consent_source", "tc_consent_source"]),
   };
@@ -267,6 +274,7 @@ export function extractLandingSiteAttribution(
     attributionSource: null,
     consentAnalytics: null,
     consentMarketing: null,
+    consentSaleOfData: null,
     consentTimestamp: null,
     consentSource: null,
     pageUrl,
