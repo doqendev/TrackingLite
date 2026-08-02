@@ -59,6 +59,7 @@ export function normalizeToTikTokEvent(
     userAgent: string;
     ttclid?: string | null;
     ttp?: string | null;
+    trackclearSessionId?: string | null;
   }
 ): TikTokEvent | null {
   const tiktokEventName =
@@ -81,6 +82,12 @@ export function normalizeToTikTokEvent(
   if (ud.customerId !== undefined && ud.customerId !== null) {
     const externalId = hashPii(String(ud.customerId));
     if (externalId) user.external_id = externalId;
+  }
+  if (!user.external_id && eventData.trackclearSessionId) {
+    // TikTok accepts one external_id; the hashed first-party session ID
+    // covers anonymous sessions when no customer identity exists yet.
+    const sessionExternalId = hashPii(eventData.trackclearSessionId);
+    if (sessionExternalId) user.external_id = sessionExternalId;
   }
   if (eventData.ttclid) {
     user.ttclid = eventData.ttclid;

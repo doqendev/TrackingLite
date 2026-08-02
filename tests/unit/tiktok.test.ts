@@ -33,6 +33,27 @@ describe("TikTok normalizer", () => {
     expect(event?.user.ttp).toBe("TTP123");
   });
 
+  it("falls back to the hashed TrackClear session ID for anonymous external_id", () => {
+    const event = normalizeToTikTokEvent("AddToCart", {
+      ...baseEventData,
+      trackclearSessionId: "session-uuid-1",
+      customData: { value: 24.99, currency: "EUR" },
+    });
+
+    expect(event?.user.external_id).toBe(hashPii("session-uuid-1"));
+  });
+
+  it("prefers the hashed customerId over the session ID for external_id", () => {
+    const event = normalizeToTikTokEvent("Purchase", {
+      ...baseEventData,
+      trackclearSessionId: "session-uuid-1",
+      userData: { customerId: "12345" },
+      customData: { value: 99, currency: "USD" },
+    });
+
+    expect(event?.user.external_id).toBe(hashPii("12345"));
+  });
+
   it("prefers rich contents over contentIds so quantity and price are preserved", () => {
     const event = normalizeToTikTokEvent("Purchase", {
       ...baseEventData,

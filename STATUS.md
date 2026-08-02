@@ -7,12 +7,23 @@ Last updated: 2026-08-02 (Track Clear remains live at exact SHA `0a2c19e16baa73e
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 685/685 passing (58 files) on local Node 22 and in the release CI Node 20/24 gates |
+| Unit tests | 692/692 passing (58 files) on local Node 22 with the 2026-08-02 match-quality working-tree changes; the deployed SHA passed 685/685 in the release CI Node 20/24 gates |
 | Integration tests | 62/62 passing (7 files) in live-release CI against PostgreSQL 16/Redis 7; the 2026-08-01 local attempt stopped in setup because loopback PostgreSQL on port 5433 and Redis were unavailable after the workstation restart |
 | Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
+
+## 2026-08-02 Meta/TikTok Match-Quality Improvements
+
+**Release state:** not deployed. These changes exist only in the local working tree and still need commit, PR, release CI, and the controlled deployment sequence in `docs/deploy.md`. No Prisma schema change and no `bridge-v1` change are involved, so no store repaste is required; the remote tracker and ingest behavior update at deploy time.
+
+- Checkout contact enrichment now covers TikTok and has a realistic window. The initial InitiateCheckout job for META and TIKTOK is delayed 90 seconds (previously META-only with a 5-second delay that usually expired before shoppers submitted contact info, so the anonymous version was sent). `checkout_contact_info_submitted` re-sends the same event ID to both platforms via `onlyDestinations`, refreshing only unclaimed PENDING rows; the single delivered event per destination carries hashed email/phone.
+- Anonymous events now carry an `external_id`. Marketing-consented events propagate `trackclearSessionId` through ingest, queue jobs, retry envelopes, and the webhook Purchase path. Meta receives an `external_id` array (hashed `customerId` plus hashed session ID); TikTok receives hashed `customerId` with a hashed-session-ID fallback. This stitches anonymous funnel events to the identified Purchase.
+- Generated pixel and legacy scripts build `contents` arrays (id, quantity, per-unit price) for ViewContent, AddToCart, and InitiateCheckout; browser `fbq` calls pass the same `contents` for catalog matching, and InitiateCheckout `numItems` sums line-item quantities instead of counting lines.
+- `_fbp`/`_fbc` validation in the Meta normalizer, generated pixel, legacy script, and headless SDK accepts any numeric subdomain index (`fb.0.`/`fb.2.`), so valid Meta cookies set at other domain depths are no longer discarded and overwritten.
+- Verification: 692/692 unit tests (58 files, including 7 new tests for enrichment fan-out, external_id, and cookie validation), `pnpm exec tsc --noEmit` clean, ESLint clean except pre-existing `<img>` warnings, production build compiles. The integration suite was not rerun locally (Docker remains unavailable on this workstation, as first noted 2026-08-01); it must pass in release CI before deployment.
+- Out of scope here, tracked as follow-ups: enabling the existing Meta/TikTok browser-ownership modes per workspace (config action, requires confirming no competing pixel owner), Mizoke storefront PageView/ViewContent dispatch and TikTok `_ttp` coverage (Mizoke repository), TikTok `test_event_code` support, and any AddPaymentInfo event expansion (blocked by the five-event scope guardrail and a `bridge-v1` repaste).
 
 ## 2026-08-02 Mizoke Funnel Tracking Contract Repair
 

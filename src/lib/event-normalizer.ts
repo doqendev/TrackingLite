@@ -1,9 +1,11 @@
-import { hashUserData } from "./hash-pii";
+import { hashPii, hashUserData } from "./hash-pii";
 import type { MetaCapiEvent } from "@/types/meta-capi";
 import type { SnippetEventPayload } from "@/types/events";
 
-const FBP_REGEX = /^fb\.1\.\d{13}\.\d{7,20}$/;
-const FBC_REGEX = /^fb\.1\.(\d{13})\..+$/;
+// Meta cookies carry a subdomain index that is not always 1 (fb.0/fb.2 are
+// valid); rejecting them would discard real browser identity.
+const FBP_REGEX = /^fb\.\d+\.\d{13}\.\d{7,20}$/;
+const FBC_REGEX = /^fb\.\d+\.(\d{13})\..+$/;
 const FBC_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 function validateFbp(fbp: string | null | undefined): string | undefined {
@@ -42,6 +44,17 @@ export function normalizeToMetaCapiEvent(
   const validFbp = validateFbp(payload.fbp);
   const validFbc = validateFbc(payload.fbc);
 
+  // Meta accepts multiple external_id values. The hashed first-party session
+  // ID gives anonymous funnel events a person key that stitches them to the
+  // identified Purchase from the same session.
+  const sessionExternalId = payload.trackclearSessionId
+    ? hashPii(payload.trackclearSessionId)
+    : undefined;
+  const externalIds = [
+    ...(hashedUserData.external_id ?? []),
+    ...(sessionExternalId ? [sessionExternalId] : []),
+  ];
+
   return {
     event_name: payload.eventName,
     event_time: Math.floor(payload.timestamp / 1000), // Convert ms to seconds
@@ -50,6 +63,7 @@ export function normalizeToMetaCapiEvent(
     ...(payload.url && { event_source_url: payload.url }),
     user_data: {
       ...hashedUserData,
+      ...(externalIds.length > 0 && { external_id: externalIds }),
       ...(clientIp && { client_ip_address: clientIp }),
       ...(clientUserAgent && { client_user_agent: clientUserAgent }),
       ...(validFbp && { fbp: validFbp }),

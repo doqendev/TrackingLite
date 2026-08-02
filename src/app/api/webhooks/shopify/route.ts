@@ -1154,6 +1154,7 @@ async function handleOrderPaid(
       timestamp: occurredAt?.getTime() ?? Date.now(),
       url: purchasePageUrl,
       referrer: "",
+      trackclearSessionId: orderAttribution.trackclearSessionId,
       fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
       fbc: finalFbc,
       fbclid: finalFbclid,

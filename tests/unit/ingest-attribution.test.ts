@@ -1494,7 +1494,7 @@ describe("ingest attribution handling", () => {
     expect(mockQueueAdd).toHaveBeenCalledWith(
       "send-meta-event",
       expect.objectContaining({ eventLogId: "event_log_123" }),
-      { jobId: "event-event_log_123", delay: 5_000 }
+      { jobId: "event-event_log_123", delay: 90_000 }
     );
   });
 
@@ -1559,11 +1559,77 @@ describe("ingest attribution handling", () => {
     ]);
     expect(mockQueueAdd.mock.calls[0][2]).toEqual({
       jobId: "event-event_log_123",
-      delay: 5_000,
+      delay: 90_000,
     });
     expect(mockQueueAdd.mock.calls[1][2]).toEqual({
       jobId: "event-event_log_123",
     });
+  });
+
+  it("delays and refreshes both Meta and TikTok checkout rows for contact enrichment", async () => {
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_123",
+      userId: "user_123",
+      isActive: true,
+      consentMode: "LAX",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: true,
+      hasTikTokCredentials: true,
+      hasGA4Credentials: false,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: false,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: false,
+      hasShopifyWebhookSecret: false,
+    });
+
+    const initialPayload = {
+      eventName: "InitiateCheckout",
+      eventId: "checkout-enrichment-both",
+      timestamp: Date.now(),
+      checkoutToken: "checkout-token-both",
+      consent: { marketingAllowed: true },
+      customData: {
+        checkoutToken: "checkout-token-both",
+        value: 99,
+        currency: "USD",
+      },
+      excludeDestinations: ["KLAVIYO"],
+    };
+    const initialResponse = await postIngest(
+      makeRequest(initialPayload, { "X-TL-API-Key": "tl_test" })
+    );
+
+    expect(initialResponse.status).toBe(200);
+    expect(mockQueueAdd).toHaveBeenCalledTimes(2);
+    expect(mockQueueAdd.mock.calls.map((call) => call[2])).toEqual([
+      { jobId: "event-event_log_123", delay: 90_000 },
+      { jobId: "event-event_log_123", delay: 90_000 },
+    ]);
+
+    const response = await postIngest(
+      makeRequest(
+        {
+          ...initialPayload,
+          excludeDestinations: undefined,
+          onlyDestinations: ["META", "TIKTOK"],
+          userData: { email: "buyer@example.com" },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEventLogUpdateMany).toHaveBeenCalledTimes(2);
+    expect(
+      JSON.stringify(
+        mockEventLogUpdateMany.mock.calls.map((call) => call[0].data.payload)
+      )
+    ).not.toContain("buyer@example.com");
   });
 
   it("does not refresh or enqueue a claimed or terminal Meta checkout row", async () => {

@@ -80,7 +80,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-TL-API-Key",
 };
-const META_INITIATE_CHECKOUT_ENRICHMENT_DELAY_MS = 5_000;
+// Hold the initial InitiateCheckout delivery long enough for Shopify's
+// checkout_contact_info_submitted enrichment (email/phone) to land on the
+// still-unclaimed outbox row. Shoppers rarely submit contact info within a
+// few seconds, so a short window would send the anonymous version first.
+const CHECKOUT_ENRICHMENT_DELAY_MS = 90_000;
+const CHECKOUT_ENRICHMENT_DESTINATIONS: readonly string[] = ["META", "TIKTOK"];
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
@@ -248,10 +253,12 @@ export async function POST(request: NextRequest) {
             customData: normalizedCustomData,
           })
         : payload.eventId;
-    const isMetaCheckoutEnrichmentRequest =
+    const isCheckoutEnrichmentRequest =
       payload.eventName === "InitiateCheckout" &&
-      payload.onlyDestinations?.length === 1 &&
-      payload.onlyDestinations[0] === "META" &&
+      !!payload.onlyDestinations?.length &&
+      payload.onlyDestinations.every((dest) =>
+        CHECKOUT_ENRICHMENT_DESTINATIONS.includes(dest)
+      ) &&
       !!(payload.userData?.email || payload.userData?.phone);
 
     // 7. Extract IP and User-Agent from request. Server-side storefront
@@ -356,6 +363,9 @@ export async function POST(request: NextRequest) {
     const consentScopedContext = {
       url: sharedContextAllowed ? payload.url : "",
       referrer: sharedContextAllowed ? payload.referrer : "",
+      trackclearSessionId: marketingContextAllowed
+        ? sessionIdentifiers.trackclearSessionId
+        : null,
       fbp: marketingContextAllowed ? payload.fbp : null,
       fbc: marketingContextAllowed ? resolvedFbc : null,
       fbclid: marketingContextAllowed ? payload.fbclid : null,
@@ -735,6 +745,7 @@ export async function POST(request: NextRequest) {
       timestamp: payload.timestamp,
       url: consentScopedContext.url,
       referrer: consentScopedContext.referrer,
+      trackclearSessionId: consentScopedContext.trackclearSessionId,
       fbp: consentScopedContext.fbp,
       fbc: consentScopedContext.fbc,
       fbclid: consentScopedContext.fbclid,
@@ -828,15 +839,16 @@ export async function POST(request: NextRequest) {
               });
               let shouldQueue = true;
 
-              // checkout_started creates one delayed META outbox row. Shopify's
-              // contact-info event reuses that event ID and may add email/phone a
-              // moment later. Refresh only an unclaimed PENDING row so the worker
-              // either reads the richer encrypted envelope or has already fixed
-              // the immutable payload it will send. Terminal/in-flight rows are
-              // never reopened and the retained deterministic job stays singular.
+              // checkout_started creates one delayed outbox row per enrichment
+              // destination (Meta/TikTok). Shopify's contact-info event reuses
+              // that event ID and may add email/phone a moment later. Refresh
+              // only an unclaimed PENDING row so the worker either reads the
+              // richer encrypted envelope or has already fixed the immutable
+              // payload it will send. Terminal/in-flight rows are never
+              // reopened and the retained deterministic job stays singular.
               if (
-                isMetaCheckoutEnrichmentRequest &&
-                dest.destination === "META"
+                isCheckoutEnrichmentRequest &&
+                CHECKOUT_ENRICHMENT_DESTINATIONS.includes(dest.destination)
               ) {
                 const refreshed = await tx.eventLog.updateMany({
                   where: {
@@ -882,11 +894,11 @@ export async function POST(request: NextRequest) {
     );
     const queueDelayForDestination = (destination: string) => {
       if (
-        destination === "META" &&
+        CHECKOUT_ENRICHMENT_DESTINATIONS.includes(destination) &&
         payload.eventName === "InitiateCheckout" &&
-        !isMetaCheckoutEnrichmentRequest
+        !isCheckoutEnrichmentRequest
       ) {
-        return META_INITIATE_CHECKOUT_ENRICHMENT_DELAY_MS;
+        return CHECKOUT_ENRICHMENT_DELAY_MS;
       }
       return payload.eventName === "Purchase" && workspace.hasVerifiedShopifyWebhook
         ? VERIFIED_WEBHOOK_PURCHASE_GRACE_MS
@@ -918,6 +930,7 @@ export async function POST(request: NextRequest) {
                 timestamp: payload.timestamp,
                 url: consentScopedContext.url,
                 referrer: consentScopedContext.referrer,
+                trackclearSessionId: consentScopedContext.trackclearSessionId,
                 fbp: consentScopedContext.fbp,
                 fbc: consentScopedContext.fbc,
                 fbclid: consentScopedContext.fbclid,
@@ -949,6 +962,7 @@ export async function POST(request: NextRequest) {
                 timestamp: payload.timestamp,
                 url: consentScopedContext.url,
                 referrer: consentScopedContext.referrer,
+                trackclearSessionId: consentScopedContext.trackclearSessionId,
                 fbp: consentScopedContext.fbp,
                 fbc: consentScopedContext.fbc,
                 fbclid: consentScopedContext.fbclid,
