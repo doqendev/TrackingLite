@@ -17,15 +17,16 @@ documentation is worse than no duplicated documentation.
 
 ## Current Release Boundary
 
-- Production remains on the deployed `main` baseline. The 2026-07-27
-  own-store tracking hardening is isolated on
-  `codex/own-store-tracking-hardening` and is not deployed.
-- `main` is the source branch. Vercel Git deployment is disabled for the
-  controlled release, and Railway autodeploy plus effective custom config paths
-  must be verified in the provider before cutover.
-- The branch-only migration chain must be applied and verified before the new
-  web or worker runtime handles production traffic. Old and new destination
-  workers must never overlap.
+- Production runs `main` at exact SHA
+  `20844b3c619fc1affefb5c6031fc01f1dc5b648e` (2026-08-02 Meta/TikTok
+  match-quality release). All 17 repository migrations are applied; no
+  unapplied migration chain is pending.
+- `main` is the source branch. Vercel Git deployment is disabled. Railway
+  GitHub autodeploy was found ENABLED on 2026-08-02 and builds code merges to
+  `main` immediately (doc-only merges do not trigger builds). Rotate
+  `TRACKCLEAR_PRODUCTION_RELEASE_SHA` before merging a release, and verify or
+  disable autodeploy before the next controlled cutover. Old and new
+  destination workers must never overlap.
 - TrackClear Meta/TikTok browser ownership is explicit, off by default,
   consent-gated, and must be the only browser owner for its dataset/Pixel ID.
 - Consent revocation durability depends on the Redis service surviving a
@@ -34,8 +35,8 @@ documentation is worse than no duplicated documentation.
   opaque session/cart/checkout anchor and their own bounded workspace budget;
   they must never create outbox or queue work. Verify production persistence
   and backups before rollout.
-- Do not deploy from this branch until every open gate in `STATUS.md` and the
-  exact sequence in `docs/deploy.md` is satisfied.
+- Follow the exact sequence in `docs/deploy.md` and satisfy every open gate in
+  `STATUS.md` for each release.
 
 ## Repeatable Verification Commands
 

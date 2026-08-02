@@ -1,22 +1,25 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-08-02 (Track Clear remains live at exact SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; Mizoke funnel repair live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`)
+Last updated: 2026-08-02 (Track Clear live at exact SHA `20844b3c619fc1affefb5c6031fc01f1dc5b648e` after the Meta/TikTok match-quality release; Mizoke funnel repair live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 692/692 passing (58 files) on local Node 22 with the 2026-08-02 match-quality working-tree changes; the deployed SHA passed 685/685 in the release CI Node 20/24 gates |
+| Unit tests | 692/692 passing (58 files) on local Node 22 and in the PR #9 release CI Node 20/24 gates at the deployed SHA |
 | Integration tests | 62/62 passing (7 files) in live-release CI against PostgreSQL 16/Redis 7; the 2026-08-01 local attempt stopped in setup because loopback PostgreSQL on port 5433 and Redis were unavailable after the workstation restart |
 | Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production release | Approved SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
+| Production release | Approved SHA `20844b3c619fc1affefb5c6031fc01f1dc5b648e`; Vercel Git deployment disabled; Railway GitHub autodeploy was discovered ENABLED during the 2026-08-02 cutover and must be re-verified in the dashboard; both providers pinned to the production database identity |
 
 ## 2026-08-02 Meta/TikTok Match-Quality Improvements
 
-**Release state:** not deployed. These changes exist only in the local working tree and still need commit, PR, release CI, and the controlled deployment sequence in `docs/deploy.md`. No Prisma schema change and no `bridge-v1` change are involved, so no store repaste is required; the remote tracker and ingest behavior update at deploy time.
+**Release state:** live. PR #9 merged to `main` as exact SHA `20844b3c619fc1affefb5c6031fc01f1dc5b648e` after all four release gates passed (Node 20 runtime, Node 24 runtime, Node 20 worker container, PostgreSQL 16 migration rehearsal). Deployed 2026-08-02 ~21:55-21:58 UTC. No Prisma schema change and no `bridge-v1` change were involved, so no store repaste was required.
+
+- Cutover evidence: old worker fleet stopped via `railway down` before the release pin rotated on both providers; Vercel source deployment `tracking-lite-ee1awfd5e` aliased to www.trackclear.io with parsed health JSON reporting `status: "ok"`, `release: "approved"`, and the exact release commit; Railway worker deployment `48142d27-47fc-4226-88df-05c498207eaf` passed the guarded predeploy (migrations verified, 11/11 indexes valid, zero drift), started 11/11 listeners, drained the paused backlog, and continued processing Meta/TikTok jobs with zero errors.
+- Cutover deviations, both benign here but material for the next release: (1) Railway GitHub autodeploy was still ENABLED and built the worker from the merge commit immediately, so the new worker went live ~2 minutes before the new web; the release gate passed because the baked commit matched the freshly rotated pin. Verify or disable autodeploy in the dashboard before the next controlled release, and rotate `TRACKCLEAR_PRODUCTION_RELEASE_SHA` before merging to `main`. (2) Two `railway up` CLI deployments (`128f8afd`, `c836cfbd`) failed without going live, consistent with the release gate failing closed on CLI uploads that carry no git commit metadata; the GitHub-triggered deployment is the working path for the worker.
 
 - Checkout contact enrichment now covers TikTok and has a realistic window. The initial InitiateCheckout job for META and TIKTOK is delayed 90 seconds (previously META-only with a 5-second delay that usually expired before shoppers submitted contact info, so the anonymous version was sent). `checkout_contact_info_submitted` re-sends the same event ID to both platforms via `onlyDestinations`, refreshing only unclaimed PENDING rows; the single delivered event per destination carries hashed email/phone.
 - Anonymous events now carry an `external_id`. Marketing-consented events propagate `trackclearSessionId` through ingest, queue jobs, retry envelopes, and the webhook Purchase path. Meta receives an `external_id` array (hashed `customerId` plus hashed session ID); TikTok receives hashed `customerId` with a hashed-session-ID fallback. This stitches anonymous funnel events to the identified Purchase.
