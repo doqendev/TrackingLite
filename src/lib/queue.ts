@@ -132,6 +132,7 @@ export interface MetaEventJob {
     timestamp: number;
     url: string;
     referrer: string;
+    trackclearSessionId?: string | null;
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;
@@ -156,6 +157,7 @@ export interface DestinationEventJob {
     timestamp: number;
     url: string;
     referrer: string;
+    trackclearSessionId?: string | null;
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;

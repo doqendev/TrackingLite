@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { normalizeToMetaCapiEvent } from "@/lib/event-normalizer";
+import { hashPii } from "@/lib/hash-pii";
 import type { SnippetEventPayload } from "@/types/events";
 
 const BASE_TIMESTAMP_MS = 1700000000000; // 1700000000 seconds
@@ -458,6 +459,45 @@ describe("normalizeToMetaCapiEvent", () => {
       );
       expect(result.user_data.fbp).toBeUndefined();
       expect(result.user_data.fbc).toBeUndefined();
+    });
+
+    it("accepts fbp/fbc cookies with a non-1 subdomain index", () => {
+      const fbp = "fb.2.1700000000000.1234567890";
+      const fbc = `fb.0.${Date.now()}.AbCdEfGhIjKl`;
+      const result = normalizeToMetaCapiEvent(makePayload({ fbp, fbc }), null, null);
+      expect(result.user_data.fbp).toBe(fbp);
+      expect(result.user_data.fbc).toBe(fbc);
+    });
+  });
+
+  describe("external_id from the TrackClear session ID", () => {
+    it("hashes trackclearSessionId into external_id for anonymous events", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ trackclearSessionId: "session-uuid-1" }),
+        null,
+        null
+      );
+      expect(result.user_data.external_id).toEqual([hashPii("session-uuid-1")]);
+    });
+
+    it("keeps the hashed customerId and appends the hashed session ID", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({
+          trackclearSessionId: "session-uuid-1",
+          userData: { customerId: "12345" },
+        }),
+        null,
+        null
+      );
+      expect(result.user_data.external_id).toEqual([
+        hashPii("12345"),
+        hashPii("session-uuid-1"),
+      ]);
+    });
+
+    it("omits external_id when neither customerId nor session ID exists", () => {
+      const result = normalizeToMetaCapiEvent(makePayload({}), null, null);
+      expect(result.user_data.external_id).toBeUndefined();
     });
   });
 

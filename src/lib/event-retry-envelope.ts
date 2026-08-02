@@ -10,6 +10,7 @@ export interface EventRetryEnvelope {
     timestamp: number;
     url: string;
     referrer: string;
+    trackclearSessionId?: string | null;
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;

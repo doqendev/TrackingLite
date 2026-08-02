@@ -4,6 +4,9 @@ export interface SnippetEventPayload {
   timestamp: number;
   url?: string;
   referrer?: string;
+  trackclearSessionId?: string | null;
+  checkoutToken?: string | null;
+  cartToken?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   fbclid?: string | null;

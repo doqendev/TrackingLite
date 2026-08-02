@@ -89,8 +89,10 @@ export type HeadlessCookieAdapter = {
   ): void | Promise<void>;
 };
 
-const FBP_REGEX = /^fb\.1\.\d{13}\.\d{7,20}$/;
-const FBC_REGEX = /^fb\.1\.(\d{13})\..+$/;
+// Meta cookies carry a subdomain index that is not always 1 (fb.0/fb.2 are
+// valid); rejecting them would discard real browser identity.
+const FBP_REGEX = /^fb\.\d+\.\d{13}\.\d{7,20}$/;
+const FBC_REGEX = /^fb\.\d+\.(\d{13})\..+$/;
 const META_COOKIE_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
 const META_COOKIE_MAX_AGE_MS = META_COOKIE_MAX_AGE_SECONDS * 1000;
 const TRACKCLEAR_SESSION_KEY = "_trackclear_session_id";
