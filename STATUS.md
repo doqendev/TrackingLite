@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-08-01 (location-aware consent release live at exact Track Clear SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; Mizoke live at exact SHA `87e027abdaa1402988bffe11e70626ee7c36ae03`)
+Last updated: 2026-08-02 (Track Clear remains live at exact SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; Mizoke funnel repair live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`)
 
 ## Build Health
 
@@ -14,9 +14,20 @@ Last updated: 2026-08-01 (location-aware consent release live at exact Track Cle
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; Vercel Git deployment and Railway autodeploy disabled; both providers pinned to the production database identity |
 
+## 2026-08-02 Mizoke Funnel Tracking Contract Repair
+
+**Release state:** live. Mizoke PR #5 restored analytics-only AddToCart/InitiateCheckout dispatch, and PR #6 repaired the strict Track Clear proxy contract. Oxygen production workflow `30766182444` deployed current exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`.
+
+- The storefront regression had two independent causes. AddToCart and InitiateCheckout were dispatched only when advertising was allowed, so analytics-allowed/marketing-denied sessions never reached Track Clear. After that gate was corrected, Mizoke's `/api/track` proxy still appended unsupported `requestId`, `ip`, and `userAgent` JSON keys; Track Clear's strict ingest schema rejected the body with HTTP 400 while the proxy returned success to the browser.
+- AddToCart and InitiateCheckout now dispatch when either analytics or advertising is permitted. Both-denied remains blocked. TikTok browser dispatch and Meta/TikTok server fan-out remain gated by marketing plus sale/sharing permission.
+- The proxy now serializes only `toTrackClearPayload()` output. Client IP and user agent remain server-only in the supported `X-TL-Client-IP` and `X-TL-Client-UA` headers, so no matching signal was removed from eligible advertising delivery.
+- Validation passed on Node 22: targeted tracking tests 18/18, full typecheck, production Hydrogen build, 344/344 tests across 82 files, and ESLint with zero errors plus 25 existing warnings. GitHub PR verification independently passed typecheck, lint, unit tests, and production build; it stopped only at the unchanged pre-existing homepage/product client bundle budgets. Those budgets were not relaxed.
+- Live analytics-only QA on the One Piece custom-sign page created exactly one `INTERNAL`/`SENT` AddToCart and one `INTERNAL`/`SENT` InitiateCheckout, with zero Meta/TikTok rows and null IP, user agent, fbp, fbc, and ttclid. Checkout reached Shopify, no Purchase was attempted, and the test cart was emptied afterward.
+- A separate positive-value signed-webhook Purchase (`39.01 EUR`, one item) reached both Meta and TikTok as `SENT` on 2026-08-02, confirming the canonical Purchase delivery path remained healthy. US geolocation/GPC behavior and a controlled marketing-allowed storefront funnel event remain open live QA.
+
 ## 2026-08-01 Location-Aware Consent and Sale/Sharing Enforcement
 
-**Release state:** live. Track Clear PR #6 is deployed to Vercel and Railway at exact SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; Mizoke PRs #3 and #4 are deployed to Oxygen at exact SHA `87e027abdaa1402988bffe11e70626ee7c36ae03`.
+**Release state:** live. Track Clear PR #6 is deployed to Vercel and Railway at exact SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582`; the Mizoke consent release from PRs #3 and #4 remains included in the current Oxygen SHA recorded above.
 
 - Mizoke now treats Shopify's Customer Privacy API as the authority for location-aware defaults. With no saved decision, the storefront uses `analyticsProcessingAllowed()`, `marketingAllowed()`, `saleOfDataAllowed()`, and `shouldShowBanner()` instead of inferring rules from a hard-coded country list.
 - In regions where Shopify permits tracking before an opt-out, the effective browser state can start enabled without writing a fabricated consent choice. Where Shopify requires opt-in, tracking remains disabled and the custom consent UI appears only when Shopify says a banner is required.
@@ -25,11 +36,11 @@ Last updated: 2026-08-01 (location-aware consent release live at exact Track Cle
 - Backward compatibility is intentional: clients that omit the new field retain the existing STRICT/LAX behavior, but an explicit `false` blocks marketing delivery in both modes.
 - First-party analytics remains separate. When analytics is explicitly allowed but advertising is denied, the existing privacy-minimized `INTERNAL` record may preserve sanitized campaign/landing attribution; it does not queue a platform event, retain click IDs/IP/user agent, or consume Purchase billing. Analytics denial records nothing.
 - The Mizoke checkout helper no longer forwards stored ad click IDs or Meta/TikTok cookies after advertising permission is denied. UTM context and the opaque Track Clear session anchor can remain for allowed first-party analytics.
-- Validation on Node 22: Track Clear TypeScript passed, ESLint passed with only existing image warnings, 685/685 unit tests passed across 58 files, and `pnpm build` succeeded. Release CI passed Node 20/24, PostgreSQL 16/Redis 7 integration (62/62), worker-container, and migration-rehearsal gates. Mizoke TypeScript passed, ESLint reported zero errors and 25 existing warnings, 341/341 tests passed across 82 files, and both the Hydrogen production build and direct built-server SSR smoke passed.
+- Validation on Node 22: Track Clear TypeScript passed, ESLint passed with only existing image warnings, 685/685 unit tests passed across 58 files, and `pnpm build` succeeded. Release CI passed Node 20/24, PostgreSQL 16/Redis 7 integration (62/62), worker-container, and migration-rehearsal gates. The current Mizoke validation baseline is recorded in the 2026-08-02 repair section above.
 - No database migration was required. The encrypted pre-release restore point is `E:\backups\trackclear\2026-08-01-0a2c19e-pre-release\trackclear-production-pre-release.7z`, SHA-256 `17923725B78D5E157E71F248AE5F85C176BF3EEA154DA80F5BFC0D16FF3C51D5`; its password is separately DPAPI-protected and plaintext working files were moved to the Windows Recycle Bin after verification.
 - Vercel deployment `D1NVfuLHUYdoSP8AuGPpsCjvgiHa` serves `www.trackclear.io`; public health returned HTTP 200 with release/database/schema/Redis ready at the full approved SHA after the 45-second serverless overlap buffer. Railway deployment `23e538aa-bf26-44f5-aebb-f80bdc729689` was created from the exact GitHub SHA, reported 17/17 migrations current, 11/11 required indexes valid, zero drift, and started all 11 listeners. The earlier CLI-source attempt `4c13b165-700f-419a-9243-c9138c8a0a05` failed closed because provider commit metadata was absent and never became the live worker.
 - The first Mizoke Oxygen attempt exposed an SSR-only import failure and was immediately rolled back to the previous healthy SHA. The minimal fix renamed the byte-identical consent helper from a client-only module to an isomorphic module; Oxygen workflow run `30711750195` then deployed exact SHA `87e027abdaa1402988bffe11e70626ee7c36ae03`. Live homepage and product-route checks return HTTP 200, the deployed bundle contains the sale-of-data logic, and a browser smoke rendered `One Piece Custom Sign` with zero console errors.
-- Live US geolocation/GPC behavior and a post-release paid Purchase remain open QA; HTTP/render health is not treated as proof of those tracking outcomes.
+- Live US geolocation/GPC behavior remains open QA. A positive-value post-release signed-webhook Purchase has since reached both Meta and TikTok; HTTP/render health alone is still not treated as tracking proof.
 
 ## 2026-07-30 Privacy-Minimized Internal Attribution
 

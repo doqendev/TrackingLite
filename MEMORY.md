@@ -1,5 +1,13 @@
 # MEMORY.md
 
+## 2026-08-02 - Mizoke Funnel Tracking Contract Repair
+
+- Mizoke is live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c` after PR #5 restored AddToCart/InitiateCheckout dispatch for analytics-allowed/advertising-denied sessions and PR #6 removed unsupported `requestId`, `ip`, and `userAgent` fields from the strict Track Clear ingest JSON body. Client IP and user agent remain available through the supported `X-TL-Client-*` headers.
+- The two regressions compounded: the component consent gate initially suppressed analytics-only funnel events; after that was fixed, Track Clear rejected the proxy payload with HTTP 400 because its Zod schema is strict. Purchases continued independently through signed Shopify webhooks.
+- Privacy behavior is unchanged: both-denied sends nothing; marketing or sale/sharing denial blocks Meta/TikTok browser and server delivery; analytics-only events may create privacy-minimized `INTERNAL` records without IP, user agent, browser cookies, or click IDs.
+- Validation passed: targeted tracking tests 18/18, Mizoke typecheck, production build, 344/344 tests across 82 files, and lint with zero errors plus 25 existing warnings. GitHub independently passed typecheck, lint, tests, and build; only the unchanged pre-existing client route performance budgets failed, and no budget was relaxed. Oxygen workflow `30766182444` deployed the exact SHA.
+- Live analytics-only QA created exactly one `INTERNAL`/`SENT` AddToCart and one `INTERNAL`/`SENT` InitiateCheckout with zero platform rows and null IP/UA/fbp/fbc/ttclid. No Purchase was attempted and the test cart was emptied. Separately, a real `39.01 EUR` signed-webhook Purchase reached both Meta and TikTok as `SENT`.
+
 ## 2026-08-01 - Location-Aware Consent Production Release
 
 - Track Clear release SHA `0a2c19e16baa73ece24c39137c091fa6d0b8a582` and Mizoke release SHA `87e027abdaa1402988bffe11e70626ee7c36ae03` delegate geographic defaults to Shopify Customer Privacy rather than maintaining a country list. A visitor with no stored decision uses Shopify's computed analytics, marketing, sale/sharing, and banner permissions.
@@ -10,7 +18,7 @@
 - Validation: Track Clear production build, TypeScript, lint with existing image warnings, 685/685 unit tests, and release CI including 62/62 PostgreSQL/Redis integration tests passed. Mizoke production build, TypeScript, lint with zero errors and 25 existing warnings, 341/341 tests, and direct built-server homepage/product SSR smokes passed.
 - The controlled Track Clear cutover deployed Vercel `D1NVfuLHUYdoSP8AuGPpsCjvgiHa` and Railway `23e538aa-bf26-44f5-aebb-f80bdc729689` at the exact approved SHA. Public health reports release/database/schema/Redis ready, all 17 migrations and 11 required indexes are current, Prisma drift is zero, and Railway started all 11 listeners. Automatic Vercel/Railway deployments remain disabled.
 - The encrypted pre-release restore point is `E:\backups\trackclear\2026-08-01-0a2c19e-pre-release\trackclear-production-pre-release.7z` with SHA-256 `17923725B78D5E157E71F248AE5F85C176BF3EEA154DA80F5BFC0D16FF3C51D5`; its password is separately DPAPI-protected and plaintext working files were moved to the Windows Recycle Bin after verification.
-- The first Mizoke Oxygen deployment exposed an SSR-only client-module import failure and was immediately rolled back. A byte-identical consent helper rename made it isomorphic; Oxygen workflow `30711750195` deployed the corrected SHA. Live homepage/product checks return HTTP 200 and the real product page renders with no console errors. US geolocation/GPC behavior and a post-release paid Purchase remain open live QA.
+- The first Mizoke Oxygen deployment exposed an SSR-only client-module import failure and was immediately rolled back. A byte-identical consent helper rename made it isomorphic; Oxygen workflow `30711750195` deployed the corrected SHA. Live homepage/product checks return HTTP 200 and the real product page renders with no console errors. At that release point, US geolocation/GPC behavior and a post-release paid Purchase were still open; the Purchase proof was closed by the 2026-08-02 evidence above.
 
 ## 2026-07-30 - Privacy-Minimized Internal Attribution Production Release
 
