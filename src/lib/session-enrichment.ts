@@ -11,6 +11,11 @@ const STALENESS_MS: Record<string, number> = {
   // Click/browser identifiers need to survive delayed and returning checkouts.
   // Thirty days covers the longest normal paid-media attribution window without
   // retaining identity context indefinitely.
+  // Hashed shopper identity follows the same thirty-day boundary as the rest of
+  // the enrichment record so a returning customer still matches, and is erased
+  // early by a marketing or sale/sharing denial like every other marketing field.
+  hashedEmail: 30 * DAY_MS,
+  hashedPhone: 30 * DAY_MS,
   fbp: 30 * DAY_MS,
   fbc: 30 * DAY_MS,
   ttclid: 30 * DAY_MS,
@@ -54,6 +59,10 @@ const MARKETING_CONTEXT_FIELDS = [
   "gbraid",
   "wbraid",
   "gclid",
+  // Already-hashed shopper identity carried forward to later events in the same
+  // session. Marketing-scoped so a marketing or sale/sharing denial erases it.
+  "hashedEmail",
+  "hashedPhone",
 ] as const;
 const ANALYTICS_CONTEXT_FIELDS = ["gaClientId"] as const;
 const SHARED_CONTEXT_FIELDS = [
@@ -83,6 +92,8 @@ const BROWSER_FIELDS = [
   "gaClientId",
   "gbraid",
   "wbraid",
+  "hashedEmail",
+  "hashedPhone",
   "clientIp",
   "userAgent",
   "url",
@@ -109,6 +120,10 @@ export interface SessionIdentifiers {
 }
 
 export interface SessionContextInput {
+  /** SHA-256 of the normalized email. Never store raw shopper identity here. */
+  hashedEmail?: string | null;
+  /** SHA-256 of the E.164 normalized phone. */
+  hashedPhone?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   ttclid?: string | null;
@@ -139,6 +154,8 @@ export interface SessionContextInput {
 }
 
 export interface SessionContext {
+  hashedEmail?: string;
+  hashedPhone?: string;
   fbp?: string;
   fbc?: string;
   ttclid?: string;
@@ -360,6 +377,8 @@ function buildFields(
       ? Math.trunc(rawTouchTimestamp)
       : null;
   const simple: Array<[string, string | null | undefined]> = [
+    ["hashedEmail", context.hashedEmail],
+    ["hashedPhone", context.hashedPhone],
     ["fbp", context.fbp],
     ["fbc", context.fbc],
     ["ttclid", context.ttclid],
@@ -678,6 +697,8 @@ export async function lookupSessionContextByIdentifiers(
     }
 
     return {
+      hashedEmail: result.hashedEmail?.value,
+      hashedPhone: result.hashedPhone?.value,
       fbp: result.fbp?.value,
       fbc: result.fbc?.value,
       ttclid: result.ttclid?.value,

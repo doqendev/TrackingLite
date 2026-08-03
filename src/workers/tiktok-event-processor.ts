@@ -108,6 +108,8 @@ async function processTikTokEvent(job: Job<DestinationEventJob>): Promise<void> 
       ttclid: event.ttclid,
       ttp: event.ttp,
       trackclearSessionId: event.trackclearSessionId,
+      hashedEmail: event.hashedEmail,
+      hashedPhone: event.hashedPhone,
     });
 
     if (!tiktokEvent) {

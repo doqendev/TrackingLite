@@ -54,6 +54,30 @@ describe("TikTok normalizer", () => {
     expect(event?.user.external_id).toBe(hashPii("12345"));
   });
 
+  it("fills user identity from session-carried hashes without re-hashing", () => {
+    const em = hashPii("buyer@example.com")!;
+    const event = normalizeToTikTokEvent("ViewContent", {
+      ...baseEventData,
+      hashedEmail: em,
+      hashedPhone: hashPii("+351912345678"),
+      customData: { value: 10, currency: "EUR" },
+    });
+
+    expect(event?.user.email).toBe(em);
+    expect(event?.user.phone).toBe(hashPii("+351912345678"));
+  });
+
+  it("prefers the event's own identity over session-carried hashes", () => {
+    const event = normalizeToTikTokEvent("Purchase", {
+      ...baseEventData,
+      userData: { email: "real@example.com" },
+      hashedEmail: hashPii("stale@example.com"),
+      customData: { value: 10, currency: "EUR" },
+    });
+
+    expect(event?.user.email).toBe(hashPii("real@example.com"));
+  });
+
   it("prefers rich contents over contentIds so quantity and price are preserved", () => {
     const event = normalizeToTikTokEvent("Purchase", {
       ...baseEventData,

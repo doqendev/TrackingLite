@@ -88,6 +88,51 @@ describe("session-enrichment", () => {
     expect(mockEval.mock.calls[0][7]).toBe("24");
   });
 
+  it("carries hashed identity forward and erases it on a marketing denial", async () => {
+    await storeSessionContextForIdentifiers(
+      "ws_123",
+      { trackclearSessionId: "tc-session-123" },
+      {
+        hashedEmail: "a".repeat(64),
+        hashedPhone: "b".repeat(64),
+        observedAt: Date.now(),
+      }
+    );
+
+    const storedFields = JSON.parse(String(mockEval.mock.calls[0][3])) as Record<
+      string,
+      { value: string }
+    >;
+    expect(storedFields.hashedEmail?.value).toBe("a".repeat(64));
+    expect(storedFields.hashedPhone?.value).toBe("b".repeat(64));
+
+    // A lookup returns the carried identity for later anonymous events.
+    mockHgetall.mockResolvedValue({
+      hashedEmail: "a".repeat(64),
+      "ts:hashedEmail": String(Date.now() - 20 * 24 * 60 * 60 * 1000),
+      hashedPhone: "b".repeat(64),
+      "ts:hashedPhone": String(Date.now() - 20 * 24 * 60 * 60 * 1000),
+    });
+    const context = await lookupSessionContextByIdentifiers("ws_123", {
+      trackclearSessionId: "tc-session-123",
+    });
+    expect(context?.hashedEmail).toBe("a".repeat(64));
+    expect(context?.hashedPhone).toBe("b".repeat(64));
+
+    // A marketing denial must clear identity along with the ad identifiers.
+    mockEval.mockClear();
+    await clearSessionContextForIdentifiers(
+      "ws_123",
+      { trackclearSessionId: "tc-session-123" },
+      { marketing: true, observedAt: Date.now() }
+    );
+    const clearedFields = mockEval.mock.calls
+      .map((call) => String(call[3]))
+      .join(" ");
+    expect(clearedFields).toContain("hashedEmail");
+    expect(clearedFields).toContain("hashedPhone");
+  });
+
   it("does not refresh click attribution when a later event repeats an old touch", async () => {
     const oldTouch = Date.now() - 10 * 24 * 60 * 60 * 1000;
 

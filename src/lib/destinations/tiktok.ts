@@ -60,6 +60,8 @@ export function normalizeToTikTokEvent(
     ttclid?: string | null;
     ttp?: string | null;
     trackclearSessionId?: string | null;
+    hashedEmail?: string | null;
+    hashedPhone?: string | null;
   }
 ): TikTokEvent | null {
   const tiktokEventName =
@@ -78,6 +80,13 @@ export function normalizeToTikTokEvent(
   }
   if (ud.phone && typeof ud.phone === "string") {
     user.phone = hashPhonePii(ud.phone, ud.countryCode as string | undefined);
+  }
+  // Session-carried identity is already SHA-256 hashed; it only fills gaps.
+  if (!user.email && eventData.hashedEmail) {
+    user.email = eventData.hashedEmail;
+  }
+  if (!user.phone && eventData.hashedPhone) {
+    user.phone = eventData.hashedPhone;
   }
   if (ud.customerId !== undefined && ud.customerId !== null) {
     const externalId = hashPii(String(ud.customerId));

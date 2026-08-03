@@ -41,6 +41,11 @@ export function normalizeToMetaCapiEvent(
       })
     : {};
 
+  // Identity carried forward from session enrichment is already SHA-256 hashed
+  // and must not be hashed twice. It only fills gaps the event itself lacks.
+  const carriedEm = !hashedUserData.em && payload.hashedEmail ? [payload.hashedEmail] : undefined;
+  const carriedPh = !hashedUserData.ph && payload.hashedPhone ? [payload.hashedPhone] : undefined;
+
   const validFbp = validateFbp(payload.fbp);
   const validFbc = validateFbc(payload.fbc);
 
@@ -63,6 +68,8 @@ export function normalizeToMetaCapiEvent(
     ...(payload.url && { event_source_url: payload.url }),
     user_data: {
       ...hashedUserData,
+      ...(carriedEm && { em: carriedEm }),
+      ...(carriedPh && { ph: carriedPh }),
       ...(externalIds.length > 0 && { external_id: externalIds }),
       ...(clientIp && { client_ip_address: clientIp }),
       ...(clientUserAgent && { client_user_agent: clientUserAgent }),

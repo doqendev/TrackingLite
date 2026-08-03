@@ -133,6 +133,8 @@ export interface MetaEventJob {
     url: string;
     referrer: string;
     trackclearSessionId?: string | null;
+    hashedEmail?: string | null;
+    hashedPhone?: string | null;
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;
@@ -158,6 +160,8 @@ export interface DestinationEventJob {
     url: string;
     referrer: string;
     trackclearSessionId?: string | null;
+    hashedEmail?: string | null;
+    hashedPhone?: string | null;
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;

@@ -109,6 +109,8 @@ async function processMetaEvent(job: Job<MetaEventJob>): Promise<void> {
       url: event.url,
       referrer: event.referrer,
       trackclearSessionId: event.trackclearSessionId,
+      hashedEmail: event.hashedEmail,
+      hashedPhone: event.hashedPhone,
       fbp: event.fbp,
       fbc: event.fbc,
       fbclid: event.fbclid,

@@ -14,6 +14,17 @@ Last updated: 2026-08-03 (Track Clear live at exact SHA `30c3813d385d8c157f7a2ae
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `30c3813d385d8c157f7a2aeec8f67173ab509688`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
 
+## 2026-08-03 Session Identity Carry-Forward (Funnel Match Quality)
+
+**Release state:** not deployed. Targets the measured funnel Event Match Quality gap.
+
+- Measured cause of the 6.1/10 funnel EMQ (Purchase scores 9.3/10): across the last 21 days of Meta-destined events, PageView, ViewContent and AddToCart carried 0% email and 0% phone on both stores. Only Dirava InitiateCheckout carried email (100%, from the Shopify contact-info re-send). Funnel events were matching on browser ID, click ID, IP and user agent alone, which is roughly a 6/10 profile.
+- Change: ingest now persists SHA-256 hashed email/phone into the existing Redis session enrichment record whenever an event supplies them under marketing consent, and recovers them for later anonymous events in the same session that carry an opaque session/checkout/cart anchor. Meta receives them as `em`/`ph`, TikTok as `user.email`/`user.phone`.
+- Safety properties, each covered by a test: values are stored hashed so raw identity never reaches Redis; normalizers never double-hash, and an event's own identity always wins; no lookup happens when the event already has identity or when marketing consent is denied; carried identity is marketing-scoped, expires on the same thirty-day boundary as click IDs, and is erased by a marketing or sale/sharing denial tombstone; the ingest schema stays `.strict()` so a client cannot inject a hash.
+- Diagnostics: `userDataFlags` gains `hasCarriedEmail`/`hasCarriedPhone` so the effect is measurable per event without storing identity.
+- Verification: 702/702 unit tests (58 files, 9 new), `tsc --noEmit` clean, zero lint errors, production build compiles.
+- Expected effect: once a shopper identifies at checkout, logs in, or returns within thirty days, subsequent funnel events carry person-level identity instead of a browser ID alone. Judge with Meta EMQ after roughly five days of data, not immediately.
+
 ## 2026-08-03 Critical: Custom Pixel Delivery Blocked By Denied Web Locks
 
 **Severity: critical, production, silent. Fixed and live at exact SHA `30c3813d385d8c157f7a2aeec8f67173ab509688` (PR #11, deployed 2026-08-03).** Every normal Shopify Custom Pixel workspace stopped delivering browser events on 2026-07-27, the day the tracking-hardening release shipped the consent-revocation queue. Dirava sent zero PageView/ViewContent/AddToCart/InitiateCheckout for seven days while still taking orders; only webhook Purchases survived.

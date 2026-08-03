@@ -7,6 +7,9 @@ export interface SnippetEventPayload {
   trackclearSessionId?: string | null;
   checkoutToken?: string | null;
   cartToken?: string | null;
+  /** Server-derived SHA-256 identity carried forward from session enrichment. Never accepted from clients. */
+  hashedEmail?: string | null;
+  hashedPhone?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   fbclid?: string | null;
