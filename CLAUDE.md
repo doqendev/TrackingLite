@@ -18,8 +18,8 @@ documentation is worse than no duplicated documentation.
 ## Current Release Boundary
 
 - Production runs `main` at exact SHA
-  `30c3813d385d8c157f7a2aeec8f67173ab509688` (2026-08-03 Custom Pixel Web
-  Locks fix). All 17 repository migrations are applied; no unapplied
+  `b7b8643942c1441fc74e72266df9f545214983ce` (2026-08-03 session identity
+  carry-forward). All 17 repository migrations are applied; no unapplied
   migration chain is pending.
 - `main` is the source branch. Vercel Git deployment and Railway GitHub auto
   deploy are both disabled, so merging to `main` never deploys on its own.
