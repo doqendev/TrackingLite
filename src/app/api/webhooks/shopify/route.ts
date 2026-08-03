@@ -20,7 +20,12 @@ import {
   recoverPurchaseBillingReservationAfterOutboxFailure,
   type PurchaseBillingReservation,
 } from "@/lib/billing";
-import { lookupSessionContextByIdentifiers, type SessionContext } from "@/lib/session-enrichment";
+import {
+  lookupSessionContextByIdentifiers,
+  storeSessionContextForIdentifiers,
+  type SessionContext,
+} from "@/lib/session-enrichment";
+import { hashPhonePii, hashPii } from "@/lib/hash-pii";
 import { getSharedRedis } from "@/lib/redis";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import {
@@ -720,6 +725,41 @@ async function handleOrderPaid(
     const consentFilteredDestinations = modeFilteredDestinations.filter((dest) =>
       shouldSendToDestination(workspace.consentMode, customerConsent, dest.destination)
     );
+
+    // A guest checkout is usually the only moment this system ever learns who a
+    // shopper is. Persist the hashed identity into the session record under the
+    // order's durable aliases so a returning visitor on the same browser still
+    // matches on later funnel events instead of arriving anonymous. Runs before
+    // the empty-destination exits below so a workspace without configured
+    // advertising credentials still builds identity for later. Marketing consent
+    // gates it, and the existing denial tombstones erase it on revocation.
+    const purchaseIdentityAllowed = shouldSendToDestination(
+      workspace.consentMode,
+      customerConsent,
+      "META"
+    );
+    const purchaseHashedEmail = purchaseIdentityAllowed ? hashPii(email) : undefined;
+    const purchaseHashedPhone = purchaseIdentityAllowed
+      ? hashPhonePii(phone, (billingAddress?.country_code as string) || undefined)
+      : undefined;
+    if (purchaseHashedEmail || purchaseHashedPhone) {
+      await storeSessionContextForIdentifiers(
+        workspace.id,
+        {
+          email,
+          trackclearSessionId: orderAttribution.trackclearSessionId,
+          checkoutToken,
+          cartToken,
+          orderId,
+          orderName,
+        },
+        {
+          hashedEmail: purchaseHashedEmail ?? null,
+          hashedPhone: purchaseHashedPhone ?? null,
+          observedAt: orderReferenceTime,
+        }
+      );
+    }
 
     // Deterministic eventId for browser/server Purchase dedup. Keep the raw
     // Shopify aliases in memory only when the event is internal analytics.

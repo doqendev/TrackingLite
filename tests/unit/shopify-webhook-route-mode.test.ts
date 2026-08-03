@@ -14,6 +14,7 @@ const mockQueueGetJob = vi.fn();
 const mockCheckOrderLimits = vi.fn();
 const mockRecoverPurchaseBillingReservation = vi.fn();
 const mockLookupSessionContext = vi.fn();
+const mockStoreSessionContext = vi.fn();
 const mockRedisEval = vi.fn();
 const mockRedisSet = vi.fn();
 const mockCaptureWebhook = vi.fn();
@@ -116,6 +117,7 @@ vi.mock("@/lib/billing", () => ({
 
 vi.mock("@/lib/session-enrichment", () => ({
   lookupSessionContextByIdentifiers: (...args: unknown[]) => mockLookupSessionContext(...args),
+  storeSessionContextForIdentifiers: (...args: unknown[]) => mockStoreSessionContext(...args),
 }));
 
 vi.mock("@/lib/redis", () => ({
@@ -133,6 +135,7 @@ vi.mock("@/lib/internal-attribution", () => ({
 }));
 
 import { POST } from "@/app/api/webhooks/shopify/route";
+import { hashPii } from "@/lib/hash-pii";
 
 const baseWorkspace = {
   id: "ws_v1",
@@ -236,6 +239,7 @@ describe("Shopify webhook workspace mode allowlist", () => {
     mockEventLogUpdate.mockResolvedValue({});
     mockEventLogUpdateMany.mockResolvedValue({ count: 1 });
     mockLookupSessionContext.mockResolvedValue(null);
+    mockStoreSessionContext.mockResolvedValue(undefined);
     mockRedisEval.mockResolvedValue(1);
     mockRedisSet.mockResolvedValue("OK");
     mockQueueGetJob.mockResolvedValue(null);
@@ -765,6 +769,49 @@ describe("Shopify webhook workspace mode allowlist", () => {
     expect(mockEventLogCreate).not.toHaveBeenCalled();
     expect(mockQueueAdd).not.toHaveBeenCalled();
     expect(mockCheckOrderLimits).not.toHaveBeenCalled();
+  });
+
+  it("carries the purchaser's hashed identity into the session record", async () => {
+    const response = await POST(makeShopifyRequest(makeOrder()));
+    expect(response.status).toBe(200);
+
+    const call = mockStoreSessionContext.mock.calls.find(
+      (args) => (args[2] as Record<string, unknown>)?.hashedEmail
+    );
+    expect(call).toBeTruthy();
+
+    const [workspaceId, identifiers, context] = call as [
+      string,
+      Record<string, unknown>,
+      Record<string, unknown>,
+    ];
+    expect(workspaceId).toBe(baseWorkspace.id);
+    // Keyed by the order's durable aliases so a later visit on the same browser
+    // resolves through the TrackClear session cookie.
+    expect(identifiers.trackclearSessionId).toBe("tc-session-123");
+    expect(context.hashedEmail).toBe(hashPii("buyer@example.com"));
+    // Raw shopper identity must never reach the session store.
+    expect(JSON.stringify(context)).not.toContain("buyer@example.com");
+  });
+
+  it("never carries purchaser identity when marketing consent is denied", async () => {
+    const order = makeOrder();
+    order.note_attributes = [
+      { name: "_trackclear_session_id", value: "tc-session-123" },
+      { name: "_tc_consent_analytics", value: "true" },
+      { name: "_tc_consent_marketing", value: "false" },
+      { name: "_tc_consent_timestamp", value: String(Date.now()) },
+    ];
+
+    const response = await POST(makeShopifyRequest(order));
+    expect(response.status).toBe(200);
+
+    const identityWrites = mockStoreSessionContext.mock.calls.filter(
+      (args) =>
+        (args[2] as Record<string, unknown>)?.hashedEmail ||
+        (args[2] as Record<string, unknown>)?.hashedPhone
+    );
+    expect(identityWrites).toHaveLength(0);
   });
 
   it("keeps a headless legacy workspace unaffected through LEGACY_WORKSPACE_IDS", async () => {
