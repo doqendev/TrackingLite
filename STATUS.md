@@ -14,6 +14,18 @@ Last updated: 2026-08-02 (Track Clear live at exact SHA `20844b3c619fc1affefb5c6
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `20844b3c619fc1affefb5c6031fc01f1dc5b648e`; Vercel Git deployment disabled; Railway GitHub autodeploy was discovered ENABLED during the 2026-08-02 cutover and must be re-verified in the dashboard; both providers pinned to the production database identity |
 
+## 2026-08-03 Critical: Custom Pixel Delivery Blocked By Denied Web Locks
+
+**Severity: critical, production, silent.** Every normal Shopify Custom Pixel workspace stopped delivering browser events on 2026-07-27, the day the tracking-hardening release shipped the consent-revocation queue. Dirava sent zero PageView/ViewContent/AddToCart/InitiateCheckout for seven days while still taking orders; only webhook Purchases survived. Not deployed yet at the time of writing.
+
+- Root cause: Shopify runs custom pixels in a sandboxed iframe with an **opaque origin**. There `navigator.locks` is present but `navigator.locks.request()` rejects with `SecurityError: Access to the Locks API is denied in this context.` The generated `dk()` helper guarded only synchronous throws (`try{...return navigator.locks.request(LK,f)}catch(e){}`), so the asynchronous rejection escaped, propagated through `rr()`, and hit the single unguarded `await rr()` in `se()` — the statement immediately before the ingest `fetch`. Every event rejected before sending, with no console error because `se()` is invoked fire-and-forget.
+- Why it looked like a store problem: the loader, snippet, workspace ID, consent, CSP, and tracker URL were all correct and verified in the live storefront. The failure was entirely inside the shipped tracker.
+- Why Mizoke was unaffected: `headless-sdk.ts` does not use Web Locks, and the Hydrogen storefront runs on a real top-level origin.
+- Fix: `dk()` now wraps the lock callback so a rejected or synchronously throwing `request()` falls back to a direct call, while a genuine callback failure after the lock was granted still propagates and is never retried. `se()` no longer lets the revocation replay block delivery (`if(!ref)try{await rr()}catch(e){}`), and the fire-and-forget init call carries its own `catch`. Applied to both `/api/pixel/:workspaceId` and legacy `/api/s/:workspaceId`.
+- Regression coverage: `tests/unit/pixel-route.test.ts` extracts the shipped `dk()` from both generated scripts and asserts denied-locks fallback, single execution under a granted lock, and no retry when the callback itself fails. 693/693 unit tests pass.
+- Diagnosis evidence: production EventLog showed browser sources stopping at `2026-07-27T18:42Z` with webhook Purchases continuing to `2026-08-02`; a live storefront probe reproduced the `SecurityError` and showed the real tracker registering all 7 subscriptions and calling `activate()` while issuing zero fetches.
+- Follow-up worth adding: a tracking-health alert for "browser events stopped while webhooks continue", which would have caught this in hours instead of a week.
+
 ## 2026-08-02 Meta/TikTok Match-Quality Improvements
 
 **Release state:** live. PR #9 merged to `main` as exact SHA `20844b3c619fc1affefb5c6031fc01f1dc5b648e` after all four release gates passed (Node 20 runtime, Node 24 runtime, Node 20 worker container, PostgreSQL 16 migration rehearsal). Deployed 2026-08-02 ~21:55-21:58 UTC. No Prisma schema change and no `bridge-v1` change were involved, so no store repaste was required.
