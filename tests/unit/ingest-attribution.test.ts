@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { hashPii, hashPhonePii } from "@/lib/hash-pii";
 
 const mockQueueAdd = vi.fn().mockResolvedValue({ id: "job-1" });
 const mockLookupWorkspaceByApiKey = vi.fn();
@@ -9,6 +10,7 @@ const mockEventLogFindMany = vi.fn();
 const mockEventLogUpdateMany = vi.fn();
 const mockStoreSessionContextForIdentifiers = vi.fn();
 const mockClearSessionContextForIdentifiers = vi.fn();
+const mockLookupSessionContextByIdentifiers = vi.fn();
 const mockRedisSet = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockCheckConsentRevocationRateLimit = vi.fn();
@@ -52,6 +54,7 @@ vi.mock("@/lib/billing", () => ({
 vi.mock("@/lib/session-enrichment", () => ({
   storeSessionContextForIdentifiers: (...args: unknown[]) => mockStoreSessionContextForIdentifiers(...args),
   clearSessionContextForIdentifiers: (...args: unknown[]) => mockClearSessionContextForIdentifiers(...args),
+  lookupSessionContextByIdentifiers: (...args: unknown[]) => mockLookupSessionContextByIdentifiers(...args),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -137,6 +140,7 @@ describe("ingest attribution handling", () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true });
     mockCheckConsentRevocationRateLimit.mockResolvedValue({ allowed: true });
     mockCheckOrderLimits.mockResolvedValue({ allowed: true });
+    mockLookupSessionContextByIdentifiers.mockResolvedValue(null);
     mockRecoverPurchaseBillingReservation.mockResolvedValue("released");
     mockPersistInternalAttributionEvent.mockResolvedValue({ id: "internal_event_1" });
     mockSupersedeInternalAttributionEvent.mockResolvedValue({ count: 0 });
@@ -1467,6 +1471,113 @@ describe("ingest attribution handling", () => {
         wbraid: "WBRAID123",
       })
     );
+  });
+
+  it("stores hashed identity for later events in the same session", async () => {
+    await postIngest(
+      makeRequest(
+        {
+          eventName: "InitiateCheckout",
+          eventId: "identity-store-event",
+          timestamp: Date.now(),
+          trackclearSessionId: "tc-session-1",
+          consent: { marketingAllowed: true },
+          userData: { email: "Buyer@Example.com", phone: "+351912345678" },
+          customData: { value: 10, currency: "EUR" },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    const stored = mockStoreSessionContextForIdentifiers.mock.calls[0]?.[2] as Record<
+      string,
+      unknown
+    >;
+    expect(stored.hashedEmail).toBe(hashPii("Buyer@Example.com"));
+    expect(stored.hashedPhone).toBe(hashPhonePii("+351912345678", undefined));
+    // The raw identity must never reach Redis.
+    expect(JSON.stringify(stored)).not.toContain("Buyer@Example.com");
+    expect(JSON.stringify(stored)).not.toContain("912345678");
+  });
+
+  it("carries stored identity onto a later anonymous event in the same session", async () => {
+    mockLookupSessionContextByIdentifiers.mockResolvedValue({
+      hashedEmail: hashPii("buyer@example.com"),
+      hashedPhone: hashPhonePii("+351912345678", undefined),
+      fieldsEnriched: ["hashedEmail", "hashedPhone"],
+      oldestTimestamp: Date.now(),
+    });
+
+    await postIngest(
+      makeRequest(
+        {
+          eventName: "ViewContent",
+          eventId: "anonymous-view",
+          timestamp: Date.now(),
+          trackclearSessionId: "tc-session-1",
+          consent: { marketingAllowed: true },
+          customData: { contentIds: ["123"] },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(mockLookupSessionContextByIdentifiers).toHaveBeenCalledWith("ws_123", {
+      trackclearSessionId: "tc-session-1",
+      checkoutToken: null,
+      cartToken: null,
+    });
+    const job = mockQueueAdd.mock.calls[0][1] as { event: Record<string, unknown> };
+    expect(job.event.hashedEmail).toBe(hashPii("buyer@example.com"));
+    expect(job.event.hashedPhone).toBe(hashPhonePii("+351912345678", undefined));
+  });
+
+  it("does not look up identity when the event already carries its own", async () => {
+    await postIngest(
+      makeRequest(
+        {
+          eventName: "InitiateCheckout",
+          eventId: "self-identified",
+          timestamp: Date.now(),
+          trackclearSessionId: "tc-session-1",
+          consent: { marketingAllowed: true },
+          userData: { email: "buyer@example.com" },
+          customData: { value: 10, currency: "EUR" },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(mockLookupSessionContextByIdentifiers).not.toHaveBeenCalled();
+  });
+
+  it("never carries identity when marketing consent is denied", async () => {
+    mockLookupSessionContextByIdentifiers.mockResolvedValue({
+      hashedEmail: hashPii("buyer@example.com"),
+      fieldsEnriched: ["hashedEmail"],
+      oldestTimestamp: Date.now(),
+    });
+
+    await postIngest(
+      makeRequest(
+        {
+          eventName: "ViewContent",
+          eventId: "denied-view",
+          timestamp: Date.now(),
+          trackclearSessionId: "tc-session-1",
+          consent: { analyticsAllowed: true, marketingAllowed: false },
+          customData: { contentIds: ["123"] },
+        },
+        { "X-TL-API-Key": "tl_test" }
+      )
+    );
+
+    expect(mockLookupSessionContextByIdentifiers).not.toHaveBeenCalled();
+    for (const call of mockQueueAdd.mock.calls) {
+      const job = call[1] as { event?: Record<string, unknown> };
+      expect(job.event?.hashedEmail ?? null).toBeNull();
+      expect(job.event?.hashedPhone ?? null).toBeNull();
+    }
   });
 
   it("delays the initial Meta InitiateCheckout fallback for contact enrichment", async () => {

@@ -470,6 +470,32 @@ describe("normalizeToMetaCapiEvent", () => {
     });
   });
 
+  describe("session-carried hashed identity", () => {
+    it("fills em/ph from carried identity when the event has none", () => {
+      const em = hashPii("buyer@example.com")!;
+      const ph = hashPii("+351912345678")!;
+      const result = normalizeToMetaCapiEvent(
+        makePayload({ hashedEmail: em, hashedPhone: ph }),
+        null,
+        null
+      );
+      expect(result.user_data.em).toEqual([em]);
+      expect(result.user_data.ph).toEqual([ph]);
+    });
+
+    it("never double-hashes: the event's own identity wins over carried values", () => {
+      const result = normalizeToMetaCapiEvent(
+        makePayload({
+          userData: { email: "real@example.com" },
+          hashedEmail: hashPii("stale@example.com"),
+        }),
+        null,
+        null
+      );
+      expect(result.user_data.em).toEqual([hashPii("real@example.com")]);
+    });
+  });
+
   describe("external_id from the TrackClear session ID", () => {
     it("hashes trackclearSessionId into external_id for anonymous events", () => {
       const result = normalizeToMetaCapiEvent(

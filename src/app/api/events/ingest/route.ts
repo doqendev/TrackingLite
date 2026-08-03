@@ -29,8 +29,10 @@ import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
 import {
   clearSessionContextForIdentifiers,
+  lookupSessionContextByIdentifiers,
   storeSessionContextForIdentifiers,
 } from "@/lib/session-enrichment";
+import { hashPii, hashPhonePii } from "@/lib/hash-pii";
 import { getSharedRedis } from "@/lib/redis";
 import { getClientIpFromHeaders, getClientUserAgentFromHeaders, resolveFbc } from "@/lib/tracking-context";
 import { buildEventLogPayload } from "@/lib/event-log-payload";
@@ -332,6 +334,14 @@ export async function POST(request: NextRequest) {
        hasExplicitConsentDecision)
     ) {
       await storeSessionContextForIdentifiers(workspace.id, sessionIdentifiers, {
+        // Persist identity hashed so later anonymous events in this session can
+        // still match. Raw shopper identity is never written to Redis.
+        hashedEmail: marketingContextAllowed
+          ? hashPii(payload.userData?.email) ?? null
+          : null,
+        hashedPhone: marketingContextAllowed
+          ? hashPhonePii(payload.userData?.phone, payload.userData?.countryCode) ?? null
+          : null,
         fbp: marketingContextAllowed ? payload.fbp : null,
         fbc: marketingContextAllowed ? resolvedFbc : null,
         ttclid: marketingContextAllowed ? payload.ttclid : null,
@@ -357,10 +367,34 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Identity carry-forward. An anonymous funnel event in a session that has
+    // already identified itself still deserves person-level matching. Only
+    // consult the store when this event carries no identity of its own and an
+    // opaque anchor exists; consent tombstones already erase the stored copy on
+    // denial, and the values are hashed so no raw identity is reconstructed.
+    const hasOwnIdentity = !!(payload.userData?.email || payload.userData?.phone);
+    const identityAnchors = {
+      trackclearSessionId: sessionIdentifiers.trackclearSessionId,
+      checkoutToken: sessionIdentifiers.checkoutToken,
+      cartToken: sessionIdentifiers.cartToken,
+    };
+    const carriedIdentity =
+      marketingContextAllowed &&
+      !hasOwnIdentity &&
+      (identityAnchors.trackclearSessionId ||
+        identityAnchors.checkoutToken ||
+        identityAnchors.cartToken)
+        ? await lookupSessionContextByIdentifiers(workspace.id, identityAnchors).catch(
+            () => null
+          )
+        : null;
+
     // Keep the durable outbox and retry envelope within the same consent
     // boundary as live delivery. A GA4-only event must not retain advertising
     // identifiers or checkout PII merely because those fields were submitted.
     const consentScopedContext = {
+      hashedEmail: marketingContextAllowed ? carriedIdentity?.hashedEmail ?? null : null,
+      hashedPhone: marketingContextAllowed ? carriedIdentity?.hashedPhone ?? null : null,
       url: sharedContextAllowed ? payload.url : "",
       referrer: sharedContextAllowed ? payload.referrer : "",
       trackclearSessionId: marketingContextAllowed
@@ -746,6 +780,8 @@ export async function POST(request: NextRequest) {
       url: consentScopedContext.url,
       referrer: consentScopedContext.referrer,
       trackclearSessionId: consentScopedContext.trackclearSessionId,
+      hashedEmail: consentScopedContext.hashedEmail,
+      hashedPhone: consentScopedContext.hashedPhone,
       fbp: consentScopedContext.fbp,
       fbc: consentScopedContext.fbc,
       fbclid: consentScopedContext.fbclid,
@@ -783,6 +819,8 @@ export async function POST(request: NextRequest) {
         rdtCid: consentScopedContext.rdtCid,
         epik: consentScopedContext.epik,
         gclid: consentScopedContext.gclid,
+        hashedEmail: consentScopedContext.hashedEmail,
+        hashedPhone: consentScopedContext.hashedPhone,
       }) as any,
       customerIp: consentScopedContext.clientIp === "unknown" ? null : consentScopedContext.clientIp,
       userAgent: consentScopedContext.userAgent || null,
@@ -931,6 +969,8 @@ export async function POST(request: NextRequest) {
                 url: consentScopedContext.url,
                 referrer: consentScopedContext.referrer,
                 trackclearSessionId: consentScopedContext.trackclearSessionId,
+                hashedEmail: consentScopedContext.hashedEmail,
+                hashedPhone: consentScopedContext.hashedPhone,
                 fbp: consentScopedContext.fbp,
                 fbc: consentScopedContext.fbc,
                 fbclid: consentScopedContext.fbclid,
@@ -963,6 +1003,8 @@ export async function POST(request: NextRequest) {
                 url: consentScopedContext.url,
                 referrer: consentScopedContext.referrer,
                 trackclearSessionId: consentScopedContext.trackclearSessionId,
+                hashedEmail: consentScopedContext.hashedEmail,
+                hashedPhone: consentScopedContext.hashedPhone,
                 fbp: consentScopedContext.fbp,
                 fbc: consentScopedContext.fbc,
                 fbclid: consentScopedContext.fbclid,

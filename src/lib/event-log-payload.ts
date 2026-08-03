@@ -69,6 +69,8 @@ export function buildEventLogPayload(input: {
   rdtCid?: string | null;
   epik?: string | null;
   gclid?: string | null;
+  hashedEmail?: string | null;
+  hashedPhone?: string | null;
 }) {
   const userData = input.userData ?? {};
 
@@ -85,6 +87,9 @@ export function buildEventLogPayload(input: {
         hasValue(userData.zip) ||
         hasValue(userData.countryCode),
       hasCustomerId: hasValue(userData.customerId),
+      // Identity recovered from session enrichment rather than this event.
+      hasCarriedEmail: !hasValue(userData.email) && hasValue(input.hashedEmail),
+      hasCarriedPhone: !hasValue(userData.phone) && hasValue(input.hashedPhone),
     },
     clickIdFlags: {
       hasFbp: hasValue(input.fbp),
