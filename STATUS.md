@@ -1,22 +1,25 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-08-02 (Track Clear live at exact SHA `20844b3c619fc1affefb5c6031fc01f1dc5b648e` after the Meta/TikTok match-quality release; Mizoke funnel repair live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`)
+Last updated: 2026-08-03 (Track Clear live at exact SHA `30c3813d385d8c157f7a2aeec8f67173ab509688` after the Custom Pixel Web Locks fix; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 692/692 passing (58 files) on local Node 22 and in the PR #9 release CI Node 20/24 gates at the deployed SHA |
+| Unit tests | 693/693 passing (58 files) on local Node 22 and in the PR #11 release CI Node 20/24 gates at the deployed SHA |
 | Integration tests | 62/62 passing (7 files) in live-release CI against PostgreSQL 16/Redis 7; the 2026-08-01 local attempt stopped in setup because loopback PostgreSQL on port 5433 and Redis were unavailable after the workstation restart |
 | Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production release | Approved SHA `20844b3c619fc1affefb5c6031fc01f1dc5b648e`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
+| Production release | Approved SHA `30c3813d385d8c157f7a2aeec8f67173ab509688`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
 
 ## 2026-08-03 Critical: Custom Pixel Delivery Blocked By Denied Web Locks
 
-**Severity: critical, production, silent.** Every normal Shopify Custom Pixel workspace stopped delivering browser events on 2026-07-27, the day the tracking-hardening release shipped the consent-revocation queue. Dirava sent zero PageView/ViewContent/AddToCart/InitiateCheckout for seven days while still taking orders; only webhook Purchases survived. Not deployed yet at the time of writing.
+**Severity: critical, production, silent. Fixed and live at exact SHA `30c3813d385d8c157f7a2aeec8f67173ab509688` (PR #11, deployed 2026-08-03).** Every normal Shopify Custom Pixel workspace stopped delivering browser events on 2026-07-27, the day the tracking-hardening release shipped the consent-revocation queue. Dirava sent zero PageView/ViewContent/AddToCart/InitiateCheckout for seven days while still taking orders; only webhook Purchases survived.
+
+- Post-deploy verification: a real denied-locks sandbox probe against the live tracker now issues `POST /api/events/ingest` for PageView with the session ID attached, where the identical probe produced zero fetches before. Production EventLog then recorded live Dirava `PageView` and `ViewContent` rows to both META and TIKTOK as `SENT` with `source=snippet` and `fbp` present. PageView and ViewContent had never produced a single row for Dirava before this release.
+- Cutover: Vercel deployment `tracking-lite-17t0hy8y9` and Railway worker deployment `a6c19e08-beca-4a1d-98e4-5d19d22fa947`, both at the approved SHA; worker predeploy reported 11/11 indexes valid, zero drift, 11/11 listeners ready. No worker stop was required because this release changes only Vercel-served generated scripts, contains no migration, and alters no worker code path.
 
 - Root cause: Shopify runs custom pixels in a sandboxed iframe with an **opaque origin**. There `navigator.locks` is present but `navigator.locks.request()` rejects with `SecurityError: Access to the Locks API is denied in this context.` The generated `dk()` helper guarded only synchronous throws (`try{...return navigator.locks.request(LK,f)}catch(e){}`), so the asynchronous rejection escaped, propagated through `rr()`, and hit the single unguarded `await rr()` in `se()` — the statement immediately before the ingest `fetch`. Every event rejected before sending, with no console error because `se()` is invoked fire-and-forget.
 - Why it looked like a store problem: the loader, snippet, workspace ID, consent, CSP, and tracker URL were all correct and verified in the live storefront. The failure was entirely inside the shipped tracker.

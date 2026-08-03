@@ -18,9 +18,9 @@ documentation is worse than no duplicated documentation.
 ## Current Release Boundary
 
 - Production runs `main` at exact SHA
-  `20844b3c619fc1affefb5c6031fc01f1dc5b648e` (2026-08-02 Meta/TikTok
-  match-quality release). All 17 repository migrations are applied; no
-  unapplied migration chain is pending.
+  `30c3813d385d8c157f7a2aeec8f67173ab509688` (2026-08-03 Custom Pixel Web
+  Locks fix). All 17 repository migrations are applied; no unapplied
+  migration chain is pending.
 - `main` is the source branch. Vercel Git deployment and Railway GitHub auto
   deploy are both disabled, so merging to `main` never deploys on its own.
   Deploying is always an explicit step. Note that `railway variables --set`
