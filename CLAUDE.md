@@ -18,8 +18,8 @@ documentation is worse than no duplicated documentation.
 ## Current Release Boundary
 
 - Production runs `main` at exact SHA
-  `b7b8643942c1441fc74e72266df9f545214983ce` (2026-08-03 session identity
-  carry-forward). All 17 repository migrations are applied; no unapplied
+  `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` (2026-08-03 purchase identity
+  write-back). All 17 repository migrations are applied; no unapplied
   migration chain is pending.
 - `main` is the source branch. Vercel Git deployment and Railway GitHub auto
   deploy are both disabled, so merging to `main` never deploys on its own.

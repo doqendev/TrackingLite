@@ -1,22 +1,25 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-08-03 (Track Clear live at exact SHA `b7b8643942c1441fc74e72266df9f545214983ce` after session identity carry-forward; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
+Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` after purchase identity write-back; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 702/702 passing (58 files) on local Node 22 and in the PR #13 release CI Node 20/24 gates at the deployed SHA |
+| Unit tests | 704/704 passing (58 files) on local Node 22 and in the PR #15 release CI Node 20/24 gates at the deployed SHA |
 | Integration tests | 62/62 passing (7 files) in live-release CI against PostgreSQL 16/Redis 7; the 2026-08-01 local attempt stopped in setup because loopback PostgreSQL on port 5433 and Redis were unavailable after the workstation restart |
 | Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production release | Approved SHA `b7b8643942c1441fc74e72266df9f545214983ce`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
+| Production release | Approved SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
 
 ## 2026-08-03 Purchase Identity Write-Back
 
-**Release state:** not deployed. Completes the funnel match-quality work for guest shoppers.
+**Release state:** live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` (PR #15, deployed 2026-08-03). Completes the funnel match-quality work for guest shoppers.
+
+- Cutover: Vercel deployment `tracking-lite-8ktt79o53` and Railway worker deployment `a3c2d2ed-cc5f-453f-92e8-04f901a5f190`, both at the approved SHA; health reported the exact commit with `release: "approved"`, and the worker predeploy reported 11/11 indexes valid, zero drift, 11/11 listeners ready.
+- Verification note: unlike the earlier releases this one cannot be proven with a synthetic event, because the write only happens on a real verified order and the payoff only appears when that buyer returns. No fake Purchase was fabricated. Confirm after the next genuine order that the session record gained hashed identity, then watch for `hasCarriedEmail: true` on that shopper's later funnel events.
 
 - Gap it closes: session identity carry-forward only helps once something supplies identity, and on both stores almost every buyer checks out as a guest. The storefront never sees the contact step, so the verified Purchase webhook was the only place identity ever appeared, and it was discarded immediately after delivery.
 - Change: the webhook now also writes the purchaser's hashed email/phone into the session enrichment record under the order's durable aliases, so a returning visitor on the same browser carries identity onto later PageView/ViewContent/AddToCart events. This covers guests, needs no storefront deploy, and benefits both stores.
