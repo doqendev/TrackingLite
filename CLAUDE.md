@@ -21,11 +21,10 @@ documentation is worse than no duplicated documentation.
   `20844b3c619fc1affefb5c6031fc01f1dc5b648e` (2026-08-02 Meta/TikTok
   match-quality release). All 17 repository migrations are applied; no
   unapplied migration chain is pending.
-- `main` is the source branch. Vercel Git deployment is disabled. Railway
-  GitHub autodeploy was found ENABLED on 2026-08-02 and builds code merges to
-  `main` immediately (doc-only merges do not trigger builds). Rotate
-  `TRACKCLEAR_PRODUCTION_RELEASE_SHA` before merging a release, and verify or
-  disable autodeploy before the next controlled cutover. Old and new
+- `main` is the source branch. Vercel Git deployment and Railway GitHub auto
+  deploy are both disabled, so merging to `main` never deploys on its own.
+  Deploying is always an explicit step. Note that `railway variables --set`
+  triggers a redeploy unless `--skip-deploys` is passed. Old and new
   destination workers must never overlap.
 - TrackClear Meta/TikTok browser ownership is explicit, off by default,
   consent-gated, and must be the only browser owner for its dataset/Pixel ID.

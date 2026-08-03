@@ -30,6 +30,91 @@ describe("GET /api/pixel/[workspaceId]", () => {
     vi.unstubAllGlobals();
   });
 
+  it("still delivers events when the Web Locks API is denied in the Shopify pixel sandbox", async () => {
+    // Shopify runs custom pixels in a sandboxed iframe with an opaque origin.
+    // There navigator.locks exists but request() rejects with SecurityError.
+    // The revocation queue must fall back instead of poisoning event delivery.
+    mockFindFirst.mockResolvedValue({
+      apiKey: "tl_test",
+      metaPixelId: "123456",
+      enableMeta: true,
+      metaBrowserTrackingEnabled: false,
+      consentMode: "LAX",
+      shopifyWebhookSecretEncrypted: null,
+      shopifyWebhookVerifiedAt: null,
+      catalogIdMode: "VARIANT_NUMERIC_ID",
+      catalogIdPrefix: null,
+      catalogIdSuffix: null,
+      catalogIdTemplate: null,
+    });
+
+    const sources: string[] = [];
+    const pixel = await getPixel(new Request("http://localhost/api/pixel/ws_123"), {
+      params: Promise.resolve({ workspaceId: "ws_123" }),
+    });
+    sources.push(await pixel.text());
+    const legacy = await getLegacyScript(new Request("http://localhost/api/s/ws_123"), {
+      params: Promise.resolve({ workspaceId: "ws_123" }),
+    });
+    sources.push(await legacy.text());
+
+    for (const js of sources) {
+      // Event delivery must not be gated on the revocation replay resolving.
+      expect(js).toContain("if(!ref)try{await rr()}catch(e){}");
+
+      const dkSource = js.match(/^function dk\(f\).*return n\}$/m)?.[0];
+      expect(dkSource).toBeTruthy();
+      const makeDk = new Function(
+        "navigator",
+        "LK",
+        `var DC=Promise.resolve();${dkSource}return dk;`
+      ) as (nav: unknown, lk: string) => (f: () => unknown) => Promise<unknown>;
+
+      const deniedLocks = {
+        locks: {
+          request: () =>
+            Promise.reject(
+              Object.assign(new Error("Access to the Locks API is denied in this context."), {
+                name: "SecurityError",
+              })
+            ),
+        },
+      };
+      let ran = false;
+      const dkDenied = makeDk(deniedLocks, "lk");
+      await expect(
+        dkDenied(() => {
+          ran = true;
+          return "delivered";
+        })
+      ).resolves.toBe("delivered");
+      expect(ran).toBe(true);
+
+      // When locks are available the callback runs exactly once inside the lock.
+      let grantedRuns = 0;
+      const workingLocks = {
+        locks: { request: (_n: string, cb: () => unknown) => Promise.resolve(cb()) },
+      };
+      const dkGranted = makeDk(workingLocks, "lk");
+      await dkGranted(() => {
+        grantedRuns += 1;
+        return "ok";
+      });
+      expect(grantedRuns).toBe(1);
+
+      // A genuine callback failure inside a granted lock must not be retried.
+      let failingRuns = 0;
+      const dkFailing = makeDk(workingLocks, "lk");
+      await expect(
+        dkFailing(() => {
+          failingRuns += 1;
+          throw new Error("callback failed");
+        })
+      ).rejects.toThrow("callback failed");
+      expect(failingRuns).toBe(1);
+    }
+  });
+
   it("does not suppress browser fbq Purchase when Shopify webhook is not configured", async () => {
     mockFindFirst.mockResolvedValue({
       apiKey: "tl_test",
@@ -264,7 +349,9 @@ describe("GET /api/pixel/[workspaceId]", () => {
       expect(js).toContain('DX=2592000000');
       expect(js).toContain('function dk(f)');
       expect(js).toContain('LK="trackclear-consent-revocation-v1"');
-      expect(js).toContain('navigator.locks.request(LK,f)');
+      // The lock callback is wrapped so a denied Locks API falls back to a
+      // direct call instead of rejecting the whole revocation queue.
+      expect(js).toContain('navigator.locks.request(LK,w)');
       expect(js).toContain('.sort(function(a,b)');
       expect(js).toContain('}).slice(-DM)');
       expect(js).toContain('x.generation!==ref.generation');
