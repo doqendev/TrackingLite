@@ -14,6 +14,16 @@ Last updated: 2026-08-03 (Track Clear live at exact SHA `b7b8643942c1441fc74e722
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `b7b8643942c1441fc74e72266df9f545214983ce`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
 
+## 2026-08-03 Purchase Identity Write-Back
+
+**Release state:** not deployed. Completes the funnel match-quality work for guest shoppers.
+
+- Gap it closes: session identity carry-forward only helps once something supplies identity, and on both stores almost every buyer checks out as a guest. The storefront never sees the contact step, so the verified Purchase webhook was the only place identity ever appeared, and it was discarded immediately after delivery.
+- Change: the webhook now also writes the purchaser's hashed email/phone into the session enrichment record under the order's durable aliases, so a returning visitor on the same browser carries identity onto later PageView/ViewContent/AddToCart events. This covers guests, needs no storefront deploy, and benefits both stores.
+- Placement and gating: runs immediately after the consent decision and before the empty-destination exits, so a workspace without configured advertising credentials still accumulates identity. Uses the same marketing consent decision that gates delivery, stores only SHA-256 hashes, and inherits the thirty-day staleness window plus the existing denial tombstones.
+- Verification: 704/704 unit tests (58 files, 2 new covering the write and the marketing-denied case, including an assertion that raw identity never reaches the store), `tsc --noEmit` clean, zero lint errors, production build compiles.
+- Limits worth stating: same-device only, because the link is the one-year `_trackclear_session_id` cookie; a thirty-day window; and it helps returning visitors only, never a first-time browser.
+
 ## 2026-08-03 Session Identity Carry-Forward (Funnel Match Quality)
 
 **Release state:** live at exact SHA `b7b8643942c1441fc74e72266df9f545214983ce` (PR #13, deployed 2026-08-03). Targets the measured funnel Event Match Quality gap.
