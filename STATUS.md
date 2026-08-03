@@ -1,22 +1,25 @@
 # Track Clear --- Project Status & Audit
 
-Last updated: 2026-08-03 (Track Clear live at exact SHA `30c3813d385d8c157f7a2aeec8f67173ab509688` after the Custom Pixel Web Locks fix; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
+Last updated: 2026-08-03 (Track Clear live at exact SHA `b7b8643942c1441fc74e72266df9f545214983ce` after session identity carry-forward; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 693/693 passing (58 files) on local Node 22 and in the PR #11 release CI Node 20/24 gates at the deployed SHA |
+| Unit tests | 702/702 passing (58 files) on local Node 22 and in the PR #13 release CI Node 20/24 gates at the deployed SHA |
 | Integration tests | 62/62 passing (7 files) in live-release CI against PostgreSQL 16/Redis 7; the 2026-08-01 local attempt stopped in setup because loopback PostgreSQL on port 5433 and Redis were unavailable after the workstation restart |
 | Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production release | Approved SHA `30c3813d385d8c157f7a2aeec8f67173ab509688`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
+| Production release | Approved SHA `b7b8643942c1441fc74e72266df9f545214983ce`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
 
 ## 2026-08-03 Session Identity Carry-Forward (Funnel Match Quality)
 
-**Release state:** not deployed. Targets the measured funnel Event Match Quality gap.
+**Release state:** live at exact SHA `b7b8643942c1441fc74e72266df9f545214983ce` (PR #13, deployed 2026-08-03). Targets the measured funnel Event Match Quality gap.
+
+- Production proof: an identified InitiateCheckout followed by an anonymous ViewContent on the same TrackClear session. The anonymous event shipped with `hasCarriedEmail: true` and `hasCarriedPhone: true` to both platforms and was accepted by Meta (`messages: []`) and TikTok (`code: 0`). The identified event correctly recorded `hasCarriedEmail: false`, proving no lookup runs when the event already carries identity.
+- Cutover: Vercel deployment `tracking-lite-ch916e616` and Railway worker deployment `678d40c3-adf8-47b6-bb51-0328d98a90a3`, both at the approved SHA; worker predeploy reported 11/11 indexes valid, zero drift, 11/11 listeners ready. The worker rebuild was mandatory here because the normalizers changed.
 
 - Measured cause of the 6.1/10 funnel EMQ (Purchase scores 9.3/10): across the last 21 days of Meta-destined events, PageView, ViewContent and AddToCart carried 0% email and 0% phone on both stores. Only Dirava InitiateCheckout carried email (100%, from the Shopify contact-info re-send). Funnel events were matching on browser ID, click ID, IP and user agent alone, which is roughly a 6/10 profile.
 - Change: ingest now persists SHA-256 hashed email/phone into the existing Redis session enrichment record whenever an event supplies them under marketing consent, and recovers them for later anonymous events in the same session that carry an opaque session/checkout/cart anchor. Meta receives them as `em`/`ph`, TikTok as `user.email`/`user.phone`.
