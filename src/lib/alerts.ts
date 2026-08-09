@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { EventStatus } from "@prisma/client";
 import { getOrderCount } from "@/lib/billing";
 import { BILLING_PLANS } from "@/lib/constants";
+import { hasUnlimitedOrders } from "@/lib/unlimited-orders";
 import { sendAlertEmail } from "@/lib/email";
 import type { AlertType, AlertDetails } from "@/lib/email";
 
@@ -118,6 +119,10 @@ async function checkOrderLimitAlerts(
   const plan = subscription?.plan ?? "FREE";
   const planConfig = BILLING_PLANS[plan as keyof typeof BILLING_PLANS];
   if (!planConfig) return alerts;
+
+  // Uncapped internal accounts would otherwise sit permanently at "limit
+  // reached" once their nominal plan quota is passed.
+  if (hasUnlimitedOrders(userId)) return alerts;
 
   const ordersLimit = planConfig.ordersPerMonth;
   let ordersUsed: number;

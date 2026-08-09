@@ -97,6 +97,65 @@ describe("checkOrderLimits", () => {
     expect(result.allowed).toBe(true);
   });
 
+  // ── Uncapped internal accounts ──
+
+  describe("unlimited internal accounts", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("allows Purchase far past the FREE limit without consulting the subscription", async () => {
+      vi.stubEnv("UNLIMITED_ORDER_USER_IDS", USER_ID);
+      mockFindUnique.mockResolvedValue(null); // would otherwise be FREE / 50
+      mockIncr.mockResolvedValue(5000); // far beyond every plan quota
+
+      const result = await checkOrderLimits(USER_ID, "Purchase");
+
+      expect(result.allowed).toBe(true);
+      // No plan, status, or Stripe state can gate an internal account.
+      expect(mockFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("still counts usage so the monthly counter stays accurate", async () => {
+      vi.stubEnv("UNLIMITED_ORDER_USER_IDS", USER_ID);
+      mockFindUnique.mockResolvedValue(null);
+
+      await checkOrderLimits(USER_ID, "Purchase");
+
+      expect(mockIncr).toHaveBeenCalled();
+    });
+
+    it("keeps every other account capped", async () => {
+      vi.stubEnv("UNLIMITED_ORDER_USER_IDS", "some_other_user");
+      mockFindUnique.mockResolvedValue(null); // FREE
+      mockIncr.mockResolvedValue(51); // over the 50 limit
+
+      const result = await checkOrderLimits(USER_ID, "Purchase");
+
+      expect(result.allowed).toBe(false);
+    });
+
+    it("caps everyone when the allowlist is unset or empty", async () => {
+      vi.stubEnv("UNLIMITED_ORDER_USER_IDS", "");
+      mockFindUnique.mockResolvedValue(null);
+      mockIncr.mockResolvedValue(51);
+
+      const result = await checkOrderLimits(USER_ID, "Purchase");
+
+      expect(result.allowed).toBe(false);
+    });
+
+    it("tolerates whitespace and multiple ids in the allowlist", async () => {
+      vi.stubEnv("UNLIMITED_ORDER_USER_IDS", ` other_user , ${USER_ID} `);
+      mockFindUnique.mockResolvedValue(null);
+      mockIncr.mockResolvedValue(9999);
+
+      const result = await checkOrderLimits(USER_ID, "Purchase");
+
+      expect(result.allowed).toBe(true);
+    });
+  });
+
   // ── FREE plan (no subscription record) ──
 
   it("should allow Purchase for FREE user under 50 orders", async () => {
