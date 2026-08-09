@@ -3,6 +3,7 @@ import { BILLING_PLANS, AUTO_UPGRADE_MAP, PLAN_PRICE_MAP } from "@/lib/constants
 import { getStripe } from "@/lib/stripe";
 import { createLogger } from "@/lib/logger";
 import { getSharedRedis } from "@/lib/redis";
+import { hasUnlimitedOrders } from "@/lib/unlimited-orders";
 import { createHash } from "crypto";
 
 const log = createLogger({ component: "billing" });
@@ -313,6 +314,33 @@ export async function checkOrderLimits(
 ): Promise<BillingCheck> {
   // Non-Purchase events are always free — no increment needed
   if (eventName !== "Purchase") {
+    return { allowed: true };
+  }
+
+  // Internal accounts are never capped. Checked before the subscription lookup
+  // so no plan, status, or Stripe state can block them. Usage is still reserved
+  // idempotently against an effectively infinite ceiling, which keeps the
+  // monthly counter and its duplicate detection accurate without ever blocking.
+  if (hasUnlimitedOrders(userId)) {
+    const monthKey = new Date().toISOString().slice(0, 7);
+    if (purchaseIdentity) {
+      const reservation = await reservePurchaseBillingUnit(
+        userId,
+        monthKey,
+        purchaseIdentity,
+        Number.MAX_SAFE_INTEGER
+      ).catch(() => {
+        log.error("Redis error for unlimited billing reservation, failing open", { userId });
+        return null;
+      });
+      return {
+        allowed: true,
+        ...(reservation && !reservation.duplicate && !reservation.blocked
+          ? { reservation: purchaseBillingKeys(userId, monthKey, purchaseIdentity) }
+          : {}),
+      };
+    }
+    await incrementOrderCount(userId);
     return { allowed: true };
   }
 

@@ -14,6 +14,16 @@ Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e886
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
 | Production release | Approved SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
 
+## 2026-08-09 Uncapped Internal Accounts
+
+**Release state:** not deployed.
+
+- Cause found by measurement, not assumption: the Mizoke workspace is owned by `mizoke.store@gmail.com`, which has **no Subscription row and therefore defaults to FREE at 50 orders per month**. Its Redis counter for `2026-08` read exactly `50/50`, so every Purchase after that point was rejected before an EventLog was written. Shopify webhooks kept arriving and were marked `PROCESSED`, which is why the outage was silent. The Dirava owner is a **different** user on GROWTH and sat at `34/1000`, so Dirava was never capped.
+- Change: `UNLIMITED_ORDER_USER_IDS` allowlists `User.id` values that are never blocked. Checked in `checkOrderLimits` before the subscription lookup, so plan, status, and Stripe state cannot cap them; `checkOrderLimitAlerts` skips them. Usage is still reserved idempotently against an effectively infinite ceiling so the counter and duplicate detection stay accurate.
+- Why an env allowlist rather than a plan change: `BillingPlan` is a Prisma enum, so an `UNLIMITED` tier would need a migration; `Subscription.stripeCustomerId` is required and unique, so inventing a subscription row for the Mizoke user would entangle it with Stripe; and a Stripe subscription webhook could silently overwrite a plan-based exemption. The env allowlist mirrors the existing `LEGACY_WORKSPACE_IDS` pattern and is reversible by deleting the variable.
+- Verification: 709/709 unit tests (58 files, 5 new covering the bypass, that usage is still counted, that other accounts stay capped, that an empty allowlist caps everyone, and whitespace tolerance), `tsc --noEmit` clean, zero lint errors, production build compiles.
+- Known follow-up: Purchases rejected while the cap was active were never written to an EventLog and are not replayed by lifting the cap. Recovering them requires webhook redelivery from Shopify for the affected orders.
+
 ## 2026-08-03 Purchase Identity Write-Back
 
 **Release state:** live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` (PR #15, deployed 2026-08-03). Completes the funnel match-quality work for guest shoppers.
