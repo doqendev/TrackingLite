@@ -12,11 +12,16 @@ Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e886
 | Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production release | Approved SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
+| Production release | Approved SHA `9abd702f84ef622d6dd1d36b630231e90377fcbb`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
 
 ## 2026-08-09 Uncapped Internal Accounts
 
-**Release state:** not deployed.
+**Release state:** live at exact SHA `9abd702f84ef622d6dd1d36b630231e90377fcbb` (PR #17, deployed 2026-08-09).
+
+- Cutover: Vercel deployment `tracking-lite-fr7gfrta5` and Railway worker deployment `cec1a16f-a77e-4a46-a05e-6357657c9a04`, both at the approved SHA with `UNLIMITED_ORDER_USER_IDS` set on both providers; health reported the exact commit and the worker predeploy reported 11/11 indexes valid, zero drift, 11/11 listeners ready.
+- Backfill completed: the 7 rejected Mizoke orders (#1086-#1092, 268.97 EUR) were reconstructed from the Shopify Admin API and replayed through ingest. All 14 destination rows reached `SENT`; Meta returned no warnings and TikTok returned `code: 0`. Every recovered event carried email, phone, name, full address, customer ID, `fbp`, and (where originally present) `fbc`, `ttp`, and UTMs, because the Shopify orders still held the TrackClear cart attributes.
+- Why the backfill was safe to replay: ingest derives the Purchase event ID deterministically from the order name, producing exactly the ID the webhook would have used (`shopify-purchase:<workspaceId>:<orderName>`), so the EventLog unique constraint and Meta/TikTok `event_id` dedup both prevent double counting. Consent was taken from each order's own `_tc_consent_*` cart attributes rather than assumed; all seven had marketing consent granted.
+- Inbox replay was not possible: `completeShopifyWebhookInbox` erases `payloadEncrypted` when marking a delivery `PROCESSED`, so the original payloads were already gone. That is the intended privacy behavior, not a defect, but it means a billing-rejected order cannot be recovered from the inbox and must be rebuilt from the Shopify Admin API.
 
 - Cause found by measurement, not assumption: the Mizoke workspace is owned by `mizoke.store@gmail.com`, which has **no Subscription row and therefore defaults to FREE at 50 orders per month**. Its Redis counter for `2026-08` read exactly `50/50`, so every Purchase after that point was rejected before an EventLog was written. Shopify webhooks kept arriving and were marked `PROCESSED`, which is why the outage was silent. The Dirava owner is a **different** user on GROWTH and sat at `34/1000`, so Dirava was never capped.
 - Change: `UNLIMITED_ORDER_USER_IDS` allowlists `User.id` values that are never blocked. Checked in `checkOrderLimits` before the subscription lookup, so plan, status, and Stripe state cannot cap them; `checkOrderLimitAlerts` skips them. Usage is still reserved idempotently against an effectively infinite ceiling so the counter and duplicate detection stay accurate.
