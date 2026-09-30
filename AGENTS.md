@@ -58,6 +58,10 @@ and TikTok resumed after the cutover (74 SENT rows each in the observed window,
 zero PENDING/RETRYING rows). Mizoke remains headless with OpenAI disabled.
 Follow-up: workspace creation selects the new active-store cookie and refreshes
 prefetched pages, preventing second-store onboarding from reopening the old store.
+Dashboard setup readiness recognizes an OpenAI-only store and resolves product
+mode explicitly instead of assuming standard Shopify has exactly two destinations.
+Integration/settings forms remount by workspace ID so switching stores cannot keep
+the previous store's credential drafts, connection badges or settings values.
 Vercel production must fetch `gitSource.sha` from GitHub: CLI uploads ignore
 `.gitignore`; `.vercelignore` also excludes local secrets, build output and prototypes.
 

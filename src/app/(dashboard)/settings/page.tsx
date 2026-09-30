@@ -98,7 +98,7 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <SettingsForm workspace={workspaceForClient} userPreferences={userPreferences} />
+      <SettingsForm key={workspaceForClient.id} workspace={workspaceForClient} userPreferences={userPreferences} />
       <AlertPreferences />
     </div>
   );

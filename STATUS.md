@@ -36,6 +36,10 @@ Ads Manager exposes only Mizoke; Infinite Layers credentials and Shopify access 
 pending, so live OpenAI delivery and campaign attribution are not yet verified.
 Live onboarding also exposed a pre-existing second-store selection bug. The follow-up
 sets the active-store cookie during creation and refreshes prefetched dashboard pages.
+The same follow-up recognizes OpenAI-only dashboard configuration and removes the
+obsolete assumption that standard Shopify has exactly two allowed destinations.
+Integration/settings forms reset on workspace changes, preventing stale credentials
+or settings from appearing under the newly selected store.
 
 Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` after purchase identity write-back; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
 

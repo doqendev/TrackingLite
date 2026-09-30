@@ -33,6 +33,10 @@
   environment values to bypass provider provenance checks.
 - Second-store onboarding must select the created workspace before opening Integrations.
   Creation now writes its active-store cookie and refreshes the Next router cache.
+- Dashboard readiness includes OpenAI credentials; use the product mode resolver,
+  not an allowlist-length check, now that standard Shopify has three destinations.
+- Key integration/settings client forms by workspace ID. Router refresh preserves
+  component state; without a key, the old store's credential drafts can survive a switch.
 
 ## 2026-08-02 - Mizoke Funnel Tracking Contract Repair
 
