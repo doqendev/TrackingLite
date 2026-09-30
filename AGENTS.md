@@ -24,7 +24,7 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ### 2026-09-30 live release: standard Shopify ChatGPT Ads
 
-Release `e3fa3a5259e253308cc714811b70a6827910f625` (PR #19) adds `OPENAI` to standard Shopify workspaces alongside Meta/TikTok,
+Release `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d` (PRs #19/#20) adds `OPENAI` to standard Shopify workspaces alongside Meta/TikTok,
 with encrypted credentials, non-recording validation, original-time/pixel-bound
 delivery, consent/tombstone rechecks, independent 30-day `oppref` capture, cart and
 webhook enrichment, recovery, diagnostics and six-language setup. OpenAI stays off
@@ -35,14 +35,14 @@ verification store is Infinite Layers (`afd09a.myshopify.com`). See
 New modules: `destinations/openai.ts`, `openai-click-context.ts`,
 `logical-event-analytics.ts`, `workspace-limits.ts`, `openai-event-processor.ts`, and
 `components/integrations/openai-integration.tsx`. New migrations:
-`20260930_add_openai_destination`, `20260930_add_openai_delivery_fields`. Candidate
+`20260930_add_openai_destination`, `20260930_add_openai_delivery_fields`. Production
 worker count is 12. `UNLIMITED_WORKSPACE_USER_IDS` provides an explicit account-level
 store allowance independent of order exemptions and Stripe. The release is deployed:
-Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW`, Railway
-`5ff0ce07-937e-400a-bff2-e94500e03f44`. Both health endpoints report the exact SHA;
+Vercel `dpl_4pQTgYYx87aQphu61uh3m7N3Mxv6`, Railway
+`7f54c9ef-621d-4e0d-8f25-5fb09c2b122f`. Both health endpoints report the exact SHA;
 all 12 listeners are ready. Nineteen migrations, 11 required indexes, zero drift.
 The older production details below are historical.
-Candidate checks: 752 unit tests and 69 integration tests pass locally, including
+Release checks: 752 unit tests and 70 integration tests pass locally, including
 generated Custom Pixel execution and signed Shopify webhook Purchase reconciliation.
 Phone normalization uses country metadata for OpenAI; other destination normalizers
 retain their existing contracts. CI still gates Node 20/24 and the 12-listener image.
@@ -51,11 +51,19 @@ check name) and production's PostgreSQL 17. Preserve that required check.
 Browser QA verified new-store creation, both installation snippets, the three
 integration cards and Add Store. Literal `</head>` installation text uses `t.raw`
 so next-intl does not parse it as an unmatched rich-text tag.
-Production verification created Infinite Layers workspace `cmuofe3gl0001e0e3srkt9gju`.
-Its Shopify installation and ad credentials remain pending; no live OpenAI delivery
-is claimed. The active Shopify login cannot manage Infinite Layers. Existing Meta
-and TikTok resumed after the cutover (74 SENT rows each in the observed window,
-zero PENDING/RETRYING rows). Mizoke remains headless with OpenAI disabled.
+Infinite Layers uses existing workspace `cmlseil1700029vaisp5tkn5k` (IL), owned by
+`infinitelayersshop@gmail.com`, as explicitly selected by the user. The empty draft
+under the Mizoke account is inactive. IL now has standard Shopify mode, the current
+connected Custom Pixel `276791629`, the live theme Cart Helper, and an encrypted
+signed orders/paid webhook verified with Shopify's Send test at 18:56 UTC. No ad
+conversion was emitted by that test. The user confirmed it has no ChatGPT Ads account
+or source yet. Track Clear Meta delivery is paused with credentials preserved while
+native Meta/wetracked tracking ownership is resolved; TikTok/OpenAI remain disabled.
+Do not claim live OpenAI delivery or a completed storefront funnel test.
+Both owned accounts have the explicit workspace allowance; order limits are unchanged.
+Exact-merge CI `36759317445` passed all five gates. Existing Meta/TikTok delivery
+resumed with 85 SENT rows each and no PENDING/RETRYING rows in the observed window.
+Mizoke remains headless with OpenAI disabled.
 Follow-up: workspace creation selects the new active-store cookie and refreshes
 prefetched pages, preventing second-store onboarding from reopening the old store.
 Dashboard setup readiness recognizes an OpenAI-only store and resolves product

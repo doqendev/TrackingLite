@@ -1,9 +1,9 @@
 # ChatGPT Ads for standard Shopify stores
 
-Released 2026-09-30 at `e3fa3a5259e253308cc714811b70a6827910f625` (PR #19).
-Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW` and Railway
-`5ff0ce07-937e-400a-bff2-e94500e03f44` report that exact commit. The first live
-store's installation, credentials, delivery and attribution checks remain pending.
+Released 2026-09-30 at `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d` (PRs #19/#20).
+Vercel `dpl_4pQTgYYx87aQphu61uh3m7N3Mxv6` and Railway
+`7f54c9ef-621d-4e0d-8f25-5fb09c2b122f` report that exact commit. The Shopify
+installation is saved; live browser, ad delivery and attribution checks remain open.
 
 ## Store setup
 
@@ -85,16 +85,29 @@ with a partially upgraded delivery fleet. Check Railway volume headroom first.
 Configure the optional internal store allowance using `--skip-deploys` for Railway
 variables; setting variables without that flag triggers a worker deployment.
 
-Local validation: 752 unit tests and 69 integration tests pass. The latter use
+Local validation: 752 unit tests and 70 integration tests pass. The latter use
 isolated loopback PostgreSQL 17 and Redis 8.8, including signed-webhook/browser
 Purchase reconciliation. The generated Custom Pixel executes in a browser-API
 harness covering original timestamps, click lifetime, contact enrichment and denial.
 TypeScript and lint pass (existing image warnings); the initial production build
-passed. Exact-merge CI `36747972761` passed all five gates. Production schema and
+passed. Exact-merge CI `36759317445` passed all five gates. Production schema and
 12-listener health passed; existing Meta/TikTok queues drained successfully.
-Infinite Layers workspace `cmuofe3gl0001e0e3srkt9gju` was created through production
-onboarding. Its Shopify managing account and ChatGPT Ads credentials are still needed.
-No OpenAI live conversion or campaign attribution has been claimed as verified.
+Infinite Layers uses existing IL workspace `cmlseil1700029vaisp5tkn5k` under
+`infinitelayersshop@gmail.com`, as selected by the user. The empty duplicate under the
+Mizoke account is inactive. Shopify and Track Clear access are working under the correct
+account. The current bridge is saved in connected Custom Pixel `276791629`; its full
+editor readback matches the generated snippet. The remote script returns HTTP 200 and
+both scripts parse. The Cart Helper appears on the live storefront after theme PR #1
+(`f1059e41ae74eee82b64faa8d20c5cbee7d383b8`), a one-line async include.
+An orders/paid webhook uses JSON/API 2026-07 and the encrypted Shopify signing secret.
+Shopify's Send test passed HMAC verification at 18:56 UTC and created no destination
+conversion. This proves signed delivery, not a real paid Purchase or attribution.
+
+The user confirmed Infinite Layers has no ChatGPT Ads account/data source yet. It needs
+its own Pixel ID/CAPI key and conversion configuration before OpenAI can be enabled.
+Native Facebook & Instagram and wetracked pixels already exist. Track Clear Meta is
+paused with its saved credentials retained; TikTok/OpenAI are disabled. Agree on one
+owner per platform before enabling delivery. No OpenAI conversion is claimed as verified.
 
 Official contract: https://developers.openai.com/ads/conversions-api and
 https://developers.openai.com/ads/supported-events (checked 2026-09-30).
