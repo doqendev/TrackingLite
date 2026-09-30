@@ -62,6 +62,8 @@ Dashboard setup readiness recognizes an OpenAI-only store and resolves product
 mode explicitly instead of assuming standard Shopify has exactly two destinations.
 Integration/settings forms remount by workspace ID so switching stores cannot keep
 the previous store's credential drafts, connection badges or settings values.
+Browser regression checks cover second-store handoff, draft clearing on switching,
+and OpenAI-only dashboard readiness. ChatGPT card actions wrap within narrow columns.
 Vercel production must fetch `gitSource.sha` from GitHub: CLI uploads ignore
 `.gitignore`; `.vercelignore` also excludes local secrets, build output and prototypes.
 

@@ -77,7 +77,7 @@ export function OpenAIIntegration({ workspace }: { workspace: {
     </div>
     <div className="flex items-center gap-3"><Switch id="openai-enabled" checked={enabled} disabled={busy} onCheckedChange={setEnabled} /><Label htmlFor="openai-enabled">{t("enableAfterValidation")}</Label></div>
     <p className="text-xs text-muted-foreground">{t("validationNote")}</p>
-    <div className="flex gap-3"><Button onClick={save} disabled={busy || !pixelId.trim() || (!key.trim() && !hasKey)}>{busy ? t("saving") : t("saveValidate")}</Button>
+    <div className="flex flex-wrap gap-3"><Button onClick={save} disabled={busy || !pixelId.trim() || (!key.trim() && !hasKey)}>{busy ? t("saving") : t("saveValidate")}</Button>
       <Button variant="outline" onClick={disable} disabled={busy}>{t("disable")}</Button></div>
     {message && <p role="status" className="text-sm">{message}</p>}
     <p className="text-xs text-muted-foreground">{t("verifyNote")} <a href="/tracking-health" className="underline">{t("trackingHealth")}</a></p>

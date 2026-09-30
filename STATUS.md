@@ -40,6 +40,8 @@ The same follow-up recognizes OpenAI-only dashboard configuration and removes th
 obsolete assumption that standard Shopify has exactly two allowed destinations.
 Integration/settings forms reset on workspace changes, preventing stale credentials
 or settings from appearing under the newly selected store.
+Browser regression checks pass for new-store handoff, draft clearing on store switch
+and OpenAI-only dashboard readiness. ChatGPT card buttons wrap in narrow columns.
 
 Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` after purchase identity write-back; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
 

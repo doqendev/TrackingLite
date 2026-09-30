@@ -37,6 +37,8 @@
   not an allowlist-length check, now that standard Shopify has three destinations.
 - Key integration/settings client forms by workspace ID. Router refresh preserves
   component state; without a key, the old store's credential drafts can survive a switch.
+- Browser regression verification passed second-store handoff, draft clearing and
+  OpenAI-only readiness. Wrap ChatGPT card actions to avoid overflowing the three-column grid.
 
 ## 2026-08-02 - Mizoke Funnel Tracking Contract Repair
 
