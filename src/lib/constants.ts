@@ -96,6 +96,7 @@ export const RATE_LIMIT = {
 export const QUEUE_CONFIG = {
   QUEUE_NAME: "meta-events",
   TIKTOK_QUEUE_NAME: "tiktok-events",
+  OPENAI_QUEUE_NAME: "openai-events",
   GA4_QUEUE_NAME: "ga4-events",
   KLAVIYO_QUEUE_NAME: "klaviyo-events",
   REDDIT_QUEUE_NAME: "reddit-events",

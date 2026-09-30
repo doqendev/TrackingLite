@@ -37,7 +37,7 @@
   },
   "dashboard": {
     "noDestinations": "Nenhum destino configurado",
-    "noDestinationsDesc": "Conecte pelo menos uma plataforma (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest ou Google Ads) para comecar a encaminhar eventos.",
+    "noDestinationsDesc": "Conecte pelo menos uma plataforma (Meta, TikTok, ChatGPT Ads, GA4, Klaviyo, Reddit, Pinterest ou Google Ads) para comecar a encaminhar eventos.",
     "ordersThisMonth": "Pedidos Neste Mês",
     "ofOrdersTracked": "de {limit} pedidos rastreados",
     "installSnippet": "Instale seu snippet para começar a rastrear compras.",
@@ -400,7 +400,7 @@
     "shopifyStep1": "Vá para Configurações > Eventos do Cliente no seu Shopify Admin",
     "shopifyStep2": "Adicione o snippet Custom Pixel e clique em Salvar e Conectar",
     "shopifyStep3": "Adicione o Cart Attribution Helper ao theme.liquid antes de </head> ou a um bloco Custom Liquid/theme app",
-    "shopifyStep4": "Configure o webhook Shopify, conecte Meta e TikTok, depois confirme eventos AddToCart e webhook Purchase em Tracking Health",
+    "shopifyStep4": "Configure o webhook Shopify e as integrações Meta, TikTok ou ChatGPT Ads, depois verifique a entrega de AddToCart e Purchase por webhook em Tracking Health",
     "trackedEvents": "Eventos que serão rastreados:",
     "skipForNow": "Pular por agora",
     "continueToVerify": "Continuar",
@@ -421,7 +421,8 @@
     "domainTaken": "Esta loja ja esta registrada por outra conta",
     "domainNotShopify": "Nao foi possivel verificar como loja Shopify. Voce pode continuar mesmo assim.",
     "domainError": "Nao foi possivel verificar a loja. Tente novamente.",
-    "workspaceLimitReached": "Voce atingiu o limite de lojas do seu plano. Faca upgrade para adicionar mais lojas."
+    "workspaceLimitReached": "Voce atingiu o limite de lojas do seu plano. Faca upgrade para adicionar mais lojas.",
+    "openaiDescription": "Acompanhamento de conversões do ChatGPT Ads no servidor."
   },
   "auth": {
     "signIn": "Entrar",
@@ -461,5 +462,29 @@
     "passwordResetSuccess": "Senha redefinida com sucesso. Você já pode entrar.",
     "invalidToken": "Token de redefinição inválido ou expirado.",
     "somethingWentWrong": "Algo deu errado. Por favor, tente novamente."
+  },
+  "openaiIntegration": {
+    "description": "Acompanhamento de conversões do ChatGPT Ads no servidor.",
+    "saved": "Credenciais guardadas; falta verificar a entrega.",
+    "validated": "Credenciais validadas",
+    "notConfigured": "Não configurado",
+    "pixelId": "ID do pixel",
+    "apiKey": "Chave da API de conversões",
+    "keySaved": "Guardada em segurança; introduza uma nova chave para substituir",
+    "enableAfterValidation": "Ativar entrega após validação",
+    "step1": "Crie ou selecione uma fonte de dados web para esta loja no",
+    "step2": "Copie o ID do pixel e gere uma chave da API de conversões. Use um pixel dedicado por loja.",
+    "step3": "Crie eventos de conversão e selecione order_created na campanha. Instale o Custom Pixel, Cart Helper e webhook orders/paid da Shopify do Track Clear.",
+    "validationNote": "A validação envia um pedido sem registar eventos. Não cria conversões nem comprova a atribuição da campanha.",
+    "saveValidate": "Guardar e validar",
+    "saving": "A validar…",
+    "disable": "Desativar entrega",
+    "saveFailed": "Não foi possível guardar. Verifique a ligação e tente novamente.",
+    "validationFailed": "A validação falhou. A entrega continua desativada. Verifique o ID e a chave.",
+    "enabledMessage": "Credenciais validadas e entrega ativada. Verifique eventos reais no estado do acompanhamento e no Ads Manager.",
+    "validatedMessage": "Credenciais validadas. A entrega está desativada.",
+    "disabledMessage": "Entrega desativada.",
+    "verifyNote": "Verifique os cinco eventos, a deduplicação de compras e o consentimento antes de confiar nos relatórios.",
+    "trackingHealth": "Estado do acompanhamento"
   }
 }

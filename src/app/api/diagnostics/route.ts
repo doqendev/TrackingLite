@@ -16,13 +16,13 @@ const FUNNEL_ORDER = [
   "Purchase",
 ] as const;
 
-// PageView and ViewContent are fire-and-forget (no EventLog records).
-// They ARE sent to platforms but not stored in the database to save space.
-const FIRE_AND_FORGET_EVENTS = new Set(["PageView", "ViewContent"]);
+// Every commerce event is retained in the durable delivery outbox.
+const FIRE_AND_FORGET_EVENTS = new Set<string>();
 
 const ALL_DESTINATIONS = [
   "META",
   "TIKTOK",
+  "OPENAI",
   "GA4",
   "KLAVIYO",
   "REDDIT",
@@ -34,6 +34,8 @@ type Destination = (typeof ALL_DESTINATIONS)[number];
 
 function hasCredentials(workspace: Record<string, unknown>, dest: Destination): boolean {
   switch (dest) {
+    case "OPENAI":
+      return !!(workspace.openaiPixelId && workspace.openaiApiKeyEncrypted);
     case "META":
       return !!(workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
     case "TIKTOK":
@@ -53,6 +55,8 @@ function hasCredentials(workspace: Record<string, unknown>, dest: Destination): 
 
 function isEnabled(workspace: Record<string, unknown>, dest: Destination): boolean {
   switch (dest) {
+    case "OPENAI":
+      return !!workspace.enableOpenAI;
     case "META":
       return !!(workspace.enableMeta);
     case "TIKTOK":
@@ -94,6 +98,9 @@ export async function GET(request: NextRequest) {
       installType: true,
       enableMeta: true,
       enableTikTok: true,
+      enableOpenAI: true,
+      openaiPixelId: true,
+      openaiApiKeyEncrypted: true,
       enableGA4: true,
       enableKlaviyo: true,
       enableReddit: true,

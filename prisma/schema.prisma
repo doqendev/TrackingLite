@@ -117,6 +117,13 @@ model Workspace {
   enableTikTok                 Boolean @default(false)
   tiktokBrowserTrackingEnabled Boolean @default(false)
 
+  // ChatGPT Ads: server-side delivery, separately enabled for each store.
+  openaiPixelId         String?
+  openaiApiKeyEncrypted String?
+  openaiApiKeyIv        String?
+  openaiApiKeyTag       String?
+  enableOpenAI          Boolean @default(false)
+
   // GA4 fields
   ga4MeasurementId      String?
   ga4ApiSecretEncrypted String?
@@ -185,7 +192,9 @@ model EventLog {
   eventName              EventName
   eventId                String // dedup event_id (UUID from JS snippet)
   status                 EventStatus @default(PENDING)
-  metaResponse           Json? // Raw Meta CAPI response
+  metaResponse           Json? // Destination delivery receipt
+  occurredAt             DateTime? // Original occurrence time, never the replay time
+  deliveryTargetId       String? // Immutable destination dataset at capture time
   errorMessage           String?
   retryCount             Int         @default(0)
   payload                Json? // Sanitized payload (no raw PII)
@@ -399,6 +408,7 @@ enum SubscriptionStatus {
 }
 
 enum Destination {
+  OPENAI
   META
   TIKTOK
   GA4

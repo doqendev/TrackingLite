@@ -207,6 +207,8 @@ async function startWorkerRuntime() {
   managedWorkers.push(metaWorker);
   const { tiktokWorker } = await import("./tiktok-event-processor");
   managedWorkers.push(tiktokWorker);
+  const { openaiWorker } = await import("./openai-event-processor");
+  managedWorkers.push(openaiWorker);
   const { ga4Worker } = await import("./ga4-event-processor");
   managedWorkers.push(ga4Worker);
   const { klaviyoWorker } = await import("./klaviyo-event-processor");
@@ -390,6 +392,7 @@ async function startWorkerRuntime() {
     queues: [
       "meta-events",
       "tiktok-events",
+      "openai-events",
       "ga4-events",
       "klaviyo-events",
       "reddit-events",

@@ -10,12 +10,16 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { SiMeta, SiTiktok, SiGoogleanalytics, SiGoogleads, SiShopify } from "react-icons/si";
 import { FaReddit, FaPinterest } from "react-icons/fa";
+import { OpenAIIntegration } from "@/components/integrations/openai-integration";
 import { SetupGuide } from "@/components/integrations/setup-guide";
 
 export interface IntegrationWorkspace {
   id: string;
   productMode: "SHOPIFY_META_TIKTOK_V1" | "LEGACY_ALL_DESTINATIONS";
   installType: "SHOPIFY_CUSTOM_PIXEL" | "HEADLESS_CUSTOM";
+  openaiPixelId?: string | null;
+  hasOpenAIApiKey?: boolean;
+  enableOpenAI?: boolean;
   // Meta
   metaPixelId: string | null;
   metaTestEventCode: string | null;
@@ -635,6 +639,8 @@ export function IntegrationsGrid({ workspace }: IntegrationsGridProps) {
           </div>
         </div>
       </div>
+
+      {workspace.installType === "SHOPIFY_CUSTOM_PIXEL" && <OpenAIIntegration workspace={workspace} />}
 
       {/* TikTok */}
       <div className="rounded-lg border border-white/[0.06] bg-card border-l-[3px] border-l-pink-500 overflow-hidden">

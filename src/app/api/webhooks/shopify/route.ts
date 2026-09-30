@@ -1,3 +1,4 @@
+import { validOpenAIClick } from "@/lib/destinations/openai";
 import { NextRequest, NextResponse } from "next/server";
 import type { EventName } from "@prisma/client";
 import { createLogger } from "@/lib/logger";
@@ -7,6 +8,7 @@ import { decrypt } from "@/lib/encryption";
 import {
   getEventQueue,
   getTiktokQueue,
+  getOpenAIQueue,
   getGA4Queue,
   getKlaviyoQueue,
   getRedditQueue,
@@ -431,6 +433,9 @@ async function handleOrderPaid(
       redditAccessTokenEncrypted: true,
       enablePinterest: true,
       pinterestConversionTokenEncrypted: true,
+      enableOpenAI: true,
+      openaiPixelId: true,
+      openaiApiKeyEncrypted: true,
       enableTikTok: true,
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
@@ -660,6 +665,9 @@ async function handleOrderPaid(
         queue: getPinterestQueue(),
         jobName: "send-pinterest-event",
       });
+    }
+    if (workspace.enableOpenAI && workspace.openaiPixelId && workspace.openaiApiKeyEncrypted) {
+      destinations.push({ destination: "OPENAI", queue: getOpenAIQueue(), jobName: "send-openai-event" });
     }
     if (workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted) {
       destinations.push({
@@ -1105,6 +1113,8 @@ async function handleOrderPaid(
                 data: {
                   ...eventLogBaseData,
                   destination: dest.destination as any, // eslint-disable-line
+                  deliveryTargetId: dest.destination === "OPENAI" ? workspace.openaiPixelId : null,
+                  occurredAt,
                 },
               });
               return { entry, created: true };
@@ -1233,8 +1243,18 @@ async function handleOrderPaid(
       userAgent: sessionContext?.userAgent ?? orderUserAgent ?? "",
     };
 
+    const openaiClick = [
+      { value: orderAttribution.oppref, capturedAt: orderAttribution.opprefCapturedAt },
+      { value: sessionContext?.oppref, capturedAt: sessionContext?.opprefCapturedAt },
+    ].filter(click => validOpenAIClick(click.value, click.capturedAt))
+      .sort((a, b) => (b.capturedAt ?? 0) - (a.capturedAt ?? 0))[0];
     const destinationEventData = {
       ...eventData,
+      oppref: openaiClick?.value ?? null,
+      opprefCapturedAt: openaiClick?.capturedAt ?? null,
+      consent: { analyticsAllowed: customerConsent.analytics, marketingAllowed: customerConsent.marketing,
+        saleOfDataAllowed: customerConsent.saleOfData },
+      openaiPixelId: workspace.openaiPixelId,
       ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? landingAttribution.ttclid ?? null,
       ttp: orderAttribution.ttp ?? sessionContext?.ttp ?? landingAttribution.ttp ?? null,
       gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? landingAttribution.gclid ?? null,
@@ -1282,6 +1302,7 @@ async function handleOrderPaid(
           },
           data: {
             ...authoritativeEventLogData,
+            occurredAt,
             ...retryEnvelope,
             ...clearedEventDeliveryClaim(),
           },

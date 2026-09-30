@@ -10,6 +10,7 @@ import { buildPurchaseBillingAliases } from "@/lib/purchase-event-id";
 import {
   getEventQueue,
   getTiktokQueue,
+  getOpenAIQueue,
   getGA4Queue,
   getKlaviyoQueue,
   getRedditQueue,
@@ -240,6 +241,7 @@ export function isRetryableDeliveryFailure(errorMessage: string | null | undefin
 // Destination queue routing map
 const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = {
   META: { queue: getEventQueue, jobName: "send-meta-event" },
+  OPENAI: { queue: getOpenAIQueue, jobName: "send-openai-event" },
   TIKTOK: { queue: getTiktokQueue, jobName: "send-tiktok-event" },
   GA4: { queue: getGA4Queue, jobName: "send-ga4-event" },
   KLAVIYO: { queue: getKlaviyoQueue, jobName: "send-klaviyo-event" },
@@ -255,6 +257,8 @@ function checkWorkspaceHasDestinationCredentials(
   switch (destination) {
     case "META":
       return !!(workspace.enableMeta && workspace.metaAccessTokenEncrypted);
+    case "OPENAI":
+      return !!(workspace.enableOpenAI && workspace.openaiPixelId && workspace.openaiApiKeyEncrypted);
     case "TIKTOK":
       return !!(workspace.enableTikTok && workspace.tiktokAccessTokenEncrypted);
     case "GA4":
@@ -301,6 +305,9 @@ export async function requeueEvents(
         installType: true,
         enableMeta: true,
         metaAccessTokenEncrypted: true,
+        enableOpenAI: true,
+        openaiPixelId: true,
+        openaiApiKeyEncrypted: true,
         enableTikTok: true,
         tiktokAccessTokenEncrypted: true,
         enableGA4: true,

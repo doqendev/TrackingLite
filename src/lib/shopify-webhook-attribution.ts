@@ -4,6 +4,8 @@ import { normalizeContentId, numericShopifyId, type ContentIdOptions } from "@/l
 type UnknownRecord = Record<string, unknown>;
 
 export interface OrderAttribution {
+  oppref: string | null;
+  opprefCapturedAt: number | null;
   trackclearSessionId: string | null;
   fbp: string | null;
   fbc: string | null;
@@ -64,7 +66,7 @@ function addAttribute(out: Record<string, string>, key: unknown, value: unknown)
   if (!attrKey) return;
   if (value === null || value === undefined) return;
 
-  const attrValue = String(value).trim();
+  const attrValue = attrKey.toLowerCase() === "_trackclear_oppref" ? String(value) : String(value).trim();
   if (attrValue) out[attrKey] = attrValue;
 }
 
@@ -226,6 +228,8 @@ export function buildOrderAttribution(
     ttclid: readOrderAttribute(attrs, ["_ttclid", "ttclid"]),
     ttp: readOrderAttribute(attrs, ["_ttp", "ttp"]),
     rdtCid: readOrderAttribute(attrs, ["_rdt_cid", "rdt_cid", "_rdtCid", "rdtCid"]),
+    oppref: readOrderAttribute(attrs, ["_trackclear_oppref"]),
+    opprefCapturedAt: boundedConsentTimestamp(readOrderAttribute(attrs, ["_trackclear_oppref_captured_at"]), now, 30 * 24 * 60 * 60 * 1000),
     epik: readOrderAttribute(attrs, ["_epik", "epik"]),
     utmSource: readOrderAttribute(attrs, ["_utm_source", "utm_source"]),
     utmMedium: readOrderAttribute(attrs, ["_utm_medium", "utm_medium"]),
@@ -263,6 +267,8 @@ export function extractLandingSiteAttribution(
     ttclid: null,
     ttp: null,
     rdtCid: null,
+    oppref: null,
+    opprefCapturedAt: null,
     epik: null,
     utmSource: null,
     utmMedium: null,

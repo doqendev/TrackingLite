@@ -8,6 +8,14 @@
 // - pinterest.ts
 
 export const DESTINATION_EVENT_MAP = {
+  OPENAI: {
+    PageView: "page_viewed",
+    ViewContent: "contents_viewed",
+    AddToCart: "items_added",
+    InitiateCheckout: "checkout_started",
+    Purchase: "order_created",
+    Refund: null,
+  },
   META: {
     PageView: "PageView",
     ViewContent: "ViewContent",

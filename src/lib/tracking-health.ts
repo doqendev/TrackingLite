@@ -1,3 +1,4 @@
+import type { Destination } from "@prisma/client";
 import { db } from "@/lib/db";
 
 export type TrackingHealthSeverity = "ok" | "warning" | "error";
@@ -125,6 +126,9 @@ export async function getTrackingHealth(
       metaPixelId: true,
       metaAccessTokenEncrypted: true,
       enableTikTok: true,
+      enableOpenAI: true,
+      openaiPixelId: true,
+      openaiApiKeyEncrypted: true,
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
       shopifyWebhookSecretEncrypted: true,
@@ -148,6 +152,14 @@ export async function getTrackingHealth(
     };
   }
 
+  const activeDestinations: Destination[] = [];
+  if (workspace.enableMeta) activeDestinations.push("META");
+  if (workspace.enableTikTok) activeDestinations.push("TIKTOK");
+  if (workspace.enableOpenAI) activeDestinations.push("OPENAI");
+  const lastOpenAIEvent = workspace.enableOpenAI ? await db.eventLog.findFirst({
+    where: { workspaceId, destination: "OPENAI", status: { not: "SUPERSEDED" } },
+    orderBy: { createdAt: "desc" }, select: { createdAt: true, status: true },
+  }) : null;
   const [
     lastSnippetEvent,
     lastWebhookPurchase,
@@ -198,7 +210,7 @@ export async function getTrackingHealth(
     db.eventLog.findFirst({
       where: {
         workspaceId,
-        destination: { in: ["META", "TIKTOK"] },
+        destination: { in: activeDestinations },
         status: "FAILED",
         createdAt: { gte: since24h },
       },
@@ -208,7 +220,7 @@ export async function getTrackingHealth(
     db.eventLog.count({
       where: {
         workspaceId,
-        destination: { in: ["META", "TIKTOK"] },
+        destination: { in: activeDestinations },
         status: "FAILED",
         createdAt: { gte: since24h },
       },
@@ -220,7 +232,7 @@ export async function getTrackingHealth(
         eventName: "Purchase",
         status: "SENT",
         orderId: { not: null },
-        destination: { in: ["META", "TIKTOK"] },
+        destination: { in: activeDestinations },
         createdAt: { gte: since7d },
       },
       _count: { _all: true },
@@ -231,7 +243,7 @@ export async function getTrackingHealth(
         source: "webhook",
         eventName: "Purchase",
         status: { not: "SUPERSEDED" },
-        destination: { in: ["META", "TIKTOK"] },
+        destination: { in: activeDestinations },
         OR: [
           { fbp: { not: null } },
           { fbc: { not: null } },
@@ -248,7 +260,7 @@ export async function getTrackingHealth(
         source: "webhook",
         eventName: "Purchase",
         status: { not: "SUPERSEDED" },
-        destination: { in: ["META", "TIKTOK"] },
+        destination: { in: activeDestinations },
       },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
@@ -259,7 +271,7 @@ export async function getTrackingHealth(
         source: "webhook",
         eventName: "Purchase",
         status: { not: "SUPERSEDED" },
-        destination: { in: ["META", "TIKTOK"] },
+        destination: { in: activeDestinations },
         createdAt: { gte: since7d },
       },
       orderBy: { createdAt: "desc" },
@@ -384,7 +396,7 @@ export async function getTrackingHealth(
       label: "Dedup active",
       severity: duplicateOrders.filter((group) => group._count._all > 1).length === 0 ? "ok" : "error",
       detail: duplicateOrders.filter((group) => group._count._all > 1).length === 0
-        ? "No duplicate Meta/TikTok Purchase order IDs found in the last 7 days."
+        ? "No duplicate enabled destination Purchase order IDs found in the last 7 days."
         : `${duplicateOrders.filter((group) => group._count._all > 1).length} duplicate order/destination group(s) found in the last 7 days.`,
     },
     attributionCheck,
@@ -397,14 +409,24 @@ export async function getTrackingHealth(
         : recentDlqEntry
         ? `Webhook dead-letter entry ${formatAge(recentDlqEntry.createdAt)}: ${recentDlqEntry.error}`
         : lastFailedEvent
-          ? `${recentFailedCount} Meta/TikTok failure(s) in 24h. Latest ${lastFailedEvent.destination}: ${lastFailedEvent.errorMessage ?? "Unknown error"}`
-          : "No unresolved Meta/TikTok or webhook errors in the last 24h.",
+          ? `${recentFailedCount} enabled destination failure(s) in 24h. Latest ${lastFailedEvent.destination}: ${lastFailedEvent.errorMessage ?? "Unknown error"}`
+          : "No unresolved enabled destination or webhook errors in the last 24h.",
       timestamp: recentDlqEntry?.createdAt ?? lastFailedEvent?.createdAt ?? null,
     },
   ];
 
-  return {
-    status: statusFromChecks(checks),
-    checks,
-  };
+  if (workspace.enableOpenAI) checks.push({
+    key: "openai", label: "ChatGPT Ads delivery",
+    severity: !workspace.openaiPixelId || !workspace.openaiApiKeyEncrypted ? "error"
+      : lastOpenAIEvent?.status === "SENT" ? "ok" : "warning",
+    detail: !workspace.openaiPixelId || !workspace.openaiApiKeyEncrypted ? "ChatGPT Ads Pixel ID or Conversions API key is missing."
+      : lastOpenAIEvent ? "Last ChatGPT Ads event is " + lastOpenAIEvent.status + ". Confirm campaign attribution in Ads Manager."
+      : "Credentials saved; waiting for a real event. Credential validation does not record an event.",
+    timestamp: lastOpenAIEvent?.createdAt ?? null,
+  });
+  const selectedChecks = checks.filter(check =>
+    (check.key !== "meta" || workspace.enableMeta) && (check.key !== "tiktok" || workspace.enableTikTok));
+  if (!activeDestinations.length) selectedChecks.push({ key: "destinations", label: "Ad integrations",
+    severity: "warning", detail: "Enable at least one ad integration to start delivery." });
+  return { status: statusFromChecks(selectedChecks), checks: selectedChecks };
 }

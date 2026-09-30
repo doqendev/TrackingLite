@@ -72,20 +72,21 @@ describe("diagnostics route workspace mode filtering", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.workspace.allowedDestinations).toEqual(["META", "TIKTOK"]);
+    expect(data.workspace.allowedDestinations).toEqual(["META", "TIKTOK", "OPENAI"]);
     expect(data.destinationHealth.map((row: { destination: string }) => row.destination)).toEqual([
       "META",
       "TIKTOK",
+      "OPENAI",
     ]);
 
     for (const [args] of mockEventLogGroupBy.mock.calls) {
-      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK"] });
+      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI"] });
     }
     for (const [args] of mockEventLogCount.mock.calls) {
-      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK"] });
+      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI"] });
     }
     for (const [args] of mockEventLogFindMany.mock.calls) {
-      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK"] });
+      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI"] });
     }
   });
 });

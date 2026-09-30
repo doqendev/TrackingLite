@@ -43,6 +43,9 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
       enableTikTok: true,
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
+      enableOpenAI: true,
+      openaiPixelId: true,
+      openaiApiKeyEncrypted: true,
       // GA4
       enableGA4: true,
       ga4MeasurementId: true,
@@ -87,6 +90,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
   const {
     metaAccessTokenEncrypted,
     tiktokAccessTokenEncrypted,
+    openaiApiKeyEncrypted,
     ga4ApiSecretEncrypted,
     klaviyoApiKeyEncrypted,
     redditAccessTokenEncrypted,
@@ -100,6 +104,7 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     ...rest,
     hasMetaCredentials: !!(workspace.enableMeta && workspace.metaPixelId && metaAccessTokenEncrypted),
     hasTikTokCredentials: !!(workspace.enableTikTok && workspace.tiktokPixelId && tiktokAccessTokenEncrypted),
+    hasOpenAICredentials: !!(workspace.enableOpenAI && workspace.openaiPixelId && openaiApiKeyEncrypted),
     hasGA4Credentials: !!(workspace.enableGA4 && workspace.ga4MeasurementId && ga4ApiSecretEncrypted),
     hasKlaviyoCredentials: !!(workspace.enableKlaviyo && klaviyoApiKeyEncrypted),
     hasRedditCredentials: !!(workspace.enableReddit && redditAccessTokenEncrypted),

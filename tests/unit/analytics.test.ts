@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // --- Mocks ---
 
+const mockRaw = vi.fn();
 const mockCount = vi.fn();
 const mockFindFirst = vi.fn();
 const mockAggregate = vi.fn();
@@ -10,6 +11,7 @@ const mockFindUnique = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   db: {
+    $queryRaw: (...args: unknown[]) => mockRaw(...args),
     eventLog: {
       count: (...args: unknown[]) => mockCount(...args),
       findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -51,8 +53,7 @@ function setupDefaultMocks() {
     .mockResolvedValueOnce(100)  // total 24h
     .mockResolvedValueOnce(95)   // sent 24h
     .mockResolvedValueOnce(5)    // failed 24h
-    .mockResolvedValueOnce(10)   // orders today (Purchase SENT today)
-    .mockResolvedValueOnce(8)    // orders yesterday (Purchase SENT yesterday)
+
     // conversionAccuracy: last7d
     .mockResolvedValueOnce(30)   // total7d
     .mockResolvedValueOnce(29)   // sent7d
@@ -62,46 +63,16 @@ function setupDefaultMocks() {
     .mockResolvedValueOnce(115)  // sent30d
     .mockResolvedValueOnce(5);   // failed30d
 
-  // getCanonicalDestination fires BEFORE Promise.all, then lastEvent (in queryHealthMetrics)
-  mockFindFirst
-    .mockResolvedValueOnce({ destination: "META" })               // getCanonicalDestination
-    .mockResolvedValueOnce({ createdAt: new Date("2026-02-18T12:00:00Z") }); // lastEvent
-
-  // groupBy call order (sequential batches to stay within DB pool limits):
-  // Batch 1: health + eventBreakdown + destinationDelivery + enabledDests
-  //   1-2. Event breakdown today/yesterday (queryEventBreakdown)
-  //   3. Destination delivery (queryDestinationDelivery)
-  //   4. enabledDestsQuery
-  // Batch 2: revenue (queryRevenueMetrics)
-  //   5-10. Revenue groupBy x6 (by currency)
-  //   11. webhookBreakdown
-  // Batch 4: billing + campaigns
-  //   12. Campaigns (queryCampaignPerformance)
-  mockGroupBy
-    .mockResolvedValueOnce([     // 1. today event breakdown
-      { eventName: "PageView", _count: 1245 },
-      { eventName: "ViewContent", _count: 834 },
-      { eventName: "AddToCart", _count: 312 },
-      { eventName: "InitiateCheckout", _count: 156 },
-      { eventName: "Purchase", _count: 89 },
-    ])
-    .mockResolvedValueOnce([     // 2. yesterday event breakdown
-      { eventName: "PageView", _count: 1100 },
-      { eventName: "ViewContent", _count: 780 },
-      { eventName: "AddToCart", _count: 290 },
-      { eventName: "InitiateCheckout", _count: 140 },
-      { eventName: "Purchase", _count: 75 },
-    ])
-    .mockResolvedValueOnce([{ destination: "META", status: "SENT", _count: 95 }, { destination: "META", status: "FAILED", _count: 5 }])  // 3. destinationDelivery
-    .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // 4. enabledDestsQuery
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 4280.5 } }])   // 5. AddToCart today
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 3800.0 } }])   // 6. AddToCart yesterday
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 2150.0 } }])   // 7. Checkout today
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 2220.0 } }])   // 8. Checkout yesterday
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 1890.0 } }])   // 9. Purchase today
-    .mockResolvedValueOnce([{ currency: "USD", _sum: { value: 1750.0 } }])   // 10. Purchase yesterday
-    .mockResolvedValueOnce([])   // 11. webhookBreakdown
-    .mockResolvedValueOnce([]);  // 12. campaigns
+  mockFindFirst.mockResolvedValue({ createdAt: new Date() });
+  mockGroupBy.mockResolvedValueOnce([{ destination: "META", status: "SENT", _count: 95 }, { destination: "META", status: "FAILED", _count: 5 }])
+    .mockResolvedValueOnce([{ destination: "META", _count: 100 }]);
+  mockRaw.mockResolvedValueOnce([
+    ...[["PageView",1245,1100,0,0],["ViewContent",834,780,0,0],["AddToCart",312,290,4280.5,3800],
+      ["InitiateCheckout",156,140,2150,2220],["Purchase",89,75,1890,1750]].flatMap(([eventName,total,prior,value,priorValue]) => [
+        { eventName, today: true, currency: "USD", source: "snippet", status: "SENT", total, value },
+        { eventName, today: false, currency: "USD", source: "snippet", status: "SENT", total: prior, value: priorValue },
+      ]),
+  ]).mockResolvedValueOnce([]);
 
   // Subscription
   mockFindUnique.mockResolvedValue({ plan: "STARTER" });
@@ -110,22 +81,8 @@ function setupDefaultMocks() {
   mockGetOrderCount.mockResolvedValue(23);
 }
 
-/** Sets up 12 empty groupBy mocks for tests where all data is empty/zero.
- *  enabledDestsMock goes at position #4 (after eventBreakdown x2 + destinationDelivery). */
 function setupEmptyGroupByMocks(enabledDestsMock?: unknown[]) {
-  mockGroupBy
-    .mockResolvedValueOnce([])   // 1. event breakdown today
-    .mockResolvedValueOnce([])   // 2. event breakdown yesterday
-    .mockResolvedValueOnce([])   // 3. destination delivery
-    .mockResolvedValueOnce(enabledDestsMock ?? [])  // 4. enabledDestsQuery
-    .mockResolvedValueOnce([])   // 5. AddToCart today
-    .mockResolvedValueOnce([])   // 6. AddToCart yesterday
-    .mockResolvedValueOnce([])   // 7. Checkout today
-    .mockResolvedValueOnce([])   // 8. Checkout yesterday
-    .mockResolvedValueOnce([])   // 9. Purchase today
-    .mockResolvedValueOnce([])   // 10. Purchase yesterday
-    .mockResolvedValueOnce([])   // 11. webhookBreakdown
-    .mockResolvedValueOnce([]);  // 12. campaigns
+  mockGroupBy.mockResolvedValueOnce([]).mockResolvedValueOnce(enabledDestsMock ?? []);
 }
 
 describe("getHealthStatus", () => {
@@ -164,7 +121,8 @@ describe("getHealthStatus", () => {
 
 describe("computeDashboardAnalytics", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mockRaw.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -188,19 +146,10 @@ describe("computeDashboardAnalytics", () => {
 
     await computeDashboardAnalytics(WORKSPACE_ID, USER_ID);
 
-    expect(mockCount.mock.calls[0][0].where.destination).toBe("META");
-    expect(mockGroupBy.mock.calls[0][0].where.destination).toEqual({
-      in: ["META", "INTERNAL"],
-    });
-    expect(mockGroupBy.mock.calls[2][0].where.destination).toEqual({
-      not: "INTERNAL",
-    });
-    expect(mockGroupBy.mock.calls[4][0].where.destination).toEqual({
-      in: ["META", "INTERNAL"],
-    });
-    expect(mockGroupBy.mock.calls[11][0].where.destination).toEqual({
-      in: ["META", "INTERNAL"],
-    });
+    expect(mockCount.mock.calls[0][0].where.destination).toEqual({ not: "INTERNAL" });
+    expect(mockGroupBy.mock.calls[0][0].where.destination).toEqual({ not: "INTERNAL" });
+    expect(mockRaw.mock.calls[0][0].values).toContain("INTERNAL");
+    expect(mockRaw.mock.calls[0][0].values).toContain("OPENAI");
   });
 
   describe("health metrics", () => {
@@ -221,8 +170,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total
         .mockResolvedValueOnce(0)  // sent
         .mockResolvedValueOnce(0)  // failed
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d
@@ -251,8 +199,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(100) // total
         .mockResolvedValueOnce(85)  // sent
         .mockResolvedValueOnce(15)  // failed
-        .mockResolvedValueOnce(0)   // orders today
-        .mockResolvedValueOnce(0)   // orders yesterday
+
         .mockResolvedValueOnce(0)   // total7d
         .mockResolvedValueOnce(0)   // sent7d
         .mockResolvedValueOnce(0)   // failed7d
@@ -280,8 +227,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(100) // total
         .mockResolvedValueOnce(50)  // sent
         .mockResolvedValueOnce(50)  // failed
-        .mockResolvedValueOnce(0)   // orders today
-        .mockResolvedValueOnce(0)   // orders yesterday
+
         .mockResolvedValueOnce(0)   // total7d
         .mockResolvedValueOnce(0)   // sent7d
         .mockResolvedValueOnce(0)   // failed7d
@@ -333,8 +279,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(10)  // total 24h
         .mockResolvedValueOnce(10)  // sent 24h
         .mockResolvedValueOnce(0)   // failed 24h
-        .mockResolvedValueOnce(0)   // orders today
-        .mockResolvedValueOnce(0)   // orders yesterday
+
         .mockResolvedValueOnce(0)   // total7d
         .mockResolvedValueOnce(0)   // sent7d
         .mockResolvedValueOnce(0)   // failed7d
@@ -364,8 +309,8 @@ describe("computeDashboardAnalytics", () => {
 
       const result = await computeDashboardAnalytics(WORKSPACE_ID, USER_ID);
 
-      expect(result.revenue.ordersToday).toBe(10);
-      expect(result.revenue.ordersYesterday).toBe(8);
+      expect(result.revenue.ordersToday).toBe(89);
+      expect(result.revenue.ordersYesterday).toBe(75);
     });
   });
 
@@ -396,8 +341,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(5)   // total 24h
         .mockResolvedValueOnce(5)   // sent 24h
         .mockResolvedValueOnce(0)   // failed 24h
-        .mockResolvedValueOnce(0)   // orders today
-        .mockResolvedValueOnce(0)   // orders yesterday
+
         .mockResolvedValueOnce(0)   // total7d
         .mockResolvedValueOnce(0)   // sent7d
         .mockResolvedValueOnce(0)   // failed7d
@@ -409,21 +353,8 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce({ destination: "META" })      // getCanonicalDestination
         .mockResolvedValueOnce({ createdAt: new Date() });   // lastEvent
 
-      // Only PageView events today, nothing yesterday
-      mockGroupBy
-        .mockResolvedValueOnce([{ eventName: "PageView", _count: 5 }]) // 1. today event breakdown
-        .mockResolvedValueOnce([])   // 2. yesterday event breakdown
-        .mockResolvedValueOnce([])   // 3. destination delivery
-        .mockResolvedValueOnce([{ destination: "META", _count: 100 }]) // 4. enabledDestsQuery
-        .mockResolvedValueOnce([])   // 5. AddToCart today
-        .mockResolvedValueOnce([])   // 6. AddToCart yesterday
-        .mockResolvedValueOnce([])   // 7. Checkout today
-        .mockResolvedValueOnce([])   // 8. Checkout yesterday
-        .mockResolvedValueOnce([])   // 9. Purchase today
-        .mockResolvedValueOnce([])   // 10. Purchase yesterday
-        .mockResolvedValueOnce([])   // 11. webhookBreakdown
-        .mockResolvedValueOnce([]);  // 12. campaigns
-
+      mockRaw.mockResolvedValueOnce([{ eventName: "PageView", today: true, currency: null, source: "snippet", status: "SENT", total: 5, value: null }]);
+      setupEmptyGroupByMocks();
 
       mockFindUnique.mockResolvedValue(null);
       mockGetOrderCount.mockResolvedValue(0);
@@ -456,8 +387,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total 24h
         .mockResolvedValueOnce(0)  // sent 24h
         .mockResolvedValueOnce(0)  // failed 24h
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d
@@ -483,8 +413,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total 24h
         .mockResolvedValueOnce(0)  // sent 24h
         .mockResolvedValueOnce(0)  // failed 24h
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d
@@ -508,8 +437,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total 24h
         .mockResolvedValueOnce(0)  // sent 24h
         .mockResolvedValueOnce(0)  // failed 24h
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d
@@ -533,8 +461,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total 24h
         .mockResolvedValueOnce(0)  // sent 24h
         .mockResolvedValueOnce(0)  // failed 24h
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d
@@ -558,8 +485,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total 24h
         .mockResolvedValueOnce(0)  // sent 24h
         .mockResolvedValueOnce(0)  // failed 24h
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d
@@ -585,8 +511,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total 24h
         .mockResolvedValueOnce(0)  // sent 24h
         .mockResolvedValueOnce(0)  // failed 24h
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d
@@ -610,8 +535,7 @@ describe("computeDashboardAnalytics", () => {
         .mockResolvedValueOnce(0)  // total 24h
         .mockResolvedValueOnce(0)  // sent 24h
         .mockResolvedValueOnce(0)  // failed 24h
-        .mockResolvedValueOnce(0)  // orders today
-        .mockResolvedValueOnce(0)  // orders yesterday
+
         .mockResolvedValueOnce(0)  // total7d
         .mockResolvedValueOnce(0)  // sent7d
         .mockResolvedValueOnce(0)  // failed7d

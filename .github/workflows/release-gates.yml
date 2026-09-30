@@ -22,10 +22,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 24]
+        include:
+          - node: 20
+            postgres: 16
+            redis: 7
+          - node: 24
+            postgres: 17
+            redis: 8.2
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:${{ matrix.postgres }}-alpine
         env:
           POSTGRES_DB: trackinglite_test
           POSTGRES_USER: trackclear
@@ -38,7 +44,7 @@ jobs:
           --health-timeout 5s
           --health-retries 12
       redis:
-        image: redis:7-alpine
+        image: redis:${{ matrix.redis }}-alpine
         ports:
           - 6379:6379
         options: >-
@@ -90,7 +96,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17-alpine
         env:
           POSTGRES_DB: trackinglite_test
           POSTGRES_USER: trackclear
@@ -103,7 +109,7 @@ jobs:
           --health-timeout 5s
           --health-retries 12
       redis:
-        image: redis:7-alpine
+        image: redis:8.2-alpine
         ports:
           - 6379:6379
         options: >-
@@ -159,8 +165,8 @@ jobs:
                   and .database == "connected"
                   and .redis == "connected"
                   and .startupReady == true
-                  and .workers == 11
-                  and .listenersReady == 11' >/dev/null
+                  and .workers == 12
+                  and .listenersReady == 12' >/dev/null
               exit 0
             fi
 
@@ -177,12 +183,16 @@ jobs:
         run: docker rm --force trackclear-worker-ci || true
 
   migration:
-    name: PostgreSQL 16 migration rehearsal
+    name: PostgreSQL ${{ matrix.postgres }} migration rehearsal
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [16, 17]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:${{ matrix.postgres }}-alpine
         env:
           POSTGRES_DB: trackinglite_test
           POSTGRES_USER: trackclear

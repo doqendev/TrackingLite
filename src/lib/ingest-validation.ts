@@ -9,6 +9,8 @@ const MAX_CUSTOM_DATA_ARRAY_ITEMS = 500;
 const MAX_CUSTOM_DATA_STRING_LENGTH = 8192;
 
 const CONSENT_REVOCATION_FORBIDDEN_CONTEXT_FIELDS = [
+  "oppref",
+  "opprefCapturedAt",
   "fbp",
   "fbc",
   "fbclid",
@@ -102,6 +104,7 @@ export function isPrivacyMinimizedConsentRevocation(payload: Record<string, unkn
 const destinationSchema = z.enum([
   "META",
   "TIKTOK",
+  "OPENAI",
   "GA4",
   "KLAVIYO",
   "REDDIT",
@@ -292,6 +295,8 @@ export const IngestPayloadSchema = z
     trackclearSessionId: nullableBoundedString(512),
     checkoutToken: nullableBoundedString(1024),
     cartToken: nullableBoundedString(1024),
+    oppref: nullableBoundedString(2048),
+    opprefCapturedAt: z.number().finite().positive().nullable().optional(),
     ttclid: nullableBoundedString(2048),
     ttp: nullableBoundedString(512),
     attributionTimestamp: z.number().finite().positive().nullable().optional(),
@@ -330,8 +335,8 @@ export const IngestPayloadSchema = z
       .optional()
       .default({}),
     customData: z.record(z.unknown()).optional().default({}),
-    onlyDestinations: z.array(destinationSchema).max(7).optional(),
-    excludeDestinations: z.array(destinationSchema).max(7).optional(),
+    onlyDestinations: z.array(destinationSchema).max(8).optional(),
+    excludeDestinations: z.array(destinationSchema).max(8).optional(),
   })
   .strict()
   .superRefine((payload, issues) => {

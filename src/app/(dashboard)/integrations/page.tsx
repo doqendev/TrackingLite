@@ -39,6 +39,9 @@ export default async function IntegrationsPage() {
         tiktokAccessTokenEncrypted: true,
         enableTikTok: true,
         tiktokBrowserTrackingEnabled: true,
+        openaiPixelId: true,
+        openaiApiKeyEncrypted: true,
+        enableOpenAI: true,
         // GA4
         ga4MeasurementId: true,
         ga4ApiSecretEncrypted: true,
@@ -86,6 +89,9 @@ export default async function IntegrationsPage() {
     id: workspace.id,
     productMode: resolveWorkspaceProductMode(workspace),
     installType: resolveWorkspaceInstallType(workspace),
+    openaiPixelId: workspace.openaiPixelId,
+    hasOpenAIApiKey: !!workspace.openaiApiKeyEncrypted,
+    enableOpenAI: workspace.enableOpenAI,
     // Meta
     metaPixelId: workspace.metaPixelId,
     metaTestEventCode: workspace.metaTestEventCode,

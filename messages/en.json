@@ -37,7 +37,7 @@
   },
   "dashboard": {
     "noDestinations": "No destinations configured",
-    "noDestinationsDesc": "Connect at least one platform (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest, or Google Ads) to start forwarding events.",
+    "noDestinationsDesc": "Connect at least one platform (Meta, TikTok, ChatGPT Ads, GA4, Klaviyo, Reddit, Pinterest, or Google Ads) to start forwarding events.",
     "ordersThisMonth": "Orders This Month",
     "ofOrdersTracked": "of {limit} orders tracked",
     "installSnippet": "Install your snippet to start tracking purchases.",
@@ -400,7 +400,7 @@
     "shopifyStep1": "Go to Settings > Customer Events in your Shopify admin",
     "shopifyStep2": "Add the Custom Pixel snippet and click Save & Connect",
     "shopifyStep3": "Add the Cart Attribution Helper to theme.liquid before </head> or to a Custom Liquid/theme app block",
-    "shopifyStep4": "Configure the Shopify webhook, connect Meta and TikTok, then confirm AddToCart and webhook Purchase events in Tracking Health",
+    "shopifyStep4": "Configure the Shopify webhook and your Meta, TikTok or ChatGPT Ads integrations, then verify AddToCart and webhook Purchase delivery in Tracking Health",
     "trackedEvents": "Events that will be tracked:",
     "skipForNow": "Skip for now",
     "continueToVerify": "Continue",
@@ -421,7 +421,8 @@
     "domainTaken": "This store is already registered by another account",
     "domainNotShopify": "Could not verify as a Shopify store. You can still continue.",
     "domainError": "Could not verify store. Please try again.",
-    "workspaceLimitReached": "You've reached the store limit for your plan. Upgrade to add more stores."
+    "workspaceLimitReached": "You've reached the store limit for your plan. Upgrade to add more stores.",
+    "openaiDescription": "Server-side conversion tracking for ChatGPT Ads."
   },
   "auth": {
     "signIn": "Sign in",
@@ -461,5 +462,29 @@
     "passwordResetSuccess": "Password reset successful. You can now sign in.",
     "invalidToken": "Invalid or expired reset token.",
     "somethingWentWrong": "Something went wrong. Please try again."
+  },
+  "openaiIntegration": {
+    "description": "Server-side conversion tracking for ChatGPT Ads.",
+    "saved": "Credentials saved; delivery still needs verification.",
+    "validated": "Credentials validated",
+    "notConfigured": "Not configured",
+    "pixelId": "Pixel ID",
+    "apiKey": "Conversions API key",
+    "keySaved": "Saved securely; enter a new key to replace it",
+    "enableAfterValidation": "Enable delivery after validation",
+    "step1": "Create or select a web data source for this store in",
+    "step2": "Copy its Pixel ID and generate a Conversions API key. Use a dedicated pixel for each store.",
+    "step3": "Create conversion events and select order_created for your campaign. Install the Track Clear Custom Pixel, Cart Helper, and Shopify orders/paid webhook.",
+    "validationNote": "Validation sends a non-recording request. It does not create a conversion or prove campaign attribution.",
+    "saveValidate": "Save and validate",
+    "saving": "Validating…",
+    "disable": "Disable delivery",
+    "saveFailed": "Could not save settings. Check your connection and try again.",
+    "validationFailed": "Validation failed. Delivery remains disabled. Check the Pixel ID and Conversions API key.",
+    "enabledMessage": "Credentials validated and delivery enabled. Verify real events in Tracking Health and Ads Manager.",
+    "validatedMessage": "Credentials validated. Delivery is disabled.",
+    "disabledMessage": "Delivery disabled.",
+    "verifyNote": "Verify all five events, Purchase deduplication, and consent before relying on campaign reporting.",
+    "trackingHealth": "Tracking Health"
   }
 }

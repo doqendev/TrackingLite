@@ -37,6 +37,7 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/queue", () => ({
   getEventQueue: () => mocks.queues.META,
   getTiktokQueue: () => mocks.queues.TIKTOK,
+  getOpenAIQueue: vi.fn(),
   getGA4Queue: () => mocks.queues.GA4,
   getKlaviyoQueue: () => mocks.queues.KLAVIYO,
   getRedditQueue: () => mocks.queues.REDDIT,

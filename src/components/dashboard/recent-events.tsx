@@ -28,6 +28,7 @@ function formatRelativeTime(date: Date): string {
 
 const destinationLabels: Record<Destination, { label: string; className: string }> = {
   META: { label: "Meta", className: "text-blue-400" },
+  OPENAI: { label: "ChatGPT Ads", className: "text-emerald-400" },
   TIKTOK: { label: "TikTok", className: "text-pink-400" },
   GA4: { label: "GA4", className: "text-green-400" },
   KLAVIYO: { label: "Klaviyo", className: "text-emerald-400" },

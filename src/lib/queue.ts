@@ -58,6 +58,13 @@ export function getTiktokQueue(): Queue {
   return _tiktokQueue;
 }
 
+let openaiQueue: Queue | null = null;
+export function getOpenAIQueue(): Queue {
+  return openaiQueue ??= new Queue(QUEUE_CONFIG.OPENAI_QUEUE_NAME, {
+    connection: getConnection() as never, defaultJobOptions,
+  });
+}
+
 // GA4 queue
 let _ga4Queue: Queue | null = null;
 
@@ -135,6 +142,11 @@ export interface MetaEventJob {
     trackclearSessionId?: string | null;
     hashedEmail?: string | null;
     hashedPhone?: string | null;
+    oppref?: string | null;
+    opprefCapturedAt?: number | null;
+    consent?: { analyticsAllowed?: boolean; marketingAllowed?: boolean; saleOfDataAllowed?: boolean };
+    openaiPixelId?: string | null;
+
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;
@@ -162,6 +174,11 @@ export interface DestinationEventJob {
     trackclearSessionId?: string | null;
     hashedEmail?: string | null;
     hashedPhone?: string | null;
+    oppref?: string | null;
+    opprefCapturedAt?: number | null;
+    consent?: { analyticsAllowed?: boolean; marketingAllowed?: boolean; saleOfDataAllowed?: boolean };
+    openaiPixelId?: string | null;
+
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;

@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Check, Copy, Loader2 } from "lucide-react";
-import { SiMeta, SiShopify, SiTiktok } from "react-icons/si";
+import { SiMeta, SiShopify, SiTiktok, SiOpenai } from "react-icons/si";
 
 type Step = 0 | 1 | 2;
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;
 
 const PLATFORMS = [
+  { key: "openai", color: "bg-emerald-500/15", textColor: "text-emerald-400", borderColor: "border-emerald-500/30", label: "ChatGPT Ads", descKey: "openaiDescription" as const, Icon: SiOpenai },
   { key: "shopifyWebhook", color: "bg-green-500/15", textColor: "text-green-400", borderColor: "border-green-500/30", label: "Shopify Webhook", descKey: "webhookDescription" as const, Icon: SiShopify },
   { key: "meta", color: "bg-blue-500/15", textColor: "text-blue-400", borderColor: "border-blue-500/30", label: "Meta", descKey: "metaDescription" as const, Icon: SiMeta },
   { key: "tiktok", color: "bg-pink-500/15", textColor: "text-pink-400", borderColor: "border-pink-500/30", label: "TikTok", descKey: "tiktokDescription" as const, Icon: SiTiktok },
@@ -332,7 +333,7 @@ export default function OnboardingPage() {
 
               <div>
                 <p className="mb-2 text-sm font-medium text-foreground">{t("cartHelperSnippet")}</p>
-                <p className="mb-2 text-xs text-muted-foreground">{t("cartHelperDescription")}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t.raw("cartHelperDescription")}</p>
                 <div className="relative">
                   <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
                     <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
@@ -368,7 +369,7 @@ export default function OnboardingPage() {
                   <ol className="list-decimal list-inside space-y-1.5 text-sm text-brand-300">
                     <li>{t("shopifyStep1")}</li>
                     <li>{t("shopifyStep2")}</li>
-                    <li>{t("shopifyStep3")}</li>
+                    <li>{t.raw("shopifyStep3")}</li>
                     <li>{t("shopifyStep4")}</li>
                   </ol>
                 </AlertDescription>

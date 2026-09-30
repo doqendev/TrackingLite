@@ -19,7 +19,7 @@ export async function GET(
 
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, isActive: true },
-    select: { id: true, consentMode: true },
+    select: { id: true, consentMode: true, enableOpenAI: true },
   });
 
   if (!workspace) {
@@ -30,7 +30,7 @@ export async function GET(
   }
 
   return new Response(
-    generateShopifyCartAttributionHelperCode(workspace.id, workspace.consentMode),
+    generateShopifyCartAttributionHelperCode(workspace.id, workspace.consentMode, workspace.enableOpenAI),
     {
       status: 200,
       headers: {
