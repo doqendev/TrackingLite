@@ -10,23 +10,31 @@
 - Original event time/pixel are durable, consent is rechecked at send, and old
   envelopes cannot be revived from BullMQ. Click age starts at URL capture and is
   independent of other platforms. Shopify canonical Purchase ownership is reused.
-- See `docs/chatgpt-ads.md`. PR #19 release `e3fa3a5259e253308cc714811b70a6827910f625`
-  is live: Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW`, Railway
-  `5ff0ce07-937e-400a-bff2-e94500e03f44`; 19 migrations, 11 required indexes,
+- See `docs/chatgpt-ads.md`. PRs #19/#20 release `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d`
+  is live: Vercel `dpl_4pQTgYYx87aQphu61uh3m7N3Mxv6`, Railway
+  `7f54c9ef-621d-4e0d-8f25-5fb09c2b122f`; 19 migrations, 11 required indexes,
   zero drift, 12/12 listeners, one worker fleet. Exact-SHA CI passed all five jobs.
-  Local build/typecheck/lint, 752 unit tests and 69 integration tests passed using
+  Local build/typecheck/lint, 752 unit tests and 70 integration tests passed using
   isolated PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and generated-pixel
   runtime behavior are covered. Live OpenAI credentials/events remain outstanding.
 - Preserve the required `PostgreSQL 16 migration rehearsal` branch check when
   expanding release coverage: the workflow now rehearses both PostgreSQL 16 and 17.
 - Local browser QA covers workspace creation, snippets, three integrations and
-  Add Store. Use `t.raw` for the literal `</head>` installation strings. The active
-  Mizoke Shopify login cannot access Infinite Layers; managing-account access is pending.
+  Add Store. Use `t.raw` for the literal `</head>` installation strings. Switching
+  Shopify and Track Clear to the existing Infinite Layers Google account resolved access.
 - Owned-store allowance is `UNLIMITED_WORKSPACE_USER_IDS`, separate from order limits.
   The connected ChatGPT Ads account inventory currently contains Mizoke only.
-- Infinite Layers production workspace is `cmuofe3gl0001e0e3srkt9gju`; installation
-  and credentials remain pending. Post-cutover existing Meta/TikTok queues drained,
-  with 74 SENT rows each and no pending/retrying rows in the observed window.
+- User selected existing IL workspace `cmlseil1700029vaisp5tkn5k`, owned by
+  `infinitelayersshop@gmail.com`. The empty Mizoke-account draft is inactive.
+  Standard Shopify mode and canonical domain are backfilled; credentials were not transferred.
+  Connected Custom Pixel `276791629` now uses bridge-v1 instead of the unavailable old
+  Railway endpoint. The live theme helper was installed through infinite-layers-theme PR #1
+  at `f1059e41ae74eee82b64faa8d20c5cbee7d383b8`. Signed orders/paid verification passed
+  through Shopify Send test, with zero destination conversions. Live browser/funnel QA is open.
+  User confirmed no Infinite Layers Ads account/source exists yet. Preserve native Meta
+  and wetracked integrations; Track Clear Meta is paused with its token saved to avoid duplicates.
+  Both owned accounts have workspace allowances; order limits are unchanged.
+  Post-cutover Meta/TikTok queues drained with 85 SENT rows each and no pending/retrying rows.
 - Vercel CLI does not use `.gitignore`. Fetch the approved GitHub `gitSource.sha`
   for production. An initial local upload was superseded and removed. `.vercelignore`
   excludes local credentials/prototypes from future CLI uploads; never inject Git SHA

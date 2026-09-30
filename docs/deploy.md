@@ -1,5 +1,26 @@
 # Deployment Runbook
 
+## Current release: 2026-09-30
+
+Approved runtime SHA: `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d` (PRs #19/#20).
+Exact-merge CI `36759317445` passed all five gates. Vercel production deployment is
+`dpl_4pQTgYYx87aQphu61uh3m7N3Mxv6`; Railway worker deployment is
+`7f54c9ef-621d-4e0d-8f25-5fb09c2b122f`. Nineteen migrations, 11 valid required indexes,
+zero drift, 12/12 listeners, one active worker fleet. Both health endpoints agree.
+
+The PR #20 cutover drained and stopped the old worker, verified encrypted database,
+Redis and provider-config restore points, deployed the exact GitHub source, waited
+for old web invocations to finish, and then started the matching worker. Restore
+points are under `E:\backups\trackclear\2026-09-30-chatgpt-pre-release` and
+`E:\backups\trackclear\2026-09-30-chatgpt-onboarding-fix`; keys are DPAPI-protected.
+
+The final Vercel deployment activates the same code SHA with both user-confirmed
+owned accounts in `UNLIMITED_WORKSPACE_USER_IDS`. Railway received the same variable
+with `--skip-deploys`; this web-only allowance did not require restarting its worker.
+It does not change Stripe or order limits. Keep the exact release pin intact.
+
+The following sections retain older migration/release details for reference.
+
 ## 2026-07-27 Tracking Hardening and 2026-07-30 Internal Attribution Releases
 
 This release is schema-first and mixed-version-sensitive. The database changes

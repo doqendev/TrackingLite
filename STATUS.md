@@ -9,31 +9,46 @@ commerce reporting. New owned stores can receive an account-level workspace allo
 Mizoke is excluded from OpenAI activation. Infinite Layers (`afd09a.myshopify.com`)
 is the selected first live store. Full details: `docs/chatgpt-ads.md`.
 
-Local candidate checks: production build and TypeScript pass; lint has only existing
-image warnings; 752 unit tests and 69 integration tests pass locally on isolated
+Release checks: production build and TypeScript pass; lint has only existing
+image warnings; 752 unit tests and 70 integration tests pass locally on isolated
 PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and the generated pixel's
-event-time, checkout-enrichment and consent paths are covered. CI remains pending.
-The candidate adds two migrations and increases workers/listeners from 11 to 12.
+event-time, checkout-enrichment and consent paths are covered. Exact-release CI passed.
+The release adds two migrations and increases workers/listeners from 11 to 12.
 Initial CI passed both runtime builds, the worker container and PostgreSQL 17
 rehearsal. The final workflow also retains PostgreSQL 16's required protection check.
 Browser QA passed new-store onboarding and the integration screen in an isolated
 local database. Fixed pre-existing raw translation keys caused by literal `</head>`
-in the two Cart Helper instructions. Infinite Layers Shopify access needs a different
-account: the currently signed-in Mizoke account is denied access.
-PR #19 is deployed at `e3fa3a5259e253308cc714811b70a6827910f625`:
-Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW` and Railway
-`5ff0ce07-937e-400a-bff2-e94500e03f44`. Exact-merge CI `36747972761` passed all
+in the two Cart Helper instructions. Shopify and Track Clear are now signed into the
+correct Infinite Layers account.
+PRs #19/#20 are deployed at `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d`:
+Vercel `dpl_4pQTgYYx87aQphu61uh3m7N3Mxv6` and Railway
+`7f54c9ef-621d-4e0d-8f25-5fb09c2b122f`. Exact-merge CI `36759317445` passed all
 five gates. Production has 19 migrations, 11 valid required indexes and zero drift;
 web and worker health agree on the release, with 12/12 listeners ready and one fleet.
 Encrypted database/Redis/config restore points were verified before the cutover.
 The CLI upload included ignored files; it was replaced with the exact GitHub source
 deployment and removed. Future releases use `gitSource.sha`; `.vercelignore` protects
 local CLI uploads. No release gate was weakened or commit variable fabricated.
-Post-cutover checks found 74 META and 74 TIKTOK SENT rows in the observed window,
+Post-cutover checks found 85 META and 85 TIKTOK SENT rows in the observed window,
 no unresolved PENDING/RETRYING rows, and empty delivery queues. Mizoke was not migrated.
-Infinite Layers workspace `cmuofe3gl0001e0e3srkt9gju` exists in production. The connected
-Ads Manager exposes only Mizoke; Infinite Layers credentials and Shopify access are
-pending, so live OpenAI delivery and campaign attribution are not yet verified.
+Infinite Layers uses existing IL workspace `cmlseil1700029vaisp5tkn5k` under
+`infinitelayersshop@gmail.com`, as explicitly selected by the user. The empty draft
+`cmuofe3gl0001e0e3srkt9gju` under Mizoke is inactive. Both owned accounts have the
+explicit store allowance, independent of unchanged order entitlements.
+The connected Custom Pixel `276791629` now contains the exact current bridge,
+replacing the unavailable old Railway collector. Its remote script is HTTP 200 and
+both scripts parse. Theme PR #1 adds only the async Cart Helper include to the live
+theme `194567373133`; the live storefront contains it at theme commit
+`f1059e41ae74eee82b64faa8d20c5cbee7d383b8`.
+The encrypted signed orders/paid webhook uses JSON/API 2026-07. Shopify Send test
+passed HMAC verification at 18:56 UTC, with no destination conversion emitted.
+Native Meta and wetracked integrations remain installed. Track Clear Meta is paused
+with credentials retained; TikTok/OpenAI remain disabled pending platform ownership.
+The user confirmed Infinite Layers has no ChatGPT Ads account/data source yet.
+Live OpenAI delivery, paid Purchase reconciliation and attribution are therefore open.
+Browser Pixel Helper reached "awaiting consent" then "Did not load" while Shopify
+privacy-banner requests failed. Saved code integrity is verified; blocker diagnosis
+and browser event verification remain open. No privacy requirements were weakened.
 Live onboarding also exposed a pre-existing second-store selection bug. The follow-up
 sets the active-store cookie during creation and refreshes prefetched dashboard pages.
 The same follow-up recognizes OpenAI-only dashboard configuration and removes the
@@ -43,19 +58,20 @@ or settings from appearing under the newly selected store.
 Browser regression checks pass for new-store handoff, draft clearing on store switch
 and OpenAI-only dashboard readiness. ChatGPT card buttons wrap in narrow columns.
 
-Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` after purchase identity write-back; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
+Last updated: 2026-09-30. Track Clear is live at the release above; the older dated
+release records below are historical. Mizoke was not migrated in this rollout.
 
 ## Build Health
 
 | Metric | Status |
 |--------|--------|
 | Build (`pnpm build`) | Compiles on local Node 22; release CI enforces a Node 20 standalone build and a Node 24 non-standalone production build |
-| Unit tests | 704/704 passing (58 files) on local Node 22 and in the PR #15 release CI Node 20/24 gates at the deployed SHA |
-| Integration tests | 62/62 passing (7 files) in live-release CI against PostgreSQL 16/Redis 7; the 2026-08-01 local attempt stopped in setup because loopback PostgreSQL on port 5433 and Redis were unavailable after the workstation restart |
-| Migrations | All 17 repository migrations are applied in production, including `20260730_add_internal_analytics_destination`; 11/11 required indexes are valid and Prisma drift is zero |
+| Unit tests | 752 passing locally and in the release CI Node 20/24 gates |
+| Integration tests | 70 passing across 8 files; release CI covers PostgreSQL 16/Redis 7 and PostgreSQL 17/Redis 8.2 |
+| Migrations | All 19 repository migrations applied; 11/11 required indexes valid and zero Prisma drift |
 | TypeScript | `pnpm exec tsc --noEmit` passes cleanly |
 | ESLint | Passes with pre-existing `<img>` optimization warnings |
-| Production release | Approved SHA `9abd702f84ef622d6dd1d36b630231e90377fcbb`; Vercel Git deployment disabled; Railway GitHub auto deploy disabled (branch `main` connected, auto deploy off, "Wait for CI" off), so merges never deploy on their own; both providers pinned to the production database identity |
+| Production release | Approved SHA `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d`; 12/12 listeners, one worker fleet, both providers pinned to the production database identity; automatic deployments remain disabled |
 
 ## 2026-08-09 Uncapped Internal Accounts
 
