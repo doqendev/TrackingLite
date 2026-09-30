@@ -118,11 +118,11 @@ model Workspace {
   tiktokBrowserTrackingEnabled Boolean @default(false)
 
   // ChatGPT Ads: server-side delivery, separately enabled for each store.
-  openaiPixelId              String?
-  openaiApiKeyEncrypted      String?
-  openaiApiKeyIv             String?
-  openaiApiKeyTag            String?
-  enableOpenAI               Boolean @default(false)
+  openaiPixelId         String?
+  openaiApiKeyEncrypted String?
+  openaiApiKeyIv        String?
+  openaiApiKeyTag       String?
+  enableOpenAI          Boolean @default(false)
 
   // GA4 fields
   ga4MeasurementId      String?
