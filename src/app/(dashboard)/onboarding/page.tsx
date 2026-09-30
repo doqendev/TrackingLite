@@ -333,7 +333,7 @@ export default function OnboardingPage() {
 
               <div>
                 <p className="mb-2 text-sm font-medium text-foreground">{t("cartHelperSnippet")}</p>
-                <p className="mb-2 text-xs text-muted-foreground">{t("cartHelperDescription")}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t.raw("cartHelperDescription")}</p>
                 <div className="relative">
                   <div className="bg-black/60 border border-white/[0.06] rounded-lg overflow-hidden">
                     <pre className="p-4 text-xs text-foreground/60 leading-relaxed font-mono whitespace-pre-wrap break-all max-h-24 overflow-hidden">
@@ -369,7 +369,7 @@ export default function OnboardingPage() {
                   <ol className="list-decimal list-inside space-y-1.5 text-sm text-brand-300">
                     <li>{t("shopifyStep1")}</li>
                     <li>{t("shopifyStep2")}</li>
-                    <li>{t("shopifyStep3")}</li>
+                    <li>{t.raw("shopifyStep3")}</li>
                     <li>{t("shopifyStep4")}</li>
                   </ol>
                 </AlertDescription>

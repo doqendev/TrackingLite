@@ -16,6 +16,10 @@ event-time, checkout-enrichment and consent paths are covered. CI remains pendin
 The candidate adds two migrations and increases workers/listeners from 11 to 12.
 Initial CI passed both runtime builds, the worker container and PostgreSQL 17
 rehearsal. The final workflow also retains PostgreSQL 16's required protection check.
+Browser QA passed new-store onboarding and the integration screen in an isolated
+local database. Fixed pre-existing raw translation keys caused by literal `</head>`
+in the two Cart Helper instructions. Infinite Layers Shopify access needs a different
+account: the currently signed-in Mizoke account is denied access.
 No production deploy or live destination activation has occurred. The connected
 Ads Manager currently exposes only Mizoke; Infinite Layers credentials are pending.
 

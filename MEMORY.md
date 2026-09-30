@@ -16,6 +16,9 @@
   runtime behavior are covered. CI and live verification remain outstanding.
 - Preserve the required `PostgreSQL 16 migration rehearsal` branch check when
   expanding release coverage: the workflow now rehearses both PostgreSQL 16 and 17.
+- Local browser QA covers workspace creation, snippets, three integrations and
+  Add Store. Use `t.raw` for the literal `</head>` installation strings. The active
+  Mizoke Shopify login cannot access Infinite Layers; managing-account access is pending.
 - Owned-store allowance is `UNLIMITED_WORKSPACE_USER_IDS`, separate from order limits.
   The connected ChatGPT Ads account inventory currently contains Mizoke only.
 
