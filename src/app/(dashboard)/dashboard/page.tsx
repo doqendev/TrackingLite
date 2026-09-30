@@ -174,8 +174,8 @@ export default async function DashboardPage() {
             <p className="text-sm font-semibold text-amber-400">No destinations configured</p>
             <p className="text-sm text-amber-400/80 mt-0.5">
               {isShopifyV1
-                ? "Connect Meta or TikTok to start forwarding events."
-                : "Connect at least one platform (Meta, TikTok, GA4, Klaviyo, Reddit, or Pinterest) to start forwarding events."}
+                ? "Connect Meta, TikTok or ChatGPT Ads to start forwarding events."
+                : "Connect at least one platform in Integrations to start forwarding events."}
             </p>
           </AlertDescription>
           <Button variant="outline" size="sm" className="border-amber-500/20 text-amber-400 hover:bg-amber-500/10 flex-shrink-0" asChild>
