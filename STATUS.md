@@ -1,6 +1,6 @@
 # Track Clear --- Project Status & Audit
 
-## 2026-09-30 ChatGPT Ads implementation candidate
+## 2026-09-30 ChatGPT Ads production release
 
 Standard Shopify now has an `OPENAI` destination, credentials/setup UI, a non-recording
 validation request, dedicated worker, 30-day click context, consent-safe retries,
@@ -20,8 +20,28 @@ Browser QA passed new-store onboarding and the integration screen in an isolated
 local database. Fixed pre-existing raw translation keys caused by literal `</head>`
 in the two Cart Helper instructions. Infinite Layers Shopify access needs a different
 account: the currently signed-in Mizoke account is denied access.
-No production deploy or live destination activation has occurred. The connected
-Ads Manager currently exposes only Mizoke; Infinite Layers credentials are pending.
+PR #19 is deployed at `e3fa3a5259e253308cc714811b70a6827910f625`:
+Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW` and Railway
+`5ff0ce07-937e-400a-bff2-e94500e03f44`. Exact-merge CI `36747972761` passed all
+five gates. Production has 19 migrations, 11 valid required indexes and zero drift;
+web and worker health agree on the release, with 12/12 listeners ready and one fleet.
+Encrypted database/Redis/config restore points were verified before the cutover.
+The CLI upload included ignored files; it was replaced with the exact GitHub source
+deployment and removed. Future releases use `gitSource.sha`; `.vercelignore` protects
+local CLI uploads. No release gate was weakened or commit variable fabricated.
+Post-cutover checks found 74 META and 74 TIKTOK SENT rows in the observed window,
+no unresolved PENDING/RETRYING rows, and empty delivery queues. Mizoke was not migrated.
+Infinite Layers workspace `cmuofe3gl0001e0e3srkt9gju` exists in production. The connected
+Ads Manager exposes only Mizoke; Infinite Layers credentials and Shopify access are
+pending, so live OpenAI delivery and campaign attribution are not yet verified.
+Live onboarding also exposed a pre-existing second-store selection bug. The follow-up
+sets the active-store cookie during creation and refreshes prefetched dashboard pages.
+The same follow-up recognizes OpenAI-only dashboard configuration and removes the
+obsolete assumption that standard Shopify has exactly two allowed destinations.
+Integration/settings forms reset on workspace changes, preventing stale credentials
+or settings from appearing under the newly selected store.
+Browser regression checks pass for new-store handoff, draft clearing on store switch
+and OpenAI-only dashboard readiness. ChatGPT card buttons wrap in narrow columns.
 
 Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` after purchase identity write-back; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
 

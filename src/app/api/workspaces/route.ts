@@ -132,8 +132,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Return full API key only on creation
-    return NextResponse.json({ ...workspace, apiKey }, { status: 201 });
+    // Select the newly created store before onboarding opens its integrations.
+    // Otherwise an existing active-store cookie can send credentials to the old store.
+    const response = NextResponse.json({ ...workspace, apiKey }, { status: 201 });
+    response.cookies.set("activeWorkspaceId", workspace.id, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 365 * 24 * 60 * 60,
+    });
+    return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

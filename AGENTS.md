@@ -22,9 +22,9 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
-### 2026-09-30 implementation candidate: standard Shopify ChatGPT Ads
+### 2026-09-30 live release: standard Shopify ChatGPT Ads
 
-The working branch adds `OPENAI` to standard Shopify workspaces alongside Meta/TikTok,
+Release `e3fa3a5259e253308cc714811b70a6827910f625` (PR #19) adds `OPENAI` to standard Shopify workspaces alongside Meta/TikTok,
 with encrypted credentials, non-recording validation, original-time/pixel-bound
 delivery, consent/tombstone rechecks, independent 30-day `oppref` capture, cart and
 webhook enrichment, recovery, diagnostics and six-language setup. OpenAI stays off
@@ -37,8 +37,11 @@ New modules: `destinations/openai.ts`, `openai-click-context.ts`,
 `components/integrations/openai-integration.tsx`. New migrations:
 `20260930_add_openai_destination`, `20260930_add_openai_delivery_fields`. Candidate
 worker count is 12. `UNLIMITED_WORKSPACE_USER_IDS` provides an explicit account-level
-store allowance independent of order exemptions and Stripe. These candidate changes
-are **not yet deployed**; the historical production release details below remain.
+store allowance independent of order exemptions and Stripe. The release is deployed:
+Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW`, Railway
+`5ff0ce07-937e-400a-bff2-e94500e03f44`. Both health endpoints report the exact SHA;
+all 12 listeners are ready. Nineteen migrations, 11 required indexes, zero drift.
+The older production details below are historical.
 Candidate checks: 752 unit tests and 69 integration tests pass locally, including
 generated Custom Pixel execution and signed Shopify webhook Purchase reconciliation.
 Phone normalization uses country metadata for OpenAI; other destination normalizers
@@ -48,6 +51,21 @@ check name) and production's PostgreSQL 17. Preserve that required check.
 Browser QA verified new-store creation, both installation snippets, the three
 integration cards and Add Store. Literal `</head>` installation text uses `t.raw`
 so next-intl does not parse it as an unmatched rich-text tag.
+Production verification created Infinite Layers workspace `cmuofe3gl0001e0e3srkt9gju`.
+Its Shopify installation and ad credentials remain pending; no live OpenAI delivery
+is claimed. The active Shopify login cannot manage Infinite Layers. Existing Meta
+and TikTok resumed after the cutover (74 SENT rows each in the observed window,
+zero PENDING/RETRYING rows). Mizoke remains headless with OpenAI disabled.
+Follow-up: workspace creation selects the new active-store cookie and refreshes
+prefetched pages, preventing second-store onboarding from reopening the old store.
+Dashboard setup readiness recognizes an OpenAI-only store and resolves product
+mode explicitly instead of assuming standard Shopify has exactly two destinations.
+Integration/settings forms remount by workspace ID so switching stores cannot keep
+the previous store's credential drafts, connection badges or settings values.
+Browser regression checks cover second-store handoff, draft clearing on switching,
+and OpenAI-only dashboard readiness. ChatGPT card actions wrap within narrow columns.
+Vercel production must fetch `gitSource.sha` from GitHub: CLI uploads ignore
+`.gitignore`; `.vercelignore` also excludes local secrets, build output and prototypes.
 
 **Purchase identity write-back is live in production at exact Track Clear release SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69`** (PR #15: the verified Purchase webhook stores hashed purchaser identity so returning guests match on later funnel events). It follows session identity carry-forward at SHA `b7b8643942c1441fc74e72266df9f545214983ce` (PR #13: hashed shopper identity persists across a session so later anonymous funnel events still match). It follows the 2026-08-03 Custom Pixel Web Locks fix at SHA `30c3813d385d8c157f7a2aeec8f67173ab509688` (PR #11: restored all Custom Pixel browser event delivery, which a denied Web Locks API had silently blocked since 2026-07-27). It follows the 2026-08-02 Meta/TikTok match-quality release (PR #9: 90-second Meta+TikTok checkout contact enrichment, hashed session-ID external_id, contents arrays on funnel events, fb.\<n\> cookie validation). It followed the 2026-08-01 location-aware consent and sale/sharing release (PR #6), which deployed through a controlled Vercel/Railway cutover with the old worker stopped until both runtimes were ready. Current state:
 - Track Clear and the Mizoke Hydrogen storefront now use Shopify's computed Customer Privacy permissions for location-aware defaults and carry `saleOfDataAllowed` end to end. When Shopify allows tracking before a decision, Mizoke can track without forcing an opt-in; where Shopify requires opt-in, it stays off and shows the consent UI. Any explicit rejection, GPC, or sale/sharing opt-out remains authoritative: Meta/TikTok browser and server delivery are blocked, advertising identifiers are removed from cart/session enrichment, and only the existing privacy-minimized `INTERNAL` path may record an event when analytics is explicitly allowed. Mizoke is live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c` after its AddToCart/InitiateCheckout analytics-only dispatch and strict Track Clear proxy payload contract were repaired.

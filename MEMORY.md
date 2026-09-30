@@ -1,6 +1,6 @@
 # MEMORY.md
 
-## 2026-09-30 - Standard Shopify ChatGPT Ads candidate
+## 2026-09-30 - Standard Shopify ChatGPT Ads release
 
 - User authorized implementation through usable new-store onboarding. Standard
   Shopify is first; Mizoke migration is explicitly deferred. Infinite Layers
@@ -10,10 +10,13 @@
 - Original event time/pixel are durable, consent is rechecked at send, and old
   envelopes cannot be revived from BullMQ. Click age starts at URL capture and is
   independent of other platforms. Shopify canonical Purchase ownership is reused.
-- See `docs/chatgpt-ads.md`. Candidate migrations and the 12th worker are not deployed.
+- See `docs/chatgpt-ads.md`. PR #19 release `e3fa3a5259e253308cc714811b70a6827910f625`
+  is live: Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW`, Railway
+  `5ff0ce07-937e-400a-bff2-e94500e03f44`; 19 migrations, 11 required indexes,
+  zero drift, 12/12 listeners, one worker fleet. Exact-SHA CI passed all five jobs.
   Local build/typecheck/lint, 752 unit tests and 69 integration tests passed using
   isolated PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and generated-pixel
-  runtime behavior are covered. CI and live verification remain outstanding.
+  runtime behavior are covered. Live OpenAI credentials/events remain outstanding.
 - Preserve the required `PostgreSQL 16 migration rehearsal` branch check when
   expanding release coverage: the workflow now rehearses both PostgreSQL 16 and 17.
 - Local browser QA covers workspace creation, snippets, three integrations and
@@ -21,6 +24,21 @@
   Mizoke Shopify login cannot access Infinite Layers; managing-account access is pending.
 - Owned-store allowance is `UNLIMITED_WORKSPACE_USER_IDS`, separate from order limits.
   The connected ChatGPT Ads account inventory currently contains Mizoke only.
+- Infinite Layers production workspace is `cmuofe3gl0001e0e3srkt9gju`; installation
+  and credentials remain pending. Post-cutover existing Meta/TikTok queues drained,
+  with 74 SENT rows each and no pending/retrying rows in the observed window.
+- Vercel CLI does not use `.gitignore`. Fetch the approved GitHub `gitSource.sha`
+  for production. An initial local upload was superseded and removed. `.vercelignore`
+  excludes local credentials/prototypes from future CLI uploads; never inject Git SHA
+  environment values to bypass provider provenance checks.
+- Second-store onboarding must select the created workspace before opening Integrations.
+  Creation now writes its active-store cookie and refreshes the Next router cache.
+- Dashboard readiness includes OpenAI credentials; use the product mode resolver,
+  not an allowlist-length check, now that standard Shopify has three destinations.
+- Key integration/settings client forms by workspace ID. Router refresh preserves
+  component state; without a key, the old store's credential drafts can survive a switch.
+- Browser regression verification passed second-store handoff, draft clearing and
+  OpenAI-only readiness. Wrap ChatGPT card actions to avoid overflowing the three-column grid.
 
 ## 2026-08-02 - Mizoke Funnel Tracking Contract Repair
 

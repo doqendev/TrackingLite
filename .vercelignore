@@ -1,0 +1,30 @@
+# CLI uploads do not inherit .gitignore. Production releases should fetch the
+# approved GitHub SHA directly; these exclusions also protect local CLI previews.
+node_modules/
+.next/
+out/
+build/
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+*.log
+build-*.txt
+vitest-*.txt
+coverage/
+.vitest/
+.omc/
+.claude/
+.vscode/
+.idea/
+.vercel/
+worker/
+*.pem
+src/app/pixel-null/
+src/components/pixel-null/
+pixel-null-dashboard-preview.html
+*.pen
+tmp-*.js
+images/
+Screenshot_*.png
+Gemini_Generated_Image_*

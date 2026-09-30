@@ -1,7 +1,9 @@
 # ChatGPT Ads for standard Shopify stores
 
-Implementation candidate dated 2026-09-30. Production is still release
-`9abd702f84ef622d6dd1d36b630231e90377fcbb` until a controlled deployment is recorded.
+Released 2026-09-30 at `e3fa3a5259e253308cc714811b70a6827910f625` (PR #19).
+Vercel `dpl_DNg82GY6LGScLGzFTAV6NyxeKmqW` and Railway
+`5ff0ce07-937e-400a-bff2-e94500e03f44` report that exact commit. The first live
+store's installation, credentials, delivery and attribution checks remain pending.
 
 ## Store setup
 
@@ -88,7 +90,11 @@ isolated loopback PostgreSQL 17 and Redis 8.8, including signed-webhook/browser
 Purchase reconciliation. The generated Custom Pixel executes in a browser-API
 harness covering original timestamps, click lifetime, contact enrichment and denial.
 TypeScript and lint pass (existing image warnings); the initial production build
-passed. CI, live credentials, actual events and campaign attribution remain release work.
+passed. Exact-merge CI `36747972761` passed all five gates. Production schema and
+12-listener health passed; existing Meta/TikTok queues drained successfully.
+Infinite Layers workspace `cmuofe3gl0001e0e3srkt9gju` was created through production
+onboarding. Its Shopify managing account and ChatGPT Ads credentials are still needed.
+No OpenAI live conversion or campaign attribution has been claimed as verified.
 
 Official contract: https://developers.openai.com/ads/conversions-api and
 https://developers.openai.com/ads/supported-events (checked 2026-09-30).

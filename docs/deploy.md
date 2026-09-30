@@ -174,6 +174,13 @@ listener has passed `waitUntilReady()` and the startup latch is set.
    if the effective provider maximum is larger, use that larger value. Require
    parsed health JSON, not only HTTP 200, to report the exact full 40-character
    release commit plus connected database, ready schema, and Redis.
+   Prefer Vercel's Create Deployment API with the linked GitHub repository,
+   `target: production`, and `gitSource.sha` set to the approved full SHA. This
+   makes Vercel fetch tracked source and supply its own Git commit identity.
+   Do not upload the everyday working directory: Vercel CLI does not inherit
+   `.gitignore`. The repository's `.vercelignore` is an additional safeguard,
+   not a substitute for source provenance. A detached worktree CLI deployment
+   may omit `VERCEL_GIT_COMMIT_SHA`; never inject that variable to bypass the gate.
 7. Start the exact approved worker SHA as one fleet. Its idempotent predeploy
    repeats the migration/status/index/drift gates. Verify all eleven queues,
    including `shopify-webhook-inbox`, are listening without schema errors. The

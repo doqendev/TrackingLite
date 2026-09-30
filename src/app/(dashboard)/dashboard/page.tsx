@@ -5,7 +5,7 @@ import { getActiveWorkspace } from "@/lib/active-workspace";
 import Link from "next/link";
 import { computeDashboardAnalytics } from "@/lib/analytics";
 import { getCachedAnalytics } from "@/lib/analytics-cache";
-import { getAllowedDestinationsForWorkspace } from "@/lib/workspace-mode";
+import { getAllowedDestinationsForWorkspace, resolveWorkspaceProductMode, SHOPIFY_META_TIKTOK_V1 } from "@/lib/workspace-mode";
 
 import { getOrderCount } from "@/lib/billing";
 import { BILLING_PLANS } from "@/lib/constants";
@@ -57,6 +57,9 @@ export default async function DashboardPage() {
         enableTikTok: true,
         tiktokPixelId: true,
         tiktokAccessTokenEncrypted: true,
+        enableOpenAI: true,
+        openaiPixelId: true,
+        openaiApiKeyEncrypted: true,
         enableGA4: true,
         enableKlaviyo: true,
         enableReddit: true,
@@ -70,14 +73,15 @@ export default async function DashboardPage() {
 
     // Check which destinations are visible for this product mode.
     const allowedDestinations = getAllowedDestinationsForWorkspace(workspace);
-    isShopifyV1 = allowedDestinations.length === 2 &&
-      allowedDestinations.includes("META") &&
-      allowedDestinations.includes("TIKTOK");
+    isShopifyV1 = resolveWorkspaceProductMode(workspace) === SHOPIFY_META_TIKTOK_V1;
     hasMetaCredentials = !!(workspace.enableMeta && workspace.metaPixelId && workspace.metaAccessTokenEncrypted);
     const hasTikTokCredentials = !!(workspace.enableTikTok && workspace.tiktokPixelId && workspace.tiktokAccessTokenEncrypted);
+    const hasOpenAICredentials = allowedDestinations.includes("OPENAI") && !!(
+      workspace.enableOpenAI && workspace.openaiPixelId && workspace.openaiApiKeyEncrypted
+    );
     hasAnyDestination = isShopifyV1
-      ? hasMetaCredentials || hasTikTokCredentials
-      : hasMetaCredentials || hasTikTokCredentials || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
+      ? hasMetaCredentials || hasTikTokCredentials || hasOpenAICredentials
+      : hasMetaCredentials || hasTikTokCredentials || hasOpenAICredentials || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
 
     // Get user's display currency
     const user = await db.user.findUnique({
@@ -174,8 +178,8 @@ export default async function DashboardPage() {
             <p className="text-sm font-semibold text-amber-400">No destinations configured</p>
             <p className="text-sm text-amber-400/80 mt-0.5">
               {isShopifyV1
-                ? "Connect Meta or TikTok to start forwarding events."
-                : "Connect at least one platform (Meta, TikTok, GA4, Klaviyo, Reddit, or Pinterest) to start forwarding events."}
+                ? "Connect Meta, TikTok or ChatGPT Ads to start forwarding events."
+                : "Connect at least one platform in Integrations to start forwarding events."}
             </p>
           </AlertDescription>
           <Button variant="outline" size="sm" className="border-amber-500/20 text-amber-400 hover:bg-amber-500/10 flex-shrink-0" asChild>

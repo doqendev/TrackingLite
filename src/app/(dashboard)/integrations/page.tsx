@@ -140,7 +140,7 @@ export default async function IntegrationsPage() {
         </p>
       </div>
 
-      <IntegrationsGrid workspace={workspaceForClient} />
+      <IntegrationsGrid key={workspaceForClient.id} workspace={workspaceForClient} />
     </div>
   );
 }
