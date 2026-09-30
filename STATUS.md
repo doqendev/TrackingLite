@@ -14,6 +14,8 @@ image warnings; 752 unit tests and 69 integration tests pass locally on isolated
 PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and the generated pixel's
 event-time, checkout-enrichment and consent paths are covered. CI remains pending.
 The candidate adds two migrations and increases workers/listeners from 11 to 12.
+Initial CI passed both runtime builds, the worker container and PostgreSQL 17
+rehearsal. The final workflow also retains PostgreSQL 16's required protection check.
 No production deploy or live destination activation has occurred. The connected
 Ads Manager currently exposes only Mizoke; Infinite Layers credentials are pending.
 

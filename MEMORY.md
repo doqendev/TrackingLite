@@ -14,6 +14,8 @@
   Local build/typecheck/lint, 752 unit tests and 69 integration tests passed using
   isolated PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and generated-pixel
   runtime behavior are covered. CI and live verification remain outstanding.
+- Preserve the required `PostgreSQL 16 migration rehearsal` branch check when
+  expanding release coverage: the workflow now rehearses both PostgreSQL 16 and 17.
 - Owned-store allowance is `UNLIMITED_WORKSPACE_USER_IDS`, separate from order limits.
   The connected ChatGPT Ads account inventory currently contains Mizoke only.
 

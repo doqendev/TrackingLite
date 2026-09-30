@@ -183,12 +183,16 @@ jobs:
         run: docker rm --force trackclear-worker-ci || true
 
   migration:
-    name: PostgreSQL 17 migration rehearsal
+    name: PostgreSQL ${{ matrix.postgres }} migration rehearsal
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [16, 17]
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:${{ matrix.postgres }}-alpine
         env:
           POSTGRES_DB: trackinglite_test
           POSTGRES_USER: trackclear
