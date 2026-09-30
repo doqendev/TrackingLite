@@ -1,5 +1,22 @@
 # MEMORY.md
 
+## 2026-09-30 - Standard Shopify ChatGPT Ads candidate
+
+- User authorized implementation through usable new-store onboarding. Standard
+  Shopify is first; Mizoke migration is explicitly deferred. Infinite Layers
+  (`www.infinitelayers.shop`, `afd09a.myshopify.com`) is the selected verification store.
+- `OPENAI` is disabled by default and rejected for headless installs. Five standard
+  commerce events use CAPI with `integration_source: trackclear`. No new browser SDK.
+- Original event time/pixel are durable, consent is rechecked at send, and old
+  envelopes cannot be revived from BullMQ. Click age starts at URL capture and is
+  independent of other platforms. Shopify canonical Purchase ownership is reused.
+- See `docs/chatgpt-ads.md`. Candidate migrations and the 12th worker are not deployed.
+  Local build/typecheck/lint, 752 unit tests and 69 integration tests passed using
+  isolated PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and generated-pixel
+  runtime behavior are covered. CI and live verification remain outstanding.
+- Owned-store allowance is `UNLIMITED_WORKSPACE_USER_IDS`, separate from order limits.
+  The connected ChatGPT Ads account inventory currently contains Mizoke only.
+
 ## 2026-08-02 - Mizoke Funnel Tracking Contract Repair
 
 - Mizoke is live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c` after PR #5 restored AddToCart/InitiateCheckout dispatch for analytics-allowed/advertising-denied sessions and PR #6 removed unsupported `requestId`, `ip`, and `userAgent` fields from the strict Track Clear ingest JSON body. Client IP and user agent remain available through the supported `X-TL-Client-*` headers.

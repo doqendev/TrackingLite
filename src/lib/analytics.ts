@@ -1,8 +1,8 @@
+import { queryLogicalCommerce, queryLogicalCampaigns } from "@/lib/logical-event-analytics";
 import { db } from "@/lib/db";
 import { Destination, EventName, EventStatus, Prisma } from "@prisma/client";
 import { BILLING_PLANS } from "@/lib/constants";
 import { getOrderCount } from "@/lib/billing";
-import { getExchangeRate } from "@/lib/currency";
 import type {
   DashboardAnalytics,
   HealthMetrics,
@@ -43,28 +43,6 @@ function getTimeWindows() {
   return { now, todayStart, yesterdayStart, since24h };
 }
 
-/**
- * Find the first destination used by a workspace.
- * Used to deduplicate the "All" view: since every event fans out to ALL
- * enabled destinations, filtering by any single one gives correct unique counts.
- */
-async function getCanonicalDestination(
-  workspaceId: string,
-  allowedDestinations?: readonly Destination[]
-): Promise<Destination | null> {
-  const first = await db.eventLog.findFirst({
-    where: {
-      workspaceId,
-      destination: allowedDestinations
-        ? { in: [...allowedDestinations] }
-        : { not: Destination.INTERNAL },
-    },
-    select: { destination: true },
-    orderBy: { createdAt: "asc" },
-  });
-  return first?.destination ?? null;
-}
-
 type DestinationWhere = Pick<Prisma.EventLogWhereInput, "destination">;
 
 function externalDestFilter(
@@ -78,14 +56,6 @@ function externalDestFilter(
   return { destination: { not: Destination.INTERNAL } };
 }
 
-function reportingDestFilter(
-  destination?: Destination | null
-): DestinationWhere {
-  return destination && destination !== Destination.INTERNAL
-    ? { destination: { in: [destination, Destination.INTERNAL] } }
-    : { destination: Destination.INTERNAL };
-}
-
 async function queryHealthMetrics(
   workspaceId: string,
   since24h: Date,
@@ -94,7 +64,7 @@ async function queryHealthMetrics(
   const [totalEvents24h, sentEvents24h, failedEvents24h, lastEvent] =
     await Promise.all([
       db.eventLog.count({
-        where: { workspaceId, createdAt: { gte: since24h }, ...df },
+        where: { workspaceId, status: { not: EventStatus.SUPERSEDED }, createdAt: { gte: since24h }, ...df },
       }),
       db.eventLog.count({
         where: {
@@ -134,227 +104,6 @@ async function queryHealthMetrics(
   };
 }
 
-/**
- * Collect exchange rates for all unique currencies in a set of grouped results.
- * Returns a Map from currency code → rate (relative to targetCurrency).
- */
-async function collectExchangeRates(
-  groups: Array<{ currency: string | null }>,
-  targetCurrency: string
-): Promise<Map<string, number>> {
-  const currencies = new Set<string>();
-  for (const g of groups) {
-    if (g.currency && g.currency !== targetCurrency) currencies.add(g.currency);
-  }
-
-  const rates = new Map<string, number>();
-  rates.set(targetCurrency, 1);
-
-  if (currencies.size > 0) {
-    await Promise.all(
-      Array.from(currencies).map(async (c) => {
-        rates.set(c, await getExchangeRate(c, targetCurrency));
-      })
-    );
-  }
-
-  return rates;
-}
-
-async function queryRevenueMetrics(
-  workspaceId: string,
-  todayStart: Date,
-  yesterdayStart: Date,
-  now: Date,
-  displayCurrency: string,
-  df: DestinationWhere
-): Promise<RevenueMetrics> {
-  const revenueEventTypes: EventName[] = [
-    "AddToCart",
-    "InitiateCheckout",
-    "Purchase",
-  ];
-
-  const revenueStatuses = { in: [EventStatus.SENT, EventStatus.PENDING, EventStatus.RETRYING] };
-
-  // Group by currency so mixed-currency events are converted before summing
-  const queries = revenueEventTypes.flatMap((eventName) => [
-    db.eventLog.groupBy({
-      by: ["currency"],
-      where: {
-        workspaceId,
-        eventName,
-        status: revenueStatuses,
-        createdAt: { gte: todayStart, lte: now },
-        ...df,
-      },
-      _sum: { value: true },
-    }),
-    db.eventLog.groupBy({
-      by: ["currency"],
-      where: {
-        workspaceId,
-        eventName,
-        status: revenueStatuses,
-        createdAt: { gte: yesterdayStart, lt: todayStart },
-        ...df,
-      },
-      _sum: { value: true },
-    }),
-  ]);
-
-  // Orders today/yesterday
-  const orderQueries = [
-    db.eventLog.count({
-      where: {
-        workspaceId,
-        eventName: "Purchase",
-        status: revenueStatuses,
-        createdAt: { gte: todayStart, lte: now },
-        ...df,
-      },
-    }),
-    db.eventLog.count({
-      where: {
-        workspaceId,
-        eventName: "Purchase",
-        status: revenueStatuses,
-        createdAt: { gte: yesterdayStart, lt: todayStart },
-        ...df,
-      },
-    }),
-  ];
-
-  // Webhook Purchase revenue grouped by payment gateway + currency
-  const webhookBreakdownQuery = db.eventLog.groupBy({
-    by: ["paymentGateway", "currency"],
-    where: {
-      workspaceId,
-      eventName: "Purchase",
-      source: "webhook",
-      status: { in: [EventStatus.SENT, EventStatus.PENDING, EventStatus.RETRYING] },
-      createdAt: { gte: todayStart, lte: now },
-      ...df,
-    },
-    _sum: { value: true },
-  });
-
-  // Split into two sub-batches to keep peak DB connections under 7
-  // Sub-batch A: 6 groupBy revenue queries
-  const results = await Promise.all(queries);
-  // Sub-batch B: 2 order counts + 1 webhook breakdown
-  const [ordersToday, ordersYesterday, webhookGroups] = await Promise.all([
-    orderQueries[0],
-    orderQueries[1],
-    webhookBreakdownQuery,
-  ]);
-
-  // Fetch exchange rates for all unique currencies → displayCurrency
-  const rates = await collectExchangeRates(
-    [...results.flat(), ...webhookGroups],
-    displayCurrency
-  );
-
-  function sumConverted(
-    groups: Array<{ currency: string | null; _sum: { value: number | null } }>
-  ): number {
-    return groups.reduce((sum, g) => {
-      const val = g._sum.value ?? 0;
-      if (val === 0) return sum;
-      const rate = rates.get(g.currency ?? displayCurrency) ?? 0;
-      if (rate === 0) return sum; // unsupported currency — skip
-      return sum + val * rate;
-    }, 0);
-  }
-
-  // Aggregate webhook breakdown by gateway with currency conversion
-  const gatewayMap = new Map<string, number>();
-  for (const g of webhookGroups) {
-    if (!g.paymentGateway) continue;
-    const val = g._sum.value ?? 0;
-    if (val === 0) continue;
-    const rate = rates.get(g.currency ?? displayCurrency) ?? 0;
-    if (rate === 0) continue; // unsupported currency — skip
-    gatewayMap.set(
-      g.paymentGateway,
-      (gatewayMap.get(g.paymentGateway) ?? 0) + val * rate
-    );
-  }
-  const webhookBreakdown = Array.from(gatewayMap.entries())
-    .map(([gateway, value]) => ({ gateway, value }))
-    .filter((g) => g.value > 0)
-    .sort((a, b) => b.value - a.value);
-
-  return {
-    addToCartValue: {
-      today: sumConverted(results[0]),
-      yesterday: sumConverted(results[1]),
-      currency: displayCurrency,
-    },
-    checkoutValue: {
-      today: sumConverted(results[2]),
-      yesterday: sumConverted(results[3]),
-      currency: displayCurrency,
-    },
-    purchaseValue: {
-      today: sumConverted(results[4]),
-      yesterday: sumConverted(results[5]),
-      currency: displayCurrency,
-    },
-    ordersToday,
-    ordersYesterday,
-    webhookBreakdown,
-  };
-}
-
-async function queryEventBreakdown(
-  workspaceId: string,
-  todayStart: Date,
-  yesterdayStart: Date,
-  now: Date,
-  df: DestinationWhere
-): Promise<EventBreakdown> {
-  const [todayGroups, yesterdayGroups] = await Promise.all([
-    db.eventLog.groupBy({
-      by: ["eventName"],
-      where: {
-        workspaceId,
-        status: { not: EventStatus.SUPERSEDED },
-        createdAt: { gte: todayStart, lte: now },
-        ...df,
-      },
-      _count: true,
-    }),
-    db.eventLog.groupBy({
-      by: ["eventName"],
-      where: {
-        workspaceId,
-        status: { not: EventStatus.SUPERSEDED },
-        createdAt: { gte: yesterdayStart, lt: todayStart },
-        ...df,
-      },
-      _count: true,
-    }),
-  ]);
-
-  const todayMap = new Map(
-    todayGroups.map((g) => [g.eventName, g._count])
-  );
-  const yesterdayMap = new Map(
-    yesterdayGroups.map((g) => [g.eventName, g._count])
-  );
-
-  const breakdown = {} as EventBreakdown;
-  for (const name of EVENT_NAMES) {
-    breakdown[name] = {
-      today: todayMap.get(name) ?? 0,
-      yesterday: yesterdayMap.get(name) ?? 0,
-    };
-  }
-
-  return breakdown;
-}
-
 async function queryConversionAccuracy(
   workspaceId: string,
   df: DestinationWhere
@@ -366,7 +115,7 @@ async function queryConversionAccuracy(
   const [total7d, sent7d, failed7d, total30d, sent30d, failed30d] =
     await Promise.all([
       db.eventLog.count({
-        where: { workspaceId, eventName: "Purchase", createdAt: { gte: since7d }, ...df },
+        where: { workspaceId, eventName: "Purchase", status: { not: EventStatus.SUPERSEDED }, createdAt: { gte: since7d }, ...df },
       }),
       db.eventLog.count({
         where: {
@@ -387,7 +136,7 @@ async function queryConversionAccuracy(
         },
       }),
       db.eventLog.count({
-        where: { workspaceId, eventName: "Purchase", createdAt: { gte: since30d }, ...df },
+        where: { workspaceId, eventName: "Purchase", status: { not: EventStatus.SUPERSEDED }, createdAt: { gte: since30d }, ...df },
       }),
       db.eventLog.count({
         where: {
@@ -426,49 +175,6 @@ async function queryConversionAccuracy(
   };
 }
 
-async function queryCampaignPerformance(
-  workspaceId: string,
-  displayCurrency: string,
-  df: DestinationWhere
-): Promise<CampaignRow[]> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-  const rows = await db.eventLog.groupBy({
-    by: ["utmSource", "utmCampaign", "currency"],
-    where: {
-      workspaceId,
-      createdAt: { gte: thirtyDaysAgo },
-      status: { not: EventStatus.SUPERSEDED },
-      utmSource: { not: null },
-      ...df,
-    },
-    _count: true,
-    _sum: { value: true },
-  });
-
-  const rates = await collectExchangeRates(rows, displayCurrency);
-
-  // Aggregate by (utmSource, utmCampaign) with currency conversion
-  const campMap = new Map<string, { utmSource: string; utmCampaign: string; events: number; revenue: number }>();
-  for (const c of rows) {
-    const key = `${c.utmSource}\0${c.utmCampaign}`;
-    const existing = campMap.get(key) ?? {
-      utmSource: c.utmSource ?? "",
-      utmCampaign: c.utmCampaign ?? "",
-      events: 0,
-      revenue: 0,
-    };
-    const rate = rates.get(c.currency ?? displayCurrency) ?? 0;
-    existing.events += c._count;
-    existing.revenue += rate === 0 ? 0 : (c._sum?.value ?? 0) * rate;
-    campMap.set(key, existing);
-  }
-
-  return Array.from(campMap.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 30);
-}
-
 async function queryDestinationDelivery(
   workspaceId: string,
   since24h: Date,
@@ -479,6 +185,7 @@ async function queryDestinationDelivery(
     where: {
       workspaceId,
       createdAt: { gte: since24h },
+      status: { not: EventStatus.SUPERSEDED },
       destination: allowedDestinations
         ? { in: [...allowedDestinations] }
         : { not: Destination.INTERNAL },
@@ -592,13 +299,8 @@ export async function computeDashboardAnalytics(
 ): Promise<DashboardAnalytics> {
   const { now, todayStart, yesterdayStart, since24h } = getTimeWindows();
 
-  // Always use canonical destination to deduplicate multi-dest fan-out
-  const canonicalDestination = await safeQuery(
-    () => getCanonicalDestination(workspaceId, allowedDestinations),
-    null
-  );
-  const externalDf = externalDestFilter(canonicalDestination, allowedDestinations);
-  const reportingDf = reportingDestFilter(canonicalDestination);
+  // Health measures all configured deliveries; commerce reports deduplicate events.
+  const externalDf = externalDestFilter(null, allowedDestinations);
 
   const targetCurrency = displayCurrency || "USD";
 
@@ -615,10 +317,10 @@ export async function computeDashboardAnalytics(
   // connection pool exhaustion and OOM from 23+ queued queries.
 
   // Batch 1: Health + event breakdown + delivery + enabled dests (~8 peak connections)
-  const [health, eventBreakdown, destinationDelivery, enabledDests] =
+  const [health, commerce, destinationDelivery, enabledDests] =
     await Promise.all([
       safeQuery(() => queryHealthMetrics(workspaceId, since24h, externalDf), DEFAULT_HEALTH),
-      safeQuery(() => queryEventBreakdown(workspaceId, todayStart, yesterdayStart, now, reportingDf), DEFAULT_EVENT_BREAKDOWN),
+      safeQuery(() => queryLogicalCommerce(workspaceId, todayStart, yesterdayStart, now, targetCurrency, allowedDestinations), { revenue: defaultRevenue, eventBreakdown: DEFAULT_EVENT_BREAKDOWN }),
       safeQuery(() => queryDestinationDelivery(workspaceId, since24h, allowedDestinations), [] as DestinationDeliveryRow[]),
       db.eventLog.groupBy({
         by: ["destination"],
@@ -635,11 +337,7 @@ export async function computeDashboardAnalytics(
       }),
     ]);
 
-  // Batch 2: Revenue queries alone (~9 peak connections internally)
-  const revenue = await safeQuery(
-    () => queryRevenueMetrics(workspaceId, todayStart, yesterdayStart, now, targetCurrency, reportingDf),
-    defaultRevenue
-  );
+  const { revenue, eventBreakdown } = commerce;
 
   // Batch 3: Conversion accuracy alone (~6 peak connections internally)
   const conversionAccuracy = await safeQuery(
@@ -650,7 +348,7 @@ export async function computeDashboardAnalytics(
   // Batch 4: Lightweight remaining queries (~3 peak connections)
   const [billing, campaigns] = await Promise.all([
     safeQuery(() => queryBillingUsage(userId), DEFAULT_BILLING),
-    safeQuery(() => queryCampaignPerformance(workspaceId, targetCurrency, reportingDf), [] as CampaignRow[]),
+    safeQuery(() => queryLogicalCampaigns(workspaceId, targetCurrency, allowedDestinations), [] as CampaignRow[]),
   ]);
 
   const planConfig =
@@ -672,4 +370,4 @@ export async function computeDashboardAnalytics(
 }
 
 // Export for testing
-export { getHealthStatus, getTimeWindows, getCanonicalDestination };
+export { getHealthStatus, getTimeWindows };

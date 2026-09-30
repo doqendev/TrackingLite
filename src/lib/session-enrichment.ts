@@ -16,6 +16,7 @@ const STALENESS_MS: Record<string, number> = {
   // early by a marketing or sale/sharing denial like every other marketing field.
   hashedEmail: 30 * DAY_MS,
   hashedPhone: 30 * DAY_MS,
+  oppref: 30 * DAY_MS,
   fbp: 30 * DAY_MS,
   fbc: 30 * DAY_MS,
   ttclid: 30 * DAY_MS,
@@ -50,6 +51,7 @@ const SESSION_ALIAS_FIELD_PREFIX = "alias:";
 const MAX_LINKED_SESSION_KEYS = 24;
 
 const MARKETING_CONTEXT_FIELDS = [
+  "oppref",
   "fbp",
   "fbc",
   "ttclid",
@@ -83,6 +85,7 @@ const ANALYTICS_CLEARED_AT_FIELD = "cleared:analytics";
 const SHARED_CLEARED_AT_FIELD = "cleared:shared";
 
 const BROWSER_FIELDS = [
+  "oppref",
   "fbp",
   "fbc",
   "ttclid",
@@ -124,6 +127,8 @@ export interface SessionContextInput {
   hashedEmail?: string | null;
   /** SHA-256 of the E.164 normalized phone. */
   hashedPhone?: string | null;
+  oppref?: string | null;
+  opprefCapturedAt?: number | null;
   fbp?: string | null;
   fbc?: string | null;
   ttclid?: string | null;
@@ -154,8 +159,12 @@ export interface SessionContextInput {
 }
 
 export interface SessionContext {
+  /** Keeps old queued identity invalid even after a later opt-in. */
+  marketingClearedAt?: number;
   hashedEmail?: string;
   hashedPhone?: string;
+  oppref?: string;
+  opprefCapturedAt?: number;
   fbp?: string;
   fbc?: string;
   ttclid?: string;
@@ -410,6 +419,13 @@ function buildFields(
     };
   }
 
+  // Only a URL capture can start or refresh this clock. Reading a stored click
+  // on another page never extends its life.
+  const clickTime = context.opprefCapturedAt;
+  if (context.oppref && typeof clickTime === "number" && Number.isFinite(clickTime) &&
+      clickTime <= receivedAt && clickTime > receivedAt - 30 * DAY_MS) {
+    fields.oppref = { value: context.oppref, timestamp: clickTime };
+  }
   const touchSource = normalizedIdentifier(context.attributionSource);
   if (touchTimestamp) {
     fields.attributionTimestamp = {
@@ -597,7 +613,8 @@ export async function lookupSessionContext(
 
 export async function lookupSessionContextByIdentifiers(
   workspaceId: string,
-  identifiers: SessionIdentifiers
+  identifiers: SessionIdentifiers,
+  options: { failClosed?: boolean } = {}
 ): Promise<SessionContext | null> {
   try {
     const redis = getSharedRedis();
@@ -697,8 +714,11 @@ export async function lookupSessionContextByIdentifiers(
     }
 
     return {
+      marketingClearedAt: latestClearAt.marketing || undefined,
       hashedEmail: result.hashedEmail?.value,
       hashedPhone: result.hashedPhone?.value,
+      oppref: result.oppref?.value,
+      opprefCapturedAt: result.oppref?.ts,
       fbp: result.fbp?.value,
       fbc: result.fbc?.value,
       ttclid: result.ttclid?.value,
@@ -733,6 +753,7 @@ export async function lookupSessionContextByIdentifiers(
       oldestTimestamp: oldestTs,
     };
   } catch (err) {
+    if (options.failClosed) throw err;
     log.error("Failed to lookup session context", {
       workspaceId,
       error: err instanceof Error ? err.message : String(err),

@@ -58,6 +58,8 @@ export function getVisibleDiagnosticsAuditFields(
       return hasCapturedValue(entry[field.key]);
     }
 
+    if (field.key === "fbp" && !allowed.has("META")) return false;
+
     if (!OPTIONAL_FIELD_KEYS.has(field.key)) {
       return true;
     }

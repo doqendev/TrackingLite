@@ -1,6 +1,9 @@
 type UnknownRecord = Record<string, unknown>;
 
 const REDACTED_CUSTOM_DATA_KEYS = new Set([
+  "oppref",
+  "opprefcapturedat",
+  "obref",
   "address",
   "address1",
   "address2",
@@ -59,6 +62,7 @@ export function buildEventLogPayload(input: {
   eventName: string;
   customData?: Record<string, unknown> | null;
   userData?: Record<string, unknown> | null;
+  oppref?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   fbclid?: string | null;
@@ -92,6 +96,7 @@ export function buildEventLogPayload(input: {
       hasCarriedPhone: !hasValue(userData.phone) && hasValue(input.hashedPhone),
     },
     clickIdFlags: {
+      hasOppref: hasValue(input.oppref),
       hasFbp: hasValue(input.fbp),
       hasFbc: hasValue(input.fbc),
       hasFbclid: hasValue(input.fbclid),

@@ -37,7 +37,7 @@
   },
   "dashboard": {
     "noDestinations": "Aucune destination configurée",
-    "noDestinationsDesc": "Connectez au moins une plateforme (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest ou Google Ads) pour commencer a transmettre des evenements.",
+    "noDestinationsDesc": "Connectez au moins une plateforme (Meta, TikTok, ChatGPT Ads, GA4, Klaviyo, Reddit, Pinterest ou Google Ads) pour commencer a transmettre des evenements.",
     "ordersThisMonth": "Commandes ce mois-ci",
     "ofOrdersTracked": "sur {limit} commandes suivies",
     "installSnippet": "Installez votre snippet pour commencer à suivre les achats.",
@@ -400,7 +400,7 @@
     "shopifyStep1": "Accédez à Paramètres > Événements clients dans votre Shopify Admin",
     "shopifyStep2": "Ajoutez le snippet Custom Pixel et cliquez sur Enregistrer et connecter",
     "shopifyStep3": "Ajoutez le Cart Attribution Helper à theme.liquid avant </head> ou dans un bloc Custom Liquid/theme app",
-    "shopifyStep4": "Configurez le webhook Shopify, connectez Meta et TikTok, puis confirmez les événements AddToCart et webhook Purchase dans Tracking Health",
+    "shopifyStep4": "Configurez le webhook Shopify et vos intégrations Meta, TikTok ou ChatGPT Ads, puis vérifiez la transmission des événements AddToCart et Purchase par webhook dans Tracking Health",
     "trackedEvents": "Événements qui seront suivis :",
     "skipForNow": "Passer pour l'instant",
     "continueToVerify": "Continuer",
@@ -421,7 +421,8 @@
     "domainTaken": "Ce magasin est deja enregistre par un autre compte",
     "domainNotShopify": "Impossible de verifier comme magasin Shopify. Vous pouvez quand meme continuer.",
     "domainError": "Impossible de verifier le magasin. Veuillez reessayer.",
-    "workspaceLimitReached": "Vous avez atteint la limite de magasins de votre plan. Passez a un plan superieur pour en ajouter."
+    "workspaceLimitReached": "Vous avez atteint la limite de magasins de votre plan. Passez a un plan superieur pour en ajouter.",
+    "openaiDescription": "Suivi des conversions ChatGPT Ads côté serveur."
   },
   "auth": {
     "signIn": "Se connecter",
@@ -461,5 +462,29 @@
     "passwordResetSuccess": "Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter.",
     "invalidToken": "Jeton de réinitialisation invalide ou expiré.",
     "somethingWentWrong": "Une erreur s'est produite. Veuillez réessayer."
+  },
+  "openaiIntegration": {
+    "description": "Suivi des conversions ChatGPT Ads côté serveur.",
+    "saved": "Identifiants enregistrés ; la livraison reste à vérifier.",
+    "validated": "Identifiants validés",
+    "notConfigured": "Non configuré",
+    "pixelId": "ID du pixel",
+    "apiKey": "Clé de l’API Conversions",
+    "keySaved": "Enregistrée en sécurité ; saisissez une nouvelle clé pour la remplacer",
+    "enableAfterValidation": "Activer la livraison après validation",
+    "step1": "Créez ou sélectionnez une source de données web pour cette boutique dans",
+    "step2": "Copiez l’ID du pixel et générez une clé de l’API Conversions. Utilisez un pixel par boutique.",
+    "step3": "Créez des événements de conversion et sélectionnez order_created pour la campagne. Installez le Custom Pixel, le Cart Helper et le webhook Shopify orders/paid de Track Clear.",
+    "validationNote": "La validation envoie une requête sans enregistrer d’événement. Elle ne crée pas de conversion et ne confirme pas l’attribution.",
+    "saveValidate": "Enregistrer et valider",
+    "saving": "Validation…",
+    "disable": "Désactiver la livraison",
+    "saveFailed": "Enregistrement impossible. Vérifiez la connexion et réessayez.",
+    "validationFailed": "Échec de validation. La livraison reste désactivée. Vérifiez l’ID et la clé.",
+    "enabledMessage": "Identifiants validés et livraison activée. Vérifiez les événements réels dans le suivi et Ads Manager.",
+    "validatedMessage": "Identifiants validés. La livraison est désactivée.",
+    "disabledMessage": "Livraison désactivée.",
+    "verifyNote": "Vérifiez les cinq événements, la déduplication des achats et le consentement avant de vous fier aux rapports.",
+    "trackingHealth": "État du suivi"
   }
 }

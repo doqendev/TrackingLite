@@ -12,6 +12,8 @@ const SOURCE_COLORS: Record<string, string> = {
   fb: "bg-blue-500",
   meta: "bg-blue-500",
   google: "bg-amber-500",
+  chatgpt: "bg-emerald-500",
+  openai: "bg-emerald-500",
   tiktok: "bg-pink-500",
   klaviyo: "bg-green-500",
   instagram: "bg-purple-500",

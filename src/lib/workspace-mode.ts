@@ -19,6 +19,7 @@ export const DEFAULT_NEW_WORKSPACE_PRODUCT_MODE = SHOPIFY_META_TIKTOK_V1;
 export const DEFAULT_NEW_WORKSPACE_INSTALL_TYPE = SHOPIFY_CUSTOM_PIXEL;
 
 const ALL_DESTINATIONS = [
+  "OPENAI",
   "META",
   "TIKTOK",
   "GA4",
@@ -29,7 +30,7 @@ const ALL_DESTINATIONS = [
 ] as const satisfies readonly ExternalDestination[];
 
 const DESTINATIONS_BY_PRODUCT_MODE: Record<WorkspaceProductModeValue, readonly ExternalDestination[]> = {
-  SHOPIFY_META_TIKTOK_V1: ["META", "TIKTOK"],
+  SHOPIFY_META_TIKTOK_V1: ["META", "TIKTOK", "OPENAI"],
   LEGACY_ALL_DESTINATIONS: ALL_DESTINATIONS,
 };
 
@@ -83,7 +84,12 @@ export function isLegacyWorkspace(workspace: WorkspaceModeSource): boolean {
 export function getAllowedDestinationsForWorkspace(
   workspace: WorkspaceModeSource
 ): readonly ExternalDestination[] {
-  return DESTINATIONS_BY_PRODUCT_MODE[resolveWorkspaceProductMode(workspace)];
+  const destinations = DESTINATIONS_BY_PRODUCT_MODE[resolveWorkspaceProductMode(workspace)];
+  // Headless migrations are a separate, explicit rollout. Existing ownership
+  // of a headless store's OpenAI pixel must remain unchanged.
+  return resolveWorkspaceInstallType(workspace) === SHOPIFY_CUSTOM_PIXEL
+    ? destinations
+    : destinations.filter((destination) => destination !== "OPENAI");
 }
 
 export function filterDestinationsForWorkspace<T extends { destination: string }>(

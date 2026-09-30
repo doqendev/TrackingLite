@@ -60,7 +60,7 @@ export default function PrivacyPage() {
 
               <h3 className="text-base font-semibold text-foreground mt-4 mb-2">2.2 Workspace Configuration Data</h3>
               <ul className="list-disc pl-5 space-y-1 text-muted-foreground leading-relaxed">
-                <li>API keys and access tokens for advertising platforms (Meta, Google Ads, TikTok, GA4, Klaviyo)</li>
+                <li>API keys and access tokens for advertising platforms (including Meta, Google Ads, TikTok, ChatGPT Ads, GA4, and Klaviyo)</li>
                 <li>All credentials are encrypted at rest using AES-256-GCM before storage in our database</li>
                 <li>Pixel IDs and measurement IDs for destination platforms</li>
               </ul>
@@ -154,6 +154,11 @@ export default function PrivacyPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
+                    <tr>
+                      <td className="px-4 py-3 text-foreground font-medium">OpenAI</td>
+                      <td className="px-4 py-3 text-muted-foreground">ChatGPT Ads conversion forwarding when enabled, including consented click attribution and hashed customer identifiers</td>
+                      <td className="px-4 py-3 text-muted-foreground">United States</td>
+                    </tr>
                     <tr>
                       <td className="px-4 py-3 text-foreground font-medium">Meta Platforms, Inc.</td>
                       <td className="px-4 py-3 text-muted-foreground">Meta Conversions API event forwarding</td>
@@ -307,7 +312,7 @@ export default function PrivacyPage() {
               </p>
               <p className="mt-3 text-muted-foreground leading-relaxed">
                 Note that deleting your account does not automatically remove data that has already been
-                forwarded to advertising platforms (Meta, Google, TikTok, GA4, Klaviyo). To request
+                forwarded to advertising platforms (including Meta, Google, TikTok, ChatGPT Ads, GA4, and Klaviyo). To request
                 deletion of data from those platforms, you must contact them directly under their
                 respective privacy policies.
               </p>

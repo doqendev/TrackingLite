@@ -36,6 +36,33 @@ describe("Workspace API", () => {
     await disconnectAll();
   });
 
+  it("saves ChatGPT Ads credentials encrypted and returns only presence flags", async () => {
+    const workspace = await createWorkspace(user.id, { productMode: "SHOPIFY_META_TIKTOK_V1", installType: "SHOPIFY_CUSTOM_PIXEL" });
+    expect(workspace.enableOpenAI).toBe(false);
+    const params = { params: Promise.resolve({ id: workspace.id }) };
+    const response = await PATCH(makeRequest(`/api/workspaces/${workspace.id}`, {
+      method: "PATCH", body: { openaiPixelId: "Pixel-AbC", openaiApiKey: "secret-openai-key", enableOpenAI: true },
+    }), params);
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result).toMatchObject({ openaiPixelId: "Pixel-AbC", enableOpenAI: true, hasOpenAIApiKey: true });
+    expect(JSON.stringify(result)).not.toContain("secret-openai-key");
+    expect(result).not.toHaveProperty("openaiApiKeyEncrypted");
+    const stored = await db.workspace.findUniqueOrThrow({ where: { id: workspace.id } });
+    expect(stored.openaiApiKeyEncrypted).toBeTruthy(); expect(stored.openaiApiKeyEncrypted).not.toBe("secret-openai-key");
+    const read = await GET_BY_ID(makeRequest(`/api/workspaces/${workspace.id}`), params);
+    expect(await read.json()).toMatchObject({ hasOpenAIApiKey: true, openaiPixelId: "Pixel-AbC" });
+  });
+
+  it("keeps headless OpenAI migrations explicitly unavailable", async () => {
+    const workspace = await createWorkspace(user.id, { productMode: "LEGACY_ALL_DESTINATIONS", installType: "HEADLESS_CUSTOM" });
+    const response = await PATCH(makeRequest(`/api/workspaces/${workspace.id}`, {
+      method: "PATCH", body: { openaiPixelId: "Pixel-AbC", openaiApiKey: "key", enableOpenAI: true },
+    }), { params: Promise.resolve({ id: workspace.id }) });
+    expect(response.status).toBe(422);
+    expect((await db.workspace.findUniqueOrThrow({ where: { id: workspace.id } })).enableOpenAI).toBe(false);
+  });
+
   // === GET /api/workspaces ===
 
   describe("GET /api/workspaces", () => {

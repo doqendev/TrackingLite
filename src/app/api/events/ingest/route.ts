@@ -7,6 +7,7 @@ import { isValidApiKeyFormat } from "@/lib/api-key";
 import {
   getEventQueue,
   getTiktokQueue,
+  getOpenAIQueue,
   getGA4Queue,
   getKlaviyoQueue,
   getRedditQueue,
@@ -87,7 +88,7 @@ const corsHeaders = {
 // still-unclaimed outbox row. Shoppers rarely submit contact info within a
 // few seconds, so a short window would send the anonymous version first.
 const CHECKOUT_ENRICHMENT_DELAY_MS = 90_000;
-const CHECKOUT_ENRICHMENT_DESTINATIONS: readonly string[] = ["META", "TIKTOK"];
+const CHECKOUT_ENRICHMENT_DESTINATIONS: readonly string[] = ["META", "TIKTOK", "OPENAI"];
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
@@ -228,13 +229,14 @@ export async function POST(request: NextRequest) {
     // encrypted values are never stored in Redis.
     const hasMetaCredentials = !!workspace.hasMetaCredentials;
     const hasTiktokCredentials = !!workspace.hasTikTokCredentials;
+    const hasOpenAICredentials = !!workspace.hasOpenAICredentials;
     const hasGA4Credentials = !!workspace.hasGA4Credentials;
     const hasKlaviyoCredentials = !!workspace.hasKlaviyoCredentials;
     const hasRedditCredentials = !!workspace.hasRedditCredentials;
     const hasPinterestCredentials = !!workspace.hasPinterestCredentials;
     const hasGoogleAdsCredentials = !!workspace.hasGoogleAdsCredentials;
 
-    if (!hasMetaCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials && !hasRedditCredentials && !hasPinterestCredentials && !hasGoogleAdsCredentials) {
+    if (!hasOpenAICredentials && !hasMetaCredentials && !hasTiktokCredentials && !hasGA4Credentials && !hasKlaviyoCredentials && !hasRedditCredentials && !hasPinterestCredentials && !hasGoogleAdsCredentials) {
       return NextResponse.json({ error: "No destination credentials configured" }, { status: 422, headers: corsHeaders });
     }
 
@@ -324,7 +326,7 @@ export async function POST(request: NextRequest) {
         sessionIdentifiers.orderId ||
         sessionIdentifiers.orderName) &&
       ((marketingContextAllowed &&
-        (payload.fbp || resolvedFbc || payload.ttclid || payload.ttp || payload.rdtCid ||
+        (payload.oppref || payload.fbp || resolvedFbc || payload.ttclid || payload.ttp || payload.rdtCid ||
          payload.epik || payload.gclid || payload.gbraid || payload.wbraid)) ||
        (analyticsContextAllowed && payload.gaClientId) ||
        (sharedContextAllowed &&
@@ -342,6 +344,8 @@ export async function POST(request: NextRequest) {
         hashedPhone: marketingContextAllowed
           ? hashPhonePii(payload.userData?.phone, payload.userData?.countryCode) ?? null
           : null,
+        oppref: marketingContextAllowed ? payload.oppref : null,
+        opprefCapturedAt: marketingContextAllowed ? payload.opprefCapturedAt : null,
         fbp: marketingContextAllowed ? payload.fbp : null,
         fbc: marketingContextAllowed ? resolvedFbc : null,
         ttclid: marketingContextAllowed ? payload.ttclid : null,
@@ -393,6 +397,8 @@ export async function POST(request: NextRequest) {
     // boundary as live delivery. A GA4-only event must not retain advertising
     // identifiers or checkout PII merely because those fields were submitted.
     const consentScopedContext = {
+      oppref: marketingContextAllowed ? payload.oppref : null,
+      opprefCapturedAt: marketingContextAllowed ? payload.opprefCapturedAt : null,
       hashedEmail: marketingContextAllowed ? carriedIdentity?.hashedEmail ?? null : null,
       hashedPhone: marketingContextAllowed ? carriedIdentity?.hashedPhone ?? null : null,
       url: sharedContextAllowed ? payload.url : "",
@@ -483,6 +489,10 @@ export async function POST(request: NextRequest) {
         queue: getTiktokQueue(),
         jobName: "send-tiktok-event",
       });
+    }
+
+    if (hasOpenAICredentials) {
+      destinations.push({ destination: "OPENAI", queue: getOpenAIQueue(), jobName: "send-openai-event" });
     }
 
     // GA4
@@ -777,6 +787,10 @@ export async function POST(request: NextRequest) {
       eventName: payload.eventName,
       eventId: effectiveEventId,
       timestamp: payload.timestamp,
+      oppref: consentScopedContext.oppref,
+      opprefCapturedAt: consentScopedContext.opprefCapturedAt,
+      consent: payload.consent,
+      openaiPixelId: workspace.openaiPixelId,
       url: consentScopedContext.url,
       referrer: consentScopedContext.referrer,
       trackclearSessionId: consentScopedContext.trackclearSessionId,
@@ -805,7 +819,9 @@ export async function POST(request: NextRequest) {
       eventName: payload.eventName as any,
       eventId: effectiveEventId,
       status: "PENDING" as const,
+      occurredAt: new Date(payload.timestamp),
       payload: buildEventLogPayload({
+        oppref: consentScopedContext.oppref,
         eventName: payload.eventName,
         customData: normalizedCustomData,
         userData: consentScopedContext.userData,
@@ -850,6 +866,7 @@ export async function POST(request: NextRequest) {
       eventName: _eventName,
       eventId: _eventId,
       status: _status,
+      occurredAt: _occurredAt,
       ...checkoutEnrichmentData
     } = eventLogBaseData;
 
@@ -872,6 +889,7 @@ export async function POST(request: NextRequest) {
                 create: {
                   ...eventLogBaseData,
                   destination: dest.destination as any,
+                  deliveryTargetId: dest.destination === "OPENAI" ? workspace.openaiPixelId : null,
                 },
                 update: {},
               });

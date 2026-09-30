@@ -1,4 +1,4 @@
-export const EXPECTED_WORKER_COUNT = 11;
+export const EXPECTED_WORKER_COUNT = 12;
 
 export type DependencyHealth = "connected" | "disconnected";
 

@@ -109,6 +109,7 @@ describe("worker health evaluation", () => {
     const workerFiles = [
       "meta-event-processor.ts",
       "tiktok-event-processor.ts",
+      "openai-event-processor.ts",
       "ga4-event-processor.ts",
       "klaviyo-event-processor.ts",
       "reddit-event-processor.ts",

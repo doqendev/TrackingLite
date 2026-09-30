@@ -55,7 +55,7 @@ describe("deployment schema readiness", () => {
       );
     await expect(
       assertTrackingDeploymentSchemaReady(missingClient)
-    ).rejects.toThrow("12 migrations");
+    ).rejects.toThrow(`${REQUIRED_TRACKING_MIGRATIONS.length} migrations`);
 
     await expect(
       assertTrackingDeploymentSchemaReady(

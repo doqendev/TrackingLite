@@ -1,5 +1,22 @@
 # Track Clear --- Project Status & Audit
 
+## 2026-09-30 ChatGPT Ads implementation candidate
+
+Standard Shopify now has an `OPENAI` destination, credentials/setup UI, a non-recording
+validation request, dedicated worker, 30-day click context, consent-safe retries,
+immutable pixel/time binding, cart/webhook enrichment, and destination-independent
+commerce reporting. New owned stores can receive an account-level workspace allowance.
+Mizoke is excluded from OpenAI activation. Infinite Layers (`afd09a.myshopify.com`)
+is the selected first live store. Full details: `docs/chatgpt-ads.md`.
+
+Local candidate checks: production build and TypeScript pass; lint has only existing
+image warnings; 752 unit tests and 69 integration tests pass locally on isolated
+PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and the generated pixel's
+event-time, checkout-enrichment and consent paths are covered. CI remains pending.
+The candidate adds two migrations and increases workers/listeners from 11 to 12.
+No production deploy or live destination activation has occurred. The connected
+Ads Manager currently exposes only Mizoke; Infinite Layers credentials are pending.
+
 Last updated: 2026-08-03 (Track Clear live at exact SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69` after purchase identity write-back; Mizoke live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c`, with the merged Meta browser pixel not yet deployed)
 
 ## Build Health

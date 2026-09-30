@@ -1,3 +1,4 @@
+import { workspaceLimit } from "@/lib/workspace-limits";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -47,7 +48,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const userEmail = session.user.email ?? "";
   const workspaceName = activeWorkspace?.name ?? null;
   const plan = (subscription?.plan ?? "FREE") as keyof typeof BILLING_PLANS;
-  const maxWorkspaces = BILLING_PLANS[plan]?.maxWorkspaces ?? 1;
+  const maxWorkspaces = workspaceLimit(session.user.id, plan);
   const canAddStore = (workspaces ?? []).length < maxWorkspaces;
   const isAdmin = isAdminUser(userEmail);
 

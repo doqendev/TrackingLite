@@ -1,3 +1,4 @@
+import { workspaceLimit } from "@/lib/workspace-limits";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       db.workspace.count({ where: { userId: session.user.id, isActive: true } }),
     ]);
     const plan = (subscription?.plan ?? "FREE") as keyof typeof BILLING_PLANS;
-    const maxWorkspaces = BILLING_PLANS[plan]?.maxWorkspaces ?? 1;
+    const maxWorkspaces = workspaceLimit(session.user.id, plan);
     if (activeWorkspaceCount >= maxWorkspaces) {
       return NextResponse.json(
         { error: `Your ${BILLING_PLANS[plan].name} plan allows up to ${maxWorkspaces} store${maxWorkspaces === 1 ? "" : "s"}. Upgrade to add more.`, code: "WORKSPACE_LIMIT" },

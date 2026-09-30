@@ -88,6 +88,7 @@ const DESTINATION_LABELS: Record<string, string> = {
   REDDIT: "Reddit",
   PINTEREST: "Pinterest",
   GOOGLE_ADS: "Google Ads",
+  OPENAI: "ChatGPT Ads",
 };
 
 // ---------------------------------------------------------------------------

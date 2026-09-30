@@ -11,6 +11,7 @@ export type DestinationCategory = "analytics" | "marketing";
 
 // Map each destination to its consent category
 export const DESTINATION_CONSENT_CATEGORY: Record<string, DestinationCategory> = {
+  OPENAI: "marketing",
   META: "marketing",
   TIKTOK: "marketing",
   GA4: "analytics",

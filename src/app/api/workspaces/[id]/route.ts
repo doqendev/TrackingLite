@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { createLogger } from "@/lib/logger";
 import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
-import { isLegacyWorkspace } from "@/lib/workspace-mode";
+import { isLegacyWorkspace, isDestinationAllowedForWorkspace } from "@/lib/workspace-mode";
 import { normalizeCustomIngestDomainInput } from "@/lib/custom-ingest-domain";
 
 const log = createLogger({ component: "workspaces-id" });
@@ -53,6 +53,9 @@ const UpdateWorkspaceSchema = z.object({
   tiktokAccessToken: z.string().optional().nullable(),
   enableTikTok: z.boolean().optional(),
   tiktokBrowserTrackingEnabled: z.boolean().optional(),
+  openaiPixelId: z.string().trim().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/).optional().nullable(),
+  openaiApiKey: z.string().trim().min(1).max(4096).optional().nullable(),
+  enableOpenAI: z.boolean().optional(),
   // GA4
   ga4MeasurementId: z.string().regex(/^G-[A-Za-z0-9]+$/, "Must be format G-XXXXXXX").optional().nullable(),
   ga4ApiSecret: z.string().optional().nullable(),
@@ -73,6 +76,7 @@ const UpdateWorkspaceSchema = z.object({
 
 // Sensitive fields that need encryption: [inputFieldName, encryptedField, ivField, tagField]
 const ENCRYPTED_FIELDS: Array<[string, string, string, string]> = [
+  ["openaiApiKey", "openaiApiKeyEncrypted", "openaiApiKeyIv", "openaiApiKeyTag"],
   ["metaAccessToken", "metaAccessTokenEncrypted", "metaAccessTokenIv", "metaAccessTokenTag"],
   ["tiktokAccessToken", "tiktokAccessTokenEncrypted", "tiktokAccessTokenIv", "tiktokAccessTokenTag"],
   ["ga4ApiSecret", "ga4ApiSecretEncrypted", "ga4ApiSecretIv", "ga4ApiSecretTag"],
@@ -151,6 +155,9 @@ export async function GET(
         tiktokAccessTokenEncrypted: true,
         enableTikTok: true,
         tiktokBrowserTrackingEnabled: true,
+        enableOpenAI: true,
+        openaiPixelId: true,
+        openaiApiKeyEncrypted: true,
         // GA4
         ga4MeasurementId: true,
         ga4ApiSecretEncrypted: true,
@@ -189,6 +196,7 @@ export async function GET(
     const {
       metaAccessTokenEncrypted,
       tiktokAccessTokenEncrypted,
+      openaiApiKeyEncrypted,
       ga4ApiSecretEncrypted,
       klaviyoApiKeyEncrypted,
       redditAccessTokenEncrypted,
@@ -201,6 +209,7 @@ export async function GET(
       ...rest,
       hasMetaAccessToken: metaAccessTokenEncrypted !== null,
       hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
+      hasOpenAIApiKey: !!openaiApiKeyEncrypted,
       hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
       hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
       hasRedditAccessToken: redditAccessTokenEncrypted !== null,
@@ -247,6 +256,15 @@ export async function PATCH(
     }
 
     const data = UpdateWorkspaceSchema.parse(body);
+    if ((data.enableOpenAI !== undefined || data.openaiPixelId !== undefined || data.openaiApiKey !== undefined) &&
+        !isDestinationAllowedForWorkspace(workspace, "OPENAI")) {
+      return NextResponse.json({ error: "ChatGPT Ads is available for standard Shopify stores. Headless migration is not enabled." }, { status: 422 });
+    }
+    if (data.openaiPixelId === null || data.openaiApiKey === null) data.enableOpenAI = false;
+    if ((data.enableOpenAI ?? workspace.enableOpenAI) &&
+        (!(data.openaiPixelId ?? workspace.openaiPixelId) || !(data.openaiApiKey ?? workspace.openaiApiKeyEncrypted))) {
+      return NextResponse.json({ error: "ChatGPT Ads requires a Pixel ID and Conversions API key." }, { status: 422 });
+    }
     if (data.enableMeta === false || data.metaPixelId === null) {
       // A browser pixel cannot remain an implicit owner after its Meta
       // destination or dataset ID is removed.
@@ -322,7 +340,7 @@ export async function PATCH(
       );
       if (blockedField) {
         return NextResponse.json(
-          { error: "This workspace mode only supports Meta and TikTok destinations." },
+          { error: "This workspace mode supports Meta, TikTok, and ChatGPT Ads destinations." },
           { status: 400 }
         );
       }
@@ -470,6 +488,9 @@ export async function PATCH(
         tiktokAccessTokenEncrypted: true,
         enableTikTok: true,
         tiktokBrowserTrackingEnabled: true,
+        enableOpenAI: true,
+        openaiPixelId: true,
+        openaiApiKeyEncrypted: true,
         // GA4
         ga4MeasurementId: true,
         ga4ApiSecretEncrypted: true,
@@ -509,6 +530,7 @@ export async function PATCH(
     const {
       metaAccessTokenEncrypted,
       tiktokAccessTokenEncrypted,
+      openaiApiKeyEncrypted,
       ga4ApiSecretEncrypted,
       klaviyoApiKeyEncrypted,
       redditAccessTokenEncrypted,
@@ -523,6 +545,7 @@ export async function PATCH(
       ...rest,
       hasMetaAccessToken: metaAccessTokenEncrypted !== null,
       hasTiktokAccessToken: tiktokAccessTokenEncrypted !== null,
+      hasOpenAIApiKey: !!openaiApiKeyEncrypted,
       hasGA4ApiSecret: ga4ApiSecretEncrypted !== null,
       hasKlaviyoApiKey: klaviyoApiKeyEncrypted !== null,
       hasRedditAccessToken: redditAccessTokenEncrypted !== null,

@@ -33,6 +33,8 @@ export interface SnippetEventPayload {
     marketingAllowed?: boolean;
     saleOfDataAllowed?: boolean;
   };
+  oppref?: string | null;
+  opprefCapturedAt?: number | null;
   ttclid?: string | null;
   ttp?: string | null;
   attributionTimestamp?: number | null;

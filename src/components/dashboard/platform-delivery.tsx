@@ -10,6 +10,7 @@ interface PlatformDeliveryProps {
 
 const DESTINATION_CONFIG: Record<string, { label: string; dotColor: string }> = {
   META: { label: "Meta", dotColor: "bg-blue-500" },
+  OPENAI: { label: "ChatGPT Ads", dotColor: "bg-emerald-500" },
   TIKTOK: { label: "TikTok", dotColor: "bg-pink-500" },
   GA4: { label: "GA4", dotColor: "bg-amber-500" },
   KLAVIYO: { label: "Klaviyo", dotColor: "bg-green-500" },

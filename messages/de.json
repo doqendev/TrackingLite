@@ -37,7 +37,7 @@
   },
   "dashboard": {
     "noDestinations": "Keine Ziele konfiguriert",
-    "noDestinationsDesc": "Verbinde mindestens eine Plattform (Meta, TikTok, GA4, Klaviyo, Reddit, Pinterest oder Google Ads), um mit der Weiterleitung von Events zu beginnen.",
+    "noDestinationsDesc": "Verbinde mindestens eine Plattform (Meta, TikTok, ChatGPT Ads, GA4, Klaviyo, Reddit, Pinterest oder Google Ads), um mit der Weiterleitung von Events zu beginnen.",
     "ordersThisMonth": "Bestellungen diesen Monat",
     "ofOrdersTracked": "von {limit} Bestellungen erfasst",
     "installSnippet": "Installiere deinen Snippet, um Käufe zu tracken.",
@@ -400,7 +400,7 @@
     "shopifyStep1": "Gehe zu Einstellungen > Kundenereignisse in deinem Shopify Admin",
     "shopifyStep2": "Füge den Custom Pixel Snippet hinzu und klicke auf Speichern & Verbinden",
     "shopifyStep3": "Füge den Cart Attribution Helper in theme.liquid vor </head> oder in einen Custom Liquid/theme app Block ein",
-    "shopifyStep4": "Konfiguriere den Shopify-Webhook, verbinde Meta und TikTok und bestätige AddToCart- und webhook Purchase-Events in Tracking Health",
+    "shopifyStep4": "Konfiguriere den Shopify-Webhook und deine Meta-, TikTok- oder ChatGPT-Ads-Integrationen und prüfe die Zustellung von AddToCart und Purchase per Webhook in Tracking Health",
     "trackedEvents": "Zu trackende Events:",
     "skipForNow": "Jetzt überspringen",
     "continueToVerify": "Weiter",
@@ -421,7 +421,8 @@
     "domainTaken": "Dieser Shop ist bereits von einem anderen Konto registriert",
     "domainNotShopify": "Konnte nicht als Shopify-Shop verifiziert werden. Sie koennen trotzdem fortfahren.",
     "domainError": "Shop konnte nicht verifiziert werden. Bitte versuchen Sie es erneut.",
-    "workspaceLimitReached": "Sie haben das Shop-Limit Ihres Plans erreicht. Upgraden Sie, um weitere Shops hinzuzufuegen."
+    "workspaceLimitReached": "Sie haben das Shop-Limit Ihres Plans erreicht. Upgraden Sie, um weitere Shops hinzuzufuegen.",
+    "openaiDescription": "Serverseitiges Conversion-Tracking für ChatGPT Ads."
   },
   "auth": {
     "signIn": "Anmelden",
@@ -461,5 +462,29 @@
     "passwordResetSuccess": "Passwort erfolgreich zurückgesetzt. Du kannst dich jetzt anmelden.",
     "invalidToken": "Ungültiger oder abgelaufener Zurücksetz-Token.",
     "somethingWentWrong": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+  },
+  "openaiIntegration": {
+    "description": "Serverseitiges Conversion-Tracking für ChatGPT Ads.",
+    "saved": "Zugangsdaten gespeichert; Zustellung noch nicht geprüft.",
+    "validated": "Zugangsdaten validiert",
+    "notConfigured": "Nicht konfiguriert",
+    "pixelId": "Pixel-ID",
+    "apiKey": "Conversions-API-Schlüssel",
+    "keySaved": "Sicher gespeichert; zum Ersetzen neuen Schlüssel eingeben",
+    "enableAfterValidation": "Zustellung nach Validierung aktivieren",
+    "step1": "Erstellen oder wählen Sie eine Web-Datenquelle für diesen Shop im",
+    "step2": "Kopieren Sie die Pixel-ID und erstellen Sie einen Conversions-API-Schlüssel. Verwenden Sie für jeden Shop einen eigenen Pixel.",
+    "step3": "Erstellen Sie Conversion-Ereignisse und wählen Sie order_created für die Kampagne. Installieren Sie Custom Pixel, Cart Helper und Shopify-Webhook orders/paid von Track Clear.",
+    "validationNote": "Die Validierung sendet eine Anfrage ohne Ereignisspeicherung. Sie erzeugt keine Conversion und bestätigt keine Attribution.",
+    "saveValidate": "Speichern und validieren",
+    "saving": "Validierung…",
+    "disable": "Zustellung deaktivieren",
+    "saveFailed": "Speichern fehlgeschlagen. Verbindung prüfen und erneut versuchen.",
+    "validationFailed": "Validierung fehlgeschlagen. Zustellung bleibt deaktiviert. Pixel-ID und Schlüssel prüfen.",
+    "enabledMessage": "Zugangsdaten validiert und Zustellung aktiviert. Echte Ereignisse im Tracking-Status und Ads Manager prüfen.",
+    "validatedMessage": "Zugangsdaten validiert. Zustellung ist deaktiviert.",
+    "disabledMessage": "Zustellung deaktiviert.",
+    "verifyNote": "Prüfen Sie alle fünf Ereignisse, Kauf-Deduplizierung und Einwilligung, bevor Sie sich auf Berichte verlassen.",
+    "trackingHealth": "Tracking-Status"
   }
 }

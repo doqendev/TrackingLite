@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Check, Copy, Loader2 } from "lucide-react";
-import { SiMeta, SiShopify, SiTiktok } from "react-icons/si";
+import { SiMeta, SiShopify, SiTiktok, SiOpenai } from "react-icons/si";
 
 type Step = 0 | 1 | 2;
 
 const EVENT_NAMES = ["PageView", "ViewContent", "AddToCart", "InitiateCheckout", "Purchase"] as const;
 
 const PLATFORMS = [
+  { key: "openai", color: "bg-emerald-500/15", textColor: "text-emerald-400", borderColor: "border-emerald-500/30", label: "ChatGPT Ads", descKey: "openaiDescription" as const, Icon: SiOpenai },
   { key: "shopifyWebhook", color: "bg-green-500/15", textColor: "text-green-400", borderColor: "border-green-500/30", label: "Shopify Webhook", descKey: "webhookDescription" as const, Icon: SiShopify },
   { key: "meta", color: "bg-blue-500/15", textColor: "text-blue-400", borderColor: "border-blue-500/30", label: "Meta", descKey: "metaDescription" as const, Icon: SiMeta },
   { key: "tiktok", color: "bg-pink-500/15", textColor: "text-pink-400", borderColor: "border-pink-500/30", label: "TikTok", descKey: "tiktokDescription" as const, Icon: SiTiktok },

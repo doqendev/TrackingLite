@@ -13,6 +13,11 @@ export interface EventRetryEnvelope {
     trackclearSessionId?: string | null;
     hashedEmail?: string | null;
     hashedPhone?: string | null;
+    oppref?: string | null;
+    opprefCapturedAt?: number | null;
+    consent?: { analyticsAllowed?: boolean; marketingAllowed?: boolean; saleOfDataAllowed?: boolean };
+    openaiPixelId?: string | null;
+
     fbp?: string | null;
     fbc?: string | null;
     fbclid?: string | null;

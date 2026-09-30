@@ -1,3 +1,7 @@
+import { decrypt } from "@/lib/encryption";
+import { sendToOpenAI, OpenAIApiError } from "@/lib/destinations/openai";
+import { isDestinationAllowedForWorkspace } from "@/lib/workspace-mode";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -25,6 +29,12 @@ export async function POST(
     where: { id, userId: session.user.id, isActive: true },
     select: {
       id: true,
+      productMode: true,
+      installType: true,
+      openaiPixelId: true,
+      openaiApiKeyEncrypted: true,
+      openaiApiKeyIv: true,
+      openaiApiKeyTag: true,
       metaPixelId: true,
       metaAccessTokenEncrypted: true,
       metaAccessTokenIv: true,
@@ -63,6 +73,24 @@ export async function POST(
   const { destination } = body;
 
   switch (destination) {
+    case "OPENAI": {
+      if (!isDestinationAllowedForWorkspace(workspace, "OPENAI") || !workspace.openaiPixelId ||
+          !workspace.openaiApiKeyEncrypted || !workspace.openaiApiKeyIv || !workspace.openaiApiKeyTag) {
+        return NextResponse.json({ connected: false, message: "ChatGPT Ads credentials not configured" });
+      }
+      const rate = await checkRateLimit(workspace.id);
+      if (!rate.allowed) return NextResponse.json({ connected: false, message: "Try again shortly" }, { status: 429 });
+      try {
+        await sendToOpenAI(workspace.openaiPixelId,
+          decrypt(workspace.openaiApiKeyEncrypted, workspace.openaiApiKeyIv, workspace.openaiApiKeyTag), {
+            id: crypto.randomUUID(), type: "page_viewed", timestamp_ms: Date.now(),
+            action_source: "web", source_url: "https://www.trackclear.io/", data: { type: "contents" },
+          }, true);
+        return NextResponse.json({ connected: true, validatedOnly: true, message: "Credentials and event schema validated. No event was recorded." });
+      } catch (error) {
+        return NextResponse.json({ connected: false, message: error instanceof OpenAIApiError ? error.message : "ChatGPT Ads validation unavailable" });
+      }
+    }
     case "META": {
       if (!workspace.metaPixelId || !workspace.metaAccessTokenEncrypted) {
         return NextResponse.json({ connected: false, message: "Meta credentials not configured" });

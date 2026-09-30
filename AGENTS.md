@@ -22,6 +22,28 @@ Small-to-mid Shopify stores running ads on Meta and TikTok. Legacy/custom worksp
 
 ## Current State
 
+### 2026-09-30 implementation candidate: standard Shopify ChatGPT Ads
+
+The working branch adds `OPENAI` to standard Shopify workspaces alongside Meta/TikTok,
+with encrypted credentials, non-recording validation, original-time/pixel-bound
+delivery, consent/tombstone rechecks, independent 30-day `oppref` capture, cart and
+webhook enrichment, recovery, diagnostics and six-language setup. OpenAI stays off
+by default and unavailable to headless installs. **Do not migrate Mizoke.** The first
+verification store is Infinite Layers (`afd09a.myshopify.com`). See
+`docs/chatgpt-ads.md` for the implementation and outstanding release checks.
+
+New modules: `destinations/openai.ts`, `openai-click-context.ts`,
+`logical-event-analytics.ts`, `workspace-limits.ts`, `openai-event-processor.ts`, and
+`components/integrations/openai-integration.tsx`. New migrations:
+`20260930_add_openai_destination`, `20260930_add_openai_delivery_fields`. Candidate
+worker count is 12. `UNLIMITED_WORKSPACE_USER_IDS` provides an explicit account-level
+store allowance independent of order exemptions and Stripe. These candidate changes
+are **not yet deployed**; the historical production release details below remain.
+Candidate checks: 752 unit tests and 69 integration tests pass locally, including
+generated Custom Pixel execution and signed Shopify webhook Purchase reconciliation.
+Phone normalization uses country metadata for OpenAI; other destination normalizers
+retain their existing contracts. CI still gates Node 20/24 and the 12-listener image.
+
 **Purchase identity write-back is live in production at exact Track Clear release SHA `9f9cb0bfd2a91007fb2e88632e1599a7c6e4eb69`** (PR #15: the verified Purchase webhook stores hashed purchaser identity so returning guests match on later funnel events). It follows session identity carry-forward at SHA `b7b8643942c1441fc74e72266df9f545214983ce` (PR #13: hashed shopper identity persists across a session so later anonymous funnel events still match). It follows the 2026-08-03 Custom Pixel Web Locks fix at SHA `30c3813d385d8c157f7a2aeec8f67173ab509688` (PR #11: restored all Custom Pixel browser event delivery, which a denied Web Locks API had silently blocked since 2026-07-27). It follows the 2026-08-02 Meta/TikTok match-quality release (PR #9: 90-second Meta+TikTok checkout contact enrichment, hashed session-ID external_id, contents arrays on funnel events, fb.\<n\> cookie validation). It followed the 2026-08-01 location-aware consent and sale/sharing release (PR #6), which deployed through a controlled Vercel/Railway cutover with the old worker stopped until both runtimes were ready. Current state:
 - Track Clear and the Mizoke Hydrogen storefront now use Shopify's computed Customer Privacy permissions for location-aware defaults and carry `saleOfDataAllowed` end to end. When Shopify allows tracking before a decision, Mizoke can track without forcing an opt-in; where Shopify requires opt-in, it stays off and shows the consent UI. Any explicit rejection, GPC, or sale/sharing opt-out remains authoritative: Meta/TikTok browser and server delivery are blocked, advertising identifiers are removed from cart/session enrichment, and only the existing privacy-minimized `INTERNAL` path may record an event when analytics is explicitly allowed. Mizoke is live at exact SHA `2b802ee9ac2f32de2321ca17fd073b98e930246c` after its AddToCart/InitiateCheckout analytics-only dispatch and strict Track Clear proxy payload contract were repaired.
 - Build: compiles cleanly on local Node 22; the release workflow enforces Node 20 standalone and Node 24 builds; lint passes with pre-existing `<img>` optimization warnings
@@ -556,7 +578,7 @@ Header: Content-Type: application/json
 - **Deployment order:** Pin the verified production database name/schema/system identifier, apply all committed migrations and verify eleven indexes, stop/drain all old workers, deploy the new web build while delivery is paused, wait for zero old Vercel invocations plus the configured duration buffer, then start exactly one new worker fleet. Never run mixed old/new workers or use a prebuilt production Vercel deployment. After new-version traffic, an older worker that does not understand current inbox/claim/enum state is not a safe rollback. See `docs/deploy.md`.
 - **Lazy Redis connections:** Queue and rate-limit modules use lazy singleton pattern to avoid build-time connection failures.
 - **customData dual-format:** Event normalizer accepts both camelCase (from snippet) and snake_case via `pick()` helper.
-- **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard "All" view deduplicates by filtering to a canonical destination (first enabled). Per-destination tabs show filtered stats. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.
+- **Analytics deduplication:** Multi-destination fan-out creates one EventLog per destination per event. Dashboard commerce and campaign queries elect one logical event row across eligible destinations; Purchase aliases prefer canonical webhook rows. Platform delivery health remains per destination. Campaign revenue includes Purchases only. Cache key: `analytics:{workspaceId}:{destination|all}:{currency|default}`.
 - **Currency conversion:** Users set `displayCurrency` on their profile. Revenue values converted via frankfurter.app API (free, no key). Exchange rates cached in Redis for 24h. Fallback: show unconverted if API fails.
 - **Internationalization:** next-intl v4 with cookie-based locale (no URL prefixes). 6 languages: EN, PT, ES, FR, DE, IT. ~250 translation keys per language in `messages/*.json`. Server components use `getTranslations`, client components use `useTranslations`. Language preference stored on User model, synced to `locale` cookie on login/change.
 - **Analytics caching:** Dashboard analytics cached in Redis for 60 seconds (`analytics:{workspaceId}:{dest}:{currency}` key). All queries run in parallel via `Promise.all()`. Cache miss falls back to direct DB computation.

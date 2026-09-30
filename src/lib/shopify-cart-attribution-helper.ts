@@ -1,4 +1,7 @@
+import { updateOpenAIClickContext, openAIClickContextScript } from "@/lib/openai-click-context";
 export const TRACKCLEAR_CART_ATTRIBUTE_KEYS = [
+  "_trackclear_oppref",
+  "_trackclear_oppref_captured_at",
   "_trackclear_session_id",
   "_fbp",
   "_fbc",
@@ -66,6 +69,7 @@ type EnsureSessionIdOptions = {
 };
 
 type ExtractAttributionOptions = EnsureSessionIdOptions & {
+  enableOpenAI?: boolean;
   url: string;
   now?: number;
   consent?: ConsentLike | null;
@@ -196,6 +200,7 @@ export function ensureTrackClearSessionId({
 
 export function extractShopifyCartAttribution({
   url,
+  enableOpenAI = false,
   now = Date.now(),
   storage,
   cookies,
@@ -300,6 +305,14 @@ export function extractShopifyCartAttribution({
   writeContext(storage, context);
 
   const attributes: TrackclearCartAttributes = {};
+  if (enableOpenAI) {
+    let prior: unknown = null;
+    try { prior = JSON.parse(safeGet(storage, "_tc_openai_click") ?? "null"); } catch { /* Ignore malformed storage. */ }
+    const click = updateOpenAIClickContext(prior, url, marketingAllowed, now);
+    safeSet(storage, "_tc_openai_click", JSON.stringify(click));
+    attributes._trackclear_oppref = click?.value ?? "";
+    attributes._trackclear_oppref_captured_at = click ? String(click.capturedAt) : "";
+  }
   setIfValue(attributes, "_trackclear_session_id", sessionId);
   if (marketingAllowed) {
     setIfValue(attributes, "_fbp", fbp);
@@ -447,11 +460,14 @@ export async function writeAndVerifyCartAttributes(
 
 export function generateShopifyCartAttributionHelperCode(
   workspaceId: string,
-  consentMode: "STRICT" | "LAX" = "LAX"
+  consentMode: "STRICT" | "LAX" = "LAX",
+  enableOpenAI = false
 ): string {
   const safeWorkspaceId = workspaceId.replace(/[\\'"<>&`\n\r\0]/g, "");
   return `(function(){
 var W="${safeWorkspaceId}",M="${consentMode}",CK=${JSON.stringify(TRACKCLEAR_CART_ATTRIBUTE_KEYS)};
+var OE=${enableOpenAI ? "true" : "false"},OU=null;
+${openAIClickContextScript()}
 var CTX="_tc_cart_attr_context",SID="_trackclear_session_id",WR=false,Q=false,T=null;
 function g(n){try{var m=document.cookie.match(new RegExp("(^| )"+n+"=([^;]+)"));return m?decodeURIComponent(m[2]):null}catch(e){return null}}
 function s(n,v){try{document.cookie=n+"="+encodeURIComponent(v)+";max-age=7776000;path=/;SameSite=Lax"}catch(e){}}
@@ -481,6 +497,7 @@ var o={};av(o,"_trackclear_session_id",id());if(mk){av(o,"_fbp",fbp);av(o,"_fbc"
 if(has){for(i=0;i<ps.length;i++){if(mk||ps[i][2].indexOf("_utm_")===0)o[ps[i][2]]=c[ps[i][1]]||""}}
 av(o,"_utm_source",c.us);av(o,"_utm_medium",c.um);av(o,"_utm_campaign",c.uc);av(o,"_utm_content",c.un);av(o,"_utm_term",c.ut);av(o,"_landing_page",c.lp);av(o,"_tc_attribution_timestamp",c.ca);av(o,"_tc_attribution_source",c.so);
 if(cn.analyticsAllowed!==undefined)av(o,"_tc_consent_analytics",cn.analyticsAllowed);if(cn.marketingAllowed!==undefined)av(o,"_tc_consent_marketing",cn.marketingAllowed);if(cn.saleOfDataAllowed!==undefined)av(o,"_tc_consent_sale_of_data",cn.saleOfDataAllowed);if(cn.analyticsAllowed!==undefined||cn.marketingAllowed!==undefined||cn.saleOfDataAllowed!==undefined){av(o,"_tc_consent_timestamp",Date.now());av(o,"_tc_consent_source","shopify_customer_privacy")}
+if(OE){var oc=updateOpenAIClickContext(js(ls("_tc_openai_click")),location.href,mk,n,OU!==location.href);OU=mk?location.href:null;ss("_tc_openai_click",JSON.stringify(oc));o._trackclear_oppref=oc?oc.value:"";o._trackclear_oppref_captured_at=oc?String(oc.capturedAt):""}
 log("attribution fields found",Object.keys(o));return o}
 function body(o){var b=new URLSearchParams();for(var k in o)b.append("attributes["+k+"]",o[k]);return b.toString()}
 function miss(exp,got){var m=[];got=got||{};for(var k in exp){if(exp[k]!==undefined&&String(got[k]||"")!==String(exp[k]))m.push(k)}return m}
