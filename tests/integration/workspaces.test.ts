@@ -109,6 +109,28 @@ describe("Workspace API", () => {
   // === POST /api/workspaces ===
 
   describe("POST /api/workspaces", () => {
+    it("selects the new store when an owner already has an active store", async () => {
+      const previous = await createWorkspace(user.id, { name: "Previous Store" });
+      vi.stubEnv("UNLIMITED_WORKSPACE_USER_IDS", user.id);
+      try {
+        const request = makeRequest("/api/workspaces", {
+          method: "POST",
+          headers: { cookie: `activeWorkspaceId=${previous.id}` },
+          body: { name: "New Store", domain: "new-store.myshopify.com" },
+        });
+        const response = await POST(request);
+        const created = await response.json();
+        expect(response.status).toBe(201);
+        expect(created.id).not.toBe(previous.id);
+        expect(response.cookies.get("activeWorkspaceId")).toMatchObject({
+          value: created.id, path: "/", httpOnly: true, sameSite: "lax",
+        });
+        expect(await db.workspace.count({ where: { userId: user.id } })).toBe(2);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("creates a workspace with valid data", async () => {
       const request = makeRequest("/api/workspaces", {
         method: "POST",

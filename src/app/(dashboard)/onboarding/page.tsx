@@ -107,6 +107,8 @@ export default function OnboardingPage() {
       }
       const data = await res.json() as { id: string; apiKey: string };
       setCreatedWorkspace({ id: data.id, apiKey: data.apiKey });
+      // Creation selects the new store; invalidate prefetched pages from the old one.
+      router.refresh();
 
       // Fetch the canonical snippet from the API
       const snippetRes = await fetch(`/api/snippet/${data.id}`);
