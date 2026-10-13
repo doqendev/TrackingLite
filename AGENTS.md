@@ -25,6 +25,13 @@ retention boundaries, duplicate protection, protected recovery/claims, summary
 idempotency and late corrections. Production remains on the prior release until
 the new exact-SHA release gates, backup and storage checks finish.
 
+Production-data rehearsal: all 68,173 rows and every identity/accounting value were
+preserved; 39,635 settled rows compacted, 44 summaries created, row bytes reduced
+from 95.4 MB to 50.9 MB. The isolated run took 14 seconds and generated about
+134 MB of WAL, requiring more headroom than the live volume's 89 MB free. The
+first CI failure was schema formatting only; Prisma formatting is corrected.
+
+
 
 This file provides guidance to Codex when working with code in this repository.
 

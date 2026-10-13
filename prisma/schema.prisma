@@ -178,7 +178,7 @@ model Workspace {
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
   events                 EventLog[]
-  eventDailySummaries     EventDailySummary[]
+  eventDailySummaries    EventDailySummary[]
   shopifyWebhookInboxes  ShopifyWebhookInbox[]
 
   @@index([userId])
@@ -236,7 +236,7 @@ model EventLog {
   deliveryClaimedAt      DateTime?
   deliveryClaimExpiresAt DateTime?
   createdAt              DateTime    @default(now())
-  detailsCompactedAt      DateTime? // Detailed history expires independently of delivery identity
+  detailsCompactedAt     DateTime? // Detailed history expires independently of delivery identity
 
   @@unique([workspaceId, eventId, destination])
   @@index([workspaceId, createdAt])
@@ -260,11 +260,11 @@ model EventLog {
 model EventDailySummary {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  day         DateTime @db.Date
+  day         DateTime  @db.Date
   scope       String
   logical     Json
   deliveries  Json
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 
   @@id([workspaceId, day, scope])
   @@index([day])
