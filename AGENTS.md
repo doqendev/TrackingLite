@@ -1,37 +1,48 @@
 # AGENTS.md
 
-## 2026-10-13 retention and event-health candidate
+## 2026-10-13 retention and checkout recovery release — live
 
-Candidate branch `codex/event-retention-and-health` separates seven-day detailed
-logs from 30-day daily reporting summaries for every plan. Compact operational
-EventLog identities remain for 35 days, preserving existing deduplication and
-current-month billing reconstruction. Pending/recoverable/ambiguous delivery owners
-remain protected; Redis attribution/consent and webhook recovery TTLs are unchanged.
+Release `d3f553a3e38b8bc27a5e1ce8855326ce20c40c68` (PR #22) keeps seven days
+of detailed logs and 30 days of reporting for every plan. Compact EventLog identities
+remain for 35 days, preserving deduplication and current-month billing. Pending,
+recoverable and ambiguous delivery owners remain protected. Redis attribution,
+consent, original event times and webhook recovery lifetimes are unchanged.
 New modules: `event-retention.ts`, `event-retention-policy.ts`, `sql-timestamp.ts`,
 `logical-events-sql.ts`; migration: `20261013_event_retention_summaries`.
-See `docs/event-retention.md` for lifecycle, storage and QA evidence.
+See `docs/event-retention.md` for lifecycle and health findings.
 
-Infinite Layers Meta health: all 9,362 sampled seven-day funnel rows were SENT.
-Dirava has similar pre-checkout contact-coverage gaps; both use server-only Meta.
-No browser mode or consent setting changed. A separate nine-checkout ChatGPT failure
-was reproduced under the worker's tsx loader: the phone library's /min metadata
-wrapper breaks. Explicit /core metadata fixes normalization; a real-runtime probe
-is now in both runtime CI and the worker container gate. Six encrypted envelopes
-remain recoverable; three expired. The two consent-blocked rows are not replayable.
-Purchase verification remains on hold until the user reports an order.
+Exact-merge CI `38377464019` passed all five gates: Node 20/24, the worker image,
+and PostgreSQL 16/17 migration rehearsals. 753 unit tests and 76 integration tests
+pass. An isolated production-data rehearsal preserved all 68,173 rows and every
+identity/accounting value, and exposed the temporary WAL headroom requirement.
 
-Local validation so far: 753 unit tests and 76 integration tests pass, including
-retention boundaries, duplicate protection, protected recovery/claims, summary
-idempotency and late corrections. Production remains on the prior release until
-the new exact-SHA release gates, backup and storage checks finish.
+The user approved capacity up to 2 GB. Railway only offered 1 GB or 5 GB; PostgreSQL
+was resized online from 500 MB to 1 GB, staying below that approval. The first live
+cleanup compacted 39,645 settled rows and created 44 summaries. Checksums of their
+tracking identities and accounting values matched before/after. Current EventLog
+row bytes fell from 91.2 MB to 49.9 MB; allocated database space is reused rather
+than immediately returned to the filesystem. Volume use was 50% after cleanup.
 
-Production-data rehearsal: all 68,173 rows and every identity/accounting value were
-preserved; 39,635 settled rows compacted, 44 summaries created, row bytes reduced
-from 95.4 MB to 50.9 MB. The isolated run took 14 seconds and generated about
-134 MB of WAL, requiring more headroom than the live volume's 89 MB free. The
-first CI failure was schema formatting only; Prisma formatting is corrected.
+Vercel `dpl_4fdMqyobwNGQa2UKjggMbC6zxNc5` and Railway
+`3cb055b2-cd2c-4c8f-97b6-7b7d96f129fb` report the exact release SHA, healthy DB/Redis,
+and 12/12 worker listeners in one fleet. The old workers were removed before the
+schema-first cutover. Twenty migrations, 11 required indexes valid, zero drift.
+Encrypted restore point: `E:/backups/trackclear/2026-10-13-retention-release`.
+Infinite Layers' unlimited orders/stores and complimentary Growth remain intact.
 
-
+Infinite Layers Meta: all 9,362 sampled seven-day non-Purchase funnel rows were SENT.
+Dirava has similar anonymous-visitor contact-coverage gaps; both use server-only
+Meta. No browser mode or consent setting changed. The separate ChatGPT phone
+normalization failure was reproduced under tsx and fixed using explicit /core
+metadata. All six recoverable checkout events subsequently received HTTP 200
+acceptance with their original IDs, timestamps and Pixel binding unchanged. Three
+older envelopes had expired and were not reconstructed. Two consent blocks remain
+untouched. The user subsequently authorized historical Purchase recovery: all 36 eligible
+orders received HTTP 200 acceptance with original identities/timestamps preserved,
+zero duplicate accepted aliases, and exactly one accepted delivery per order.
+Seven older Purchase envelopes had expired and were not reconstructed. This is
+recovery of existing genuine orders; fresh cart-to-webhook attribution and
+consent-denial live QA remain separate open checks. No monitoring was scheduled.
 
 This file provides guidance to Codex when working with code in this repository.
 
