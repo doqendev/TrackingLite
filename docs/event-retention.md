@@ -117,4 +117,3 @@ metadata. All six recoverable checkout events subsequently received HTTP 200
 acceptance with their original IDs, timestamps and Pixel binding unchanged. Three
 older envelopes had expired and were not reconstructed. Two consent blocks remain
 untouched. Purchase verification remains on hold until the user reports an order.
-
