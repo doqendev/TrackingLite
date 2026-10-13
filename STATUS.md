@@ -37,7 +37,12 @@ normalization failure was reproduced under tsx and fixed using explicit /core
 metadata. All six recoverable checkout events subsequently received HTTP 200
 acceptance with their original IDs, timestamps and Pixel binding unchanged. Three
 older envelopes had expired and were not reconstructed. Two consent blocks remain
-untouched. Purchase verification remains on hold until the user reports an order.
+untouched. The user subsequently authorized historical Purchase recovery: all 36 eligible
+orders received HTTP 200 acceptance with original identities/timestamps preserved,
+zero duplicate accepted aliases, and exactly one accepted delivery per order.
+Seven older Purchase envelopes had expired and were not reconstructed. This is
+recovery of existing genuine orders; fresh cart-to-webhook attribution and
+consent-denial live QA remain separate open checks. No monitoring was scheduled.
 
 ## 2026-10-13 Infinite Layers unlimited orders
 

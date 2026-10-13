@@ -159,4 +159,9 @@ probe now runs in Node 20/24 CI and the worker image. Six previously failed IL
 checkout events were replayed through the normal delivery guards and accepted
 (HTTP 200), preserving original IDs, times and Pixel binding. Three older expired
 envelopes were not reconstructed; two consent-blocked events were left untouched.
-This does not complete the separately deferred live Purchase verification.
+The user subsequently authorized historical Purchase recovery: all 36 eligible
+orders received HTTP 200 acceptance with original identities/timestamps preserved,
+zero duplicate accepted aliases, and exactly one accepted delivery per order.
+Seven older Purchase envelopes had expired and were not reconstructed. This is
+recovery of existing genuine orders; fresh cart-to-webhook attribution and
+consent-denial live QA remain separate open checks. No monitoring was scheduled.
