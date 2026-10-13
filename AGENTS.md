@@ -1,33 +1,36 @@
 # AGENTS.md
 
-## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
+## 2026-10-13 Google Ads Data Manager release — live
 
-Branch `feature/google-ads-data-manager` replaces the Google Ads destination. The
-old worker pinged the browser conversion endpoint from the server, which carries
-no Google cookies, so nothing was attributable. Purchases now go to one merchant
-"Website (Import from clicks)" conversion action through Google's Data Manager
-API with the Google click ID (gclid/gbraid/wbraid) and hashed customer data.
-Track Clear's own service account authenticates (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`,
-on Railway and Vercel); merchants add its email to Google Ads and enter their
-customer ID and conversion action ID. Google processes uploads asynchronously:
-SENT means accepted, and `destinationRequestStatus` records Google's final
-result, polled from the existing 5-minute recovery cycle (still 12 listeners).
-Google Ads is now allowed for standard Shopify V1 workspaces (not headless V1).
-Full design, setup and error guide: `docs/google-ads.md`.
+Release `42cb4f9ef10788b3bfbb466a7514aa388a12a829` (PR #24) replaces the Google Ads
+destination. The old worker pinged the browser conversion endpoint from the server,
+which carries no Google cookies, so nothing was attributable. Purchases now go to one
+merchant "Website (Import from clicks)" conversion action through Google's Data
+Manager API with the Google click ID (gclid/gbraid/wbraid) and hashed customer data.
+Track Clear's service account `trackclear-google-ads@track-clear.iam.gserviceaccount.com`
+(GCP project `track-clear`, key in `GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY` on Railway
+and Vercel) authenticates; merchants add its email to Google Ads. SENT means accepted;
+`destinationRequestStatus` holds Google's asynchronous result, polled from the existing
+5-minute recovery cycle (still 12 listeners). Google Ads is allowed for standard Shopify
+V1 workspaces (not headless V1). Design, setup and errors: `docs/google-ads.md`.
 
-New: `google-data-manager-auth.ts`, `destinations/google-ads-ids.ts`,
-`google-ads-request-status.ts`, `components/integrations/google-ads-integration.tsx`;
-rewritten `destinations/google-ads.ts` and `workers/google-ads-event-processor.ts`.
-Migrations `20261014_google_ads_data_manager` (nullable columns) and
-`20261014_google_ads_data_manager_idx01_request_status` (concurrent index), so the
-release gate now requires 12 indexes. `markEventDeliveryAccepted` gained an
-optional bookkeeping argument. Four de/es/fr/pt dashboard strings that were saved
-as Latin-1 (`reportingRetention`) were restored to UTF-8.
+Exact-merge CI `38469839345` passed all five gates; 823 unit tests (70 new) and the
+integration suite pass. Encrypted restore point:
+`E:/backups/trackclear/2026-10-13-google-ads-release` (identity verified). The old worker
+`3cb055b2-cd2c-4c8f-97b6-7b7d96f129fb` was removed before the cutover; the staged
+Railway key was committed without a deploy and the release pins were set on both hosts.
+Migrations `20261014_google_ads_data_manager` and `_idx01_request_status` applied:
+22 migrations, 12/12 indexes valid, zero drift. Vercel `dpl_7wTEVDpxeL8Uma1hfCaEVUJYuqEh`
+reports the exact SHA with database, schema and Redis ready; after a 2-minute drain margin
+Railway `f4574ad5-20e4-4258-adb1-de3a18e4d995` passed its guarded predeploy and reports
+12/12 listeners in one fleet. Delivery paused 21:24-21:33 UTC; all 24 events captured
+in that window were SENT afterwards and the delivery queues drained.
 
-Verification: 823 unit tests pass (70 new), `tsc` and lint clean. Integration
-tests were updated but not run locally (no PostgreSQL on this machine); CI must
-run them. Not merged or deployed: the release needs the owner's explicit go, the
-service account key on both hosts, and the `docs/deploy.md` gates.
+Infinite Layers: Google Ads customer 867-880-1549 granted the service account Standard
+access; conversion action "Track Clear purchase" (ID 7843158220, Purchase, Primary, count
+Every, 90-day click window, data-driven) created. The workspace's Save and validate passed
+(`validateOnly`) and delivery is enabled. Older Purchase conversion actions in that
+Google Ads account are still Primary and await the owner's account cleanup.
 
 ## 2026-10-13 retention and checkout recovery release — live
 
