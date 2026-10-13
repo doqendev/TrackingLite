@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getActiveWorkspace } from "@/lib/active-workspace";
 import { IntegrationsGrid } from "@/components/integrations/integrations-grid";
+import { getGoogleDataManagerServiceAccountEmail } from "@/lib/google-data-manager-auth";
 import { getTranslations } from "next-intl/server";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -58,11 +59,9 @@ export default async function IntegrationsPage() {
         pinterestConversionTokenEncrypted: true,
         enablePinterest: true,
         // Google Ads
-        googleAdsConversionId: true,
-        googleAdsLabelPurchase: true,
-        googleAdsLabelAddToCart: true,
-        googleAdsLabelInitiateCheckout: true,
-        googleAdsLabelViewContent: true,
+        googleAdsCustomerId: true,
+        googleAdsLoginCustomerId: true,
+        googleAdsConversionActionId: true,
         enableGoogleAds: true,
          // Shopify Webhook
          shopifyWebhookSecretEncrypted: true,
@@ -119,11 +118,9 @@ export default async function IntegrationsPage() {
     hasPinterestConversionToken: !!workspace.pinterestConversionTokenEncrypted,
     enablePinterest: workspace.enablePinterest,
     // Google Ads
-    googleAdsConversionId: workspace.googleAdsConversionId,
-    googleAdsLabelPurchase: workspace.googleAdsLabelPurchase,
-    googleAdsLabelAddToCart: workspace.googleAdsLabelAddToCart,
-    googleAdsLabelInitiateCheckout: workspace.googleAdsLabelInitiateCheckout,
-    googleAdsLabelViewContent: workspace.googleAdsLabelViewContent,
+    googleAdsCustomerId: workspace.googleAdsCustomerId,
+    googleAdsLoginCustomerId: workspace.googleAdsLoginCustomerId,
+    googleAdsConversionActionId: workspace.googleAdsConversionActionId,
     enableGoogleAds: workspace.enableGoogleAds,
     // Shopify Webhook
     hasShopifyWebhookSecret: !!workspace.shopifyWebhookSecretEncrypted,
@@ -140,7 +137,11 @@ export default async function IntegrationsPage() {
         </p>
       </div>
 
-      <IntegrationsGrid key={workspaceForClient.id} workspace={workspaceForClient} />
+      <IntegrationsGrid
+        key={workspaceForClient.id}
+        workspace={workspaceForClient}
+        googleServiceAccountEmail={getGoogleDataManagerServiceAccountEmail()}
+      />
     </div>
   );
 }

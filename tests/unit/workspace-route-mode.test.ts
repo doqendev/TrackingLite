@@ -91,11 +91,9 @@ function makeUpdatedWorkspace(overrides: Record<string, unknown> = {}) {
     pinterestAdAccountId: null,
     pinterestConversionTokenEncrypted: null,
     enablePinterest: false,
-    googleAdsConversionId: null,
-    googleAdsLabelPurchase: null,
-    googleAdsLabelAddToCart: null,
-    googleAdsLabelInitiateCheckout: null,
-    googleAdsLabelViewContent: null,
+    googleAdsCustomerId: null,
+    googleAdsLoginCustomerId: null,
+    googleAdsConversionActionId: null,
     enableGoogleAds: false,
     shopifyDomain: "store.myshopify.com",
     shopifyWebhookSecretEncrypted: null,
@@ -476,5 +474,59 @@ describe("workspace mode route guard", () => {
         }),
       })
     );
+  });
+
+  it("stores Google Ads IDs as digits and enables delivery only with both", async () => {
+    mockWorkspaceUpdate.mockResolvedValue(makeUpdatedWorkspace({
+      googleAdsCustomerId: "1234567890", googleAdsConversionActionId: "987654321", enableGoogleAds: true,
+    }));
+
+    const response = await PATCH(
+      makePatchRequest({ googleAdsCustomerId: "123-456-7890", googleAdsConversionActionId: " 987654321 ",
+        googleAdsLoginCustomerId: "", enableGoogleAds: true }),
+      { params: Promise.resolve({ id: "ws_v1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockWorkspaceUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ googleAdsCustomerId: "1234567890", googleAdsConversionActionId: "987654321",
+        googleAdsLoginCustomerId: null, enableGoogleAds: true }),
+    }));
+  });
+
+  it.each([
+    [{ googleAdsCustomerId: "123-456" }, "customer ID must be 10 digits"],
+    [{ googleAdsLoginCustomerId: "manager" }, "Manager account ID must be 10 digits"],
+    [{ googleAdsConversionActionId: "AW-123/abc" }, "Conversion action ID must be a number"],
+    [{ enableGoogleAds: true }, "requires a customer ID and a conversion action ID"],
+  ])("rejects incomplete or malformed Google Ads settings %j", async (body, message) => {
+    const response = await PATCH(makePatchRequest(body), { params: Promise.resolve({ id: "ws_v1" }) });
+
+    expect(response.status).toBe(422);
+    expect((await response.json()).error).toContain(message);
+    expect(mockWorkspaceUpdate).not.toHaveBeenCalled();
+  });
+
+  it("disables Google Ads delivery when an ID is cleared", async () => {
+    mockWorkspaceUpdate.mockResolvedValue(makeUpdatedWorkspace());
+
+    await PATCH(makePatchRequest({ googleAdsConversionActionId: null }), { params: Promise.resolve({ id: "ws_v1" }) });
+
+    expect(mockWorkspaceUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ googleAdsConversionActionId: null, enableGoogleAds: false }),
+    }));
+  });
+
+  it("keeps Google Ads off headless V1 installs", async () => {
+    mockWorkspaceFindFirst.mockResolvedValueOnce({
+      id: "ws_v1", userId: "user_123", apiKey: "tl_test", isActive: true,
+      productMode: "SHOPIFY_META_TIKTOK_V1", installType: "HEADLESS_CUSTOM",
+    });
+
+    const response = await PATCH(makePatchRequest({ googleAdsCustomerId: "1234567890" }),
+      { params: Promise.resolve({ id: "ws_v1" }) });
+
+    expect(response.status).toBe(422);
+    expect(mockWorkspaceUpdate).not.toHaveBeenCalled();
   });
 });

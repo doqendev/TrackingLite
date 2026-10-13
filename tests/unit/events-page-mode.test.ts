@@ -66,7 +66,7 @@ describe("Events page workspace mode filtering", () => {
     expect(mockEventLogFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          destination: { in: ["META", "TIKTOK", "OPENAI", "INTERNAL"] },
+          destination: { in: ["META", "TIKTOK", "OPENAI", "GOOGLE_ADS", "INTERNAL"] },
         }),
       })
     );
@@ -76,7 +76,7 @@ describe("Events page workspace mode filtering", () => {
         workspaceId: "ws_v1",
         status: "FAILED",
         createdAt: { gte: expect.any(Date) },
-        destination: { in: ["META", "TIKTOK", "OPENAI"] },
+        destination: { in: ["META", "TIKTOK", "OPENAI", "GOOGLE_ADS"] },
       },
     });
   });

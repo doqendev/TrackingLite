@@ -1,5 +1,9 @@
 import { db } from "@/lib/db";
 import { getSharedRedis } from "@/lib/redis";
+import {
+  normalizeGoogleAdsConversionActionId,
+  normalizeGoogleAdsCustomerId,
+} from "@/lib/destinations/google-ads-ids";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -61,13 +65,10 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
       enablePinterest: true,
       pinterestAdAccountId: true,
       pinterestConversionTokenEncrypted: true,
-      // Google Ads (no encryption -- public values)
+      // Google Ads (account IDs, not secrets; Track Clear's service account sends)
       enableGoogleAds: true,
-      googleAdsConversionId: true,
-      googleAdsLabelPurchase: true,
-      googleAdsLabelAddToCart: true,
-      googleAdsLabelInitiateCheckout: true,
-      googleAdsLabelViewContent: true,
+      googleAdsCustomerId: true,
+      googleAdsConversionActionId: true,
       // Shopify webhook
       shopifyWebhookSecretEncrypted: true,
       shopifyWebhookVerifiedAt: true,
@@ -109,7 +110,11 @@ export async function lookupWorkspaceByApiKey(apiKey: string) {
     hasKlaviyoCredentials: !!(workspace.enableKlaviyo && klaviyoApiKeyEncrypted),
     hasRedditCredentials: !!(workspace.enableReddit && redditAccessTokenEncrypted),
     hasPinterestCredentials: !!(workspace.enablePinterest && pinterestConversionTokenEncrypted),
-    hasGoogleAdsCredentials: !!(workspace.enableGoogleAds && workspace.googleAdsConversionId),
+    hasGoogleAdsCredentials: !!(
+      workspace.enableGoogleAds &&
+      normalizeGoogleAdsCustomerId(workspace.googleAdsCustomerId) &&
+      normalizeGoogleAdsConversionActionId(workspace.googleAdsConversionActionId)
+    ),
     hasShopifyWebhookSecret: !!shopifyWebhookSecretEncrypted,
     hasVerifiedShopifyWebhook: !!shopifyWebhookVerifiedAt,
   };

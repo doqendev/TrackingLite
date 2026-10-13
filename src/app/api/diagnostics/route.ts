@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Destination as PrismaDestination } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { googleAdsTargetForWorkspace } from "@/lib/destinations/google-ads-ids";
 import {
   getAllowedDestinationsForWorkspace,
   resolveWorkspaceInstallType,
@@ -49,7 +50,7 @@ function hasCredentials(workspace: Record<string, unknown>, dest: Destination): 
     case "PINTEREST":
       return !!(workspace.pinterestAdAccountId && workspace.pinterestConversionTokenEncrypted);
     case "GOOGLE_ADS":
-      return !!(workspace.googleAdsConversionId);
+      return !!googleAdsTargetForWorkspace(workspace);
   }
 }
 
@@ -117,7 +118,8 @@ export async function GET(request: NextRequest) {
       pinterestAdAccountId: true,
       pinterestConversionTokenEncrypted: true,
       enableGoogleAds: true,
-      googleAdsConversionId: true,
+      googleAdsCustomerId: true,
+      googleAdsConversionActionId: true,
     },
   });
 

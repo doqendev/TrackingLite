@@ -28,6 +28,7 @@ import {
 } from "@/lib/billing";
 import { extractCustomData } from "@/lib/extract-custom-data";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
+import { googleAdsTargetForWorkspace } from "@/lib/destinations/google-ads-ids";
 import {
   clearSessionContextForIdentifiers,
   lookupSessionContextByIdentifiers,
@@ -412,6 +413,12 @@ export async function POST(request: NextRequest) {
       gbraid: marketingContextAllowed ? payload.gbraid : null,
       wbraid: marketingContextAllowed ? payload.wbraid : null,
       ttclid: marketingContextAllowed ? payload.ttclid : null,
+      // The pixel stamps attributionTimestamp when it sees a fresh ad click; for a
+      // Google click that is the click time Google's 90-day window counts from.
+      googleClickCapturedAt:
+        marketingContextAllowed && payload.attributionSource === "google"
+          ? payload.attributionTimestamp ?? null
+          : null,
       ttp: marketingContextAllowed ? payload.ttp : null,
       gclid: marketingContextAllowed ? payload.gclid : null,
       rdtCid: marketingContextAllowed ? payload.rdtCid : null,
@@ -531,7 +538,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Google Ads (no encryption -- Conversion ID and Labels are public)
+    // Google Ads (Purchase click conversions via Track Clear's service account)
     if (hasGoogleAdsCredentials) {
       destinations.push({
         destination: "GOOGLE_ADS",
@@ -783,6 +790,7 @@ export async function POST(request: NextRequest) {
     // events use the same short plan-based retention as conversions, which
     // makes delivery failures visible and recoverable instead of fire-and-forget.
 
+    const googleAdsTarget = googleAdsTargetForWorkspace(workspace);
     const retryEvent: EventRetryEnvelope["event"] = {
       eventName: payload.eventName,
       eventId: effectiveEventId,
@@ -791,6 +799,8 @@ export async function POST(request: NextRequest) {
       opprefCapturedAt: consentScopedContext.opprefCapturedAt,
       consent: payload.consent,
       openaiPixelId: workspace.openaiPixelId,
+      googleClickCapturedAt: consentScopedContext.googleClickCapturedAt,
+      googleAdsTargetId: googleAdsTarget,
       url: consentScopedContext.url,
       referrer: consentScopedContext.referrer,
       trackclearSessionId: consentScopedContext.trackclearSessionId,
@@ -856,6 +866,8 @@ export async function POST(request: NextRequest) {
       utmContent: consentScopedContext.utmContent || null,
       utmTerm: consentScopedContext.utmTerm || null,
       gclid: consentScopedContext.gclid || null,
+      gbraid: consentScopedContext.gbraid || null,
+      wbraid: consentScopedContext.wbraid || null,
       ttclid: consentScopedContext.ttclid || null,
       rdtCid: consentScopedContext.rdtCid || null,
       epik: consentScopedContext.epik || null,
@@ -889,7 +901,10 @@ export async function POST(request: NextRequest) {
                 create: {
                   ...eventLogBaseData,
                   destination: dest.destination as any,
-                  deliveryTargetId: dest.destination === "OPENAI" ? workspace.openaiPixelId : null,
+                  deliveryTargetId:
+                    dest.destination === "OPENAI" ? workspace.openaiPixelId
+                      : dest.destination === "GOOGLE_ADS" ? googleAdsTarget
+                      : null,
                 },
                 update: {},
               });

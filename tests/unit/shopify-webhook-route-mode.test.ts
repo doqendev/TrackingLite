@@ -165,7 +165,8 @@ const baseWorkspace = {
   enableKlaviyo: false,
   klaviyoApiKeyEncrypted: null,
   enableGoogleAds: false,
-  googleAdsConversionId: null,
+  googleAdsCustomerId: null,
+  googleAdsConversionActionId: null,
   enablePurchase: true,
   consentMode: "LAX",
 };

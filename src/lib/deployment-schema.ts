@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 
 export const REQUIRED_TRACKING_MIGRATIONS = [
+  "20261014_google_ads_data_manager",
+  "20261014_google_ads_data_manager_idx01_request_status",
   "20261013_event_retention_summaries",
   "20260930_add_openai_destination",
   "20260930_add_openai_delivery_fields",
@@ -27,6 +29,7 @@ export const REQUIRED_TRACKING_INDEXES = [
   "EventLog_workspaceId_cartToken_idx",
   "EventLog_deliveryClaimToken_idx",
   "EventLog_workspaceId_refundId_idx",
+  "EventLog_destination_request_status_idx",
   "ShopifyWebhookInbox_workspaceId_deliveryId_key",
   "ShopifyWebhookInbox_status_nextAttemptAt_idx",
   "ShopifyWebhookInbox_workspaceId_createdAt_idx",

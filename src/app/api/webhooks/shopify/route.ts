@@ -30,6 +30,7 @@ import {
 import { hashPhonePii, hashPii } from "@/lib/hash-pii";
 import { getSharedRedis } from "@/lib/redis";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
+import { googleAdsTargetForWorkspace } from "@/lib/destinations/google-ads-ids";
 import {
   buildLineItemContentIds,
   buildLineItemContents,
@@ -445,7 +446,8 @@ async function handleOrderPaid(
       enableKlaviyo: true,
       klaviyoApiKeyEncrypted: true,
       enableGoogleAds: true,
-      googleAdsConversionId: true,
+      googleAdsCustomerId: true,
+      googleAdsConversionActionId: true,
       enablePurchase: true,
       consentMode: true,
     },
@@ -698,7 +700,8 @@ async function handleOrderPaid(
         jobName: "send-klaviyo-event",
       });
     }
-    if (workspace.enableGoogleAds && workspace.googleAdsConversionId) {
+    const googleAdsTarget = googleAdsTargetForWorkspace(workspace);
+    if (workspace.enableGoogleAds && googleAdsTarget) {
       destinations.push({
         destination: "GOOGLE_ADS",
         queue: getGoogleAdsQueue(),
@@ -1096,6 +1099,8 @@ async function handleOrderPaid(
       utmContent: orderAttribution.utmContent ?? sessionContext?.utmContent ?? landingAttribution.utmContent,
       utmTerm: orderAttribution.utmTerm ?? sessionContext?.utmTerm ?? landingAttribution.utmTerm,
       gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? landingAttribution.gclid,
+      gbraid: orderAttribution.gbraid ?? sessionContext?.gbraid ?? landingAttribution.gbraid ?? null,
+      wbraid: orderAttribution.wbraid ?? sessionContext?.wbraid ?? landingAttribution.wbraid ?? null,
       pageUrl: purchasePageUrl,
       fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
       fbc: finalFbc,
@@ -1113,7 +1118,10 @@ async function handleOrderPaid(
                 data: {
                   ...eventLogBaseData,
                   destination: dest.destination as any, // eslint-disable-line
-                  deliveryTargetId: dest.destination === "OPENAI" ? workspace.openaiPixelId : null,
+                  deliveryTargetId:
+                    dest.destination === "OPENAI" ? workspace.openaiPixelId
+                      : dest.destination === "GOOGLE_ADS" ? googleAdsTarget
+                      : null,
                   occurredAt,
                 },
               });
@@ -1208,8 +1216,8 @@ async function handleOrderPaid(
       fbp: orderAttribution.fbp ?? sessionContext?.fbp ?? null,
       fbc: finalFbc,
       fbclid: finalFbclid,
-      gbraid: orderAttribution.gbraid ?? sessionContext?.gbraid ?? null,
-      wbraid: orderAttribution.wbraid ?? sessionContext?.wbraid ?? null,
+      gbraid: orderAttribution.gbraid ?? sessionContext?.gbraid ?? landingAttribution.gbraid ?? null,
+      wbraid: orderAttribution.wbraid ?? sessionContext?.wbraid ?? landingAttribution.wbraid ?? null,
       userData: {
         email: email || null,
         phone: phone || null,
@@ -1255,6 +1263,10 @@ async function handleOrderPaid(
       consent: { analyticsAllowed: customerConsent.analytics, marketingAllowed: customerConsent.marketing,
         saleOfDataAllowed: customerConsent.saleOfData },
       openaiPixelId: workspace.openaiPixelId,
+      // The pixel and cart helper stamp the attribution time when they see a
+      // fresh ad click; for a Google click it bounds Google's 90-day window.
+      googleClickCapturedAt: finalAttributionSource === "google" ? finalAttributionTimestamp : null,
+      googleAdsTargetId: googleAdsTarget,
       ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? landingAttribution.ttclid ?? null,
       ttp: orderAttribution.ttp ?? sessionContext?.ttp ?? landingAttribution.ttp ?? null,
       gclid: orderAttribution.gclid ?? sessionContext?.gclid ?? landingAttribution.gclid ?? null,

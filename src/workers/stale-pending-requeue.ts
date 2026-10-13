@@ -28,6 +28,8 @@ import {
   decryptEventRetryEnvelope,
   type EventRetryEnvelope,
 } from "@/lib/event-retry-envelope";
+import { pollGoogleAdsRequestStatuses } from "@/lib/google-ads-request-status";
+import { googleAdsTargetForWorkspace } from "@/lib/destinations/google-ads-ids";
 import { WORKER_LOCK_DURATION_MS, WORKER_MAX_STALLED_COUNT, WORKER_STALLED_INTERVAL_MS } from "./worker-options";
 
 const QUEUE_NAME = "stale-pending-requeue";
@@ -270,7 +272,7 @@ function checkWorkspaceHasDestinationCredentials(
     case "PINTEREST":
       return !!(workspace.enablePinterest && workspace.pinterestConversionTokenEncrypted);
     case "GOOGLE_ADS":
-      return !!(workspace.enableGoogleAds && workspace.googleAdsConversionId);
+      return !!(workspace.enableGoogleAds && googleAdsTargetForWorkspace(workspace));
     default:
       return false;
   }
@@ -319,7 +321,8 @@ export async function requeueEvents(
         enablePinterest: true,
         pinterestConversionTokenEncrypted: true,
         enableGoogleAds: true,
-        googleAdsConversionId: true,
+        googleAdsCustomerId: true,
+        googleAdsConversionActionId: true,
       },
     });
 
@@ -806,6 +809,10 @@ export const staleRequeueWorker = new Worker(
     await requeueStaleRetrying();
     await requeueFailedEvents();
     await cleanupDlq();
+    // Google Ads uploads are processed asynchronously; confirm their outcome.
+    await pollGoogleAdsRequestStatuses().catch((err) => {
+      log.error("Google Ads status check failed", { error: err });
+    });
 
     reconcileCycle++;
     if (reconcileCycle >= RECONCILE_INTERVAL) {

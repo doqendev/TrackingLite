@@ -753,7 +753,10 @@ export async function completeEventDeliveryClaim(
 export async function markEventDeliveryAccepted(
   claim: EventDeliveryClaim,
   response: unknown,
-  acceptedAt = new Date()
+  acceptedAt = new Date(),
+  // Destination bookkeeping kept with the accepted state, so every settlement
+  // path (including crash recovery) retains it, e.g. an async request ID.
+  extraData: Prisma.EventLogUpdateManyMutationInput = {}
 ): Promise<void> {
   if (!claim.eventLogId || !claim.token) return;
   let accepted: { count: number };
@@ -768,6 +771,8 @@ export async function markEventDeliveryAccepted(
         status: { in: DELIVERABLE_STATUSES },
       },
       data: {
+        // First, so the ownership fields below can never be overridden.
+        ...extraData,
         deliveryClaimOwner: WORKER_ACCEPTED_CLAIM_OWNER,
         deliveryClaimedAt: acceptedAt,
         deliveryClaimExpiresAt: null,

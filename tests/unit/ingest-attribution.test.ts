@@ -744,6 +744,57 @@ describe("ingest attribution handling", () => {
     ).toEqual(["META", "TIKTOK"]);
   });
 
+  it("binds a Google Ads Purchase to the configured account and keeps the Google click time", async () => {
+    const clickedAt = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_v1",
+      userId: "user_123",
+      isActive: true,
+      productMode: "SHOPIFY_META_TIKTOK_V1",
+      installType: "SHOPIFY_CUSTOM_PIXEL",
+      consentMode: "STRICT",
+      enablePageView: true,
+      enableViewContent: true,
+      enableAddToCart: true,
+      enableInitiateCheckout: true,
+      enablePurchase: true,
+      hasMetaCredentials: false,
+      hasTikTokCredentials: false,
+      hasGA4Credentials: false,
+      hasKlaviyoCredentials: false,
+      hasRedditCredentials: false,
+      hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: true,
+      googleAdsCustomerId: "1234567890",
+      googleAdsConversionActionId: "987654321",
+      hasVerifiedShopifyWebhook: false,
+    });
+
+    const response = await postIngest(makeRequest({
+      eventName: "Purchase",
+      eventId: "google-purchase",
+      timestamp: Date.now(),
+      url: "https://shop.example/checkouts/thank-you",
+      gclid: "Cj0KCQ-google-click",
+      gbraid: "GBRAID123",
+      attributionSource: "google",
+      attributionTimestamp: clickedAt,
+      consent: { analyticsAllowed: true, marketingAllowed: true, saleOfDataAllowed: true },
+      userData: { email: "buyer@example.com" },
+      customData: { value: 39.99, currency: "EUR", numItems: 1, orderId: "5530", orderName: "#5530" },
+    }, { "X-TL-API-Key": "tl_test" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ destinations: ["GOOGLE_ADS"] });
+    const created = mockEventLogCreate.mock.calls[0][0].data;
+    expect(created).toMatchObject({ destination: "GOOGLE_ADS", deliveryTargetId: "1234567890:987654321",
+      gclid: "Cj0KCQ-google-click", gbraid: "GBRAID123" });
+    const { decryptEventRetryEnvelope } = await import("@/lib/event-retry-envelope");
+    expect(decryptEventRetryEnvelope(created)?.event).toMatchObject({
+      googleAdsTargetId: "1234567890:987654321", googleClickCapturedAt: clickedAt, gclid: "Cj0KCQ-google-click",
+    });
+  });
+
   it("preserves onlyDestinations for null-mode legacy workspaces", async () => {
     mockLookupWorkspaceByApiKey.mockResolvedValue({
       id: "ws_legacy",

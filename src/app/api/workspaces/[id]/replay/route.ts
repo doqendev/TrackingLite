@@ -25,6 +25,7 @@ import {
   type EventRetryEnvelope,
 } from "@/lib/event-retry-envelope";
 import type { Queue } from "bullmq";
+import { googleAdsTargetForWorkspace } from "@/lib/destinations/google-ads-ids";
 
 const DEST_QUEUE_MAP: Record<string, { queue: () => Queue; jobName: string }> = {
   META: { queue: getEventQueue, jobName: "send-meta-event" },
@@ -57,7 +58,7 @@ function workspaceHasCredentials(
     case "PINTEREST":
       return !!(workspace.enablePinterest && workspace.pinterestConversionTokenEncrypted);
     case "GOOGLE_ADS":
-      return !!(workspace.enableGoogleAds && workspace.googleAdsConversionId);
+      return !!(workspace.enableGoogleAds && googleAdsTargetForWorkspace(workspace));
     default:
       return false;
   }
@@ -102,7 +103,8 @@ export async function POST(
       enablePinterest: true,
       pinterestConversionTokenEncrypted: true,
       enableGoogleAds: true,
-      googleAdsConversionId: true,
+      googleAdsCustomerId: true,
+      googleAdsConversionActionId: true,
     },
   });
 
