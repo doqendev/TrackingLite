@@ -81,6 +81,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Unit tests
         run: pnpm vitest run --reporter=dot --silent
+      - name: OpenAI phone normalization in worker runtime
+        run: pnpm exec tsx scripts/verify-openai-worker-runtime.ts
       - name: Integration tests
         run: pnpm test:integration -- --reporter=dot --silent
       - name: TypeScript
@@ -133,6 +135,7 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm "$WORKER_IMAGE" node --version | grep -Eq '^v20\.'
+          docker run --rm "$WORKER_IMAGE" pnpm exec tsx scripts/verify-openai-worker-runtime.ts
           docker run --rm --network host \
             -e DATABASE_URL \
             -e DIRECT_DATABASE_URL \

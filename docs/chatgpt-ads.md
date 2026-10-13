@@ -30,9 +30,20 @@ Adding another store does not require a code change. Internal account owners may
 be listed once in `UNLIMITED_WORKSPACE_USER_IDS` on Vercel and Railway. This changes
 only the workspace allowance, not Stripe or monthly order entitlements.
 
+On 2026-10-13, the user separately requested uncapped Infinite Layers tracking.
+Its owner is now also in `UNLIMITED_ORDER_USER_IDS` on both production hosts;
+the unchanged release was redeployed to activate this allowance. This account-wide
+exemption removes the former Free 50-Purchase/month gate and skips quota alerts.
+It does not remove the 100 requests/second stability guard or plan-based log retention.
+The user then requested Growth's 1,000-order display. The same owner now has an active,
+complimentary Growth entitlement with 30-day retention and no expiry. Both unlimited
+exemptions remain in effect. A real Stripe customer exists, but no Stripe subscription,
+price or recurring payment was created; the billing UI's $49/month is the standard
+list price. Live UI verification shows Growth / Active and the 1,000-order allowance.
+
 The first live verification store selected by the owner is `www.infinitelayers.shop`
-(`afd09a.myshopify.com`). Its own ChatGPT Ads account/source and credentials must be
-configured; the currently connected Ads Manager exposes only Mizoke.
+(`afd09a.myshopify.com`). Its dedicated web data source and credentials are configured
+inside the existing Ads account; the store does not need a separate advertiser account.
 
 ## Delivery contract
 
@@ -103,11 +114,38 @@ An orders/paid webhook uses JSON/API 2026-07 and the encrypted Shopify signing s
 Shopify's Send test passed HMAC verification at 18:56 UTC and created no destination
 conversion. This proves signed delivery, not a real paid Purchase or attribution.
 
-The user confirmed Infinite Layers has no ChatGPT Ads account/data source yet. It needs
-its own Pixel ID/CAPI key and conversion configuration before OpenAI can be enabled.
-Native Facebook & Instagram and wetracked pixels already exist. Track Clear Meta is
-paused with its saved credentials retained; TikTok/OpenAI are disabled. Agree on one
-owner per platform before enabling delivery. No OpenAI conversion is claimed as verified.
+The user created a dedicated Infinite Layers web source and CAPI key inside the
+existing Ads account. At 19:22 UTC its Pixel ID matched the correct IL workspace,
+fresh non-recording validation succeeded, and OpenAI delivery is enabled.
+`Infinite Layers - Purchase` maps `order_created` to this source only, with default
+30-day click/1-day view windows and no campaign attached. A separate advertiser
+account is not required for the store-specific source. Credentials are encrypted.
+The user chose Track Clear as the Meta sender and selected the existing `InfiniteNew`
+dataset (`803269915787577`), replacing saved `test il` (`1411310997119266`). At 21:14
+UTC, Facebook & Instagram data sharing was switched off and Track Clear Meta CAPI
+enabled; the sales channel catalog remains in sync. Browser ownership stays off and
+the production test-event code is null. The saved encrypted token passed a TestEvent
+POST and Meta UI showed Processed/Server. A Graph GET read-permission error did not
+indicate missing event-write access. By 21:17 UTC, eight logical events each had one
+accepted META and one accepted OPENAI receipt: five PageView, one ViewContent, one
+AddToCart and one InitiateCheckout, with matching IDs and no retries. Checkout at
+21:15:34.096Z passed after its normal 90-second contact hold. Removed only TRACKMETAQA,
+preserving the original two-item/29.98 EUR cart; no order or customer details submitted.
+Track Clear TikTok is disabled and unrelated wetracked pixels are unchanged.
+The initial Pixel Helper load issue
+cleared after the user's refresh; its root cause is unproven, and privacy settings
+were not weakened. At 19:36 UTC the live IL workspace had 16 OPENAI/SENT receipts,
+all HTTP 200 with no retries: 12 PageView, 2 ViewContent, 1 AddToCart and 1
+InitiateCheckout. The Ads Manager latest-15-minute sample independently exposed all
+four types as server-to-server. Checkout retained occurrence time 19:34:02.749Z
+and was received at 19:35:34.821Z after the expected contact-enrichment hold.
+The cart test added one 14.99 EUR item, then began the 44.97 EUR/three-item checkout.
+Only the marked TRACKCLEARQA item was removed afterward; the original two remained.
+No order was placed. These are live QA events, not attributed sales or ROAS evidence.
+Paid Purchase deduplication, cart-to-webhook attribution, live consent-denial QA and
+campaign attribution remain unverified. The user requested the next genuine order
+for Purchase verification, then canceled automatic checks. The heartbeat was deleted;
+wait for the user to report a purchase before resuming verification.
 
 Official contract: https://developers.openai.com/ads/conversions-api and
 https://developers.openai.com/ads/supported-events (checked 2026-09-30).

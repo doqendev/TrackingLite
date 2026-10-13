@@ -130,7 +130,8 @@ export default async function BillingPage({
               </div>
               <p className="text-sm text-muted-foreground">
                 {t("ordersPerMonth", { count: planConfig.ordersPerMonth.toLocaleString() })} &middot;{" "}
-                {t("dayRetention", { days: planConfig.eventLogRetentionDays })}
+                {t("dayRetention", { days: planConfig.eventLogRetentionDays })} &middot;{" "}
+                {t("reportingRetention", { days: planConfig.reportingRetentionDays })}
               </p>
               {plan !== "FREE" && planConfig.priceMonthly > 0 && (
                 <p className="text-sm text-muted-foreground">

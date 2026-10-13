@@ -1,7 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
-import { BILLING_PLANS, BillingPlanKey } from "@/lib/constants";
+import { refreshEventSummaries, compactEventDetails, pruneExpiredDeliveryIdentities } from "@/lib/event-retention";
 import { createLogger } from "@/lib/logger";
 import {
   cleanupTerminalShopifyWebhookInboxes,
@@ -107,81 +107,13 @@ export async function runEventLogCleanup(): Promise<void> {
     log.info("Anonymized PII on old events", { count: anonymized.count, cutoffHours: 48 });
   }
 
-  // Step 2: Fetch workspaces with their owner's subscription plan
-  const workspaces = await db.workspace.findMany({
-    where: { isActive: true },
-    select: {
-      id: true,
-      userId: true,
-      user: {
-        select: {
-          subscription: {
-            select: { plan: true },
-          },
-        },
-      },
-    },
-  });
-
-  log.info("Checking retention for workspaces", { count: workspaces.length });
-
-  // Group workspace IDs by retention period (days)
-  const retentionGroups = new Map<number, string[]>();
-
-  for (const ws of workspaces) {
-    const plan = (ws.user?.subscription?.plan ?? "FREE") as BillingPlanKey;
-    const retentionDays = BILLING_PLANS[plan]?.eventLogRetentionDays ?? 7;
-
-    if (!retentionGroups.has(retentionDays)) {
-      retentionGroups.set(retentionDays, []);
-    }
-    retentionGroups.get(retentionDays)!.push(ws.id);
-  }
-
-  let totalDeleted = 0;
-
-  // Step 3: Delete old events per retention period
-  for (const [days, workspaceIds] of Array.from(retentionGroups)) {
-    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const durableIdentityOwners = {
-      eventName: "Purchase" as const,
-      deliveryClaimToken: { not: null },
-      deliveryClaimOwner: {
-        in: ["WORKER", "WORKER_ATTEMPTING", "WORKER_ACCEPTED"],
-      },
-    };
-    const protectedCount = await db.eventLog.count({
-      where: {
-        workspaceId: { in: workspaceIds },
-        createdAt: { lt: cutoff },
-        ...durableIdentityOwners,
-      },
-    });
-    if (protectedCount > 0) {
-      log.warn("Retaining ambiguous Purchase delivery identity owners", {
-        count: protectedCount,
-        workspaceCount: workspaceIds.length,
-        retentionDays: days,
-      });
-    }
-    const result = await db.eventLog.deleteMany({
-      where: {
-        workspaceId: { in: workspaceIds },
-        createdAt: { lt: cutoff },
-        NOT: durableIdentityOwners,
-      },
-    });
-    if (result.count > 0) {
-      log.info("Deleted events for retention period", {
-        count: result.count,
-        workspaceCount: workspaceIds.length,
-        retentionDays: days,
-      });
-    }
-    totalDeleted += result.count;
-  }
-
-  log.info("Cleanup run complete", { totalDeleted });
+  // Reporting must succeed before detailed data is compacted. Recovery, consent,
+  // and billing identity have independent lifetimes and never follow plan expiry.
+  const now = new Date();
+  await refreshEventSummaries(now);
+  const compacted = await compactEventDetails(now);
+  const deleted = await pruneExpiredDeliveryIdentities(now);
+  log.info("Cleanup run complete", { compacted, totalDeleted: deleted });
 }
 
 // Register the repeatable job on the queue

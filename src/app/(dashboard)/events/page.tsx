@@ -1,3 +1,4 @@
+import { detailedEventCutoff } from "@/lib/event-retention-policy";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -92,6 +93,7 @@ export default async function EventsPage({
 
     const where = {
       workspaceId: workspace.id,
+      createdAt: { gte: detailedEventCutoff() },
       destination: { in: visibleDestinations },
       ...(filterEventName && EVENT_NAMES.includes(filterEventName as (typeof EVENT_NAMES)[number])
         ? { eventName: filterEventName }
@@ -128,6 +130,7 @@ export default async function EventsPage({
         where: {
           workspaceId: workspace.id,
           status: "FAILED",
+          createdAt: { gte: detailedEventCutoff() },
           destination: { in: [...allowedDestinations] },
         },
       }),

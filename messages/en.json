@@ -206,6 +206,7 @@
     "purchaseEventsNote": "Only Purchase events count toward your limit. All other events are free and unlimited.",
     "ordersPerMonth": "Up to {count} orders/month",
     "dayRetention": "{days}-day log retention",
+    "reportingRetention": "{days}-day reporting summaries",
     "perMonth": "${price}/month",
     "renewsOn": "Renews on",
     "cancelsOn": "Cancels on",

@@ -197,12 +197,14 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">5. Data Retention</h2>
               <p className="text-muted-foreground leading-relaxed mb-3">
-                Event logs (records of individual forwarding operations) are retained according to the
-                merchant&apos;s subscription plan:
+                Detailed event logs are retained for seven days on every plan. Daily reporting
+                summaries are retained for 30 days.
               </p>
               <ul className="list-disc pl-5 space-y-1 text-muted-foreground leading-relaxed">
-                <li><strong className="text-foreground">Free and Starter plans:</strong> 7 days</li>
-                <li><strong className="text-foreground">Growth and Scale plans:</strong> 30 days</li>
+                <li>After seven days, settled event payloads, URLs and click identifiers are removed.</li>
+                <li>Compact delivery identities, order aliases and accounting fields remain for 35 days
+                  to prevent duplicates and reconcile billing. Unresolved delivery ownership and active
+                  recovery records are retained until they can be settled safely.</li>
               </ul>
               <p className="mt-3 text-muted-foreground leading-relaxed">
                 IP addresses and browser information in normal event-log columns are automatically

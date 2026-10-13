@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { Prisma } from "@prisma/client";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
-import { isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/min";
+import { isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/core";
+import phoneMetadata from "libphonenumber-js/metadata.min.json";
 import type { DestinationEventJob } from "@/lib/queue";
 
 export const OPENAI_CLICK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -45,11 +46,13 @@ function phoneWithCallingCode(value: unknown, countryCode: unknown): string | nu
   const compact = text(value).replace(/[\s().-]/g, "");
   if (!/^\+?[0-9]+$/.test(compact)) return null;
   const country = text(countryCode).toUpperCase();
-  const defaultCountry = isSupportedCountry(country) ? country as CountryCode : undefined;
+  // Pass metadata explicitly: the worker's tsx runtime can resolve the /min
+  // wrapper's relative JSON import through its .json.js ESM compatibility shim.
+  const defaultCountry = isSupportedCountry(country as CountryCode, phoneMetadata) ? country as CountryCode : undefined;
   const international = compact.startsWith("00") ? "+" + compact.slice(2) : compact;
   // Country metadata handles national trunk prefixes without guessing US from
   // length or accidentally adding a calling code twice.
-  const parsed = parsePhoneNumberFromString(international, { defaultCountry, extract: false });
+  const parsed = parsePhoneNumberFromString(international, { defaultCountry, extract: false }, phoneMetadata);
   if (!parsed?.isPossible()) return null;
   const digits = parsed.number.replace(/^\+/, "").replace(/^0+/, "");
   return /^[1-9][0-9]{7,14}$/.test(digits) ? digits : null;

@@ -206,6 +206,7 @@
     "purchaseEventsNote": "Nur Kauf-Events zählen auf dein Limit. Alle anderen Events sind kostenlos und unbegrenzt.",
     "ordersPerMonth": "Bis zu {count} Bestellungen/Monat",
     "dayRetention": "{days} Tage Protokollaufbewahrung",
+    "reportingRetention": "Berichtszusammenfassungen f�r {days} Tage",
     "perMonth": "${price}/Monat",
     "renewsOn": "Verlängert sich am",
     "cancelsOn": "Endet am",

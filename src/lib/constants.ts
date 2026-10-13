@@ -1,3 +1,4 @@
+import { DETAILED_EVENT_RETENTION_DAYS, REPORTING_RETENTION_DAYS } from "./event-retention-policy";
 export const META_API_VERSION = process.env.META_API_VERSION || "v21.0";
 export const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
@@ -11,13 +12,14 @@ export const BILLING_PLANS = {
     currency: "usd",
     ordersPerMonth: 50,
     maxWorkspaces: 1,
-    eventLogRetentionDays: 7,
+    eventLogRetentionDays: DETAILED_EVENT_RETENTION_DAYS,
+    reportingRetentionDays: REPORTING_RETENTION_DAYS,
     features: [
       "1 store",
       "Up to 50 orders/month",
       "Unlimited non-purchase events",
       "5 event types",
-      "7-day event log",
+      "7-day event log and 30-day reports",
     ],
   },
   STARTER: {
@@ -26,13 +28,14 @@ export const BILLING_PLANS = {
     currency: "usd",
     ordersPerMonth: 500,
     maxWorkspaces: 3,
-    eventLogRetentionDays: 7,
+    eventLogRetentionDays: DETAILED_EVENT_RETENTION_DAYS,
+    reportingRetentionDays: REPORTING_RETENTION_DAYS,
     features: [
       "Up to 3 stores",
       "Up to 500 orders/month",
       "Unlimited non-purchase events",
       "5 event types",
-      "7-day event log",
+      "7-day event log and 30-day reports",
       "Email support",
     ],
   },
@@ -42,13 +45,14 @@ export const BILLING_PLANS = {
     currency: "usd",
     ordersPerMonth: 1000,
     maxWorkspaces: 5,
-    eventLogRetentionDays: 30,
+    eventLogRetentionDays: DETAILED_EVENT_RETENTION_DAYS,
+    reportingRetentionDays: REPORTING_RETENTION_DAYS,
     features: [
       "Up to 5 stores",
       "Up to 1,000 orders/month",
       "Unlimited non-purchase events",
       "5 event types",
-      "30-day event log",
+      "7-day event log and 30-day reports",
       "Priority support",
     ],
   },
@@ -58,13 +62,14 @@ export const BILLING_PLANS = {
     currency: "usd",
     ordersPerMonth: 5000,
     maxWorkspaces: Infinity,
-    eventLogRetentionDays: 30,
+    eventLogRetentionDays: DETAILED_EVENT_RETENTION_DAYS,
+    reportingRetentionDays: REPORTING_RETENTION_DAYS,
     features: [
       "Unlimited stores",
       "Up to 5,000 orders/month",
       "Unlimited non-purchase events",
       "5 event types",
-      "30-day event log",
+      "7-day event log and 30-day reports",
       "Priority support",
     ],
   },

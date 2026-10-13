@@ -206,6 +206,7 @@
     "purchaseEventsNote": "Solo gli eventi di acquisto contano ai fini del limite. Tutti gli altri eventi sono gratuiti e illimitati.",
     "ordersPerMonth": "Fino a {count} ordini/mese",
     "dayRetention": "Conservazione log di {days} giorni",
+    "reportingRetention": "Riepiloghi dei report per {days} giorni",
     "perMonth": "${price}/mese",
     "renewsOn": "Si rinnova il",
     "cancelsOn": "Si cancella il",

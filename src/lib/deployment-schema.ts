@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 export const REQUIRED_TRACKING_MIGRATIONS = [
+  "20261013_event_retention_summaries",
   "20260930_add_openai_destination",
   "20260930_add_openai_delivery_fields",
   "20260727_add_shopify_webhook_inbox",

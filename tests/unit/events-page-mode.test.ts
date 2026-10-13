@@ -75,6 +75,7 @@ describe("Events page workspace mode filtering", () => {
       where: {
         workspaceId: "ws_v1",
         status: "FAILED",
+        createdAt: { gte: expect.any(Date) },
         destination: { in: ["META", "TIKTOK", "OPENAI"] },
       },
     });

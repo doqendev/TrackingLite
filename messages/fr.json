@@ -206,6 +206,7 @@
     "purchaseEventsNote": "Seuls les événements d'achat comptent dans votre limite. Tous les autres événements sont gratuits et illimités.",
     "ordersPerMonth": "Jusqu'à {count} commandes/mois",
     "dayRetention": "Rétention des journaux sur {days} jours",
+    "reportingRetention": "Synth�ses des rapports sur {days} jours",
     "perMonth": "${price}/mois",
     "renewsOn": "Renouvellement le",
     "cancelsOn": "Annulation le",
