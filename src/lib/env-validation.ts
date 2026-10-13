@@ -1,4 +1,5 @@
 import { createLogger } from "./logger";
+import { GOOGLE_DATA_MANAGER_KEY_ENV, isGoogleDataManagerConfigured } from "./google-data-manager-auth";
 
 const log = createLogger({ component: "env-validation" });
 
@@ -56,5 +57,10 @@ export function validateEnv(context: "web" | "worker" = "web") {
   }
   if (!process.env.SENTRY_DSN && !process.env.NEXT_PUBLIC_SENTRY_DSN) {
     log.warn("SENTRY_DSN is not set. Error tracking via Sentry will be disabled.");
+  }
+  if (!process.env[GOOGLE_DATA_MANAGER_KEY_ENV]) {
+    log.warn(`${GOOGLE_DATA_MANAGER_KEY_ENV} is not set. Google Ads delivery will retry until it is configured.`);
+  } else if (!isGoogleDataManagerConfigured()) {
+    log.warn(`${GOOGLE_DATA_MANAGER_KEY_ENV} is not a valid Google service account key. Google Ads delivery will fail.`);
   }
 }

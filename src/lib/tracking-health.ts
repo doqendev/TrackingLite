@@ -1,5 +1,6 @@
 import type { Destination } from "@prisma/client";
 import { db } from "@/lib/db";
+import { googleAdsTargetForWorkspace } from "@/lib/destinations/google-ads-ids";
 
 export type TrackingHealthSeverity = "ok" | "warning" | "error";
 
@@ -112,6 +113,63 @@ export function buildCartAttributionCheck(input: {
   };
 }
 
+type GoogleUploadStatusCounts = Partial<Record<string, number>>;
+
+function firstGoogleErrorReason(detail: unknown): string | null {
+  if (!detail || typeof detail !== "object") return null;
+  const { errors, lastError } = detail as { errors?: unknown; lastError?: unknown };
+  const first = Array.isArray(errors) ? errors[0] : null;
+  if (first && typeof first === "object" && typeof (first as { reason?: unknown }).reason === "string") {
+    return (first as { reason: string }).reason;
+  }
+  return typeof lastError === "string" ? lastError : null;
+}
+
+/**
+ * Google Ads accepts an upload first (EventLog SENT) and reports whether the
+ * conversion was usable about 30 minutes later (destinationRequestStatus).
+ * Both stages are surfaced, since a SENT row alone proves nothing.
+ */
+export function buildGoogleAdsDeliveryCheck(input: {
+  configured: boolean;
+  lastEvent: {
+    createdAt: Date; status: string; errorMessage: string | null;
+    destinationRequestStatus: string | null; destinationStatusDetail: unknown;
+  } | null;
+  uploadCounts: GoogleUploadStatusCounts;
+  lastProblem: { destinationRequestStatus: string | null; destinationStatusDetail: unknown } | null;
+}): TrackingHealthCheck {
+  const { configured, lastEvent, uploadCounts, lastProblem } = input;
+  if (!configured) {
+    return { key: "google_ads", label: "Google Ads delivery", severity: "error",
+      detail: "Google Ads customer ID or conversion action ID is missing." };
+  }
+  if (!lastEvent) {
+    return { key: "google_ads", label: "Google Ads delivery", severity: "warning",
+      detail: "Account saved; waiting for a real Purchase. Validation does not record a conversion." };
+  }
+  const count = (status: string) => uploadCounts[status] ?? 0;
+  const problems = count("FAILED") + count("PARTIAL_SUCCESS") + count("TIMED_OUT");
+  const summary = `Last 7 days: ${count("SUCCESS")} processed, ${count("PROCESSING")} processing, ${problems} with problems.`;
+  if (lastEvent.status === "FAILED") {
+    return { key: "google_ads", label: "Google Ads delivery", severity: "warning", timestamp: lastEvent.createdAt,
+      detail: `Last Google Ads upload failed: ${lastEvent.errorMessage ?? "Unknown error"}. ${summary}` };
+  }
+  if (problems > 0) {
+    const reason = firstGoogleErrorReason(lastProblem?.destinationStatusDetail);
+    return { key: "google_ads", label: "Google Ads delivery", severity: "warning", timestamp: lastEvent.createdAt,
+      detail: `Google reported ${lastProblem?.destinationRequestStatus ?? "a problem"} for a recent upload` +
+        `${reason ? ` (${reason})` : ""}. ${summary}` };
+  }
+  return {
+    key: "google_ads", label: "Google Ads delivery",
+    severity: lastEvent.status === "SENT" ? "ok" : "warning", timestamp: lastEvent.createdAt,
+    detail: `Last Google Ads upload is ${lastEvent.status}` +
+      `${lastEvent.destinationRequestStatus ? ` (Google: ${lastEvent.destinationRequestStatus})` : ""}. ${summary}` +
+      " Confirm conversions in Google Ads > Goals > Conversions.",
+  };
+}
+
 export async function getTrackingHealth(
   workspaceId: string
 ): Promise<TrackingHealthSummary> {
@@ -129,6 +187,9 @@ export async function getTrackingHealth(
       enableOpenAI: true,
       openaiPixelId: true,
       openaiApiKeyEncrypted: true,
+      enableGoogleAds: true,
+      googleAdsCustomerId: true,
+      googleAdsConversionActionId: true,
       tiktokPixelId: true,
       tiktokAccessTokenEncrypted: true,
       shopifyWebhookSecretEncrypted: true,
@@ -156,10 +217,39 @@ export async function getTrackingHealth(
   if (workspace.enableMeta) activeDestinations.push("META");
   if (workspace.enableTikTok) activeDestinations.push("TIKTOK");
   if (workspace.enableOpenAI) activeDestinations.push("OPENAI");
+  if (workspace.enableGoogleAds) activeDestinations.push("GOOGLE_ADS");
   const lastOpenAIEvent = workspace.enableOpenAI ? await db.eventLog.findFirst({
     where: { workspaceId, destination: "OPENAI", status: { not: "SUPERSEDED" } },
     orderBy: { createdAt: "desc" }, select: { createdAt: true, status: true },
   }) : null;
+  const googleAdsCheck = workspace.enableGoogleAds ? await (async () => {
+    const [lastEvent, grouped, lastProblem] = await Promise.all([
+      db.eventLog.findFirst({
+        where: { workspaceId, destination: "GOOGLE_ADS", status: { not: "SUPERSEDED" } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true, status: true, errorMessage: true,
+          destinationRequestStatus: true, destinationStatusDetail: true },
+      }),
+      db.eventLog.groupBy({
+        by: ["destinationRequestStatus"],
+        where: { workspaceId, destination: "GOOGLE_ADS", status: "SENT", createdAt: { gte: since7d } },
+        _count: { _all: true },
+      }),
+      db.eventLog.findFirst({
+        where: { workspaceId, destination: "GOOGLE_ADS", createdAt: { gte: since7d },
+          destinationRequestStatus: { in: ["FAILED", "PARTIAL_SUCCESS", "TIMED_OUT"] } },
+        orderBy: { createdAt: "desc" },
+        select: { destinationRequestStatus: true, destinationStatusDetail: true },
+      }),
+    ]);
+    return buildGoogleAdsDeliveryCheck({
+      configured: !!googleAdsTargetForWorkspace(workspace),
+      lastEvent,
+      uploadCounts: Object.fromEntries(grouped.flatMap((group) =>
+        group.destinationRequestStatus ? [[group.destinationRequestStatus, group._count._all]] : [])),
+      lastProblem,
+    });
+  })() : null;
   const [
     lastSnippetEvent,
     lastWebhookPurchase,
@@ -424,6 +514,7 @@ export async function getTrackingHealth(
       : "Credentials saved; waiting for a real event. Credential validation does not record an event.",
     timestamp: lastOpenAIEvent?.createdAt ?? null,
   });
+  if (googleAdsCheck) checks.push(googleAdsCheck);
   const selectedChecks = checks.filter(check =>
     (check.key !== "meta" || workspace.enableMeta) && (check.key !== "tiktok" || workspace.enableTikTok));
   if (!activeDestinations.length) selectedChecks.push({ key: "destinations", label: "Ad integrations",

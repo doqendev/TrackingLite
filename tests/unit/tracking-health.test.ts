@@ -24,7 +24,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { buildCartAttributionCheck, getTrackingHealth } from "@/lib/tracking-health";
+import { buildCartAttributionCheck, buildGoogleAdsDeliveryCheck, getTrackingHealth } from "@/lib/tracking-health";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -95,6 +95,33 @@ describe("tracking health cart attribution check", () => {
     expect(check.detail).toContain("purchase attribution is weak or missing");
     expect(check.detail).toContain("no attribution context");
     expect(check.detail).toContain("Verify Custom Pixel, Shopify webhook, and Cart Attribution Helper");
+  });
+});
+
+describe("tracking health Google Ads delivery check", () => {
+  const lastEvent = (overrides: Record<string, unknown> = {}) => ({ createdAt: new Date(), status: "SENT", errorMessage: null,
+    destinationRequestStatus: "SUCCESS", destinationStatusDetail: null, ...overrides });
+
+  it("errors when the account or conversion action is missing", () => {
+    expect(buildGoogleAdsDeliveryCheck({ configured: false, lastEvent: null, uploadCounts: {}, lastProblem: null }).severity).toBe("error");
+  });
+  it("waits for a real purchase after setup", () => {
+    expect(buildGoogleAdsDeliveryCheck({ configured: true, lastEvent: null, uploadCounts: {}, lastProblem: null }))
+      .toMatchObject({ severity: "warning", detail: expect.stringContaining("waiting for a real Purchase") });
+  });
+  it("is ok only when uploads are accepted and Google reports no problems", () => {
+    expect(buildGoogleAdsDeliveryCheck({ configured: true, lastEvent: lastEvent(), uploadCounts: { SUCCESS: 3, PROCESSING: 1 }, lastProblem: null }))
+      .toMatchObject({ severity: "ok", detail: expect.stringContaining("3 processed, 1 processing, 0 with problems") });
+  });
+  it("surfaces Google's reason when an accepted upload later failed", () => {
+    const check = buildGoogleAdsDeliveryCheck({ configured: true, lastEvent: lastEvent(), uploadCounts: { SUCCESS: 2, FAILED: 1 },
+      lastProblem: { destinationRequestStatus: "FAILED", destinationStatusDetail: { errors: [{ reason: "INVALID_GCLID", recordCount: 1 }] } } });
+    expect(check).toMatchObject({ severity: "warning", detail: expect.stringContaining("FAILED for a recent upload (INVALID_GCLID)") });
+  });
+  it("warns when the last upload was rejected before Google accepted it", () => {
+    expect(buildGoogleAdsDeliveryCheck({ configured: true, uploadCounts: {}, lastProblem: null,
+      lastEvent: lastEvent({ status: "FAILED", errorMessage: "Google Ads conversion upload rejected (HTTP 403 PERMISSION_DENIED)", destinationRequestStatus: null }) }))
+      .toMatchObject({ severity: "warning", detail: expect.stringContaining("PERMISSION_DENIED") });
   });
 });
 

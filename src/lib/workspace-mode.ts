@@ -30,7 +30,7 @@ const ALL_DESTINATIONS = [
 ] as const satisfies readonly ExternalDestination[];
 
 const DESTINATIONS_BY_PRODUCT_MODE: Record<WorkspaceProductModeValue, readonly ExternalDestination[]> = {
-  SHOPIFY_META_TIKTOK_V1: ["META", "TIKTOK", "OPENAI"],
+  SHOPIFY_META_TIKTOK_V1: ["META", "TIKTOK", "OPENAI", "GOOGLE_ADS"],
   LEGACY_ALL_DESTINATIONS: ALL_DESTINATIONS,
 };
 
@@ -86,10 +86,13 @@ export function getAllowedDestinationsForWorkspace(
 ): readonly ExternalDestination[] {
   const destinations = DESTINATIONS_BY_PRODUCT_MODE[resolveWorkspaceProductMode(workspace)];
   // Headless migrations are a separate, explicit rollout. Existing ownership
-  // of a headless store's OpenAI pixel must remain unchanged.
-  return resolveWorkspaceInstallType(workspace) === SHOPIFY_CUSTOM_PIXEL
-    ? destinations
-    : destinations.filter((destination) => destination !== "OPENAI");
+  // of a headless store's OpenAI pixel must remain unchanged, and V1 Google Ads
+  // delivery depends on the Shopify pixel and cart attribution it ships with.
+  if (resolveWorkspaceInstallType(workspace) === SHOPIFY_CUSTOM_PIXEL) return destinations;
+  const v1 = resolveWorkspaceProductMode(workspace) === SHOPIFY_META_TIKTOK_V1;
+  return destinations.filter((destination) =>
+    destination !== "OPENAI" && !(v1 && destination === "GOOGLE_ADS")
+  );
 }
 
 export function filterDestinationsForWorkspace<T extends { destination: string }>(

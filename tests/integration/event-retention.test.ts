@@ -56,14 +56,16 @@ describe("independent log, report and operational retention", () => {
     const row = await event("purchase", { eventName: "Purchase", orderId: "100", orderName: "#100",
       checkoutToken: "checkout", cartToken: "cart", deliveryTargetId: "pixel", occurredAt: ago(10),
       source: "webhook", refundId: "refund", refundAmount: 3, metaResponse: { accepted: true },
-      customerIp: "127.0.0.1", userAgent: "agent", gclid: "click", utmContent: "creative", paymentGateway: "paypal" });
+      customerIp: "127.0.0.1", userAgent: "agent", gclid: "click", gbraid: "app-click", wbraid: "web-click",
+      utmContent: "creative", paymentGateway: "paypal", destinationRequestId: "req-1", destinationRequestStatus: "SUCCESS" });
     await compactEventDetails(now);
     expect(await db.eventLog.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({
       eventId: "purchase", orderId: "100", orderName: "#100", checkoutToken: "checkout", cartToken: "cart",
       deliveryTargetId: "pixel", occurredAt: ago(10), source: "webhook", refundId: "refund", refundAmount: 3,
       value: 10, currency: "USD", status: "SENT", utmSource: "facebook", utmCampaign: "campaign-a",
       paymentGateway: "paypal", payload: null, metaResponse: null, fbp: null, pageUrl: null,
-      customerIp: null, userAgent: null, gclid: null, utmContent: null, detailsCompactedAt: now,
+      customerIp: null, userAgent: null, gclid: null, gbraid: null, wbraid: null, utmContent: null, detailsCompactedAt: now,
+      destinationRequestId: "req-1", destinationRequestStatus: "SUCCESS",
     });
     await expect(event("purchase")).rejects.toMatchObject({ code: "P2002" });
   });

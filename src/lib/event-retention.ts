@@ -66,7 +66,7 @@ export async function compactEventDetails(now = new Date()): Promise<number> {
       )
       UPDATE "EventLog" e SET payload = NULL, "metaResponse" = NULL, "customerIp" = NULL,
         "userAgent" = NULL, fbp = NULL, fbc = NULL, "pageUrl" = NULL,
-        gclid = NULL, ttclid = NULL, "rdtCid" = NULL, epik = NULL,
+        gclid = NULL, gbraid = NULL, wbraid = NULL, ttclid = NULL, "rdtCid" = NULL, epik = NULL,
         "utmMedium" = NULL, "utmContent" = NULL, "utmTerm" = NULL,
         "detailsCompactedAt" = ${utcTimestamp(now)}
       FROM batch WHERE e.id = batch.id

@@ -30,14 +30,14 @@ describe("workspace-mode", () => {
     ]);
   });
 
-  it("limits standard Shopify workspaces to Meta, TikTok, and ChatGPT Ads", () => {
+  it("limits standard Shopify workspaces to Meta, TikTok, ChatGPT Ads, and Google Ads", () => {
     const workspace = {
       id: "ws_v1",
       productMode: "SHOPIFY_META_TIKTOK_V1",
       installType: "SHOPIFY_CUSTOM_PIXEL",
     };
 
-    expect(getAllowedDestinationsForWorkspace(workspace)).toEqual(["META", "TIKTOK", "OPENAI"]);
+    expect(getAllowedDestinationsForWorkspace(workspace)).toEqual(["META", "TIKTOK", "OPENAI", "GOOGLE_ADS"]);
     expect(isDestinationAllowedForWorkspace(workspace, "INTERNAL")).toBe(false);
     expect(
       filterDestinationsForWorkspace(workspace, [
@@ -46,6 +46,13 @@ describe("workspace-mode", () => {
         { destination: "TIKTOK" },
       ])
     ).toEqual([{ destination: "META" }, { destination: "TIKTOK" }]);
+  });
+
+  it("keeps ChatGPT Ads and Google Ads off headless V1 installs", () => {
+    const workspace = { id: "ws_headless", productMode: "SHOPIFY_META_TIKTOK_V1", installType: "HEADLESS_CUSTOM" };
+
+    expect(getAllowedDestinationsForWorkspace(workspace)).toEqual(["META", "TIKTOK"]);
+    expect(getAllowedDestinationsForWorkspace({ ...workspace, productMode: null })).toContain("GOOGLE_ADS");
   });
 
   it("uses LEGACY_WORKSPACE_IDS as an emergency bypass", () => {

@@ -1,5 +1,10 @@
 import { decrypt } from "@/lib/encryption";
 import { sendToOpenAI, OpenAIApiError } from "@/lib/destinations/openai";
+import {
+  buildGoogleAdsIngestRequest, googleUserIdentifiers, normalizeGoogleAdsConversionActionId,
+  normalizeGoogleAdsCustomerId, sendToGoogleAds, GoogleAdsApiError,
+} from "@/lib/destinations/google-ads";
+import { getGoogleDataManagerServiceAccountEmail } from "@/lib/google-data-manager-auth";
 import { isDestinationAllowedForWorkspace } from "@/lib/workspace-mode";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -56,6 +61,9 @@ export async function POST(
       pinterestConversionTokenEncrypted: true,
       pinterestConversionTokenIv: true,
       pinterestConversionTokenTag: true,
+      googleAdsCustomerId: true,
+      googleAdsLoginCustomerId: true,
+      googleAdsConversionActionId: true,
     },
   });
 
@@ -89,6 +97,39 @@ export async function POST(
         return NextResponse.json({ connected: true, validatedOnly: true, message: "Credentials and event schema validated. No event was recorded." });
       } catch (error) {
         return NextResponse.json({ connected: false, message: error instanceof OpenAIApiError ? error.message : "ChatGPT Ads validation unavailable" });
+      }
+    }
+    case "GOOGLE_ADS": {
+      const customerId = normalizeGoogleAdsCustomerId(workspace.googleAdsCustomerId);
+      const conversionActionId = normalizeGoogleAdsConversionActionId(workspace.googleAdsConversionActionId);
+      const serviceAccountEmail = getGoogleDataManagerServiceAccountEmail();
+      if (!isDestinationAllowedForWorkspace(workspace, "GOOGLE_ADS") || !customerId || !conversionActionId) {
+        return NextResponse.json({ connected: false, message: "Google Ads account not configured" });
+      }
+      if (!serviceAccountEmail) {
+        return NextResponse.json({ connected: false, message: "Track Clear's Google connection is not set up yet" });
+      }
+      const rate = await checkRateLimit(workspace.id);
+      if (!rate.allowed) return NextResponse.json({ connected: false, message: "Try again shortly" }, { status: 429 });
+      try {
+        // validateOnly checks access, the conversion action and the event schema.
+        // The sample customer is a fixed Track Clear address, never a shopper.
+        await sendToGoogleAds(buildGoogleAdsIngestRequest({
+          customerId, conversionActionId,
+          loginCustomerId: normalizeGoogleAdsCustomerId(workspace.googleAdsLoginCustomerId),
+        }, {
+          transactionId: `trackclear-validation-${crypto.randomUUID()}`,
+          eventTimestamp: new Date().toISOString(),
+          eventSource: "WEB",
+          conversionValue: 1,
+          currency: "EUR",
+          userData: { userIdentifiers: googleUserIdentifiers({ email: "validation@trackclear.io" }) },
+        }, { marketingAllowed: true, saleOfDataAllowed: true }, true));
+        return NextResponse.json({ connected: true, validatedOnly: true, serviceAccountEmail,
+          message: "Track Clear can upload purchases to this Google Ads conversion action. No conversion was recorded." });
+      } catch (error) {
+        return NextResponse.json({ connected: false, serviceAccountEmail,
+          message: error instanceof GoogleAdsApiError ? error.message : "Google Ads validation unavailable" });
       }
     }
     case "META": {

@@ -52,6 +52,7 @@ const expected = new Map<
   ["EventLog_workspaceId_cartToken_idx", { tableName: "EventLog", columns: ["workspaceId", "cartToken"], isUnique: false }],
   ["EventLog_deliveryClaimToken_idx", { tableName: "EventLog", columns: ["deliveryClaimToken"], isUnique: false }],
   ["EventLog_workspaceId_refundId_idx", { tableName: "EventLog", columns: ["workspaceId", "refundId"], isUnique: false }],
+  ["EventLog_destination_request_status_idx", { tableName: "EventLog", columns: ["destination", "destinationRequestStatus", "destinationStatusNextCheckAt"], isUnique: false }],
   ["ShopifyWebhookInbox_workspaceId_deliveryId_key", { tableName: "ShopifyWebhookInbox", columns: ["workspaceId", "deliveryId"], isUnique: true }],
   ["ShopifyWebhookInbox_status_nextAttemptAt_idx", { tableName: "ShopifyWebhookInbox", columns: ["status", "nextAttemptAt"], isUnique: false }],
   ["ShopifyWebhookInbox_workspaceId_createdAt_idx", { tableName: "ShopifyWebhookInbox", columns: ["workspaceId", "createdAt"], isUnique: false }],
@@ -255,6 +256,7 @@ async function main() {
         'EventLog_workspaceId_cartToken_idx',
         'EventLog_deliveryClaimToken_idx',
         'EventLog_workspaceId_refundId_idx',
+        'EventLog_destination_request_status_idx',
         'ShopifyWebhookInbox_workspaceId_deliveryId_key',
         'ShopifyWebhookInbox_status_nextAttemptAt_idx',
         'ShopifyWebhookInbox_workspaceId_createdAt_idx'
@@ -309,8 +311,8 @@ async function main() {
 
   console.log(
     populatedRehearsal
-      ? "Tracking hardening migration verified: 11/11 indexes plus populated backfills."
-      : "Tracking hardening migration verified: 11/11 indexes valid and ready."
+      ? "Tracking hardening migration verified: 12/12 indexes plus populated backfills."
+      : "Tracking hardening migration verified: 12/12 indexes valid and ready."
   );
 }
 

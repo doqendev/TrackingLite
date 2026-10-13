@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Settings, AlertTriangle } from "lucide-react";
+import { googleAdsTargetForWorkspace } from "@/lib/destinations/google-ads-ids";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,9 @@ export default async function DashboardPage() {
         enableOpenAI: true,
         openaiPixelId: true,
         openaiApiKeyEncrypted: true,
+        enableGoogleAds: true,
+        googleAdsCustomerId: true,
+        googleAdsConversionActionId: true,
         enableGA4: true,
         enableKlaviyo: true,
         enableReddit: true,
@@ -79,9 +83,11 @@ export default async function DashboardPage() {
     const hasOpenAICredentials = allowedDestinations.includes("OPENAI") && !!(
       workspace.enableOpenAI && workspace.openaiPixelId && workspace.openaiApiKeyEncrypted
     );
+    const hasGoogleAdsCredentials = allowedDestinations.includes("GOOGLE_ADS") &&
+      workspace.enableGoogleAds && !!googleAdsTargetForWorkspace(workspace);
     hasAnyDestination = isShopifyV1
-      ? hasMetaCredentials || hasTikTokCredentials || hasOpenAICredentials
-      : hasMetaCredentials || hasTikTokCredentials || hasOpenAICredentials || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
+      ? hasMetaCredentials || hasTikTokCredentials || hasOpenAICredentials || hasGoogleAdsCredentials
+      : hasMetaCredentials || hasTikTokCredentials || hasOpenAICredentials || hasGoogleAdsCredentials || workspace.enableGA4 || workspace.enableKlaviyo || workspace.enableReddit || workspace.enablePinterest;
 
     // Get user's display currency
     const user = await db.user.findUnique({

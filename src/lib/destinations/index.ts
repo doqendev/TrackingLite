@@ -64,11 +64,12 @@ export const DESTINATION_EVENT_MAP = {
     Purchase: "checkout",
     Refund: null,
   },
+  // Offline click conversions (Data Manager API): one purchase conversion action.
   GOOGLE_ADS: {
     PageView: null,
-    ViewContent: "view_content",
-    AddToCart: "add_to_cart",
-    InitiateCheckout: "begin_checkout",
+    ViewContent: null,
+    AddToCart: null,
+    InitiateCheckout: null,
     Purchase: "purchase",
     Refund: null,
   },

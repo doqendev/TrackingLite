@@ -10,6 +10,11 @@ import { createLogger } from "@/lib/logger";
 import { resolveShopifyDomain } from "@/lib/shopify-domain-resolver";
 import { isLegacyWorkspace, isDestinationAllowedForWorkspace } from "@/lib/workspace-mode";
 import { normalizeCustomIngestDomainInput } from "@/lib/custom-ingest-domain";
+import {
+  googleAdsTargetForWorkspace,
+  normalizeGoogleAdsConversionActionId,
+  normalizeGoogleAdsCustomerId,
+} from "@/lib/destinations/google-ads-ids";
 
 const log = createLogger({ component: "workspaces-id" });
 
@@ -63,12 +68,11 @@ const UpdateWorkspaceSchema = z.object({
   // Klaviyo
   klaviyoApiKey: z.string().optional().nullable(),
   enableKlaviyo: z.boolean().optional(),
-  // Google Ads (no encryption -- public values)
-  googleAdsConversionId: z.string().regex(/^\d+$/, "Conversion ID must be numeric").optional().nullable(),
-  googleAdsLabelPurchase: z.string().optional().nullable(),
-  googleAdsLabelAddToCart: z.string().optional().nullable(),
-  googleAdsLabelInitiateCheckout: z.string().optional().nullable(),
-  googleAdsLabelViewContent: z.string().optional().nullable(),
+  // Google Ads account IDs (not secrets; Track Clear's service account sends).
+  // Normalized and validated after parsing so dashes from the Google Ads UI work.
+  googleAdsCustomerId: z.string().trim().max(32).optional().nullable(),
+  googleAdsLoginCustomerId: z.string().trim().max(32).optional().nullable(),
+  googleAdsConversionActionId: z.string().trim().max(32).optional().nullable(),
   enableGoogleAds: z.boolean().optional(),
   // Shopify webhook
   shopifyWebhookSecret: z.string().optional().nullable(),
@@ -98,13 +102,14 @@ const LEGACY_DESTINATION_UPDATE_FIELDS = new Set([
   "pinterestAdAccountId",
   "pinterestConversionToken",
   "enablePinterest",
-  "googleAdsConversionId",
-  "googleAdsLabelPurchase",
-  "googleAdsLabelAddToCart",
-  "googleAdsLabelInitiateCheckout",
-  "googleAdsLabelViewContent",
-  "enableGoogleAds",
 ]);
+
+const GOOGLE_ADS_UPDATE_FIELDS = [
+  "googleAdsCustomerId",
+  "googleAdsLoginCustomerId",
+  "googleAdsConversionActionId",
+  "enableGoogleAds",
+] as const;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -174,11 +179,9 @@ export async function GET(
         pinterestConversionTokenEncrypted: true,
         enablePinterest: true,
         // Google Ads
-        googleAdsConversionId: true,
-        googleAdsLabelPurchase: true,
-        googleAdsLabelAddToCart: true,
-        googleAdsLabelInitiateCheckout: true,
-        googleAdsLabelViewContent: true,
+        googleAdsCustomerId: true,
+        googleAdsLoginCustomerId: true,
+        googleAdsConversionActionId: true,
         enableGoogleAds: true,
         // Shopify webhook
         shopifyDomain: true,
@@ -265,6 +268,30 @@ export async function PATCH(
         (!(data.openaiPixelId ?? workspace.openaiPixelId) || !(data.openaiApiKey ?? workspace.openaiApiKeyEncrypted))) {
       return NextResponse.json({ error: "ChatGPT Ads requires a Pixel ID and Conversions API key." }, { status: 422 });
     }
+    if (GOOGLE_ADS_UPDATE_FIELDS.some((field) => data[field] !== undefined) &&
+        !isDestinationAllowedForWorkspace(workspace, "GOOGLE_ADS")) {
+      return NextResponse.json({ error: "Google Ads is available for standard Shopify stores. Headless migration is not enabled." }, { status: 422 });
+    }
+    for (const [field, normalize, label] of [
+      ["googleAdsCustomerId", normalizeGoogleAdsCustomerId, "Google Ads customer ID must be 10 digits"],
+      ["googleAdsLoginCustomerId", normalizeGoogleAdsCustomerId, "Manager account ID must be 10 digits"],
+      ["googleAdsConversionActionId", normalizeGoogleAdsConversionActionId, "Conversion action ID must be a number"],
+    ] as const) {
+      const value = data[field];
+      if (value === undefined || value === null) continue;
+      if (value === "") { data[field] = null; continue; }
+      const normalized = normalize(value);
+      if (!normalized) return NextResponse.json({ error: label }, { status: 422 });
+      data[field] = normalized;
+    }
+    if (data.googleAdsCustomerId === null || data.googleAdsConversionActionId === null) data.enableGoogleAds = false;
+    if ((data.enableGoogleAds ?? workspace.enableGoogleAds) && !googleAdsTargetForWorkspace({
+      googleAdsCustomerId: data.googleAdsCustomerId !== undefined ? data.googleAdsCustomerId : workspace.googleAdsCustomerId,
+      googleAdsConversionActionId: data.googleAdsConversionActionId !== undefined
+        ? data.googleAdsConversionActionId : workspace.googleAdsConversionActionId,
+    })) {
+      return NextResponse.json({ error: "Google Ads requires a customer ID and a conversion action ID." }, { status: 422 });
+    }
     if (data.enableMeta === false || data.metaPixelId === null) {
       // A browser pixel cannot remain an implicit owner after its Meta
       // destination or dataset ID is removed.
@@ -340,7 +367,7 @@ export async function PATCH(
       );
       if (blockedField) {
         return NextResponse.json(
-          { error: "This workspace mode supports Meta, TikTok, and ChatGPT Ads destinations." },
+          { error: "This workspace mode supports Meta, TikTok, ChatGPT Ads, and Google Ads destinations." },
           { status: 400 }
         );
       }
@@ -507,11 +534,9 @@ export async function PATCH(
         pinterestConversionTokenEncrypted: true,
         enablePinterest: true,
         // Google Ads
-        googleAdsConversionId: true,
-        googleAdsLabelPurchase: true,
-        googleAdsLabelAddToCart: true,
-        googleAdsLabelInitiateCheckout: true,
-        googleAdsLabelViewContent: true,
+        googleAdsCustomerId: true,
+        googleAdsLoginCustomerId: true,
+        googleAdsConversionActionId: true,
         enableGoogleAds: true,
         // Shopify webhook
          shopifyDomain: true,

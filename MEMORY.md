@@ -1,5 +1,34 @@
 # MEMORY.md
 
+## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
+
+Branch `feature/google-ads-data-manager` replaces the Google Ads destination. The
+old worker pinged the browser conversion endpoint from the server, which carries
+no Google cookies, so nothing was attributable. Purchases now go to one merchant
+"Website (Import from clicks)" conversion action through Google's Data Manager
+API with the Google click ID (gclid/gbraid/wbraid) and hashed customer data.
+Track Clear's own service account authenticates (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`,
+on Railway and Vercel); merchants add its email to Google Ads and enter their
+customer ID and conversion action ID. Google processes uploads asynchronously:
+SENT means accepted, and `destinationRequestStatus` records Google's final
+result, polled from the existing 5-minute recovery cycle (still 12 listeners).
+Google Ads is now allowed for standard Shopify V1 workspaces (not headless V1).
+Full design, setup and error guide: `docs/google-ads.md`.
+
+New: `google-data-manager-auth.ts`, `destinations/google-ads-ids.ts`,
+`google-ads-request-status.ts`, `components/integrations/google-ads-integration.tsx`;
+rewritten `destinations/google-ads.ts` and `workers/google-ads-event-processor.ts`.
+Migrations `20261014_google_ads_data_manager` (nullable columns) and
+`20261014_google_ads_data_manager_idx01_request_status` (concurrent index), so the
+release gate now requires 12 indexes. `markEventDeliveryAccepted` gained an
+optional bookkeeping argument. Four de/es/fr/pt dashboard strings that were saved
+as Latin-1 (`reportingRetention`) were restored to UTF-8.
+
+Verification: 823 unit tests pass (70 new), `tsc` and lint clean. Integration
+tests were updated but not run locally (no PostgreSQL on this machine); CI must
+run them. Not merged or deployed: the release needs the owner's explicit go, the
+service account key on both hosts, and the `docs/deploy.md` gates.
+
 ## 2026-10-13 retention and checkout recovery release — live
 
 Release `d3f553a3e38b8bc27a5e1ce8855326ce20c40c68` (PR #22) keeps seven days

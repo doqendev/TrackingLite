@@ -151,13 +151,22 @@ model Workspace {
   pinterestConversionTokenTag       String?
   enablePinterest                   Boolean @default(false)
 
-  // Google Ads fields (no encryption needed -- Conversion ID and Labels are public values)
-  googleAdsConversionId          String? // e.g. "1234567890" (the AW- number)
-  googleAdsLabelPurchase         String? // e.g. "AbCdEfGhIjKl"
+  // Google Ads: Purchase conversions are uploaded through Google's Data Manager
+  // API as click conversions. Track Clear's service account must be a user of the
+  // operating account, or of the manager account used as the login account.
+  googleAdsCustomerId         String? // Operating Google Ads account, 10 digits
+  googleAdsLoginCustomerId    String? // Optional manager account that grants access
+  googleAdsConversionActionId String? // Numeric "Website (Import from clicks)" conversion action
+  enableGoogleAds             Boolean @default(false)
+
+  // Deprecated browser-tag configuration. Server-side requests to the browser
+  // conversion endpoint carried no shopper cookies and were never attributable.
+  // Retained read-only until a later release drops the columns.
+  googleAdsConversionId          String?
+  googleAdsLabelPurchase         String?
   googleAdsLabelAddToCart        String?
   googleAdsLabelInitiateCheckout String?
   googleAdsLabelViewContent      String?
-  enableGoogleAds                Boolean @default(false)
 
   // Shopify webhook fields
   shopifyWebhookSecretEncrypted String? // AES-256-GCM encrypted
@@ -187,56 +196,65 @@ model Workspace {
 }
 
 model EventLog {
-  id                     String      @id @default(cuid())
-  workspaceId            String
-  workspace              Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  eventName              EventName
-  eventId                String // dedup event_id (UUID from JS snippet)
-  status                 EventStatus @default(PENDING)
-  metaResponse           Json? // Destination delivery receipt
-  occurredAt             DateTime? // Original occurrence time, never the replay time
-  deliveryTargetId       String? // Immutable destination dataset at capture time
-  errorMessage           String?
-  retryCount             Int         @default(0)
-  payload                Json? // Sanitized payload (no raw PII)
-  customerIp             String?
-  userAgent              String?
-  fbp                    String? // _fbp cookie value
-  fbc                    String? // _fbc cookie value
-  pageUrl                String? // URL where event occurred
-  value                  Float? // monetary value (e.g., cart total, purchase amount)
-  currency               String? // ISO 4217 currency code (e.g., "USD", "BRL")
-  numItems               Int? // number of items in cart/order
-  orderId                String? // Shopify order ID (for dedup)
-  orderName              String? // Normalized Shopify order name alias
-  checkoutToken          String? // Durable browser/webhook Purchase alias
-  cartToken              String? // Durable browser/webhook Purchase alias
-  utmSource              String?
-  utmMedium              String?
-  utmCampaign            String?
-  utmContent             String?
-  utmTerm                String?
-  gclid                  String?
-  ttclid                 String?
-  rdtCid                 String?
-  epik                   String?
-  refundId               String?
-  refundAmount           Float?
-  destination            Destination @default(META)
-  source                 String?     @default("snippet") // "snippet" | "webhook"
-  paymentGateway         String? // e.g. "paypal", "shopify_payments", "klarna" (webhook only)
-  retryPayloadEncrypted  String?     @db.Text // Short-lived AES-256-GCM retry envelope
-  retryPayloadIv         String?
-  retryPayloadTag        String?
-  retryPayloadExpiresAt  DateTime?
-  lastAttemptAt          DateTime? // Last worker/replay claim time for crash recovery
-  nextRetryAt            DateTime? // Earliest automatic retry time for transient failures
-  deliveryClaimToken     String? // Durable worker/webhook delivery ownership token
-  deliveryClaimOwner     String? // "WORKER" (rolling) | "WORKER_ATTEMPTING" | "WORKER_ACCEPTED" | "SHOPIFY_WEBHOOK"
-  deliveryClaimedAt      DateTime?
-  deliveryClaimExpiresAt DateTime?
-  createdAt              DateTime    @default(now())
-  detailsCompactedAt     DateTime? // Detailed history expires independently of delivery identity
+  id                           String      @id @default(cuid())
+  workspaceId                  String
+  workspace                    Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventName                    EventName
+  eventId                      String // dedup event_id (UUID from JS snippet)
+  status                       EventStatus @default(PENDING)
+  metaResponse                 Json? // Destination delivery receipt
+  occurredAt                   DateTime? // Original occurrence time, never the replay time
+  deliveryTargetId             String? // Immutable destination dataset at capture time
+  errorMessage                 String?
+  retryCount                   Int         @default(0)
+  payload                      Json? // Sanitized payload (no raw PII)
+  customerIp                   String?
+  userAgent                    String?
+  fbp                          String? // _fbp cookie value
+  fbc                          String? // _fbc cookie value
+  pageUrl                      String? // URL where event occurred
+  value                        Float? // monetary value (e.g., cart total, purchase amount)
+  currency                     String? // ISO 4217 currency code (e.g., "USD", "BRL")
+  numItems                     Int? // number of items in cart/order
+  orderId                      String? // Shopify order ID (for dedup)
+  orderName                    String? // Normalized Shopify order name alias
+  checkoutToken                String? // Durable browser/webhook Purchase alias
+  cartToken                    String? // Durable browser/webhook Purchase alias
+  utmSource                    String?
+  utmMedium                    String?
+  utmCampaign                  String?
+  utmContent                   String?
+  utmTerm                      String?
+  gclid                        String?
+  gbraid                       String?
+  wbraid                       String?
+  ttclid                       String?
+  rdtCid                       String?
+  epik                         String?
+  refundId                     String?
+  refundAmount                 Float?
+  destination                  Destination @default(META)
+  source                       String?     @default("snippet") // "snippet" | "webhook"
+  paymentGateway               String? // e.g. "paypal", "shopify_payments", "klarna" (webhook only)
+  retryPayloadEncrypted        String?     @db.Text // Short-lived AES-256-GCM retry envelope
+  retryPayloadIv               String?
+  retryPayloadTag              String?
+  retryPayloadExpiresAt        DateTime?
+  lastAttemptAt                DateTime? // Last worker/replay claim time for crash recovery
+  nextRetryAt                  DateTime? // Earliest automatic retry time for transient failures
+  deliveryClaimToken           String? // Durable worker/webhook delivery ownership token
+  deliveryClaimOwner           String? // "WORKER" (rolling) | "WORKER_ATTEMPTING" | "WORKER_ACCEPTED" | "SHOPIFY_WEBHOOK"
+  deliveryClaimedAt            DateTime?
+  deliveryClaimExpiresAt       DateTime?
+  // Providers that accept a request and process it later (Google Data Manager)
+  // report the real outcome asynchronously. SENT only means accepted for processing.
+  destinationRequestId         String? // Provider request ID used to retrieve processing status
+  destinationRequestStatus     String? // PROCESSING | SUCCESS | PARTIAL_SUCCESS | FAILED | TIMED_OUT
+  destinationStatusCheckedAt   DateTime?
+  destinationStatusNextCheckAt DateTime?
+  destinationStatusDetail      Json? // Safe counts and reason codes only, never shopper data
+  createdAt                    DateTime    @default(now())
+  detailsCompactedAt           DateTime? // Detailed history expires independently of delivery identity
 
   @@unique([workspaceId, eventId, destination])
   @@index([workspaceId, createdAt])
@@ -255,6 +273,7 @@ model EventLog {
   @@index([workspaceId, checkoutToken])
   @@index([workspaceId, cartToken])
   @@index([deliveryClaimToken])
+  @@index([destination, destinationRequestStatus, destinationStatusNextCheckAt], map: "EventLog_destination_request_status_idx")
 }
 
 model EventDailySummary {

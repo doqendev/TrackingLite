@@ -9,7 +9,6 @@ const processors = [
   ["klaviyo-event-processor.ts", "sendToKlaviyo", "KlaviyoApiError"],
   ["reddit-event-processor.ts", "sendToReddit", "RedditApiError"],
   ["pinterest-event-processor.ts", "sendToPinterest", "PinterestApiError"],
-  ["google-ads-event-processor.ts", "sendToGoogleAds", "GoogleAdsApiError"],
 ] as const;
 
 describe("destination worker delivery ownership", () => {

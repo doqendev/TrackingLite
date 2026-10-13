@@ -146,6 +146,9 @@ export interface MetaEventJob {
     opprefCapturedAt?: number | null;
     consent?: { analyticsAllowed?: boolean; marketingAllowed?: boolean; saleOfDataAllowed?: boolean };
     openaiPixelId?: string | null;
+    // When the Google click behind gclid/gbraid/wbraid was seen (Google honours 90 days).
+    googleClickCapturedAt?: number | null;
+    googleAdsTargetId?: string | null;
 
     fbp?: string | null;
     fbc?: string | null;
@@ -178,6 +181,9 @@ export interface DestinationEventJob {
     opprefCapturedAt?: number | null;
     consent?: { analyticsAllowed?: boolean; marketingAllowed?: boolean; saleOfDataAllowed?: boolean };
     openaiPixelId?: string | null;
+    // When the Google click behind gclid/gbraid/wbraid was seen (Google honours 90 days).
+    googleClickCapturedAt?: number | null;
+    googleAdsTargetId?: string | null;
 
     fbp?: string | null;
     fbc?: string | null;

@@ -57,7 +57,8 @@ describe("diagnostics route workspace mode filtering", () => {
       redditAccessTokenEncrypted: "encrypted",
       pinterestAdAccountId: "pinterest",
       pinterestConversionTokenEncrypted: "encrypted",
-      googleAdsConversionId: "AW-123",
+      googleAdsCustomerId: "1234567890",
+      googleAdsConversionActionId: "987654321",
     });
     mockEventLogGroupBy.mockResolvedValue([]);
     mockEventLogCount.mockResolvedValue(0);
@@ -72,21 +73,22 @@ describe("diagnostics route workspace mode filtering", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.workspace.allowedDestinations).toEqual(["META", "TIKTOK", "OPENAI"]);
+    expect(data.workspace.allowedDestinations).toEqual(["META", "TIKTOK", "OPENAI", "GOOGLE_ADS"]);
     expect(data.destinationHealth.map((row: { destination: string }) => row.destination)).toEqual([
       "META",
       "TIKTOK",
       "OPENAI",
+      "GOOGLE_ADS",
     ]);
 
     for (const [args] of mockEventLogGroupBy.mock.calls) {
-      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI"] });
+      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI", "GOOGLE_ADS"] });
     }
     for (const [args] of mockEventLogCount.mock.calls) {
-      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI"] });
+      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI", "GOOGLE_ADS"] });
     }
     for (const [args] of mockEventLogFindMany.mock.calls) {
-      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI"] });
+      expect(args.where.destination).toEqual({ in: ["META", "TIKTOK", "OPENAI", "GOOGLE_ADS"] });
     }
   });
 });

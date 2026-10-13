@@ -185,7 +185,7 @@ Keep database URLs in the child environment as shown. Do not pass a production
 connection URL through `--from-url`, where it becomes visible in process
 arguments.
 
-The verifier requires exactly eleven indexes on the expected schema/table, exact
+The verifier requires exactly twelve indexes on the expected schema/table, exact
 ordered columns and uniqueness, and `indisvalid = indisready = true`. Migration
 status alone is not a sufficient concurrent-index gate. The zero-exit schema
 diff is also mandatory because an idempotent `IF NOT EXISTS` statement can hide
@@ -196,7 +196,7 @@ valid, or invalid while Prisma still records a failed migration. Stop the
 rollout, identify the exact failed `idxNN` migration, run `DROP INDEX
 CONCURRENTLY IF EXISTS "<exact_index_name>"` for only that migration's index,
 mark only that migration rolled back with `pnpm prisma migrate resolve
---rolled-back <name>`, then rerun deploy, status, schema diff, and the eleven-index
+--rolled-back <name>`, then rerun deploy, status, schema diff, and the twelve-index
 verifier. Never mark an incomplete migration applied.
 
 If `20260727_schema_history_catch_up_drop_plaintext_secret` refuses to run,
@@ -253,7 +253,7 @@ listener has passed `waitUntilReady()` and the startup latch is set.
    the exact environment and SHA; keep them pinned for that release's lifetime.
    Run `pnpm release:railway-production` in the
    approved Railway production environment and require matching runtime/direct
-   database identity, clean migration status, 11/11 indexes, and zero drift.
+   database identity, clean migration status, 12/12 indexes, and zero drift.
 6. Deploy the exact approved SHA to Vercel from source while outbound workers
    remain stopped. The production build must pass its read-only schema gate and
    the Edge runtime must accept the same exact SHA. Wait for

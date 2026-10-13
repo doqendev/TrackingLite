@@ -1,5 +1,34 @@
 # AGENTS.md
 
+## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
+
+Branch `feature/google-ads-data-manager` replaces the Google Ads destination. The
+old worker pinged the browser conversion endpoint from the server, which carries
+no Google cookies, so nothing was attributable. Purchases now go to one merchant
+"Website (Import from clicks)" conversion action through Google's Data Manager
+API with the Google click ID (gclid/gbraid/wbraid) and hashed customer data.
+Track Clear's own service account authenticates (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`,
+on Railway and Vercel); merchants add its email to Google Ads and enter their
+customer ID and conversion action ID. Google processes uploads asynchronously:
+SENT means accepted, and `destinationRequestStatus` records Google's final
+result, polled from the existing 5-minute recovery cycle (still 12 listeners).
+Google Ads is now allowed for standard Shopify V1 workspaces (not headless V1).
+Full design, setup and error guide: `docs/google-ads.md`.
+
+New: `google-data-manager-auth.ts`, `destinations/google-ads-ids.ts`,
+`google-ads-request-status.ts`, `components/integrations/google-ads-integration.tsx`;
+rewritten `destinations/google-ads.ts` and `workers/google-ads-event-processor.ts`.
+Migrations `20261014_google_ads_data_manager` (nullable columns) and
+`20261014_google_ads_data_manager_idx01_request_status` (concurrent index), so the
+release gate now requires 12 indexes. `markEventDeliveryAccepted` gained an
+optional bookkeeping argument. Four de/es/fr/pt dashboard strings that were saved
+as Latin-1 (`reportingRetention`) were restored to UTF-8.
+
+Verification: 823 unit tests pass (70 new), `tsc` and lint clean. Integration
+tests were updated but not run locally (no PostgreSQL on this machine); CI must
+run them. Not merged or deployed: the release needs the owner's explicit go, the
+service account key on both hosts, and the `docs/deploy.md` gates.
+
 ## 2026-10-13 retention and checkout recovery release — live
 
 Release `d3f553a3e38b8bc27a5e1ce8855326ce20c40c68` (PR #22) keeps seven days
@@ -403,6 +432,8 @@ src/
     circuit-breaker.ts                # Redis-based circuit breaker for destination APIs (5 failures = 60s cooldown)
     env-validation.ts                 # Validates required env vars at startup, warns for optional
     extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
+    google-data-manager-auth.ts       # Track Clear service-account JWT -> OAuth token for the Data Manager API (cached, no new deps)
+    google-ads-request-status.ts      # Polls Google's async processing result for SENT Google Ads rows (30 min, 1.3x, 24 h)
     destinations/
       index.ts                        # DESTINATION_EVENT_MAP for all 7 platforms
       tiktok.ts                       # TikTok normalizer + Events API client, external_id hashing, rich contents
@@ -410,7 +441,8 @@ src/
       klaviyo.ts                      # Klaviyo normalizer + Events API client (raw email)
       reddit.ts                       # Reddit normalizer + Conversions API client (rdtCid click ID)
       pinterest.ts                    # Pinterest normalizer + Conversions API client (epik click ID, value as string)
-      google-ads.ts                   # Google Ads pixel endpoint normalizer + client (server-side GET, Enhanced Conversions, Gmail normalization)
+      google-ads.ts                   # Google Ads Data Manager API client: Purchase click conversions, Google normalization/hashing, consent, ingest + requestStatus
+      google-ads-ids.ts               # Dependency-free customer/conversion action ID validation and delivery target
   types/
     meta-capi.ts                      # MetaCapiEvent, MetaUserData, MetaCustomData, etc.
     events.ts                         # SnippetEventPayload
@@ -425,7 +457,7 @@ src/
     klaviyo-event-processor.ts        # BullMQ worker: circuit breaker, Klaviyo Events API
     reddit-event-processor.ts         # BullMQ worker: circuit breaker, Reddit Conversions API
     pinterest-event-processor.ts      # BullMQ worker: circuit breaker, Pinterest Conversions API
-    google-ads-event-processor.ts     # BullMQ worker: circuit breaker, Google Ads pixel endpoint
+    google-ads-event-processor.ts     # BullMQ worker: durable claim, target/consent re-checks, Data Manager upload, request ID bookkeeping
     alert-checker.ts                  # Hourly repeatable job: evaluate alerts, send emails
     stale-pending-requeue.ts          # deterministic delivery recovery + hourly alias-aware usage reconciliation
     shopify-webhook-inbox-worker.ts   # one-minute encrypted Shopify inbox processing/replay
@@ -467,7 +499,10 @@ tests/
     event-retry-envelope.test.ts      # 3 tests (encrypted short-lived replay payload)
     events-page-mode.test.ts          # 1 test (Events page failed-count respects workspace destination allowlist)
     extract-custom-data.test.ts       # 29 tests (bounded customData extraction)
-    google-ads.test.ts                # 34 tests (email normalization, param building, pixel endpoint)
+    google-ads.test.ts                # 47 tests (IDs, Google normalization/hashing, consent, request shape, API errors, request status)
+    google-ads-event-processor.test.ts # 21 tests (worker ownership, target, toggles, consent, retries, bookkeeping)
+    google-ads-request-status.test.ts # 9 tests (status polling, backoff, timeout, safe details)
+    google-data-manager-auth.test.ts  # 14 tests (key parsing, RS256 assertion, token caching, safe errors)
     hash-pii.test.ts                  # 24 tests
     headless-sdk.test.ts              # 20 tests (consent, revocation replay/serialization, fallback session anchors, attribution, cookies/session, cart attributes, ingest client)
     ingest-attribution.test.ts        # 30 tests (outbox, attribution, explicit internal-only consent path, tombstones, billing aliases, fallback delay, checkout enrichment)
@@ -730,7 +765,7 @@ Header: Content-Type: application/json
 - **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.
 - **Reddit click ID (rdtCid):** Snippet captures `rdt_cid` URL param and passes as `rdtCid`. Forwarded to Reddit Conversions API for attribution matching.
 - **Pinterest click ID (epik):** Snippet captures `epik` URL param and passes as `epik`. Pinterest Conversions API requires `value` as a string (not number) — normalizer handles the conversion.
-- **Google Ads pixel endpoint:** Server-side GET to `googleadservices.com/pagead/conversion/{ID}/`. No OAuth or developer token needed — Conversion ID and Labels are public values stored plaintext (not encrypted). Supports 4 events (Purchase, AddToCart, InitiateCheckout, ViewContent). Enhanced Conversions via `em` parameter with SHA-256 hashed PII. Gmail-specific normalization strips dots and +suffix before hashing. Order deduplication via `oid` parameter matches browser gtag.js.
+- **Google Ads (Data Manager API):** Purchases only, uploaded as click conversions to one "Website (Import from clicks)" conversion action with gclid/gbraid/wbraid and hashed customer data. Track Clear's service account (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`, Railway + Vercel) authenticates; merchants add its email to Google Ads; no developer token. SENT means accepted; `destinationRequestStatus` holds Google's async result, polled from the 5-minute recovery cycle. The old server-side GET to the browser conversion endpoint had no shopper cookies and could not attribute; its columns are retained read-only. See `docs/google-ads.md`.
 - **Vercel hosting:** Web app runs on Vercel (serverless). Workers stay on Railway. Redis and PostgreSQL on Railway with public TCP proxies for Vercel connectivity. Railway-specific code (keepalive, self-ping, cgroup reader, signal handlers) conditionally disabled via `process.env.VERCEL`.
 
 ## Style Rules
