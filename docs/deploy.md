@@ -1,6 +1,29 @@
 # Deployment Runbook
 
-## Current release: 2026-09-30
+## Current deployment: 2026-10-13 order-exemption configuration
+
+Code remains approved SHA `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d`.
+Vercel `dpl_765K25T6gWqFCLoSnkwYQu1A4ycT` and Railway
+`5a2db944-3155-4c93-a6f0-8e4da7a92c3b` activate the Infinite Layers owner in
+`UNLIMITED_ORDER_USER_IDS`; the two existing exemptions and all release pins were
+preserved. The workspace allowance was already configured. No Stripe/schema/code
+change. Both hosts are healthy, the running worker confirms both allowances,
+12/12 listeners are ready, and only the new worker deployment remains active.
+The deployment used exact GitHub SHA source and Railway's explicit pinned deploy;
+variables were saved with `--skip-deploys` before that explicit deployment.
+Backup: `E:/backups/trackclear/2026-10-13-infinite-unlimited`, encrypted PostgreSQL,
+Redis and provider config with verified primary identity and DPAPI-protected key.
+All 35 targeted billing/workspace-limit tests passed. Existing exact-SHA CI was
+rechecked green; Railway predeploy verified the schema and all 11 required indexes.
+
+Later the same day, the user requested Growth's 1,000-order display for Infinite
+Layers. A complimentary active Growth entitlement was granted to its owner using
+a real Stripe customer record and no Stripe subscription, price or expiry. This
+database-only update required no additional deployment; unlimited exemptions remain
+enabled and plan-based event-log retention is now 30 days. The live billing page
+shows Growth / Active, with the standard list price still visible but no charge.
+
+## Previous deployment: 2026-09-30
 
 Approved runtime SHA: `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d` (PRs #19/#20).
 Exact-merge CI `36759317445` passed all five gates. Vercel production deployment is

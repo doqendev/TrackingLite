@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockEventLogUpdateMany = vi.fn();
-const mockEventLogDeleteMany = vi.fn();
-const mockEventLogCount = vi.fn();
-const mockWorkspaceFindMany = vi.fn();
+const mockSummaries = vi.fn();
+const mockCompact = vi.fn();
+const mockPrune = vi.fn();
+vi.mock("@/lib/event-retention", () => ({
+  refreshEventSummaries: (...args: unknown[]) => mockSummaries(...args),
+  compactEventDetails: (...args: unknown[]) => mockCompact(...args),
+  pruneExpiredDeliveryIdentities: (...args: unknown[]) => mockPrune(...args),
+}));
 const mockExpireWebhookInboxes = vi.fn();
 const mockCleanupWebhookInboxes = vi.fn();
 
@@ -24,12 +29,9 @@ vi.mock("@/lib/db", () => ({
   db: {
     eventLog: {
       updateMany: (...args: unknown[]) => mockEventLogUpdateMany(...args),
-      deleteMany: (...args: unknown[]) => mockEventLogDeleteMany(...args),
-      count: (...args: unknown[]) => mockEventLogCount(...args),
+
     },
-    workspace: {
-      findMany: (...args: unknown[]) => mockWorkspaceFindMany(...args),
-    },
+
   },
 }));
 
@@ -48,9 +50,9 @@ describe("event log cleanup", () => {
     mockEventLogUpdateMany
       .mockResolvedValueOnce({ count: 2 })
       .mockResolvedValueOnce({ count: 3 });
-    mockWorkspaceFindMany.mockResolvedValue([]);
-    mockEventLogDeleteMany.mockResolvedValue({ count: 0 });
-    mockEventLogCount.mockResolvedValue(0);
+    mockSummaries.mockResolvedValue(undefined);
+    mockCompact.mockResolvedValue(0);
+    mockPrune.mockResolvedValue(0);
     mockExpireWebhookInboxes.mockResolvedValue(1);
     mockCleanupWebhookInboxes.mockResolvedValue(4);
   });
@@ -77,34 +79,15 @@ describe("event log cleanup", () => {
     });
   });
 
-  it("never removes ambiguous Purchase identity owners during plan retention", async () => {
-    mockWorkspaceFindMany.mockResolvedValue([
-      {
-        id: "ws-1",
-        userId: "user-1",
-        user: { subscription: { plan: "FREE" } },
-      },
-    ]);
-    mockEventLogCount.mockResolvedValue(2);
-
+  it("requires durable reporting before compaction or identity expiry", async () => {
+    mockSummaries.mockRejectedValueOnce(new Error("summary failed"));
+    await expect(runEventLogCleanup()).rejects.toThrow("summary failed");
+    expect(mockCompact).not.toHaveBeenCalled();
+    expect(mockPrune).not.toHaveBeenCalled();
+  });
+  it("summarizes, compacts, then expires identities in that order", async () => {
     await runEventLogCleanup();
-
-    const protectedOwnerFilter = {
-      eventName: "Purchase",
-      deliveryClaimToken: { not: null },
-      deliveryClaimOwner: {
-        in: ["WORKER", "WORKER_ATTEMPTING", "WORKER_ACCEPTED"],
-      },
-    };
-    expect(mockEventLogCount).toHaveBeenCalledWith({
-      where: expect.objectContaining(protectedOwnerFilter),
-    });
-    expect(mockEventLogDeleteMany).toHaveBeenCalledWith({
-      where: expect.objectContaining({
-        workspaceId: { in: ["ws-1"] },
-        createdAt: { lt: expect.any(Date) },
-        NOT: protectedOwnerFilter,
-      }),
-    });
+    expect(mockSummaries.mock.invocationCallOrder[0]).toBeLessThan(mockCompact.mock.invocationCallOrder[0]);
+    expect(mockCompact.mock.invocationCallOrder[0]).toBeLessThan(mockPrune.mock.invocationCallOrder[0]);
   });
 });

@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
 
     // Recent failures — last 20 by createdAt desc
     db.eventLog.findMany({
-      where: { workspaceId, status: "FAILED", ...destinationWhere },
+      where: { workspaceId, status: "FAILED", createdAt: { gte: ago7d }, ...destinationWhere },
       orderBy: { createdAt: "desc" },
       take: 20,
       select: {
@@ -235,7 +235,7 @@ export async function GET(request: NextRequest) {
 
     // Purchase event audit — last 10 unique purchases (fetch extra rows for multi-destination fan-out)
     db.eventLog.findMany({
-      where: { workspaceId, eventName: "Purchase", ...destinationWhere },
+      where: { workspaceId, eventName: "Purchase", createdAt: { gte: ago7d }, ...destinationWhere },
       orderBy: { createdAt: "desc" },
       take: 60,
       select: {
@@ -269,7 +269,7 @@ export async function GET(request: NextRequest) {
 
     // AddToCart event audit — last 10 unique events
     db.eventLog.findMany({
-      where: { workspaceId, eventName: "AddToCart", ...destinationWhere },
+      where: { workspaceId, eventName: "AddToCart", createdAt: { gte: ago7d }, ...destinationWhere },
       orderBy: { createdAt: "desc" },
       take: 60,
       select: {
@@ -303,7 +303,7 @@ export async function GET(request: NextRequest) {
 
     // InitiateCheckout event audit — last 10 unique events
     db.eventLog.findMany({
-      where: { workspaceId, eventName: "InitiateCheckout", ...destinationWhere },
+      where: { workspaceId, eventName: "InitiateCheckout", createdAt: { gte: ago7d }, ...destinationWhere },
       orderBy: { createdAt: "desc" },
       take: 60,
       select: {

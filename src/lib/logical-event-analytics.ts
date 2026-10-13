@@ -1,29 +1,11 @@
+import { utcTimestamp } from "@/lib/sql-timestamp";
 import { Destination, EventName, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getExchangeRate } from "@/lib/currency";
 import type { RevenueMetrics, EventBreakdown, CampaignRow } from "@/types/app";
 
-/** Elect one row per commerce event, independently of which platforms are enabled.
- * Purchase aliases converge browser/webhook IDs. INTERNAL already uses its own
- * privacy-minimized identity and is superseded when external delivery resumes.
- */
-export function logicalEventsSql(workspaceId: string, since: Date, until: Date,
-  allowed?: readonly Destination[]): Prisma.Sql {
-  const destinations = allowed ? Array.from(new Set([...allowed, Destination.INTERNAL])) : Object.values(Destination);
-  return Prisma.sql`WITH ranked AS (
-    SELECT *, ROW_NUMBER() OVER (
-      PARTITION BY "eventName", CASE WHEN "eventName" = 'Purchase' THEN
-        COALESCE(NULLIF("orderName", ''), NULLIF("orderId", ''), NULLIF("checkoutToken", ''), NULLIF("cartToken", ''), "eventId")
-        ELSE "eventId" END
-      ORDER BY CASE WHEN source = 'webhook' THEN 0 ELSE 1 END,
-        CASE WHEN status = 'SENT' THEN 0 WHEN status IN ('PENDING', 'RETRYING') THEN 1 ELSE 2 END,
-        "createdAt", id
-    ) AS rank
-    FROM "EventLog"
-    WHERE "workspaceId" = ${workspaceId} AND "createdAt" >= ${since} AND "createdAt" <= ${until}
-      AND status <> 'SUPERSEDED' AND destination::text IN (${Prisma.join(destinations)})
-  ), logical AS (SELECT * FROM ranked WHERE rank = 1)`;
-}
+import { logicalEventsSql, reportingScope } from "@/lib/logical-events-sql";
+export { logicalEventsSql } from "@/lib/logical-events-sql";
 
 type CommerceGroup = { eventName: EventName; today: boolean; currency: string | null;
   paymentGateway: string | null; source: string | null; status: string; total: number; value: number | null };
@@ -32,7 +14,7 @@ export async function queryLogicalCommerce(workspaceId: string, today: Date, yes
   displayCurrency: string, allowed?: readonly Destination[]): Promise<{ revenue: RevenueMetrics; eventBreakdown: EventBreakdown }> {
   const rows = await db.$queryRaw<CommerceGroup[]>(Prisma.sql`
     ${logicalEventsSql(workspaceId, yesterday, now, allowed)}
-    SELECT "eventName", ("createdAt" >= ${today}) AS today, currency, "paymentGateway", source, status,
+    SELECT "eventName", ("createdAt" >= ${utcTimestamp(today)}) AS today, currency, "paymentGateway", source, status,
       COUNT(*)::int AS total, SUM(value)::float8 AS value
     FROM logical GROUP BY "eventName", today, currency, "paymentGateway", source, status
   `);
@@ -70,11 +52,21 @@ export async function queryLogicalCommerce(workspaceId: string, today: Date, yes
 export async function queryLogicalCampaigns(workspaceId: string, currency: string,
   allowed?: readonly Destination[]): Promise<CampaignRow[]> {
   const now = new Date();
+  const since = new Date(now.getTime() - 30 * 86400000);
+  const scope = reportingScope(allowed);
   const rows = await db.$queryRaw<Array<{ utmSource: string; utmCampaign: string | null; currency: string | null; events: number; revenue: number | null }>>(Prisma.sql`
-    ${logicalEventsSql(workspaceId, new Date(now.getTime() - 30 * 86400000), now, allowed)}
+    ${logicalEventsSql(workspaceId, since, now, allowed, scope)}
     SELECT "utmSource", "utmCampaign", currency, COUNT(*)::int AS events,
       SUM(CASE WHEN "eventName" = 'Purchase' THEN COALESCE(value, 0) ELSE 0 END)::float8 AS revenue
     FROM logical WHERE "utmSource" IS NOT NULL GROUP BY "utmSource", "utmCampaign", currency
+    UNION ALL
+    SELECT r."utmSource", r."utmCampaign", r.currency, SUM(r.events)::int,
+      SUM(CASE WHEN r."eventName" = 'Purchase' THEN r.value ELSE 0 END)::float8
+    FROM "EventDailySummary" s CROSS JOIN LATERAL jsonb_to_recordset(s.logical)
+      AS r("eventName" text, "utmSource" text, "utmCampaign" text, currency text, events int, value float8)
+    WHERE s."workspaceId" = ${workspaceId} AND s.scope = ${scope}
+      AND s.day >= ${utcTimestamp(since)} AND s.day + interval '1 day' <= ${utcTimestamp(now)} AND r."utmSource" IS NOT NULL
+    GROUP BY r."utmSource", r."utmCampaign", r.currency
   `);
   const rates = new Map<string, number>([[currency, 1]]);
   await Promise.all(Array.from(new Set(rows.map(row => row.currency).filter((c): c is string => !!c && c !== currency)))

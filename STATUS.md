@@ -1,5 +1,69 @@
 # Track Clear --- Project Status & Audit
 
+## 2026-10-13 retention and event-health candidate
+
+Candidate branch `codex/event-retention-and-health` separates seven-day detailed
+logs from 30-day daily reporting summaries for every plan. Compact operational
+EventLog identities remain for 35 days, preserving existing deduplication and
+current-month billing reconstruction. Pending/recoverable/ambiguous delivery owners
+remain protected; Redis attribution/consent and webhook recovery TTLs are unchanged.
+New modules: `event-retention.ts`, `event-retention-policy.ts`, `sql-timestamp.ts`,
+`logical-events-sql.ts`; migration: `20261013_event_retention_summaries`.
+See `docs/event-retention.md` for lifecycle, storage and QA evidence.
+
+Infinite Layers Meta health: all 9,362 sampled seven-day funnel rows were SENT.
+Dirava has similar pre-checkout contact-coverage gaps; both use server-only Meta.
+No browser mode or consent setting changed. A separate nine-checkout ChatGPT failure
+was reproduced under the worker's tsx loader: the phone library's /min metadata
+wrapper breaks. Explicit /core metadata fixes normalization; a real-runtime probe
+is now in both runtime CI and the worker container gate. Six encrypted envelopes
+remain recoverable; three expired. The two consent-blocked rows are not replayable.
+Purchase verification remains on hold until the user reports an order.
+
+Local validation so far: 753 unit tests and 76 integration tests pass, including
+retention boundaries, duplicate protection, protected recovery/claims, summary
+idempotency and late corrections. Production remains on the prior release until
+the new exact-SHA release gates, backup and storage checks finish.
+
+Production-data rehearsal: all 68,173 rows and every identity/accounting value were
+preserved; 39,635 settled rows compacted, 44 summaries created, row bytes reduced
+from 95.4 MB to 50.9 MB. The isolated run took 14 seconds and generated about
+134 MB of WAL, requiring more headroom than the live volume's 89 MB free. The
+first CI failure was schema formatting only; Prisma formatting is corrected.
+
+
+
+## 2026-10-13 Infinite Layers unlimited orders
+
+- Live inspection confirmed IL (`cmlseil1700029vaisp5tkn5k`) has no Stripe subscription
+  and was still capped at Free's 50 Purchases/month. Non-Purchase events were already
+  uncapped monthly; its owner already had unlimited workspaces on both providers.
+- Added only owner `cmlsehb7t00009vaih2k1o1sc` (`infinitelayersshop@gmail.com`) to
+  `UNLIMITED_ORDER_USER_IDS`, preserving both prior owners. This applies account-wide
+  to the owner's three existing workspaces and future stores. Other accounts and
+  Stripe are unchanged. Billing checks and quota alerts bypass this owner's plan cap.
+- Refreshed both services at unchanged approved SHA
+  `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d`: Vercel
+  `dpl_765K25T6gWqFCLoSnkwYQu1A4ycT`, Railway
+  `5a2db944-3155-4c93-a6f0-8e4da7a92c3b`. Production alias and health passed;
+  Railway runtime reports both exemptions true, DB/Redis connected and 12/12 ready
+  listeners. Only the new worker deployment remains active. Release CI remains green;
+  35 targeted billing/workspace-limit tests passed, including above-quota allowance
+  and continued caps for other accounts. Predeploy passed 11/11 indexes and zero drift.
+- Encrypted, verified PostgreSQL/Redis/config restore point:
+  `E:/backups/trackclear/2026-10-13-infinite-unlimited` (DPAPI-protected key).
+- This removes monthly order enforcement, not the 100 requests/second stability
+  guard. The user then requested Growth's 1,000-order plan display. Granted a
+  complimentary local `GROWTH`/`ACTIVE` subscription for the same owner, with a real
+  newly created Stripe customer and no Stripe subscription/price, trial, expiry or
+  scheduled cancellation. Stripe readback confirmed zero subscriptions. Both unlimited
+  exemptions remain enabled. Live billing UI shows Growth / Active, 47 of 1,000
+  orders and 30-day log retention, with the previous near-limit warning gone.
+  The UI still renders the standard $49/month list price; no recurring bill or
+  payment was created. Plan benefits/retention are account-wide. No code changed.
+  No synthetic Purchase or purchase-history check was performed; the user's request
+  to wait for their next genuine-order report remains in force.
+
 ## 2026-09-30 ChatGPT Ads production release
 
 Standard Shopify now has an `OPENAI` destination, credentials/setup UI, a non-recording
@@ -42,13 +106,38 @@ theme `194567373133`; the live storefront contains it at theme commit
 `f1059e41ae74eee82b64faa8d20c5cbee7d383b8`.
 The encrypted signed orders/paid webhook uses JSON/API 2026-07. Shopify Send test
 passed HMAC verification at 18:56 UTC, with no destination conversion emitted.
-Native Meta and wetracked integrations remain installed. Track Clear Meta is paused
-with credentials retained; TikTok/OpenAI remain disabled pending platform ownership.
-The user confirmed Infinite Layers has no ChatGPT Ads account/data source yet.
-Live OpenAI delivery, paid Purchase reconciliation and attribution are therefore open.
-Browser Pixel Helper reached "awaiting consent" then "Did not load" while Shopify
-privacy-banner requests failed. Saved code integrity is verified; blocker diagnosis
-and browser event verification remain open. No privacy requirements were weakened.
+At 21:14 UTC, Meta tracking moved to Track Clear CAPI using the user-selected
+`InfiniteNew` dataset (`803269915787577`), replacing Track Clear's old `test il` ID
+`1411310997119266`. The existing encrypted token returned HTTP 200/events_received=1
+for a TestEvent, also Processed/Server in Meta Events Manager. Graph GET returned
+Missing Permission but did not predict CAPI write access. Native Facebook & Instagram
+data sharing is off; the channel's catalog remains in sync. Track Clear Meta is on,
+its browser mode stays off, and no production test code is saved. At 21:17 UTC, eight
+logical events each had one accepted META and one accepted OPENAI receipt: five
+PageView, one ViewContent, one AddToCart (14.99 EUR/one item), and one InitiateCheckout
+(44.97 EUR/three items), with matching IDs and no retries. Checkout retained occurrence
+time 21:15:34.096Z and passed after the normal 90-second hold. Removed only TRACKMETAQA;
+the two original items and 29.98 EUR cart remained. No order or customer details submitted.
+Unrelated wetracked integrations remain installed; Track Clear TikTok remains disabled.
+At 19:22 UTC, the user-created Infinite Layers source in the existing Ads account
+matched Track Clear's saved Pixel ID. The encrypted CAPI key passed a fresh
+non-recording validation and OpenAI delivery is enabled. Created and independently
+read back `Infinite Layers - Purchase`, based on `order_created` for only the Infinite
+Layers source, retaining Ads Manager's 30-day click/1-day view defaults. It has no
+campaign attached. A separate advertiser account is not needed for this source setup.
+The initial Pixel Helper "awaiting consent"/"Did not load" issue cleared after the
+user refreshed the storefront; the original network failure's cause is unproven.
+No privacy requirements were weakened. At 19:36 UTC, Track Clear had 16 OPENAI/SENT
+rows (12 PageView, 2 ViewContent, 1 AddToCart, 1 InitiateCheckout), with HTTP 200 accepted
+receipts and no retries. The Ads Manager latest-15-minute sample independently showed
+all 16 as server-to-server, including checkout at 19:34:02.749Z received at 19:35:34.821Z
+after its intended 90-second enrichment hold. AddToCart was one item/14.99 EUR;
+checkout was three items/44.97 EUR. These are QA actions, not sales performance.
+Removed only the TRACKCLEARQA test item and verified the original two items remained.
+No order was placed. Purchase deduplication, cart-to-webhook attribution, live denial
+QA and campaign attribution remain open. The user selected the next genuine order;
+the user subsequently canceled automatic checks and will report when the purchase
+happens. The verification heartbeat was deleted; resume verification on that message.
 Live onboarding also exposed a pre-existing second-store selection bug. The follow-up
 sets the active-store cookie during creation and refreshes prefetched dashboard pages.
 The same follow-up recognizes OpenAI-only dashboard configuration and removes the

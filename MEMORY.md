@@ -1,5 +1,64 @@
 # MEMORY.md
 
+## 2026-10-13 retention and event-health candidate
+
+Candidate branch `codex/event-retention-and-health` separates seven-day detailed
+logs from 30-day daily reporting summaries for every plan. Compact operational
+EventLog identities remain for 35 days, preserving existing deduplication and
+current-month billing reconstruction. Pending/recoverable/ambiguous delivery owners
+remain protected; Redis attribution/consent and webhook recovery TTLs are unchanged.
+New modules: `event-retention.ts`, `event-retention-policy.ts`, `sql-timestamp.ts`,
+`logical-events-sql.ts`; migration: `20261013_event_retention_summaries`.
+See `docs/event-retention.md` for lifecycle, storage and QA evidence.
+
+Infinite Layers Meta health: all 9,362 sampled seven-day funnel rows were SENT.
+Dirava has similar pre-checkout contact-coverage gaps; both use server-only Meta.
+No browser mode or consent setting changed. A separate nine-checkout ChatGPT failure
+was reproduced under the worker's tsx loader: the phone library's /min metadata
+wrapper breaks. Explicit /core metadata fixes normalization; a real-runtime probe
+is now in both runtime CI and the worker container gate. Six encrypted envelopes
+remain recoverable; three expired. The two consent-blocked rows are not replayable.
+Purchase verification remains on hold until the user reports an order.
+
+Local validation so far: 753 unit tests and 76 integration tests pass, including
+retention boundaries, duplicate protection, protected recovery/claims, summary
+idempotency and late corrections. Production remains on the prior release until
+the new exact-SHA release gates, backup and storage checks finish.
+
+Production-data rehearsal: all 68,173 rows and every identity/accounting value were
+preserved; 39,635 settled rows compacted, 44 summaries created, row bytes reduced
+from 95.4 MB to 50.9 MB. The isolated run took 14 seconds and generated about
+134 MB of WAL, requiring more headroom than the live volume's 89 MB free. The
+first CI failure was schema formatting only; Prisma formatting is corrected.
+
+
+
+## 2026-10-13 - Infinite Layers uncapped order tracking
+
+- User requested no Track Clear limit for Infinite Layers. Live state was no Stripe
+  subscription / Free 50 Purchases per month, despite unlimited workspace allowance.
+- Added owner `cmlsehb7t00009vaih2k1o1sc` (`infinitelayersshop@gmail.com`) to
+  `UNLIMITED_ORDER_USER_IDS` on both hosts; prior two exempt owners were preserved.
+  The existing implementation is account-wide, covering this owner's current and
+  future workspaces. Stripe and all other accounts were left unchanged.
+- Same runtime SHA `e9ff8c7bf566c02c3be2c5fc2f3ef3dceab1294d` is now served by
+  Vercel `dpl_765K25T6gWqFCLoSnkwYQu1A4ycT` and Railway
+  `5a2db944-3155-4c93-a6f0-8e4da7a92c3b`. Both healthy; one active fleet, 12/12
+  listeners. Railway SSH confirmed the runtime exemptions, not merely saved variables.
+  Vercel config, production alias and replacement deployment were verified.
+- Existing targeted billing/workspace-limit suite passed 35 tests. Verified encrypted
+  restore point: `E:/backups/trackclear/2026-10-13-infinite-unlimited`.
+- User then requested the 1,000-order tier to avoid apparent expiry. Granted a
+  complimentary local `GROWTH`/`ACTIVE` Subscription for this owner using a real Stripe
+  customer record, with null Stripe subscription/price/trial/period end and no
+  scheduled cancellation. Stripe readback confirmed zero subscriptions. No payment
+  or recurring charge was created. Both unlimited exemptions were rechecked intact.
+  Live billing UI shows Growth / Active, 47 of 1,000 orders, and 30-day retention.
+  Standard $49/month list price is still displayed even though the grant is complimentary.
+  The 100 requests/second stability guard remains. Do not claim unlimited retention.
+- No Purchase created or history polled. Continue waiting for the user's order report;
+  do not recreate the canceled purchase-check automation.
+
 ## 2026-09-30 - Standard Shopify ChatGPT Ads release
 
 - User authorized implementation through usable new-store onboarding. Standard
@@ -16,7 +75,8 @@
   zero drift, 12/12 listeners, one worker fleet. Exact-SHA CI passed all five jobs.
   Local build/typecheck/lint, 752 unit tests and 70 integration tests passed using
   isolated PostgreSQL 17/Redis 8.8. Signed-webhook reconciliation and generated-pixel
-  runtime behavior are covered. Live OpenAI credentials/events remain outstanding.
+  runtime behavior are covered. Four live funnel types are verified below; Purchase
+  and consent-denial verification remain outstanding.
 - Preserve the required `PostgreSQL 16 migration rehearsal` branch check when
   expanding release coverage: the workflow now rehearses both PostgreSQL 16 and 17.
 - Local browser QA covers workspace creation, snippets, three integrations and
@@ -30,9 +90,34 @@
   Connected Custom Pixel `276791629` now uses bridge-v1 instead of the unavailable old
   Railway endpoint. The live theme helper was installed through infinite-layers-theme PR #1
   at `f1059e41ae74eee82b64faa8d20c5cbee7d383b8`. Signed orders/paid verification passed
-  through Shopify Send test, with zero destination conversions. Live browser/funnel QA is open.
-  User confirmed no Infinite Layers Ads account/source exists yet. Preserve native Meta
-  and wetracked integrations; Track Clear Meta is paused with its token saved to avoid duplicates.
+  through Shopify Send test, with zero destination conversions. Purchase QA is open.
+  At 19:22 UTC the user's new dedicated Infinite Layers source in the existing Ads
+  account matched Track Clear; its encrypted CAPI key passed non-recording validation
+  and delivery is enabled. `Infinite Layers - Purchase` now maps `order_created` to
+  that source only, with default 30-day click/1-day view windows and no campaign.
+  User refresh cleared the Pixel Helper load issue without code/privacy changes;
+  the original cause is unknown. At 19:36 UTC, all 16 OPENAI rows were SENT/HTTP 200:
+  12 PageView, 2 ViewContent, 1 AddToCart, 1 InitiateCheckout. Ads Manager independently
+  exposed those four types as server-to-server in its recent sample. Checkout's
+  roughly 92-second receipt lag included the intentional 90-second contact hold.
+  The TRACKCLEARQA test item was removed, preserving two original cart items; no
+  order was placed. These are QA events, not attributed sales. Purchase reconciliation,
+  cart-to-webhook attribution, live consent denial and campaign attribution remain open.
+  User chose the next genuine order, then canceled automatic checks. Heartbeat
+  `verify-infinite-layers-first-purchase` was deleted. Wait for the user's message
+  that a purchase happened before resuming verification.
+  User subsequently requested Track Clear to own Meta and selected existing
+  `InfiniteNew` (`803269915787577`), replacing saved `test il` (`1411310997119266`).
+  At 21:14 UTC the native Facebook & Instagram data sharing was switched off,
+  preserving its synced catalog, then Track Clear Meta CAPI was enabled. Browser
+  ownership remains off and production test code is null. Existing encrypted token
+  passed POST TestEvent (HTTP 200/events_received=1; Processed/Server in Meta UI),
+  despite Graph GET Missing Permission. Do not equate read denial with CAPI failure.
+  By 21:17 UTC, eight logical events (five PageView, one ViewContent, one AddToCart,
+  one InitiateCheckout) each had accepted META and OPENAI receipts, matching IDs and
+  no retries. Checkout passed after its 90-second hold. Removed only TRACKMETAQA and
+  preserved the original two-item cart; no order was placed. TikTok stays disabled;
+  unrelated wetracked integrations were preserved.
   Both owned accounts have workspace allowances; order limits are unchanged.
   Post-cutover Meta/TikTok queues drained with 85 SENT rows each and no pending/retrying rows.
 - Vercel CLI does not use `.gitignore`. Fetch the approved GitHub `gitSource.sha`
