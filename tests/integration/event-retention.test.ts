@@ -6,12 +6,14 @@ import { compactEventDetails, pruneExpiredDeliveryIdentities, refreshEventSummar
 import { queryLogicalCampaigns } from "@/lib/logical-event-analytics";
 import { DAY_MS } from "@/lib/event-retention-policy";
 import { reportingScope } from "@/lib/logical-events-sql";
-import { Destination, Prisma } from "@prisma/client";
+import { getAllowedDestinationsForWorkspace } from "@/lib/workspace-mode";
+import { Prisma } from "@prisma/client";
 
 vi.mock("@/lib/currency", () => ({ getExchangeRate: vi.fn().mockResolvedValue(1) }));
 const now = new Date();
 const ago = (days: number) => new Date(now.getTime() - days * DAY_MS);
-const allowed = [Destination.META, Destination.TIKTOK, Destination.OPENAI];
+// Follow the product mode, as refreshEventSummaries does, so scope keys match.
+const allowed = getAllowedDestinationsForWorkspace({ productMode: "SHOPIFY_META_TIKTOK_V1", installType: "SHOPIFY_CUSTOM_PIXEL" });
 let workspaceId: string;
 
 async function event(eventId: string, extra: Partial<Prisma.EventLogUncheckedCreateInput> = {}) {
