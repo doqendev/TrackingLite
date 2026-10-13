@@ -34,9 +34,10 @@ On 2026-10-13, the user separately requested uncapped Infinite Layers tracking.
 Its owner is now also in `UNLIMITED_ORDER_USER_IDS` on both production hosts;
 the unchanged release was redeployed to activate this allowance. This account-wide
 exemption removes the former Free 50-Purchase/month gate and skips quota alerts.
-It does not remove the 100 requests/second stability guard or plan-based log retention.
+It does not remove the 100 requests/second stability guard or event retention.
 The user then requested Growth's 1,000-order display. The same owner now has an active,
-complimentary Growth entitlement with 30-day retention and no expiry. Both unlimited
+complimentary Growth entitlement with no expiry. The later retention release gives
+all plans seven-day detailed logs and 30-day reporting summaries. Both unlimited
 exemptions remain in effect. A real Stripe customer exists, but no Stripe subscription,
 price or recurring payment was created; the billing UI's $49/month is the standard
 list price. Live UI verification shows Growth / Active and the 1,000-order allowance.
@@ -149,3 +150,13 @@ wait for the user to report a purchase before resuming verification.
 
 Official contract: https://developers.openai.com/ads/conversions-api and
 https://developers.openai.com/ads/supported-events (checked 2026-09-30).
+
+## 2026-10-13 phone normalization recovery
+
+Release `d3f553a3e38b8bc27a5e1ce8855326ce20c40c68` fixes the tsx phone metadata
+loader failure with an explicit `/core` metadata import. The real worker-runtime
+probe now runs in Node 20/24 CI and the worker image. Six previously failed IL
+checkout events were replayed through the normal delivery guards and accepted
+(HTTP 200), preserving original IDs, times and Pixel binding. Three older expired
+envelopes were not reconstructed; two consent-blocked events were left untouched.
+This does not complete the separately deferred live Purchase verification.
