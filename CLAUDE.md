@@ -17,10 +17,11 @@ documentation is worse than no duplicated documentation.
 
 ## Current Release Boundary
 
-- Production runs exact SHA `44afc8557a0d764913e7dcbcc7c5581a8db1b7db`
-  (2026-10-25 server-side InitiateCheckout) from branch
-  `agent/wetracked-learnings-20261025`, two commits ahead of `main`
-  (`42cb4f9`). It is not merged because `main` requires the GitHub Actions
+- Production runs branch `agent/wetracked-learnings-20261025` (2026-10-25
+  server-side InitiateCheckout), ahead of `main` (`42cb4f9`): the web at
+  exact SHA `f87dbac3ca38e12ce153a78315618b600b68fc35` and the worker at
+  `44afc8557a0d764913e7dcbcc7c5581a8db1b7db`; the later commit only fixes
+  the Cart Helper script the web serves. It is not merged because `main` requires the GitHub Actions
   checks and there is no Actions allowance. Merge it through a pull request
   before deploying `main` again: `main` alone would drop it, and once
   checkout webhooks are registered an older worker hands their inbox rows to

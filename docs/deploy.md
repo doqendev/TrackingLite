@@ -57,19 +57,44 @@ start the new fleet):
    EventLog rows created since 15:00 were SENT (Meta 34, ChatGPT 26, TikTok 8),
    none pending or retrying.
 
-Open after the cutover: no checkout webhook was registered yet, so no webhook
-InitiateCheckout had been sent. Per store, add "Checkout creation" and "Checkout
-update" (JSON, latest API version) in Shopify admin > Settings > Notifications >
-Webhooks with the URL already used for "Order payment". To verify on Mizoke,
-start a Shop Pay checkout: about 5 minutes later (the webhook hold) one
-InitiateCheckout with event ID `shopify-checkout:<workspaceId>:<checkout token>`
-and source `webhook` is SENT, and paying adds the Purchase without a second
-InitiateCheckout.
+8. 15:42:52 web-only hotfix `f87dbac3ca38e12ce153a78315618b600b68fc35`, Vercel
+   `dpl_4DuoCsF4SpdXEnGNF1QkJjqDKmiD`. A test checkout at 15:27 showed the live
+   Cart Helper failing to parse on every store (`SyntaxError: Missing catch or
+   finally after try`): the production build folded the helper's template
+   literal into a plain string and dropped its escape sequences, so the
+   `cartUrl` regex became `//cart/...`, a comment. From 15:05 to about 15:43
+   no cart got TrackClear attributes or consent markers; the unit tests run the
+   unminified source and passed. The fix writes those regexes with character
+   classes, a test keeps backslashes out of the template, and the compiled
+   template now holds none. Only the Vercel pin moved: the worker keeps
+   `44afc85` and its own pin, since it does not serve the helper. Health:
+   release approved, commit `f87dbac...`. All four workspaces' live helpers
+   parse, and on live Mizoke the helper read Shopify's consent and wrote the
+   session ID and consent markers to the cart.
+
+Checkout webhooks: Mizoke added them before 15:27. Test checkout at 15:27:23 with
+cookies declined: `checkouts/create` arrived at 15:28:39 and was processed at
+15:29:00, and its InitiateCheckout for Meta and TikTok was held, then SENT at
+15:34:00 (Meta `events_received: 1`, TikTok OK). It was sent because the broken
+helper had written no consent markers, so TrackClear saw no answer and LAX
+allowed it. After the hotfix, a second checkout at 15:44 with the same decline
+was skipped (`no_eligible_destinations`). No `checkouts/update` has arrived
+yet; neither test typed anything into checkout. Other stores: add "Checkout
+creation" and "Checkout update" (JSON, latest API version) in Shopify admin >
+Settings > Notifications > Webhooks with the "Order payment" URL. A consenting
+Shop Pay checkout then gets one InitiateCheckout with event ID
+`shopify-checkout:<workspaceId>:<checkout token>` and source `webhook` about 5
+minutes later, and paying adds the Purchase without a second InitiateCheckout.
+
+Unit tests do not run the minified build: after changing a served script, fetch
+the live script and parse it.
 
 Rollback while no checkout webhooks are registered: restore both pins to
 `42cb4f9`, redeploy Vercel `dpl_7wTEVDpxeL8Uma1hfCaEVUJYuqEh` and the worker at
 `42cb4f9` with zero overlap. After they are registered, remove both webhooks
 first: the old worker routes an unknown inbox topic to the refund handler.
+Never roll the web back to `dpl_AvJFXCYCp8R6RX1CZ9fHEFME5ME8` (`44afc85`): its
+Cart Helper does not parse.
 
 ## Previous deployment: 2026-10-13 retention and checkout recovery
 

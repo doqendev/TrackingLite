@@ -81,9 +81,16 @@ allowance). On live Dirava the consent API was absent, `Shopify.loadFeatures`
 loaded it in 29 ms, and it reported marketing not allowed for an unanswered EU
 visitor.
 
-Release: live since 25 October 2026 at `44afc8557a0d764913e7dcbcc7c5581a8db1b7db` on both
-hosts (Vercel `dpl_AvJFXCYCp8R6RX1CZ9fHEFME5ME8`, Railway worker
-`c58250ea-f3b8-4ca1-b5f9-d8b93bbcc2fb`); cutover record in `docs/deploy.md`.
+Release: live since 25 October 2026. The worker runs
+`44afc8557a0d764913e7dcbcc7c5581a8db1b7db` (Railway
+`c58250ea-f3b8-4ca1-b5f9-d8b93bbcc2fb`); the web runs
+`f87dbac3ca38e12ce153a78315618b600b68fc35` (Vercel
+`dpl_4DuoCsF4SpdXEnGNF1QkJjqDKmiD`), a web-only fix: the first web build served
+a Cart Helper that did not parse, because the production build dropped the
+escape sequences in its template literal, so from 15:05 to about 15:43 no cart
+got TrackClear attributes or consent markers. Unit tests run the unminified
+source; after changing a served script, fetch the live script and parse it.
+Cutover record and the checkout webhook tests: `docs/deploy.md`.
 It was deployed from this branch because `main` requires the GitHub Actions
 checks and there is no Actions allowance. Merge it through a pull request once
 Actions can run, and do not deploy `main` before that. No migration. The
