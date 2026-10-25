@@ -16,6 +16,7 @@ import {
   verifyCartAttributes,
   writeAndVerifyCartAttributes,
 } from "@/lib/shopify-cart-attribution-helper";
+import { updateOpenAIClickContext } from "@/lib/openai-click-context";
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const store = { ...initial };
@@ -80,6 +81,21 @@ describe("Shopify cart attribution helper", () => {
     for (const key of TRACKCLEAR_CART_ATTRIBUTE_KEYS) {
       expect(js).toContain(key);
     }
+  });
+
+  it("keeps backslashes out of the helper's own code, which the production minifier strips", () => {
+    let own = generateShopifyCartAttributionHelperCode("ws_123", "LAX", true);
+    for (const fn of [
+      updateOpenAIClickContext,
+      resolveHelperMarketingState,
+      isForeignAttributeOnlyCartUpdate,
+      cartAttributeSignature,
+      shouldSkipCartAttributeWrite,
+    ]) {
+      own = own.replace(fn.toString(), "");
+    }
+
+    expect(own).not.toContain("\\");
   });
 
   it("extracts click IDs and UTM values from the landing URL", () => {

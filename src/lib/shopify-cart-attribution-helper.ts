@@ -606,6 +606,10 @@ export function generateShopifyCartAttributionHelperCode(
   enableOpenAI = false
 ): string {
   const safeWorkspaceId = workspaceId.replace(/[\\'"<>&`\n\r\0]/g, "");
+  // The production minifier folds this template into a plain string and drops
+  // its escape sequences (it broke the live helper on 25 Oct 2026), so the
+  // browser code below uses no backslashes. Embedded functions are safe: their
+  // source is interpolated at runtime.
   return `(function(){
 var W="${safeWorkspaceId}",M="${consentMode}",CK=${JSON.stringify(TRACKCLEAR_CART_ATTRIBUTE_KEYS)};
 var OE=${enableOpenAI ? "true" : "false"},OU=null;
@@ -620,8 +624,8 @@ var D=lg();function log(){if(!D)return;try{console.info.apply(console,["[TrackCl
 function ls(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function ss(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function gp(n){try{var v=new URL(location.href).searchParams.get(n);return v&&v.trim()?v.trim():null}catch(e){return null}}
-function vp(v){return v&&/^fb\\.1\\.\\d{13}\\.\\d{7,20}$/.test(v)?v:null}
-function vf(v){if(!v)return null;var m=v.match(/^fb\\.1\\.(\\d{13})\\..+$/);if(!m)return null;if(Date.now()-parseInt(m[1],10)>7776000000)return null;return v}
+function vp(v){return v&&/^fb[.]1[.][0-9]{13}[.][0-9]{7,20}$/.test(v)?v:null}
+function vf(v){if(!v)return null;var m=v.match(/^fb[.]1[.]([0-9]{13})[.].+$/);if(!m)return null;if(Date.now()-parseInt(m[1],10)>7776000000)return null;return v}
 function xf(v){if(!v)return null;var p=v.lastIndexOf(".");return p>0?v.substring(p+1):null}
 function js(v){try{return v?JSON.parse(v):{}}catch(e){return {}}}
 function id(){var x=g(SID)||ls(SID),gen=false;if(!x){gen=true;x=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"."+Math.random().toString(36).slice(2))}s(SID,x);ss(SID,x);log(gen?"session id generated":"session id present/reused",x);return x}
@@ -655,7 +659,7 @@ async function wr(reason,retry){if(!PR){log("cart write waits for Shopify consen
 function sch(r){if(!PR)return;clearTimeout(T);T=setTimeout(function(){wr(r,true)},120)}
 function pr(){if(PR)return;PR=true;log("consent state read");sch("consent_ready")}
 function pl(){var p=pa();if(p&&rd(p,"marketingAllowed")!==undefined){pr();return}try{if(window.Shopify&&typeof window.Shopify.loadFeatures==="function"){setTimeout(pr,PT);window.Shopify.loadFeatures([{name:"consent-tracking-api",version:"0.2"}],function(err){if(err)log("consent API failed to load",err&&err.message?err.message:err);pr()});return}}catch(e){}pr()}
-function cartUrl(u){try{var x=String(u&&u.url?u.url:u);return /\\/cart\\/(add|change|update|clear)(\\.js)?/.test(x)}catch(e){return false}}
+function cartUrl(u){try{var x=String(u&&u.url?u.url:u);return /[/]cart[/](add|change|update|clear)([.]js)?/.test(x)}catch(e){return false}}
 function checkoutEl(el){try{return !!(el&&(el.closest('a[href*="/checkout"],button[name="checkout"],input[name="checkout"],form[action*="/checkout"]')))}catch(e){return false}}
 function cartEl(el){try{return !!(el&&(el.closest('form[action*="/cart/add"],button[name="add"],input[name="add"],[data-add-to-cart],[data-cart-add]')))}catch(e){return false}}
 function bind(){log("TrackClear cart helper loaded",W);window.addEventListener("pageshow",function(){sch("pageshow")});window.addEventListener("pagehide",function(){wr("pagehide",false)});document.addEventListener("visitorConsentCollected",function(e){var d=e&&e.detail;if(d&&typeof d==="object")EV={analyticsAllowed:d.analyticsAllowed,marketingAllowed:d.marketingAllowed,saleOfDataAllowed:d.saleOfDataAllowed};if(PR)sch("consent_change");else pr()});document.addEventListener("submit",function(e){var f=e.target;if(cartEl(f))sch("cart_submit");if(checkoutEl(f))wr("before_checkout_submit",false)},true);document.addEventListener("click",function(e){var el=e.target;if(cartEl(el))sch("cart_click");if(checkoutEl(el))wr("before_checkout_click",false)},true);if(window.fetch){var of=window.fetch;window.fetch=function(){var u=arguments[0],b=arguments[1]?arguments[1].body:undefined,p=of.apply(this,arguments);if(!WR&&cartUrl(u)&&!isForeignAttributeOnlyCartUpdate(u,b,location.href,CK)){ss(WC,"");Promise.resolve(p).then(function(){sch("fetch_cart_change")},function(){})}return p}};if(window.XMLHttpRequest){var O=XMLHttpRequest.prototype.open,S=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.open=function(m,u){this.__tcCartUrl=cartUrl(u);this.__tcUrl=u;return O.apply(this,arguments)};XMLHttpRequest.prototype.send=function(b){if(this.__tcCartUrl&&!WR&&!isForeignAttributeOnlyCartUpdate(this.__tcUrl,b,location.href,CK)){ss(WC,"");this.addEventListener("loadend",function(){sch("xhr_cart_change")})}return S.apply(this,arguments)}}pl()}
