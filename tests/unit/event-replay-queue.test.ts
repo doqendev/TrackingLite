@@ -50,6 +50,21 @@ describe("event replay queue", () => {
     });
   });
 
+  it("delays only a newly added job when a hold is requested", async () => {
+    const queue = {
+      getJob: vi.fn().mockResolvedValue(null),
+      add: vi.fn().mockResolvedValue({ id: "event-log-1" }),
+    } as unknown as Queue;
+    const data = replayData();
+
+    await enqueueReplayJob(queue, "send-tiktok-event", "log-1", data, { delayMs: 300_000 });
+
+    expect(queue.add).toHaveBeenCalledWith("send-tiktok-event", data, {
+      jobId: "event-log-1",
+      delay: 300_000,
+    });
+  });
+
   it("retries a retained failed job while preserving richer identity data", async () => {
     const updateData = vi.fn().mockResolvedValue(undefined);
     const retry = vi.fn().mockResolvedValue(undefined);

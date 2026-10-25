@@ -1,12 +1,34 @@
 # AGENTS.md
 
-## 2026-10-25 Cart Helper consent, cart writes and funnel country: branch only, not deployed
+## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: branch only, not deployed
 
-Branch `agent/wetracked-learnings-20261025` applies three findings from the 24-25
+Branch `agent/wetracked-learnings-20261025` applies the findings of the 24-25
 October side-by-side comparison with Wetracked on Mizoke
 (`mizoke-theme/docs/mizoke-tracking-compare-2026-10-25.md`), each also checked on
 Dirava and Infinite Layers.
 
+- InitiateCheckout from the server. Mizoke sent none for its two checkouts on
+  25 October. Vercel request logs show why for order #1240: Mizoke's Custom Pixel
+  script loaded on the product page at 03:07:04 and next at 03:08:05, after
+  payment at 03:07:59, so it never ran during the checkout. Shop Pay's
+  accelerated checkout runs in its own popup, outside the store's pixels. Signed
+  `checkouts/create` and `checkouts/update` webhooks now go through the same
+  durable inbox as `orders/paid` and become one InitiateCheckout per checkout,
+  under `shopify-checkout:<workspaceId>:<checkout token>`
+  (`src/lib/shopify-checkout-event.ts`). Email, phone, names and address come
+  from the signed payload; attribution from the cart attributes, session record
+  and landing site; consent through the same resolution as Purchase. A new row
+  is held 5 minutes (`CHECKOUT_WEBHOOK_HOLD_MS`) so later updates enrich it; a
+  pending, unclaimed row is enriched in place; a claimed or settled row is never
+  reopened; a row an older pixel created for the same checkout under a random ID
+  wins. The Custom Pixel and legacy script now name `checkout_started` with the
+  same ID, so the pixel's fast path and the webhooks fill one event. `orders/paid`
+  also adds the checkout's InitiateCheckout, unheld, when the checkout has none,
+  which covers paid Shop Pay checkouts before the checkout webhooks are
+  registered; a failure there never blocks the Purchase. Destinations: Meta,
+  TikTok, ChatGPT, GA4 and Pinterest, filtered by workspace mode and consent;
+  Klaviyo keeps the pixel's own Started Checkout. The merchant setup guide now
+  asks for the two checkout webhooks.
 - Cart Helper consent. Shopify's Customer Privacy API was not loaded when the
   helper read it, so it read nothing. LAX counted that as allowed: for an EU
   visitor with no choice yet, Dirava's helper wrote `_fbp` to the cart and set the
@@ -42,25 +64,33 @@ Dirava and Infinite Layers.
 New pure helpers, embedded in the storefront script with `toString()` so the
 browser runs the tested code: `resolveHelperMarketingState`,
 `isForeignAttributeOnlyCartUpdate`, `cartAttributeSignature`,
-`shouldSkipCartAttributeWrite`. The helper tests now also run the generated script
-against a simulated storefront (consent API, cart, cookies, other scripts' fetch
-and XHR); new `tests/unit/pixel-country.test.ts`.
+`shouldSkipCartAttributeWrite`. `enqueueReplayJob` accepts `delayMs` for a newly
+added job. New tests: `tests/unit/shopify-checkout-webhook.test.ts` (checkout
+webhooks, pixel-row enrichment and dedupe, consent, order fallback),
+`tests/unit/pixel-country.test.ts` (country and the shared checkout event ID),
+and the helper tests now run the generated script against a simulated storefront
+(consent API, cart, cookies, other scripts' fetch and XHR).
 
-Verification: 838 unit tests pass, `tsc` clean, lint has only the existing
-`<img>` warnings, production build passes. Prisma checks pass the way CI runs
+Verification: 850 unit tests pass, `tsc` clean, lint has only the existing
+`<img>` warnings, production build passes, and the webhook route and new module
+load under `tsx` as the worker runs them. Prisma checks pass the way CI runs
 them: the format check flags this Windows checkout's CRLF schema on `main` too,
 an LF copy is formatted, and `validate` passes with placeholder database URLs.
-Integration tests were not run (no local PostgreSQL/Redis); none of them executes
-the changed scripts. On live Dirava the consent API was absent, `Shopify.loadFeatures`
+Integration tests were not run (no local PostgreSQL/Redis, and no GitHub Actions
+allowance). On live Dirava the consent API was absent, `Shopify.loadFeatures`
 loaded it in 29 ms, and it reported marketing not allowed for an unanswered EU
-visitor. Deploying changes only the public scripts (`/api/cart-helper`,
-`/api/pixel`, `/api/s`): no migration, no worker change, no Custom Pixel repaste;
-their 5-minute and 30-second caches bound the rollout. Not merged or deployed.
+visitor. Not merged or deployed.
 
-Not in this branch: server-side InitiateCheckout from Shopify checkout webhooks.
-The pixel's InitiateCheckout works on Dirava (53 for 80 checkout sessions,
-18-24 October) and Infinite Layers (266 for 142 orders), while Mizoke sent none
-for its two checkouts on 25 October, so Mizoke's gap needs its EventLog first.
+Release notes: no migration. The Shopify inbox worker on Railway runs the
+webhook route, so web and worker must both run this release (the usual
+`docs/deploy.md` order: stop old workers, deploy web, start the new fleet).
+Register the checkout webhooks only after that; an old worker would hand an
+inbox row for an unknown topic to the refund handler. Then, per store, in
+Shopify admin > Settings > Notifications > Webhooks add "Checkout creation" and
+"Checkout update" (JSON, latest API version) with the URL already used for
+"Order payment"; Shopify signs them with the same key. Without them, paid
+checkouts are still covered by the `orders/paid` fallback, while abandoned
+checkouts the pixel cannot see are not.
 
 ## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
 
@@ -337,6 +367,7 @@ Shopify webhook --> verify HMAC before any state change
   |-- Only signed orders/paid marks the workspace webhook as verified
   |-- Return the live acknowledgement immediately after durable capture
   |-- One-minute inbox worker processes canonical Purchase/refund and defers with backoff on failure
+  |-- checkouts/create and checkouts/update become one server-side InitiateCheckout per checkout token (5-minute hold, pending rows enriched in place); orders/paid adds it when the checkout has none
   |-- Analytics-allowed/advertising-denied Purchase persists only sanitized INTERNAL attribution; analytics-denied persists nothing
   |-- Erase payload after successful processing; retain payload-free receipt
 
@@ -367,7 +398,7 @@ Shopify Inbox Recovery (every 1 minute)
 
 ### Deduplication Strategy
 
-- JS snippet/pixel events generate `event_id` via `crypto.randomUUID()`.
+- JS snippet/pixel events generate `event_id` via `crypto.randomUUID()`, except InitiateCheckout, which uses `shopify-checkout:<workspaceId>:<checkout token>` from the pixel, the checkout webhooks and the `orders/paid` fallback alike.
 - Server-side Meta CAPI and TikTok Events API delivery is the default. TrackClear browser Meta/TikTok modes are separate persisted workspace opt-ins and remain off by default.
 - When one of those browser modes is enabled, the generated script loads that platform SDK only after consent permits it and sends the same `event_id` used by TrackClear's server event. TrackClear must be the only browser owner for that dataset/Pixel ID; browser/server deduplication cannot repair two independent browser integrations.
 - Purchase events normalize to `shopify-purchase:<workspaceId>:<order|checkout|cart>`. Order name wins when available; numeric and GraphQL IDs converge; generated scripts include `checkout.orderName` in both browser and server identity inputs.
@@ -482,6 +513,7 @@ src/
     tracking-context.ts               # Server-proxy client IP/UA extraction + fbclid-derived fbc helpers
     shopify-webhook-attribution.ts    # Shopify order/cart/landing-site attribution extraction + absolute webhook Purchase URL/content helpers
     shopify-webhook-inbox.ts          # encrypted HMAC-verified capture, claims, replay backoff, retention, timing constants
+    shopify-checkout-event.ts         # Server-side InitiateCheckout per checkout token: fan-out, pixel-row dedupe/enrichment, hold, order fallback guard
     shopify-cart-attribution-helper.ts # Storefront cart attribution helper generator + pure cart attribute extraction/write/verify helpers
     headless-sdk.ts                   # Headless/Hydrogen helper for click attribution, _fbp/_fbc cookies, _trackclear_session_id, cart attributes, and ingest calls
     currency.ts                       # Exchange rate fetcher (frankfurter.app API), Redis-cached 24h
@@ -557,7 +589,7 @@ tests/
     event-log-cleanup.test.ts         # 2 tests (retention and accepted/attempting protection)
     event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
     event-normalizer.test.ts          # 51 tests (all 5 event types + camelCase handling + Meta cookie validation + anonymous country)
-    event-replay-queue.test.ts        # 6 tests (deterministic recovery queueing)
+    event-replay-queue.test.ts        # 7 tests (deterministic recovery queueing, delayed new jobs)
     event-retry-envelope.test.ts      # 3 tests (encrypted short-lived replay payload)
     events-page-mode.test.ts          # 1 test (Events page failed-count respects workspace destination allowlist)
     extract-custom-data.test.ts       # 29 tests (bounded customData extraction)
@@ -574,7 +606,7 @@ tests/
     meta-event-processor.test.ts      # 8 tests (delivery ownership, acceptance, errors, retry)
     middleware-public-routes.test.ts  # 7 tests (public routes plus fail-closed production release middleware)
     phone-normalizer.test.ts          # 16 tests
-    pixel-country.test.ts             # 3 tests (storefront country on funnel events, checkout country precedence, denial and invalid cookie, legacy script)
+    pixel-country.test.ts             # 4 tests (storefront country on funnel events, checkout country precedence, denial and invalid cookie, legacy script, shared checkout event ID)
     pixel-route.test.ts               # 11 tests (browser ownership, consent revocation replay/serialization, exact IDs, cache and Purchase guard)
     production-release-gate.test.ts   # 11 tests (exact provider environment and full-SHA production gates)
     purchase-event-id.test.ts         # 10 tests (deterministic IDs and cross-source aliases)
@@ -587,6 +619,7 @@ tests/
     shopify-webhook-attribution.test.ts # 15 tests (order/landing attribution, consent freshness, catalog IDs)
     shopify-webhook-inbox.test.ts     # 12 tests (durable encrypted capture/claim/backoff/retention)
     shopify-webhook-inbox-worker.test.ts # 5 tests (internal replay and failure handling)
+    shopify-checkout-webhook.test.ts  # 10 tests (checkout webhook InitiateCheckout, pixel-row enrichment/dedupe, no reopen, consent, toggles, orders/paid fallback)
     shopify-webhook-route-mode.test.ts # 21 tests (capture-only ACK, canonical reconciliation, explicit-consent internal attribution, allowlists/catalogs)
     snippet-route.test.ts             # 5 tests (verified host and bounded ordered bridge-v1 startup)
     stale-pending-requeue.test.ts     # 8 tests (deterministic retries and alias-aware usage reconciliation)
@@ -715,7 +748,7 @@ All documented in `.env.example`. Critical ones:
 | `GET /api/cart-helper/:workspaceId` | GET | Public storefront theme helper JS that writes and verifies TrackClear attribution in Shopify cart attributes |
 | `GET /api/pixel/:workspaceId` | GET | 30-second shared-cache Custom Pixel tracker loaded by `bridge-v1` |
 | `GET /api/s/:workspaceId` | GET | 30-second shared-cache legacy direct tracker |
-| `POST /api/webhooks/shopify` | POST | HMAC verification and encrypted durable capture; live requests acknowledge before inbox processing |
+| `POST /api/webhooks/shopify` | POST | HMAC verification and encrypted durable capture for `orders/paid`, `refunds/create`, `checkouts/create` and `checkouts/update`; live requests acknowledge before inbox processing |
 | `POST /api/stripe/webhook` | POST | Stripe webhook handler (signature verified) |
 | `GET /api/health` | GET | Release approval, pinned DB identity, migration/index, and Redis readiness; HTTP 200 when ready and 503 when degraded |
 | `POST /api/auth/signup` | POST | User registration, sends verification email |
@@ -804,6 +837,7 @@ Header: Content-Type: application/json
 - **Server-proxy shopper context:** Headless storefront proxies can pass real shopper IP/UA with `X-TL-Client-IP` and `X-TL-Client-UA`. These headers are intentionally not exposed in the public CORS allow-list.
 - **Meta fbc/fbp recovery:** Ingest accepts raw `fbclid` and derives `fbc` as `fb.1.<timestamp_ms>.<fbclid>` when `_fbc` is missing. Existing `_fbc` values are preserved. `_fbp`/`_fbc` validation accepts any numeric subdomain index (`fb.<n>.`), and `_fbp` random IDs from 7 to 20 digits, so real Meta cookies set at other domain depths are never discarded or overwritten.
 - **Checkout contact enrichment (Meta + TikTok):** `checkout_started` queues the initial InitiateCheckout job for META and TIKTOK with a 90-second delay (`CHECKOUT_ENRICHMENT_DELAY_MS`). Shopify's `checkout_contact_info_submitted` re-sends the same event ID with email/phone via `onlyDestinations: ["META","TIKTOK"]`; ingest refreshes only unclaimed PENDING rows so the delayed worker sends one enriched event per destination. Rows already claimed or terminal are never reopened.
+- **Server-side InitiateCheckout:** Shop Pay's accelerated checkout runs in a popup where the store's Custom Pixel never loads, so the pixel alone misses those checkouts (Mizoke order #1240). Signed `checkouts/create`/`checkouts/update` webhooks run through the durable inbox into `queueServerInitiateCheckout` (`shopify-checkout-event.ts`): one event per checkout token under `shopify-checkout:<workspaceId>:<token>`, the same ID the pixel now uses for `checkout_started` and its contact enrichment. Identity comes only from the signed payload; attribution from cart attributes, session record and landing site; consent through the Purchase resolution (`resolveWebhookConsent`). New rows are held `CHECKOUT_WEBHOOK_HOLD_MS` (5 minutes) so later updates enrich them; pending unclaimed rows, including the pixel's, are enriched in place; claimed or settled rows are never reopened; an existing row for the same checkout under another ID (older pixel) wins. `orders/paid` calls the same helper with `onlyIfMissing` and no hold, inside a try/catch so it can never block the Purchase. Klaviyo is excluded (the pixel sends its own Started Checkout). Merchants register "Checkout creation" and "Checkout update" next to "Order payment" in Shopify Notifications; Shopify signs them with the same key.
 - **Uncapped internal accounts:** `UNLIMITED_ORDER_USER_IDS` is a comma-separated allowlist of `User.id` values that are never blocked by the monthly order limit. It is checked in `checkOrderLimits` before the subscription lookup, so no plan, subscription status, or Stripe state can cap those accounts, and `checkOrderLimitAlerts` skips them so they do not sit permanently at "limit reached". Usage is still reserved idempotently against an effectively infinite ceiling, so the monthly counter and its duplicate detection stay accurate. This mirrors `LEGACY_WORKSPACE_IDS`: an explicit env allowlist rather than schema or Stripe state, so it needs no enum migration and a Stripe webhook cannot overwrite it. The variable must be set on both Vercel and Railway, since ingest and the webhook run on Vercel while the inbox replay worker runs on Railway. Every account not on the list stays capped exactly as before. Note the dashboard usage bar still renders the nominal plan quota for these accounts; that display is cosmetic and intentionally untouched, because `ordersLimit` crosses a server/client boundary as a plain `number`.
 - **Purchase identity write-back:** A guest checkout is usually the only moment the system learns who a shopper is, so the verified Shopify webhook also stores the purchaser's hashed email/phone into the session enrichment record under the order's durable aliases (session ID, checkout token, cart token, order ID/name, email key). A returning visitor on the same browser then matches on later funnel events instead of arriving anonymous. It runs before the empty-destination exits so a workspace without advertising credentials still builds identity, is gated on the same marketing consent decision used for delivery, and is erased by the existing denial tombstones.
 - **Session identity carry-forward:** When an event carries shopper email/phone and marketing consent allows it, ingest stores SHA-256 hashes (never raw identity) in the Redis enrichment record under the existing session/checkout/cart keys. A later event in that session that has no identity of its own, but does have an opaque anchor, recovers those hashes and sends them as Meta `em`/`ph` and TikTok `user.email`/`user.phone`. The values are already hashed, so normalizers must never hash them again, and an event's own identity always wins. Carried identity is a marketing-scoped field: it follows the same thirty-day staleness boundary as click IDs and is erased by a marketing or sale/sharing denial tombstone. Clients cannot inject it — the ingest schema is `.strict()` and the fields are server-derived only.

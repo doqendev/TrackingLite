@@ -348,7 +348,7 @@
     "webhookGuideStep1Title": "Abre las Notificaciones de Shopify",
     "webhookGuideStep1Desc": "Ve al Admin de Shopify > Configuracion > Notificaciones. Desplazate hasta la seccion de Webhooks.",
     "webhookGuideStep2Title": "Crea el Webhook",
-    "webhookGuideStep2Desc": "Haz clic en Crear Webhook. Selecciona 'Pago del pedido' como evento. Pega la URL del Webhook mostrada arriba y haz clic en Guardar.",
+    "webhookGuideStep2Desc": "Haz clic en Crear Webhook. Selecciona 'Pago del pedido' como evento. Pega la URL del Webhook mostrada arriba y haz clic en Guardar. Repite con la misma URL para 'Creación de pantalla de pago' y 'Actualización de pantalla de pago', para que los pagos que el píxel no ve (como la ventana emergente de Shop Pay) también envíen InitiateCheckout.",
     "webhookGuideStep3Title": "Copia el Secreto de Firma",
     "webhookGuideStep3Desc": "Despues de crear el webhook, Shopify muestra un secreto de firma. Copialo y pegalo en el campo Secreto de Firma arriba, luego haz clic en Guardar."
   },

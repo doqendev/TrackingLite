@@ -45,7 +45,7 @@ import {
   buildPurchaseEventId,
   normalizePurchaseIdentifier,
 } from "@/lib/purchase-event-id";
-import { contentIdOptionsFromWorkspace } from "@/lib/content-id";
+import { contentIdOptionsFromWorkspace, type ContentIdWorkspaceSource } from "@/lib/content-id";
 import type { Queue } from "bullmq";
 import {
   clearedEventRetryEnvelope,
@@ -75,8 +75,19 @@ import {
   persistInternalAttributionEvent,
   supersedeInternalAttributionEvent,
 } from "@/lib/internal-attribution";
+import {
+  CHECKOUT_WEBHOOK_HOLD_MS,
+  queueServerInitiateCheckout,
+  type CheckoutEventWorkspace,
+} from "@/lib/shopify-checkout-event";
 
 const log = createLogger({ component: "shopify-webhook" });
+
+const CHECKOUT_TOPICS = new Set(["checkouts/create", "checkouts/update"]);
+const SUPPORTED_TOPICS = new Set(["orders/paid", "refunds/create", ...Array.from(CHECKOUT_TOPICS)]);
+// Non-web sources never had a storefront session to attribute. A denylist lets
+// unknown or new source types (including Shopify test notifications) through.
+const BLOCKED_COMMERCE_SOURCES = new Set(["pos", "shopify_draft_order", "manual", "bulk", "subscription"]);
 
 function firstString(source: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
@@ -190,7 +201,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing headers" }, { status: 400 });
     }
 
-    if (topic !== "orders/paid" && topic !== "refunds/create") {
+    if (!SUPPORTED_TOPICS.has(topic)) {
       reqLog.info("Ignoring unhandled topic", { topic });
       return NextResponse.json({ ok: true });
     }
@@ -348,6 +359,15 @@ async function processCapturedShopifyWebhook(input: {
           input.inbox.occurredAt,
           claim.attempts > 1
         )
+      : CHECKOUT_TOPICS.has(input.inbox.topic)
+      ? await handleCheckoutWebhook(
+          input.bodyData,
+          input.shopDomain,
+          input.reqLog,
+          input.requestId,
+          input.inbox.workspaceId,
+          input.inbox.occurredAt
+        )
       : await handleRefundCreated(
           input.bodyData,
           input.rawBody,
@@ -449,6 +469,7 @@ async function handleOrderPaid(
       googleAdsCustomerId: true,
       googleAdsConversionActionId: true,
       enablePurchase: true,
+      enableInitiateCheckout: true,
       consentMode: true,
     },
   });
@@ -521,8 +542,7 @@ async function handleOrderPaid(
   // Use a denylist so unknown/new source types (including Shopify test notifications) pass through
   const paymentGateway = orderData.gateway ? String(orderData.gateway) : null;
   const orderSource = orderData.source_name ? String(orderData.source_name).toLowerCase() : "web";
-  const BLOCKED_SOURCES = new Set(["pos", "shopify_draft_order", "manual", "bulk", "subscription"]);
-  if (BLOCKED_SOURCES.has(orderSource)) {
+  if (BLOCKED_COMMERCE_SOURCES.has(orderSource)) {
     reqLog.info("Skipping non-web order", { orderSource, orderId: orderId || orderName });
     return NextResponse.json({ ok: true });
   }
@@ -710,29 +730,7 @@ async function handleOrderPaid(
     }
 
     const modeFilteredDestinations = filterDestinationsForWorkspace(workspace, destinations);
-    const customerConsent = {
-      analytics: resolveNewestConsentValue({
-        cartValue: orderAttribution.consentAnalytics,
-        cartTimestamp: orderAttribution.consentTimestamp,
-        sessionValue: sessionContext?.consent?.analytics,
-        sessionTimestamp: sessionContext?.consentTimestamps?.analytics,
-        now: orderReferenceTime,
-      }),
-      marketing: resolveNewestConsentValue({
-        cartValue: orderAttribution.consentMarketing,
-        cartTimestamp: orderAttribution.consentTimestamp,
-        sessionValue: sessionContext?.consent?.marketing,
-        sessionTimestamp: sessionContext?.consentTimestamps?.marketing,
-        now: orderReferenceTime,
-      }),
-      saleOfData: resolveNewestConsentValue({
-        cartValue: orderAttribution.consentSaleOfData,
-        cartTimestamp: orderAttribution.consentTimestamp,
-        sessionValue: sessionContext?.consent?.saleOfData,
-        sessionTimestamp: sessionContext?.consentTimestamps?.saleOfData,
-        now: orderReferenceTime,
-      }),
-    };
+    const customerConsent = resolveWebhookConsent(orderAttribution, sessionContext, orderReferenceTime);
     const consentFilteredDestinations = modeFilteredDestinations.filter((dest) =>
       shouldSendToDestination(workspace.consentMode, customerConsent, dest.destination)
     );
@@ -770,6 +768,42 @@ async function handleOrderPaid(
           observedAt: orderReferenceTime,
         }
       );
+    }
+
+    // A paid checkout that produced no InitiateCheckout (Shop Pay's popup
+    // checkout never runs the store's Custom Pixel, and checkout webhooks may
+    // not be registered) still gets one, under the checkout's own event ID.
+    // Best effort: it must never hold up the canonical Purchase.
+    if (checkoutToken) {
+      try {
+        const orderCreatedAt = parseShopifyDate(orderData.created_at);
+        const fallback = await queueCheckoutEventFromPayload({
+          workspace,
+          data: orderData,
+          shopDomain,
+          requestId,
+          checkoutToken,
+          cartToken,
+          occurredAt: orderCreatedAt ?? occurredAt ?? new Date(orderReferenceTime),
+          holdMs: 0,
+          onlyIfMissing: true,
+          attribution: orderAttribution,
+          landing: landingAttribution,
+          sessionContext,
+          consent: customerConsent,
+        });
+        if (fallback.status === "queued" && fallback.created.length > 0) {
+          wsLog.info("InitiateCheckout added from paid order", {
+            orderId: orderId || orderName,
+            destinations: fallback.created,
+          });
+        }
+      } catch (error) {
+        wsLog.warn("InitiateCheckout fallback from paid order failed", {
+          orderId: orderId || orderName,
+          error: sanitizeWebhookProcessingError(error),
+        });
+      }
     }
 
     // Deterministic eventId for browser/server Purchase dedup. Keep the raw
@@ -1381,6 +1415,360 @@ async function handleOrderPaid(
   }
 
   // Always return 200 quickly (Shopify requires response within 5 seconds)
+  return NextResponse.json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+// Shared: webhook consent and server-side InitiateCheckout
+// ---------------------------------------------------------------------------
+
+function resolveWebhookConsent(
+  attribution: ReturnType<typeof buildOrderAttribution>,
+  sessionContext: SessionContext | null,
+  referenceTime: number
+) {
+  return {
+    analytics: resolveNewestConsentValue({
+      cartValue: attribution.consentAnalytics,
+      cartTimestamp: attribution.consentTimestamp,
+      sessionValue: sessionContext?.consent?.analytics,
+      sessionTimestamp: sessionContext?.consentTimestamps?.analytics,
+      now: referenceTime,
+    }),
+    marketing: resolveNewestConsentValue({
+      cartValue: attribution.consentMarketing,
+      cartTimestamp: attribution.consentTimestamp,
+      sessionValue: sessionContext?.consent?.marketing,
+      sessionTimestamp: sessionContext?.consentTimestamps?.marketing,
+      now: referenceTime,
+    }),
+    saleOfData: resolveNewestConsentValue({
+      cartValue: attribution.consentSaleOfData,
+      cartTimestamp: attribution.consentTimestamp,
+      sessionValue: sessionContext?.consent?.saleOfData,
+      sessionTimestamp: sessionContext?.consentTimestamps?.saleOfData,
+      now: referenceTime,
+    }),
+  };
+}
+
+function parseShopifyDate(value: unknown): Date | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function firstPresent<T>(...values: Array<T | null | undefined>): T | null {
+  for (const value of values) {
+    if (value !== null && value !== undefined && value !== "") return value;
+  }
+  return null;
+}
+
+// Shopper identity from a signed Shopify checkout or order payload. Checkouts
+// often have only a shipping address until payment, so it is the fallback.
+function shopperFromPayload(data: Record<string, unknown>) {
+  const record = (value: unknown) =>
+    value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  const billing = record(data.billing_address);
+  const shipping = record(data.shipping_address);
+  const customer = record(data.customer);
+  const address = billing && Object.keys(billing).length > 0 ? billing : shipping;
+  const from = (source: Record<string, unknown> | null, keys: string[]) =>
+    source ? firstString(source, keys) : null;
+  return {
+    email: firstPresent(firstString(data, ["email", "contact_email"]), from(customer, ["email"])),
+    phone: firstPresent(
+      firstString(data, ["phone", "sms_marketing_phone"]),
+      from(billing, ["phone"]),
+      from(shipping, ["phone"]),
+      from(customer, ["phone"])
+    ),
+    firstName: firstPresent(from(customer, ["first_name"]), from(address, ["first_name"])),
+    lastName: firstPresent(from(customer, ["last_name"]), from(address, ["last_name"])),
+    city: from(address, ["city"]),
+    state: from(address, ["province_code", "province"]),
+    zip: from(address, ["zip"]),
+    countryCode: from(address, ["country_code"]),
+    customerId: from(customer, ["id"]),
+  };
+}
+
+type CheckoutPayloadWorkspace = CheckoutEventWorkspace & ContentIdWorkspaceSource;
+
+async function queueCheckoutEventFromPayload(input: {
+  workspace: CheckoutPayloadWorkspace;
+  data: Record<string, unknown>;
+  shopDomain: string;
+  requestId: string;
+  checkoutToken: string;
+  cartToken: string | null;
+  occurredAt: Date;
+  holdMs: number;
+  onlyIfMissing: boolean;
+  attribution: ReturnType<typeof buildOrderAttribution>;
+  landing: ReturnType<typeof extractLandingSiteAttribution>;
+  sessionContext: SessionContext | null;
+  consent: { analytics?: boolean; marketing?: boolean; saleOfData?: boolean };
+}) {
+  const { data, attribution, landing, sessionContext, consent } = input;
+  const shopper = shopperFromPayload(data);
+  const lineItems = Array.isArray(data.line_items)
+    ? (data.line_items as Array<Record<string, unknown>>)
+    : [];
+  const contentIdOptions = contentIdOptionsFromWorkspace(input.workspace);
+  const numItems = lineItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  const total = Number(data.total_price);
+  const value = data.total_price !== undefined && data.total_price !== null && Number.isFinite(total)
+    ? total
+    : null;
+  const currency = firstString(data, ["currency", "presentment_currency"]);
+  const clientDetails = data.client_details && typeof data.client_details === "object"
+    ? (data.client_details as Record<string, unknown>)
+    : null;
+  const clientIp = firstPresent(
+    sessionContext?.clientIp,
+    firstString(data, ["browser_ip"]),
+    clientDetails ? firstString(clientDetails, ["browser_ip"]) : null
+  );
+  const userAgent = firstPresent(
+    sessionContext?.userAgent,
+    clientDetails ? firstString(clientDetails, ["user_agent"]) : null
+  );
+  const pageUrl =
+    sessionContext?.url ||
+    normalizeLandingPageUrl(attribution.landingPage, input.shopDomain) ||
+    landing.pageUrl ||
+    `https://${input.shopDomain}`;
+  const fbp = firstPresent(attribution.fbp, sessionContext?.fbp);
+  const fbc = firstPresent(attribution.fbc, sessionContext?.fbc, landing.fbc, landing.fbcFromFbclid);
+  const clickIds = {
+    fbclid: firstPresent(attribution.fbclid, landing.fbclid),
+    gclid: firstPresent(attribution.gclid, sessionContext?.gclid, landing.gclid),
+    gbraid: firstPresent(attribution.gbraid, sessionContext?.gbraid, landing.gbraid),
+    wbraid: firstPresent(attribution.wbraid, sessionContext?.wbraid, landing.wbraid),
+    ttclid: firstPresent(attribution.ttclid, sessionContext?.ttclid, landing.ttclid),
+    ttp: firstPresent(attribution.ttp, sessionContext?.ttp, landing.ttp),
+    rdtCid: firstPresent(attribution.rdtCid, sessionContext?.rdtCid, landing.rdtCid),
+    epik: firstPresent(attribution.epik, sessionContext?.epik, landing.epik),
+  };
+  const utm = {
+    utmSource: firstPresent(attribution.utmSource, sessionContext?.utmSource, landing.utmSource),
+    utmMedium: firstPresent(attribution.utmMedium, sessionContext?.utmMedium, landing.utmMedium),
+    utmCampaign: firstPresent(attribution.utmCampaign, sessionContext?.utmCampaign, landing.utmCampaign),
+    utmContent: firstPresent(attribution.utmContent, sessionContext?.utmContent, landing.utmContent),
+    utmTerm: firstPresent(attribution.utmTerm, sessionContext?.utmTerm, landing.utmTerm),
+  };
+  const openaiClick = [
+    { value: attribution.oppref, capturedAt: attribution.opprefCapturedAt },
+    { value: sessionContext?.oppref, capturedAt: sessionContext?.opprefCapturedAt },
+  ].filter((click) => validOpenAIClick(click.value, click.capturedAt))
+    .sort((a, b) => (b.capturedAt ?? 0) - (a.capturedAt ?? 0))[0];
+  const customData = {
+    value,
+    currency,
+    num_items: numItems,
+    checkout_token: input.checkoutToken,
+    cart_token: input.cartToken,
+    content_type: "product",
+    content_ids: buildLineItemContentIds(lineItems, contentIdOptions),
+    contents: buildLineItemContents(lineItems, contentIdOptions),
+  };
+  const attributionSources = attributionSourcesForPurchase({
+    orderAttribution: attribution,
+    sessionContext,
+    landingAttribution: landing,
+  });
+
+  return queueServerInitiateCheckout({
+    workspace: input.workspace,
+    requestId: input.requestId,
+    checkoutToken: input.checkoutToken,
+    cartToken: input.cartToken,
+    occurredAt: input.occurredAt,
+    holdMs: input.holdMs,
+    onlyIfMissing: input.onlyIfMissing,
+    consent,
+    referrer: firstString(data, ["referring_site"]),
+    event: {
+      url: pageUrl,
+      referrer: "",
+      trackclearSessionId: attribution.trackclearSessionId,
+      fbp,
+      fbc,
+      ...clickIds,
+      gaClientId: sessionContext?.gaClientId ?? null,
+      oppref: openaiClick?.value ?? null,
+      opprefCapturedAt: openaiClick?.capturedAt ?? null,
+      consent: {
+        analyticsAllowed: consent.analytics,
+        marketingAllowed: consent.marketing,
+        saleOfDataAllowed: consent.saleOfData,
+      },
+      openaiPixelId: input.workspace.openaiPixelId ?? null,
+      userData: { ...shopper, customerId: shopper.customerId ?? undefined },
+      customData,
+      clientIp: clientIp ?? "",
+      userAgent: userAgent ?? "",
+    },
+    columns: {
+      payload: JSON.parse(JSON.stringify({
+        eventName: "InitiateCheckout",
+        customData,
+        hasUserData: !!(shopper.email || shopper.phone),
+        attributionSource: attributionSources[0],
+        attributionSources,
+        trackclearSessionIdPresent: !!attribution.trackclearSessionId,
+        consent: {
+          analytics: consent.analytics ?? null,
+          marketing: consent.marketing ?? null,
+          saleOfData: consent.saleOfData ?? null,
+          source: attribution.consentSource ?? (sessionContext?.consent ? "session_enrichment" : null),
+          timestamp: attribution.consentTimestamp ?? null,
+        },
+      })),
+      pageUrl,
+      value,
+      currency,
+      numItems: numItems || null,
+      customerIp: clientIp,
+      userAgent,
+      fbp,
+      fbc,
+      ...utm,
+      gclid: clickIds.gclid,
+      gbraid: clickIds.gbraid,
+      wbraid: clickIds.wbraid,
+      ttclid: clickIds.ttclid,
+      rdtCid: clickIds.rdtCid,
+      epik: clickIds.epik,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Handler: checkouts/create and checkouts/update
+// ---------------------------------------------------------------------------
+
+async function handleCheckoutWebhook(
+  checkoutData: Record<string, unknown>,
+  shopDomain: string,
+  reqLog: ReturnType<typeof log.child>,
+  requestId: string,
+  targetWorkspaceId?: string,
+  occurredAt: Date | null = null
+): Promise<NextResponse> {
+  const checkoutToken = firstString(checkoutData, ["token", "checkout_token"]);
+  if (!checkoutToken) {
+    reqLog.warn("Checkout webhook without a checkout token");
+    return NextResponse.json({ ok: true });
+  }
+  const checkoutSource = checkoutData.source_name
+    ? String(checkoutData.source_name).toLowerCase()
+    : "web";
+  if (BLOCKED_COMMERCE_SOURCES.has(checkoutSource)) {
+    reqLog.info("Skipping non-web checkout", { checkoutSource });
+    return NextResponse.json({ ok: true });
+  }
+
+  const workspaces = await db.workspace.findMany({
+    where: {
+      ...(targetWorkspaceId ? { id: targetWorkspaceId } : {}),
+      shopifyDomain: shopDomain,
+      isActive: true,
+      shopifyWebhookSecretEncrypted: { not: null },
+    },
+    select: {
+      id: true,
+      productMode: true,
+      installType: true,
+      consentMode: true,
+      enableInitiateCheckout: true,
+      catalogIdMode: true,
+      catalogIdPrefix: true,
+      catalogIdSuffix: true,
+      catalogIdTemplate: true,
+      enableMeta: true,
+      metaPixelId: true,
+      metaAccessTokenEncrypted: true,
+      enableTikTok: true,
+      tiktokAccessTokenEncrypted: true,
+      enableOpenAI: true,
+      openaiPixelId: true,
+      openaiApiKeyEncrypted: true,
+      enableGA4: true,
+      ga4MeasurementId: true,
+      ga4ApiSecretEncrypted: true,
+      enablePinterest: true,
+      pinterestConversionTokenEncrypted: true,
+    },
+  });
+
+  const cartToken = firstString(checkoutData, ["cart_token", "cartToken"]);
+  const startedAt = parseShopifyDate(checkoutData.created_at) ?? occurredAt ?? new Date();
+  const referenceTime = Date.now();
+  const attribution = buildOrderAttribution(checkoutData, referenceTime);
+  const landing = extractLandingSiteAttribution(
+    checkoutData.landing_site ? String(checkoutData.landing_site) : null,
+    shopDomain,
+    referenceTime
+  );
+  const shopper = shopperFromPayload(checkoutData);
+
+  for (const workspace of workspaces) {
+    const wsLog = reqLog.child({ workspaceId: workspace.id });
+    if (!workspace.enableInitiateCheckout) continue;
+
+    const sessionContext = await lookupSessionContextByIdentifiers(workspace.id, {
+      email: shopper.email,
+      trackclearSessionId: attribution.trackclearSessionId,
+      checkoutToken,
+      cartToken,
+    });
+    const consent = resolveWebhookConsent(attribution, sessionContext, referenceTime);
+
+    // Same identity write-back as the paid order, so a returning shopper on
+    // this browser matches on later funnel events. Marketing consent gates it.
+    if (shouldSendToDestination(workspace.consentMode, consent, "META")) {
+      const hashedEmail = hashPii(shopper.email);
+      const hashedPhone = hashPhonePii(shopper.phone, shopper.countryCode);
+      if (hashedEmail || hashedPhone) {
+        await storeSessionContextForIdentifiers(
+          workspace.id,
+          {
+            email: shopper.email,
+            trackclearSessionId: attribution.trackclearSessionId,
+            checkoutToken,
+            cartToken,
+          },
+          { hashedEmail: hashedEmail ?? null, hashedPhone: hashedPhone ?? null, observedAt: referenceTime }
+        );
+      }
+    }
+
+    const result = await queueCheckoutEventFromPayload({
+      workspace,
+      data: checkoutData,
+      shopDomain,
+      requestId,
+      checkoutToken,
+      cartToken,
+      occurredAt: startedAt,
+      holdMs: CHECKOUT_WEBHOOK_HOLD_MS,
+      onlyIfMissing: false,
+      attribution,
+      landing,
+      sessionContext,
+      consent,
+    });
+    wsLog.info(
+      "Checkout webhook processed",
+      result.status === "queued"
+        ? { created: result.created, refreshed: result.refreshed, skipped: result.skipped }
+        : { skipped: result.reason }
+    );
+  }
+
   return NextResponse.json({ ok: true });
 }
 

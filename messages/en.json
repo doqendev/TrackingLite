@@ -348,7 +348,7 @@
     "webhookGuideStep1Title": "Open Shopify Notifications",
     "webhookGuideStep1Desc": "Go to Shopify Admin > Settings > Notifications. Scroll down to the Webhooks section.",
     "webhookGuideStep2Title": "Create the Webhook",
-    "webhookGuideStep2Desc": "Click Create Webhook. Select 'Order payment' as the event. Paste the Webhook URL shown above and click Save.",
+    "webhookGuideStep2Desc": "Click Create Webhook. Select 'Order payment' as the event. Paste the Webhook URL shown above and click Save. Repeat with the same URL for 'Checkout creation' and 'Checkout update', so checkouts the pixel cannot see (such as Shop Pay's popup checkout) still send InitiateCheckout.",
     "webhookGuideStep3Title": "Copy the Signing Secret",
     "webhookGuideStep3Desc": "After creating the webhook, Shopify displays a signing secret. Copy it and paste it in the Signing Secret field above, then click Save."
   },

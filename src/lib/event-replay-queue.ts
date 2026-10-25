@@ -6,7 +6,13 @@ export type ReplayEnqueueResult = "queued" | "already-queued" | "active" | "comp
 export type ReplayEnqueueOptions = {
   /** Prefer fresh canonical webhook fields over retained browser job fields. */
   preferReplayData?: boolean;
+  /** Delay a newly added job; a retained job keeps its own timing. */
+  delayMs?: number;
 };
+
+function addOptions(jobId: string, options: ReplayEnqueueOptions) {
+  return options.delayMs && options.delayMs > 0 ? { jobId, delay: options.delayMs } : { jobId };
+}
 
 export function eventReplayJobId(eventLogId: string): string {
   return `event-${eventLogId}`;
@@ -130,7 +136,7 @@ async function reconcileRetainedJob(
     // The retained job disappeared between getJob() and getState(). Re-adding
     // with the same deterministic ID is safe. Re-read it because a concurrent
     // producer can win this add too, leaving its payload under the shared ID.
-    await queue.add(jobName, data, { jobId });
+    await queue.add(jobName, data, addOptions(jobId, options));
     if (options.preferReplayData) {
       const replacement = await queue.getJob(jobId);
       if (replacement) {
@@ -194,7 +200,7 @@ export async function enqueueReplayJob(
   }
 
   try {
-    await queue.add(jobName, data, { jobId });
+    await queue.add(jobName, data, addOptions(jobId, options));
   } catch (error) {
     // A concurrent producer may have won the deterministic-ID race between
     // getJob() and add(). Only suppress the add error when that durable job can

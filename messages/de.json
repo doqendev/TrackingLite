@@ -348,7 +348,7 @@
     "webhookGuideStep1Title": "Shopify-Benachrichtigungen oeffnen",
     "webhookGuideStep1Desc": "Gehen Sie zum Shopify Admin > Einstellungen > Benachrichtigungen. Scrollen Sie zum Abschnitt Webhooks.",
     "webhookGuideStep2Title": "Webhook erstellen",
-    "webhookGuideStep2Desc": "Klicken Sie auf Webhook erstellen. Waehlen Sie 'Bestellzahlung' als Ereignis. Fuegen Sie die oben angezeigte Webhook-URL ein und klicken Sie auf Speichern.",
+    "webhookGuideStep2Desc": "Klicken Sie auf Webhook erstellen. Waehlen Sie 'Bestellzahlung' als Ereignis. Fuegen Sie die oben angezeigte Webhook-URL ein und klicken Sie auf Speichern. Wiederholen Sie dies mit derselben URL fuer 'Checkout-Erstellung' und 'Checkout-Aktualisierung', damit auch Checkouts, die das Pixel nicht sieht (etwa das Shop Pay-Popup), InitiateCheckout senden.",
     "webhookGuideStep3Title": "Signaturgeheimnis kopieren",
     "webhookGuideStep3Desc": "Nach dem Erstellen des Webhooks zeigt Shopify ein Signaturgeheimnis an. Kopieren Sie es und fuegen Sie es oben im Feld Signaturgeheimnis ein, dann klicken Sie auf Speichern."
   },

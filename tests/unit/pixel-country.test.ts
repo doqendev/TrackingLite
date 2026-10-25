@@ -10,6 +10,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+import { buildCheckoutEventId } from "@/lib/shopify-checkout-event";
+
 let getPixel: typeof import("@/app/api/pixel/[workspaceId]/route").GET;
 let getLegacyScript: typeof import("@/app/api/s/[workspaceId]/route").GET;
 
@@ -196,5 +198,26 @@ describe("country on Shopify funnel events", () => {
 
     await vi.waitFor(() => expect(ingestPayloads(fetchMock)).toHaveLength(1));
     expect(ingestPayloads(fetchMock)[0].userData).toEqual({ countryCode: "PT" });
+  });
+
+  it("names InitiateCheckout by the checkout token, as the checkout and order webhooks do", async () => {
+    const { handlers, fetchMock } = await runGeneratedPixel({}, ALLOWED);
+    const checkout = { token: "CHK-TOKEN-1", totalPrice: { amount: "39.25", currencyCode: "EUR" }, lineItems: [] };
+
+    handlers.checkout_started({ ...page("https://shop.example/checkouts/cn/CHK-TOKEN-1"), data: { checkout } });
+    handlers.checkout_contact_info_submitted({
+      ...page("https://shop.example/checkouts/cn/CHK-TOKEN-1"),
+      data: { checkout: { ...checkout, email: "buyer@example.com" } },
+    });
+    handlers.checkout_started({ ...page(), data: { checkout: { totalPrice: {}, lineItems: [] } } });
+
+    await vi.waitFor(() => expect(ingestPayloads(fetchMock).length).toBeGreaterThanOrEqual(4));
+    const ids = ingestPayloads(fetchMock).map((p) => (p as unknown as { eventId: string }).eventId);
+    const expected = buildCheckoutEventId("ws_123", "CHK-TOKEN-1");
+    // checkout_started, then the Meta/TikTok contact enrichment of the same event.
+    expect(ids.slice(0, 2)).toEqual([expected, expected]);
+    // Without a token the pixel falls back to a random ID instead of a shared one.
+    expect(ids[3]).not.toBe(expected);
+    expect(ids[3]).not.toMatch(/^shopify-checkout:/);
   });
 });

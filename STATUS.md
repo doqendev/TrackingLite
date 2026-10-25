@@ -1,12 +1,34 @@
 # Track Clear --- Project Status & Audit
 
-## 2026-10-25 Cart Helper consent, cart writes and funnel country: branch only, not deployed
+## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: branch only, not deployed
 
-Branch `agent/wetracked-learnings-20261025` applies three findings from the 24-25
+Branch `agent/wetracked-learnings-20261025` applies the findings of the 24-25
 October side-by-side comparison with Wetracked on Mizoke
 (`mizoke-theme/docs/mizoke-tracking-compare-2026-10-25.md`), each also checked on
 Dirava and Infinite Layers.
 
+- InitiateCheckout from the server. Mizoke sent none for its two checkouts on
+  25 October. Vercel request logs show why for order #1240: Mizoke's Custom Pixel
+  script loaded on the product page at 03:07:04 and next at 03:08:05, after
+  payment at 03:07:59, so it never ran during the checkout. Shop Pay's
+  accelerated checkout runs in its own popup, outside the store's pixels. Signed
+  `checkouts/create` and `checkouts/update` webhooks now go through the same
+  durable inbox as `orders/paid` and become one InitiateCheckout per checkout,
+  under `shopify-checkout:<workspaceId>:<checkout token>`
+  (`src/lib/shopify-checkout-event.ts`). Email, phone, names and address come
+  from the signed payload; attribution from the cart attributes, session record
+  and landing site; consent through the same resolution as Purchase. A new row
+  is held 5 minutes (`CHECKOUT_WEBHOOK_HOLD_MS`) so later updates enrich it; a
+  pending, unclaimed row is enriched in place; a claimed or settled row is never
+  reopened; a row an older pixel created for the same checkout under a random ID
+  wins. The Custom Pixel and legacy script now name `checkout_started` with the
+  same ID, so the pixel's fast path and the webhooks fill one event. `orders/paid`
+  also adds the checkout's InitiateCheckout, unheld, when the checkout has none,
+  which covers paid Shop Pay checkouts before the checkout webhooks are
+  registered; a failure there never blocks the Purchase. Destinations: Meta,
+  TikTok, ChatGPT, GA4 and Pinterest, filtered by workspace mode and consent;
+  Klaviyo keeps the pixel's own Started Checkout. The merchant setup guide now
+  asks for the two checkout webhooks.
 - Cart Helper consent. Shopify's Customer Privacy API was not loaded when the
   helper read it, so it read nothing. LAX counted that as allowed: for an EU
   visitor with no choice yet, Dirava's helper wrote `_fbp` to the cart and set the
@@ -42,25 +64,33 @@ Dirava and Infinite Layers.
 New pure helpers, embedded in the storefront script with `toString()` so the
 browser runs the tested code: `resolveHelperMarketingState`,
 `isForeignAttributeOnlyCartUpdate`, `cartAttributeSignature`,
-`shouldSkipCartAttributeWrite`. The helper tests now also run the generated script
-against a simulated storefront (consent API, cart, cookies, other scripts' fetch
-and XHR); new `tests/unit/pixel-country.test.ts`.
+`shouldSkipCartAttributeWrite`. `enqueueReplayJob` accepts `delayMs` for a newly
+added job. New tests: `tests/unit/shopify-checkout-webhook.test.ts` (checkout
+webhooks, pixel-row enrichment and dedupe, consent, order fallback),
+`tests/unit/pixel-country.test.ts` (country and the shared checkout event ID),
+and the helper tests now run the generated script against a simulated storefront
+(consent API, cart, cookies, other scripts' fetch and XHR).
 
-Verification: 838 unit tests pass, `tsc` clean, lint has only the existing
-`<img>` warnings, production build passes. Prisma checks pass the way CI runs
+Verification: 850 unit tests pass, `tsc` clean, lint has only the existing
+`<img>` warnings, production build passes, and the webhook route and new module
+load under `tsx` as the worker runs them. Prisma checks pass the way CI runs
 them: the format check flags this Windows checkout's CRLF schema on `main` too,
 an LF copy is formatted, and `validate` passes with placeholder database URLs.
-Integration tests were not run (no local PostgreSQL/Redis); none of them executes
-the changed scripts. On live Dirava the consent API was absent, `Shopify.loadFeatures`
+Integration tests were not run (no local PostgreSQL/Redis, and no GitHub Actions
+allowance). On live Dirava the consent API was absent, `Shopify.loadFeatures`
 loaded it in 29 ms, and it reported marketing not allowed for an unanswered EU
-visitor. Deploying changes only the public scripts (`/api/cart-helper`,
-`/api/pixel`, `/api/s`): no migration, no worker change, no Custom Pixel repaste;
-their 5-minute and 30-second caches bound the rollout. Not merged or deployed.
+visitor. Not merged or deployed.
 
-Not in this branch: server-side InitiateCheckout from Shopify checkout webhooks.
-The pixel's InitiateCheckout works on Dirava (53 for 80 checkout sessions,
-18-24 October) and Infinite Layers (266 for 142 orders), while Mizoke sent none
-for its two checkouts on 25 October, so Mizoke's gap needs its EventLog first.
+Release notes: no migration. The Shopify inbox worker on Railway runs the
+webhook route, so web and worker must both run this release (the usual
+`docs/deploy.md` order: stop old workers, deploy web, start the new fleet).
+Register the checkout webhooks only after that; an old worker would hand an
+inbox row for an unknown topic to the refund handler. Then, per store, in
+Shopify admin > Settings > Notifications > Webhooks add "Checkout creation" and
+"Checkout update" (JSON, latest API version) with the URL already used for
+"Order payment"; Shopify signs them with the same key. Without them, paid
+checkouts are still covered by the `orders/paid` fallback, while abandoned
+checkouts the pixel cannot see are not.
 
 ## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
 

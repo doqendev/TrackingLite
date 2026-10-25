@@ -348,7 +348,7 @@
     "webhookGuideStep1Title": "Apri le Notifiche Shopify",
     "webhookGuideStep1Desc": "Vai all'Admin Shopify > Impostazioni > Notifiche. Scorri fino alla sezione Webhooks.",
     "webhookGuideStep2Title": "Crea il Webhook",
-    "webhookGuideStep2Desc": "Clicca su Crea Webhook. Seleziona 'Pagamento ordine' come evento. Incolla l'URL del Webhook mostrato sopra e clicca su Salva.",
+    "webhookGuideStep2Desc": "Clicca su Crea Webhook. Seleziona 'Pagamento ordine' come evento. Incolla l'URL del Webhook mostrato sopra e clicca su Salva. Ripeti con lo stesso URL per 'Creazione del checkout' e 'Aggiornamento del checkout', così anche i checkout che il pixel non vede (come il popup di Shop Pay) inviano InitiateCheckout.",
     "webhookGuideStep3Title": "Copia il Segreto di Firma",
     "webhookGuideStep3Desc": "Dopo aver creato il webhook, Shopify mostra un segreto di firma. Copialo e incollalo nel campo Segreto di Firma qui sopra, poi clicca su Salva."
   },
