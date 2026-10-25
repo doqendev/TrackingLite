@@ -1,6 +1,77 @@
 # Deployment Runbook
 
-## Current deployment: 2026-10-13 retention and checkout recovery
+## Current deployment: 2026-10-25 server-side InitiateCheckout, Cart Helper consent and funnel country
+
+Release `44afc8557a0d764913e7dcbcc7c5581a8db1b7db` on branch
+`agent/wetracked-learnings-20261025` (two commits on top of `42cb4f9`): signed
+`checkouts/create`/`checkouts/update` webhooks and an `orders/paid` fallback send
+one InitiateCheckout per checkout token, the Custom Pixel names `checkout_started`
+with the same ID, the Cart Helper waits for Shopify's consent answer and skips
+unchanged cart writes, and funnel events carry the storefront country. No
+migration and no schema change. Details: the 2026-10-25 section of `AGENTS.md`.
+
+Deployed from the branch, not `main`: `main` requires the four GitHub Actions
+checks (enforced for admins) and the owner has no Actions allowance, so no pull
+request or `main` push was made. Production therefore runs a commit that is not
+on `main`. Merge it through a pull request once Actions can run, and do not
+deploy `main` before that: it would drop this release, and once checkout
+webhooks are registered an older worker hands their inbox rows to the refund
+handler. The release gates compare exact SHAs and environments, not branch
+names.
+
+Cutover (UTC), in this runbook's drained order (stop the old worker, deploy web,
+start the new fleet):
+
+1. Pre-release state: Vercel `dpl_7wTEVDpxeL8Uma1hfCaEVUJYuqEh` and Railway
+   `f4574ad5-20e4-4258-adb1-de3a18e4d995`, both `42cb4f9` (PR #24, Google Ads
+   Data Manager; that worker deployment dates from 2026-10-13 21:29 and the
+   release was not recorded in this runbook). Railway worker: no deployment
+   triggers (autodeploy off), config `/railway.worker.toml` (predeploy
+   `pnpm release:railway-production`, `/health`, 60 s drain, 0 s overlap), one
+   active deployment, no Railway web service.
+2. 14:59 encrypted restore point `E:/backups/trackclear/2026-10-25-checkout-webhooks-release`:
+   verified writable primary matching the pinned database identity, PostgreSQL
+   custom dump (21.5 MB, 14 table-data entries), Redis RDB (53.6 MB) and both
+   providers' configuration, each AES-256-GCM with round-trip verification; the
+   DPAPI key unwraps. Redis persists RDB snapshots every 60 s to `/data`.
+3. 15:01:31 `railway down` on the worker; the old deployment was REMOVED at
+   15:02:36 after its drain. All 12 queues then showed 0 workers and 0 active
+   jobs, with live events waiting.
+4. 15:03 release pin `TRACKCLEAR_PRODUCTION_RELEASE_SHA` rotated to the new SHA
+   on Railway (`--skip-deploys`, no deployment created) and on Vercel; both
+   values verified.
+5. 15:04:19 Vercel deployment from GitHub source (`gitSource.sha`)
+   `dpl_AvJFXCYCp8R6RX1CZ9fHEFME5ME8`, READY and aliased to www.trackclear.io at
+   15:05:24 after the build's read-only schema gate. The old build's last request
+   was 15:04:37. Health JSON: `status: ok`, `release: approved`, database
+   connected, schema ready, Redis connected, commit `44afc855...`. The live Cart
+   Helper and pixel serve the new code.
+6. 15:06:12 Railway worker deployment `c58250ea-f3b8-4ca1-b5f9-d8b93bbcc2fb`
+   from the exact commit (`serviceInstanceDeployV2`). Predeploy: production
+   environment and release SHA approved, 22 migrations with none pending, schema
+   up to date, 12/12 required indexes valid, no drift. 12/12 listeners ready at
+   15:08:47, deployment SUCCESS at 15:08:51, and the events queued while no
+   worker ran were delivered within seconds. Only `c58250ea` is active;
+   `f4574ad5` is REMOVED.
+7. 15:11 checks: every queue 0 waiting and 0 active with one worker each; all 68
+   EventLog rows created since 15:00 were SENT (Meta 34, ChatGPT 26, TikTok 8),
+   none pending or retrying.
+
+Open after the cutover: no checkout webhook was registered yet, so no webhook
+InitiateCheckout had been sent. Per store, add "Checkout creation" and "Checkout
+update" (JSON, latest API version) in Shopify admin > Settings > Notifications >
+Webhooks with the URL already used for "Order payment". To verify on Mizoke,
+start a Shop Pay checkout: about 5 minutes later (the webhook hold) one
+InitiateCheckout with event ID `shopify-checkout:<workspaceId>:<checkout token>`
+and source `webhook` is SENT, and paying adds the Purchase without a second
+InitiateCheckout.
+
+Rollback while no checkout webhooks are registered: restore both pins to
+`42cb4f9`, redeploy Vercel `dpl_7wTEVDpxeL8Uma1hfCaEVUJYuqEh` and the worker at
+`42cb4f9` with zero overlap. After they are registered, remove both webhooks
+first: the old worker routes an unknown inbox topic to the refund handler.
+
+## Previous deployment: 2026-10-13 retention and checkout recovery
 
 Release `d3f553a3e38b8bc27a5e1ce8855326ce20c40c68` (PR #22) keeps seven days
 of detailed logs and 30 days of reporting for every plan. Compact EventLog identities

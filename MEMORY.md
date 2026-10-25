@@ -1,6 +1,6 @@
 # MEMORY.md
 
-## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: branch only, not deployed
+## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: live, not on `main`
 
 Branch `agent/wetracked-learnings-20261025` applies the findings of the 24-25
 October side-by-side comparison with Wetracked on Mizoke
@@ -79,20 +79,24 @@ an LF copy is formatted, and `validate` passes with placeholder database URLs.
 Integration tests were not run (no local PostgreSQL/Redis, and no GitHub Actions
 allowance). On live Dirava the consent API was absent, `Shopify.loadFeatures`
 loaded it in 29 ms, and it reported marketing not allowed for an unanswered EU
-visitor. Not merged or deployed.
+visitor.
 
-Release notes: no migration. The Shopify inbox worker on Railway runs the
-webhook route, so web and worker must both run this release (the usual
-`docs/deploy.md` order: stop old workers, deploy web, start the new fleet).
-Register the checkout webhooks only after that; an old worker would hand an
-inbox row for an unknown topic to the refund handler. Then, per store, in
-Shopify admin > Settings > Notifications > Webhooks add "Checkout creation" and
-"Checkout update" (JSON, latest API version) with the URL already used for
-"Order payment"; Shopify signs them with the same key. Without them, paid
-checkouts are still covered by the `orders/paid` fallback, while abandoned
-checkouts the pixel cannot see are not.
+Release: live since 25 October 2026 at `44afc8557a0d764913e7dcbcc7c5581a8db1b7db` on both
+hosts (Vercel `dpl_AvJFXCYCp8R6RX1CZ9fHEFME5ME8`, Railway worker
+`c58250ea-f3b8-4ca1-b5f9-d8b93bbcc2fb`); cutover record in `docs/deploy.md`.
+It was deployed from this branch because `main` requires the GitHub Actions
+checks and there is no Actions allowance. Merge it through a pull request once
+Actions can run, and do not deploy `main` before that. No migration. The
+Shopify inbox worker on Railway runs the webhook route, so web and worker must
+both run this release. Register the checkout webhooks only on a fleet running
+it; an older worker hands an inbox row for an unknown topic to the refund
+handler. Per store, in Shopify admin > Settings > Notifications > Webhooks add
+"Checkout creation" and "Checkout update" (JSON, latest API version) with the
+URL already used for "Order payment"; Shopify signs them with the same key.
+Without them, paid checkouts are still covered by the `orders/paid` fallback,
+while abandoned checkouts the pixel cannot see are not.
 
-## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
+## 2026-10-13 Google Ads Data Manager destination: merged (PR #24) and deployed
 
 Branch `feature/google-ads-data-manager` replaces the Google Ads destination. The
 old worker pinged the browser conversion endpoint from the server, which carries
@@ -118,8 +122,10 @@ as Latin-1 (`reportingRetention`) were restored to UTF-8.
 
 Verification: 823 unit tests pass (70 new), `tsc` and lint clean. Integration
 tests were updated but not run locally (no PostgreSQL on this machine); CI must
-run them. Not merged or deployed: the release needs the owner's explicit go, the
-service account key on both hosts, and the `docs/deploy.md` gates.
+run them. Later merged as PR #24 (`42cb4f9`) and deployed: Railway worker
+`f4574ad5-20e4-4258-adb1-de3a18e4d995` (2026-10-13 21:29 UTC) and Vercel
+`dpl_7wTEVDpxeL8Uma1hfCaEVUJYuqEh` ran it until the 25 October release. That
+deployment was not recorded at the time; this entry was corrected on 25 October.
 
 ## 2026-10-13 retention and checkout recovery release — live
 

@@ -17,10 +17,15 @@ documentation is worse than no duplicated documentation.
 
 ## Current Release Boundary
 
-- Production runs `main` at exact SHA
-  `9abd702f84ef622d6dd1d36b630231e90377fcbb` (2026-08-09 uncapped internal
-  accounts). All 17 repository migrations are applied; no unapplied
-  migration chain is pending.
+- Production runs exact SHA `44afc8557a0d764913e7dcbcc7c5581a8db1b7db`
+  (2026-10-25 server-side InitiateCheckout) from branch
+  `agent/wetracked-learnings-20261025`, two commits ahead of `main`
+  (`42cb4f9`). It is not merged because `main` requires the GitHub Actions
+  checks and there is no Actions allowance. Merge it through a pull request
+  before deploying `main` again: `main` alone would drop it, and once
+  checkout webhooks are registered an older worker hands their inbox rows to
+  the refund handler. All 22 repository migrations are applied; none is
+  pending.
 - `main` is the source branch. Vercel Git deployment and Railway GitHub auto
   deploy are both disabled, so merging to `main` never deploys on its own.
   Deploying is always an explicit step. Note that `railway variables --set`
