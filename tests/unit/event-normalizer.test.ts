@@ -66,6 +66,12 @@ describe("normalizeToMetaCapiEvent", () => {
       expect(result.user_data.client_user_agent).toBeUndefined();
     });
 
+    it("hashes the storefront country sent with an anonymous funnel event", () => {
+      const result = normalizeToMetaCapiEvent(makePayload({ userData: { countryCode: "US" } }), null, null);
+      expect(result.user_data.country).toEqual([hashPii("us")]);
+      expect(result.user_data.em).toBeUndefined();
+    });
+
     it("includes fbp when provided in valid format", () => {
       const result = normalizeToMetaCapiEvent(makePayload({ fbp: "fb.1.1700000000000.1234567890" }), null, null);
       expect(result.user_data.fbp).toBe("fb.1.1700000000000.1234567890");

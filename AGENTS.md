@@ -1,5 +1,67 @@
 # AGENTS.md
 
+## 2026-10-25 Cart Helper consent, cart writes and funnel country: branch only, not deployed
+
+Branch `agent/wetracked-learnings-20261025` applies three findings from the 24-25
+October side-by-side comparison with Wetracked on Mizoke
+(`mizoke-theme/docs/mizoke-tracking-compare-2026-10-25.md`), each also checked on
+Dirava and Infinite Layers.
+
+- Cart Helper consent. Shopify's Customer Privacy API was not loaded when the
+  helper read it, so it read nothing. LAX counted that as allowed: for an EU
+  visitor with no choice yet, Dirava's helper wrote `_fbp` to the cart and set the
+  cookie, and 7 of Dirava's last 60 orders carry `_fbp` next to
+  `_tc_consent_marketing=false`. STRICT counted it as a denial: Infinite Layers'
+  first write on a page, made before the API had loaded, cleared `_fbp`, `_fbc`
+  and, by the same code path, the ChatGPT click context written under real
+  consent; 6 of its last 60 orders from consenting shoppers ended without `_fbp`.
+  The helper now loads the API itself with `Shopify.loadFeatures`
+  (`consent-tracking-api` 0.2), takes the decision from `visitorConsentCollected`
+  while the API answers nothing, and waits for one of them before its first write
+  (at most 3 seconds, `CART_HELPER_CONSENT_WAIT_MS`). An explicit false or a
+  sale/sharing opt-out still clears identifiers in both modes. With no answer at
+  all, LAX keeps allow-by-default and STRICT now leaves identifiers and the
+  ChatGPT click untouched.
+- Cart writes. The helper wrote on every page load, again at `pageshow`,
+  `pagehide` and checkout clicks, and 120 ms after any other script's cart call;
+  next to Wetracked's repeated attribute writes on Mizoke that was 5 to 7 write
+  and read pairs per page. It now keeps a digest of the last verified attribute
+  set per cart token in localStorage (`_tc_cart_attr_written`) and skips the write
+  when nothing changed within 30 minutes (`CART_HELPER_WRITE_REUSE_MS`).
+  `_tc_consent_timestamp` is left out of the comparison and restamped on every
+  real write, so the webhook's 24-hour grant freshness holds. Other scripts'
+  attribute-only `/cart/update` calls that do not touch TrackClear keys are
+  ignored; any other cart change drops the digest and re-verifies.
+- Country. The generated Custom Pixel and the legacy script send the storefront
+  country from Shopify's `localization` cookie (two letters only) as
+  `userData.countryCode` on every marketing-allowed event; checkout events prefer
+  the checkout's billing or shipping country, then its localization. Meta
+  receives it hashed as `country`. Before this, Dirava and Infinite Layers sent no
+  country on PageView, ViewContent or AddToCart.
+
+New pure helpers, embedded in the storefront script with `toString()` so the
+browser runs the tested code: `resolveHelperMarketingState`,
+`isForeignAttributeOnlyCartUpdate`, `cartAttributeSignature`,
+`shouldSkipCartAttributeWrite`. The helper tests now also run the generated script
+against a simulated storefront (consent API, cart, cookies, other scripts' fetch
+and XHR); new `tests/unit/pixel-country.test.ts`.
+
+Verification: 838 unit tests pass, `tsc` clean, lint has only the existing
+`<img>` warnings, production build passes. Prisma checks pass the way CI runs
+them: the format check flags this Windows checkout's CRLF schema on `main` too,
+an LF copy is formatted, and `validate` passes with placeholder database URLs.
+Integration tests were not run (no local PostgreSQL/Redis); none of them executes
+the changed scripts. On live Dirava the consent API was absent, `Shopify.loadFeatures`
+loaded it in 29 ms, and it reported marketing not allowed for an unanswered EU
+visitor. Deploying changes only the public scripts (`/api/cart-helper`,
+`/api/pixel`, `/api/s`): no migration, no worker change, no Custom Pixel repaste;
+their 5-minute and 30-second caches bound the rollout. Not merged or deployed.
+
+Not in this branch: server-side InitiateCheckout from Shopify checkout webhooks.
+The pixel's InitiateCheckout works on Dirava (53 for 80 checkout sessions,
+18-24 October) and Infinite Layers (266 for 142 orders), while Mizoke sent none
+for its two checkouts on 25 October, so Mizoke's gap needs its EventLog first.
+
 ## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
 
 Branch `feature/google-ads-data-manager` replaces the Google Ads destination. The
@@ -494,7 +556,7 @@ tests/
     event-delivery-guard.test.ts      # 14 tests (alias election, attempting/accepted claims, settlement)
     event-log-cleanup.test.ts         # 2 tests (retention and accepted/attempting protection)
     event-log-payload.test.ts         # 2 tests (EventLog payload PII redaction + flags)
-    event-normalizer.test.ts          # 50 tests (all 5 event types + camelCase handling + Meta cookie validation)
+    event-normalizer.test.ts          # 51 tests (all 5 event types + camelCase handling + Meta cookie validation + anonymous country)
     event-replay-queue.test.ts        # 6 tests (deterministic recovery queueing)
     event-retry-envelope.test.ts      # 3 tests (encrypted short-lived replay payload)
     events-page-mode.test.ts          # 1 test (Events page failed-count respects workspace destination allowlist)
@@ -512,13 +574,14 @@ tests/
     meta-event-processor.test.ts      # 8 tests (delivery ownership, acceptance, errors, retry)
     middleware-public-routes.test.ts  # 7 tests (public routes plus fail-closed production release middleware)
     phone-normalizer.test.ts          # 16 tests
+    pixel-country.test.ts             # 3 tests (storefront country on funnel events, checkout country precedence, denial and invalid cookie, legacy script)
     pixel-route.test.ts               # 11 tests (browser ownership, consent revocation replay/serialization, exact IDs, cache and Purchase guard)
     production-release-gate.test.ts   # 11 tests (exact provider environment and full-SHA production gates)
     purchase-event-id.test.ts         # 10 tests (deterministic IDs and cross-source aliases)
     rate-limit.test.ts                # 17 tests (delivery plus isolated consent-revocation budgets)
     replay-route.test.ts              # 3 tests (privacy-preserving deterministic manual replay)
     session-enrichment.test.ts        # 12 tests (multi-key context, atomic value-aware tombstones, cross-alias denial)
-    shopify-cart-attribution-helper.test.ts # 13 tests (consent, URL/session/cart write/verify/retry, no raw PII)
+    shopify-cart-attribution-helper.test.ts # 25 tests (consent states, URL/session/cart write/verify/retry, no raw PII, generated script on a simulated storefront: consent API wait, visitorConsentCollected, STRICT unknown, write reuse, foreign attribute-only writes)
     shopify-domain-resolver.test.ts   # 28 tests (Shopify domain resolution)
     shopify-webhook.test.ts           # 6 tests (HMAC/replay/header verification)
     shopify-webhook-attribution.test.ts # 15 tests (order/landing attribution, consent freshness, catalog IDs)
@@ -745,7 +808,7 @@ Header: Content-Type: application/json
 - **Purchase identity write-back:** A guest checkout is usually the only moment the system learns who a shopper is, so the verified Shopify webhook also stores the purchaser's hashed email/phone into the session enrichment record under the order's durable aliases (session ID, checkout token, cart token, order ID/name, email key). A returning visitor on the same browser then matches on later funnel events instead of arriving anonymous. It runs before the empty-destination exits so a workspace without advertising credentials still builds identity, is gated on the same marketing consent decision used for delivery, and is erased by the existing denial tombstones.
 - **Session identity carry-forward:** When an event carries shopper email/phone and marketing consent allows it, ingest stores SHA-256 hashes (never raw identity) in the Redis enrichment record under the existing session/checkout/cart keys. A later event in that session that has no identity of its own, but does have an opaque anchor, recovers those hashes and sends them as Meta `em`/`ph` and TikTok `user.email`/`user.phone`. The values are already hashed, so normalizers must never hash them again, and an event's own identity always wins. Carried identity is a marketing-scoped field: it follows the same thirty-day staleness boundary as click IDs and is erased by a marketing or sale/sharing denial tombstone. Clients cannot inject it — the ingest schema is `.strict()` and the fields are server-derived only.
 - **Anonymous external_id:** Marketing-consented events carry `trackclearSessionId` through jobs and retry envelopes. Meta receives `external_id` as an array (hashed `customerId` plus hashed session ID); TikTok receives one `external_id`, preferring hashed `customerId` and falling back to the hashed session ID. This stitches anonymous funnel events to the identified webhook Purchase.
-- **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. The storefront Cart Attribution Helper (`/api/cart-helper/:workspaceId`) is the reliability layer for normal Shopify themes: it runs outside the Custom Pixel sandbox, writes early/repeatedly through same-origin `/cart/update.js`, verifies through `/cart.js`, retries once, stores local diagnostics, and never writes raw shopper PII. Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
+- **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. The storefront Cart Attribution Helper (`/api/cart-helper/:workspaceId`) is the reliability layer for normal Shopify themes: it runs outside the Custom Pixel sandbox, loads Shopify's Customer Privacy API itself (`Shopify.loadFeatures`, `consent-tracking-api` 0.2) and waits for its answer or a `visitorConsentCollected` decision (at most 3 seconds) before its first write, writes through same-origin `/cart/update.js` only when its attributes, the cart token or a 30-minute-old verification call for it, verifies through `/cart.js`, retries once, ignores other scripts' attribute-only cart writes, stores local diagnostics, and never writes raw shopper PII. An explicit denial clears advertising identifiers in both modes; with no consent answer, LAX allows and STRICT leaves existing identifiers untouched. Generated and legacy pixels send the storefront country from Shopify's `localization` cookie as `userData.countryCode` on marketing-allowed events (checkout events prefer the checkout's own country). Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
 - **Controlled production QA artifacts:** Store real-order QA evidence under `docs/qa/` without raw PII or full webhook payloads. Dirava order `#5076` proved webhook Purchase flow and session enrichment for a controlled `0 EUR` order. Dirava order `#5077` proved the storefront Cart Attribution Helper and paid revenue propagation for one normal paid `0.5 EUR` order with `cart_attributes` attribution.
 - **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`). Order name is preferred over numeric order ID when both are present so browser checkout events and Shopify webhooks converge on the same order-based ID; numeric and GraphQL order IDs still normalize to the same fallback segment.
 - **Catalog content ID normalization:** Generated pixel, legacy script, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. Workspace settings control variant numeric, product numeric, GraphQL, SKU, prefix/suffix, and custom template modes from Settings.

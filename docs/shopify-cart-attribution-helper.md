@@ -109,17 +109,42 @@ off. TrackClear browser events and Events API events share the same event ID;
 that pairing cannot repair duplicates created by a second browser owner. Use
 the same 30-second wait and fresh-session cutover rule.
 
+## Consent
+
+The helper reads consent from Shopify's Customer Privacy API. Shopify does not
+load that API on every storefront page (on Mizoke and Dirava it was absent when
+the helper ran), so the helper loads it itself with
+`Shopify.loadFeatures([{ name: "consent-tracking-api", version: "0.2" }])` and
+also listens for `visitorConsentCollected`, whose decision wins while the API
+still answers nothing. The first cart write waits for one of them, at most 3
+seconds (`CART_HELPER_CONSENT_WAIT_MS`).
+
+- Shopify reports marketing allowed (a US visitor, or an EU visitor who
+  accepted): click IDs and `_fbp`/`_fbc`/`_ttp` are written.
+- Shopify reports marketing not allowed, or a sale/sharing opt-out (an EU
+  visitor who has not answered yet, or declined): advertising identifiers are
+  cleared from the cart, from the `_fbp`/`_fbc`/`_ttp`/`_epik` cookies and from
+  the ChatGPT click context, in both modes.
+- No answer within the wait: LAX keeps its allow-by-default. STRICT neither
+  writes nor clears advertising identifiers or the ChatGPT click context, so
+  values written earlier under real consent survive.
+
 ## Timing
 
-The helper writes early and repeatedly:
+The helper compares the attributes it wants with the last set it verified for
+the same cart (`_tc_cart_attr_written` in localStorage, a digest only, never
+the values) and writes only when they differ, when the cart token changed, or
+when that verification is older than 30 minutes (`CART_HELPER_WRITE_REUSE_MS`).
+`_tc_consent_timestamp` is left out of the comparison and restamped on every
+real write, so the webhook's 24-hour consent-grant freshness still holds.
+Checks run on:
 
-- page load
-- product page load
-- cart page load
-- add-to-cart form submit/click
-- detected cart mutations through `fetch` or `XMLHttpRequest`
-- before checkout navigation
-- pagehide fallback
+- page load, once the consent answer is known
+- `pageshow`, `pagehide`, add-to-cart clicks/submits and checkout navigation
+- consent changes (`visitorConsentCollected`)
+- cart changes through `fetch` or `XMLHttpRequest`. Another script's
+  `/cart/update` call that only sets its own attributes or the note is ignored;
+  any other cart change drops the digest and re-verifies.
 
 It does not block checkout.
 

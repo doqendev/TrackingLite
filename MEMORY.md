@@ -1,5 +1,67 @@
 # MEMORY.md
 
+## 2026-10-25 Cart Helper consent, cart writes and funnel country: branch only, not deployed
+
+Branch `agent/wetracked-learnings-20261025` applies three findings from the 24-25
+October side-by-side comparison with Wetracked on Mizoke
+(`mizoke-theme/docs/mizoke-tracking-compare-2026-10-25.md`), each also checked on
+Dirava and Infinite Layers.
+
+- Cart Helper consent. Shopify's Customer Privacy API was not loaded when the
+  helper read it, so it read nothing. LAX counted that as allowed: for an EU
+  visitor with no choice yet, Dirava's helper wrote `_fbp` to the cart and set the
+  cookie, and 7 of Dirava's last 60 orders carry `_fbp` next to
+  `_tc_consent_marketing=false`. STRICT counted it as a denial: Infinite Layers'
+  first write on a page, made before the API had loaded, cleared `_fbp`, `_fbc`
+  and, by the same code path, the ChatGPT click context written under real
+  consent; 6 of its last 60 orders from consenting shoppers ended without `_fbp`.
+  The helper now loads the API itself with `Shopify.loadFeatures`
+  (`consent-tracking-api` 0.2), takes the decision from `visitorConsentCollected`
+  while the API answers nothing, and waits for one of them before its first write
+  (at most 3 seconds, `CART_HELPER_CONSENT_WAIT_MS`). An explicit false or a
+  sale/sharing opt-out still clears identifiers in both modes. With no answer at
+  all, LAX keeps allow-by-default and STRICT now leaves identifiers and the
+  ChatGPT click untouched.
+- Cart writes. The helper wrote on every page load, again at `pageshow`,
+  `pagehide` and checkout clicks, and 120 ms after any other script's cart call;
+  next to Wetracked's repeated attribute writes on Mizoke that was 5 to 7 write
+  and read pairs per page. It now keeps a digest of the last verified attribute
+  set per cart token in localStorage (`_tc_cart_attr_written`) and skips the write
+  when nothing changed within 30 minutes (`CART_HELPER_WRITE_REUSE_MS`).
+  `_tc_consent_timestamp` is left out of the comparison and restamped on every
+  real write, so the webhook's 24-hour grant freshness holds. Other scripts'
+  attribute-only `/cart/update` calls that do not touch TrackClear keys are
+  ignored; any other cart change drops the digest and re-verifies.
+- Country. The generated Custom Pixel and the legacy script send the storefront
+  country from Shopify's `localization` cookie (two letters only) as
+  `userData.countryCode` on every marketing-allowed event; checkout events prefer
+  the checkout's billing or shipping country, then its localization. Meta
+  receives it hashed as `country`. Before this, Dirava and Infinite Layers sent no
+  country on PageView, ViewContent or AddToCart.
+
+New pure helpers, embedded in the storefront script with `toString()` so the
+browser runs the tested code: `resolveHelperMarketingState`,
+`isForeignAttributeOnlyCartUpdate`, `cartAttributeSignature`,
+`shouldSkipCartAttributeWrite`. The helper tests now also run the generated script
+against a simulated storefront (consent API, cart, cookies, other scripts' fetch
+and XHR); new `tests/unit/pixel-country.test.ts`.
+
+Verification: 838 unit tests pass, `tsc` clean, lint has only the existing
+`<img>` warnings, production build passes. Prisma checks pass the way CI runs
+them: the format check flags this Windows checkout's CRLF schema on `main` too,
+an LF copy is formatted, and `validate` passes with placeholder database URLs.
+Integration tests were not run (no local PostgreSQL/Redis); none of them executes
+the changed scripts. On live Dirava the consent API was absent, `Shopify.loadFeatures`
+loaded it in 29 ms, and it reported marketing not allowed for an unanswered EU
+visitor. Deploying changes only the public scripts (`/api/cart-helper`,
+`/api/pixel`, `/api/s`): no migration, no worker change, no Custom Pixel repaste;
+their 5-minute and 30-second caches bound the rollout. Not merged or deployed.
+
+Not in this branch: server-side InitiateCheckout from Shopify checkout webhooks.
+The pixel's InitiateCheckout works on Dirava (53 for 80 checkout sessions,
+18-24 October) and Infinite Layers (266 for 142 orders), while Mizoke sent none
+for its two checkouts on 25 October, so Mizoke's gap needs its EventLog first.
+
 ## 2026-10-13 Google Ads Data Manager destination — branch only, not deployed
 
 Branch `feature/google-ads-data-manager` replaces the Google Ads destination. The
