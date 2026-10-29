@@ -1,6 +1,6 @@
 # MEMORY.md
 
-## 2026-10-29 Track Clear Google tag and multi-source purchases: branch only, not deployed
+## 2026-10-29 Track Clear Google tag and multi-source purchases: live, not on `main`
 
 Branch `agent/google-tag-multisource-20261029`, cut from the live release branch
 `agent/google-ads-click-window-20261029` (`2c58732`), lets Track Clear run a
@@ -42,14 +42,22 @@ tag code, and the compiled pixel sent the purchase conversion with the stored
 click, the numeric order ID and an E.164 phone. Integration tests were not run (no
 local PostgreSQL/Redis).
 
-Release notes: one additive migration, which the running release ignores, so
-apply it before the web build (Vercel's build asserts the schema); web and worker
-both change. Then configure Adelia London (`cmvrbe9vn0004dsebol88j81d`): tag ID
-`AW-18544016973`, labels Purchase `UPUGCOrzsK4dEM38vIpF`, Add to cart
-`RZs9CJ2mr64dEM38vIpF`, Begin checkout `7_X1CMDws64dEM38vIpF` and Page view
-`xOeaCOXfr64dEM38vIpF`, conversion action 7881898474 in place of the unused
-import action 7881446101, then Save and validate with delivery on. Not merged or
-deployed.
+Release: live since 29 October 2026 at `5deb9f62eed5148b4bc2c3a22870304e91b26d49`
+on both hosts (Vercel `dpl_5Vbt1QyaU6xXwUVDYswRkrFMHvwW`, Railway worker
+`0e60c1f1-6708-4485-9f3c-fd5cab6a5c15`), after the encrypted restore point
+`E:/backups/trackclear/2026-10-29-google-tag-release`. The migration was applied
+before the web build; cutover record in `docs/deploy.md`. Like the two releases
+before it, this branch is not on `main`: merge all three through pull requests
+once Actions can run, and do not deploy `main` before that. Adelia London
+(`cmvrbe9vn0004dsebol88j81d`) now runs the tag (`AW-18544016973`, Purchase
+`UPUGCOrzsK4dEM38vIpF`, Add to cart `RZs9CJ2mr64dEM38vIpF`, Begin checkout
+`7_X1CMDws64dEM38vIpF`, Page view `xOeaCOXfr64dEM38vIpF`) and uploads to its
+Website Purchase action 7881898474 instead of the unused import action
+7881446101, after a `validateOnly` upload was accepted. Its live pixel sends
+nothing to Google before strict consent, then the page view and the purchase
+with the numeric order ID. No other store serves the tag. Remove the unused
+import action in Google Ads when convenient. For an action's first 14 days
+Google reports uploaded purchases without bidding on them.
 
 ## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: live, not on `main`
 

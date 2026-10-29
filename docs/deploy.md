@@ -1,6 +1,72 @@
 # Deployment Runbook
 
-## Current deployment: 2026-10-29 Google Ads six-hour hold and persistent Google click
+## Current deployment: 2026-10-29 Google tag and multi-source purchases
+
+Release `5deb9f62eed5148b4bc2c3a22870304e91b26d49` on branch
+`agent/google-tag-multisource-20261029`, one commit on top of the earlier
+29 October release branch (`2c58732`): Track Clear can run a store's Google
+Ads tag in the browser (off by default) and upload server purchases into the
+tag's Website Purchase action, merged by the numeric Shopify order ID. One
+additive migration, `20261029_google_tag_browser_ownership`, which the
+previous release ignores. Details: the 2026-10-29 section of `AGENTS.md`.
+
+Deployed from the branch, not `main`, for the same reason as the two releases
+before it; three unmerged release branches now sit ahead of `main`.
+
+Cutover (UTC), in this runbook's drained order:
+
+1. Pre-release state: Vercel `dpl_AJtBicK8tnyUJekfUEcUpEAmpXb1` and Railway
+   `3a3536fb-1871-44aa-9c5b-5047fa6de6b2`, both `3d222c5`. Worker config
+   `/railway.worker.toml`, no deployment triggers, one active deployment. All
+   12 queues had one worker and nothing waiting or active.
+2. 16:56 encrypted restore point `E:/backups/trackclear/2026-10-29-google-tag-release`:
+   writable primary matching the pinned identity, custom dump (24.2 MB), Redis RDB
+   (61.1 MB) and both providers' configuration, each round-trip verified through
+   the DPAPI-unwrapped key.
+3. 16:57:24 `railway down`; `3a3536fb` REMOVED at 16:58:28. All 12 queues then
+   had 0 workers and 0 active jobs, with live events waiting.
+4. 16:58:52 release pin rotated on Railway (`--skip-deploys`, read back, no
+   deployment created) and at 16:58:58 on Vercel.
+5. 16:59:06 migration from the clean release checkout, with the release gate's
+   sequence: the repository's database identity assertion (writable primary,
+   pinned name, schema and system ID), `prisma migrate deploy` (applied
+   `20261029_google_tag_browser_ownership`), `migrate status` (23 migrations, up
+   to date), 12/12 indexes and no drift, done at 16:59:26. Railway's own approval
+   check needs its build-time commit SHA and was not faked; the checkout SHA was
+   compared with the Railway pin instead, and the worker's predeploy repeated the
+   full gate in Railway.
+6. 16:59:58 Vercel deployment from GitHub source (`gitSource.sha`)
+   `dpl_5Vbt1QyaU6xXwUVDYswRkrFMHvwW`, READY and aliased at 17:00:52 after its
+   read-only schema gate (23 migrations, 12/12 indexes). Health JSON: `status:
+   ok`, `release: approved`, database connected, schema ready, Redis connected,
+   commit `5deb9f6...`.
+7. 17:01:20 Railway worker deployment `0e60c1f1-6708-4485-9f3c-fd5cab6a5c15` from
+   the exact commit (`serviceInstanceDeployV2`). Predeploy: release approved, no
+   pending migrations, schema up to date, 12/12 indexes. 12 listeners ready at
+   17:02:43, SUCCESS at 17:02:45, and the waiting events were delivered. One
+   ChatGPT Purchase hit a database write conflict during alias election at
+   startup and was SENT on its automatic retry.
+8. 17:04 Adelia London configured through the repository's own code: the
+   settings validators, a `validateOnly` upload to action 7881898474 (accepted),
+   the update (Google tag on with four labels, conversion action 7881446101 to
+   7881898474, delivery on) and the API-key cache invalidation.
+9. 17:05 checks: every queue one worker, nothing waiting or active; all Meta (42),
+   TikTok (15) and ChatGPT (27) rows created since 16:55 were SENT. An Infinite
+   Layers order placed during the cutover has its Google Ads upload PENDING until
+   23:16 (six-hour hold) and its pixel copy SUPERSEDED; `google-ads-events` holds
+   five delayed Infinite Layers uploads. The live pixel, legacy script and Cart
+   Helper of all eight workspaces return 200 and parse; only Adelia's pixel serves
+   the Google tag, and run with strict consent it sent nothing before consent,
+   then the page view and the purchase conversion with the numeric order ID
+   (ingest stubbed, nothing sent).
+
+Rollback: the previous release ignores the new columns, so restore both pins to
+`3d222c5` and redeploy Vercel `dpl_AJtBicK8tnyUJekfUEcUpEAmpXb1` and the worker
+at `3d222c5` with zero overlap; the migration can stay. Adelia's Google tag then
+stops, and its uploads keep going to 7881898474 with the order name as
+transaction ID.
+
+## Previous deployment: 2026-10-29 Google Ads six-hour hold and persistent Google click
 
 Release `3d222c5a0297ff4d6720a9fafd04c7bde6f15113` on branch
 `agent/google-ads-click-window-20261029`, two commits on top of the 25 October
