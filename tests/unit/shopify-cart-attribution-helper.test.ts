@@ -153,6 +153,52 @@ describe("Shopify cart attribution helper", () => {
     expect(result.attributes._tc_attribution_source).toBe("tiktok");
   });
 
+  it("keeps a Google click and its capture time through later non-Google touches", () => {
+    const now = 1710000000000;
+    const clickedAt = String(now - 20 * 24 * 60 * 60 * 1000);
+    const { storage } = memoryStorage({
+      _tc_cart_attr_context: JSON.stringify({
+        gclid: "G1", googleClickCapturedAt: clickedAt, capturedAt: clickedAt, source: "google",
+      }),
+    });
+    const metaVisit = extractShopifyCartAttribution({
+      url: "https://dirava.com/products/test?fbclid=F1&utm_source=facebook",
+      now, storage, consent: { marketingAllowed: true },
+      generateId: () => "session_123", generateFbpRandom: () => "1234567890",
+    });
+    expect(metaVisit.attributes).toMatchObject({ _fbclid: "F1", _gclid: "G1", _gbraid: "", _tc_google_click_at: clickedAt,
+      _tc_attribution_source: "meta", _tc_attribution_timestamp: String(now) });
+
+    const newerGoogleClick = extractShopifyCartAttribution({
+      url: "https://dirava.com/?wbraid=W2", now: now + 1000, storage, consent: { marketingAllowed: true },
+      generateId: () => "session_123", generateFbpRandom: () => "1234567890",
+    });
+    expect(newerGoogleClick.attributes).toMatchObject({ _wbraid: "W2", _gclid: "", _tc_google_click_at: String(now + 1000) });
+  });
+
+  it("drops a Google click older than 90 days and clears it on marketing denial", () => {
+    const now = 1710000000000;
+    const { storage } = memoryStorage({
+      _tc_cart_attr_context: JSON.stringify({
+        gclid: "G1", googleClickCapturedAt: String(now - 91 * 24 * 60 * 60 * 1000),
+        fbclid: "F0", capturedAt: String(now - 10 * 24 * 60 * 60 * 1000), source: "meta",
+      }),
+    });
+    const expired = extractShopifyCartAttribution({
+      url: "https://dirava.com/products/test", now, storage, consent: { marketingAllowed: true },
+      generateId: () => "session_123", generateFbpRandom: () => "1234567890",
+    });
+    expect(expired.attributes._gclid).toBeUndefined();
+    expect(expired.attributes._tc_google_click_at).toBeUndefined();
+    expect(expired.attributes._fbclid).toBe("F0");
+
+    const denied = extractShopifyCartAttribution({
+      url: "https://dirava.com/?gclid=G2", now, storage, consent: { marketingAllowed: false },
+      generateId: () => "session_123", generateFbpRandom: () => "1234567890",
+    });
+    expect(denied.attributes).toMatchObject({ _gclid: "", _tc_google_click_at: "" });
+  });
+
   it("does not create or retain advertising identifiers after explicit marketing denial", () => {
     const { storage, store: storageStore } = memoryStorage({
       _fbp: "fb.1.1710000000000.1234567890",
@@ -705,6 +751,24 @@ describe("generated cart helper on a storefront", () => {
 
     const cartRequests = profile.requests.filter((r) => r.path === "/cart/update.js" || r.path === "/cart.js");
     expect(cartRequests.map((r) => r.path)).toEqual(["/cart/update.js", "/cart.js"]);
+  });
+
+  it("keeps the stored Google click on the cart through a later Meta ad click", async () => {
+    const clickedAt = Date.now() - 5 * 24 * 60 * 60 * 1000;
+    const profile = createProfile({}, {
+      _tc_cart_attr_context: JSON.stringify({ gl: "G1", ga: clickedAt, ca: clickedAt, so: "google" }),
+    });
+    loadHelperPage(profile, {
+      url: "https://shop.example/products/sign?fbclid=F1",
+      privacy: { answers: ALLOWED, loadDelayMs: 50 },
+    });
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(profile.cart.attributes).toMatchObject({ _fbclid: "F1", _gclid: "G1",
+      _tc_google_click_at: String(clickedAt), _tc_attribution_source: "meta" });
+    expect(JSON.parse(profile.storage.get("_tc_cart_attr_context") ?? "{}")).toMatchObject({
+      gl: "G1", ga: clickedAt, fb: "F1", so: "meta",
+    });
   });
 
   it("ignores other scripts' attribute-only cart writes and re-verifies after a real cart change", async () => {

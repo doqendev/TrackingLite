@@ -147,6 +147,8 @@ export interface SessionContextInput {
   utmContent?: string | null;
   utmTerm?: string | null;
   gclid?: string | null;
+  /** When gclid/gbraid/wbraid were captured; they outlive later non-Google touches. */
+  googleClickCapturedAt?: number | null;
   attributionTimestamp?: number | null;
   attributionSource?: string | null;
   /** Event occurrence time. Delayed requests must not refresh stored identity or consent. */
@@ -260,6 +262,7 @@ const TOUCH_SCOPED_FIELDS = new Set([
   "utmContent",
   "utmTerm",
 ]);
+const GOOGLE_CLICK_FIELDS = new Set(["gclid", "gbraid", "wbraid"]);
 
 const UPSERT_FIELDS_IF_NEWER_SCRIPT = `
 local entries = cjson.decode(ARGV[1])
@@ -385,6 +388,15 @@ function buildFields(
     rawTouchTimestamp <= receivedAt + 5 * 60 * 1000
       ? Math.trunc(rawTouchTimestamp)
       : null;
+  // A Google click is carried past later touches, so it ages from its own
+  // capture time rather than from the latest touch.
+  const rawGoogleClickTimestamp = Number(context.googleClickCapturedAt);
+  const googleClickTimestamp =
+    Number.isFinite(rawGoogleClickTimestamp) &&
+    rawGoogleClickTimestamp > 0 &&
+    rawGoogleClickTimestamp <= receivedAt + 5 * 60 * 1000
+      ? Math.trunc(rawGoogleClickTimestamp)
+      : null;
   const simple: Array<[string, string | null | undefined]> = [
     ["hashedEmail", context.hashedEmail],
     ["hashedPhone", context.hashedPhone],
@@ -413,9 +425,11 @@ function buildFields(
     fields[field] = {
       value,
       timestamp:
-        touchTimestamp && TOUCH_SCOPED_FIELDS.has(field)
-          ? touchTimestamp
-          : observedAt,
+        googleClickTimestamp && GOOGLE_CLICK_FIELDS.has(field)
+          ? googleClickTimestamp
+          : touchTimestamp && TOUCH_SCOPED_FIELDS.has(field)
+            ? touchTimestamp
+            : observedAt,
     };
   }
 

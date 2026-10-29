@@ -1,6 +1,6 @@
 # AGENTS.md
 
-## 2026-10-29 Google Ads six-hour click hold and new-account setup: branch only, not deployed
+## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: branch only, not deployed
 
 Branch `agent/google-ads-click-window-20261029`, cut from the live branch
 `agent/wetracked-learnings-20261025` (`d7572dd`), fixes a Google Ads delivery
@@ -31,21 +31,46 @@ documentation before connecting a newly created Google Ads account.
   which is every Track Clear upload, and `validateOnly` does not detect it. The
   success message names the hold. Six languages; `docs/google-ads.md` has the
   setup, the hold and Google's error reasons.
+- Google click kept through later visits. The Custom Pixel, legacy script and
+  Cart Helper treated any click ID or UTM in a URL as a new touch that replaced
+  every stored click ID, so a Google click followed by a Meta, TikTok or email
+  visit reached Google without its gclid; Google's own conversion linker keeps
+  it for 90 days. Google click IDs now persist on their own: only a newer Google
+  click replaces them, they expire 90 days after their own capture time (`ga`
+  in browser storage, `_tc_google_click_at` on the cart, `googleClickCapturedAt`
+  at ingest, the Redis field timestamp), and a marketing or sale-of-data denial
+  clears them. Last-touch source, time, UTMs, landing page and the other click
+  IDs are unchanged. The webhook takes the click time from the source that
+  supplied the click ID (`googleClickCapturedAtForPurchase`); carts and scripts
+  from before this change fall back to the last touch when it was the Google
+  click. The Custom Pixel also ran its consent re-initialisation (`ri()`) on
+  every page load and treated any visit with a stored click ID as a new touch,
+  resetting the attribution time and landing page on each page. Only click IDs
+  in the page URL start a touch now, as in the legacy script and Cart Helper.
+  Headless installs cannot use Google Ads, so `headless-sdk.ts` is unchanged.
 
-Verification: 856 unit tests pass across 67 files (5 new), `tsc` is clean and
-lint has only the existing `<img>` warnings. BullMQ 5.69's worker treats
+Verification: 876 unit tests pass across 68 files (25 new), `tsc` is clean, lint
+has only the existing `<img>` warnings and the production build passes. The new
+script tests fail against the previous pixel and legacy script. Loaded from the
+production build with a stubbed database, the pixel, legacy and Cart Helper
+routes serve scripts that parse; the built pixel, given a stored Google click
+and a Meta visit, sent the gclid with its original time and source `meta`. The
+Cart Helper's own code still has no backslash. BullMQ 5.69's worker treats
 `DelayedError` as a reschedule and `moveToDelayed` skips the attempt counter
 (checked in its source). Integration tests were not run (no local
 PostgreSQL/Redis). Google's documents checked: Data Manager `requestStatus`
 error reasons, the offline-conversion send-events guide, and Google Ads Help
 "Fix discrepancies and errors in offline conversion imports".
 
-Release notes: no migration. The worker (hold, recovery filter) and the web
-(Tracking Health, setup copy) both change, so follow the `docs/deploy.md` order
+Release notes: no migration. The worker (hold, recovery filter, webhook click
+time) and the web (scripts, ingest, Tracking Health, setup copy) both change, so follow the `docs/deploy.md` order
 used on 25 October: stop the old worker, deploy the web, start one new fleet.
 Purchases uploaded since 13 October within six hours of their click may show
-`TOO_RECENT_CLICK` in Tracking Health; they were not re-uploaded. Not merged or
-deployed.
+`TOO_RECENT_CLICK` in Tracking Health; they were not re-uploaded. The ingest
+schema gains `googleClickCapturedAt`, which the new scripts send, so the web must
+be deployed as one unit (it is), and shoppers' stored Google clicks carry over
+without a capture time until their next Google click: they are dated by their
+stored touch. Not merged or deployed.
 
 ## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: live, not on `main`
 
@@ -657,11 +682,12 @@ tests/
     google-ads-event-processor.test.ts # 23 tests (six-hour hold, worker ownership, target, toggles, consent, retries, bookkeeping)
     google-ads-request-status.test.ts # 9 tests (status polling, backoff, timeout, safe details)
     google-data-manager-auth.test.ts  # 14 tests (key parsing, RS256 assertion, token caching, safe errors)
+    google-click-persistence.test.ts  # 10 tests (generated pixel/legacy script keep a dated Google click through later touches)
     hash-pii.test.ts                  # 24 tests
     headless-sdk.test.ts              # 20 tests (consent, revocation replay/serialization, fallback session anchors, attribution, cookies/session, cart attributes, ingest client)
-    ingest-attribution.test.ts        # 30 tests (outbox, attribution, explicit internal-only consent path, tombstones, billing aliases, fallback delay, checkout enrichment)
+    ingest-attribution.test.ts        # 37 tests (outbox, attribution, Google click time, explicit internal-only consent path, tombstones, billing aliases, fallback delay, checkout enrichment)
     internal-attribution.test.ts      # 6 tests (sanitization, hashed identity, no external delivery fields, consent-transition supersession)
-    ingest-validation.test.ts         # 9 tests (strict bounded payload validation and minimized revocation exception)
+    ingest-validation.test.ts         # 11 tests (strict bounded payload validation, Google click time, minimized revocation exception)
     meta-capi.test.ts                 # 21 tests
     meta-event-processor.test.ts      # 8 tests (delivery ownership, acceptance, errors, retry)
     middleware-public-routes.test.ts  # 7 tests (public routes plus fail-closed production release middleware)
@@ -672,11 +698,11 @@ tests/
     purchase-event-id.test.ts         # 10 tests (deterministic IDs and cross-source aliases)
     rate-limit.test.ts                # 17 tests (delivery plus isolated consent-revocation budgets)
     replay-route.test.ts              # 3 tests (privacy-preserving deterministic manual replay)
-    session-enrichment.test.ts        # 12 tests (multi-key context, atomic value-aware tombstones, cross-alias denial)
-    shopify-cart-attribution-helper.test.ts # 25 tests (consent states, URL/session/cart write/verify/retry, no raw PII, generated script on a simulated storefront: consent API wait, visitorConsentCollected, STRICT unknown, write reuse, foreign attribute-only writes)
+    session-enrichment.test.ts        # 15 tests (multi-key context, atomic value-aware tombstones, cross-alias denial, Google click age)
+    shopify-cart-attribution-helper.test.ts # 29 tests (consent states, URL/session/cart write/verify/retry, Google click kept, no raw PII, generated script on a simulated storefront: consent API wait, visitorConsentCollected, STRICT unknown, write reuse, foreign attribute-only writes)
     shopify-domain-resolver.test.ts   # 28 tests (Shopify domain resolution)
     shopify-webhook.test.ts           # 6 tests (HMAC/replay/header verification)
-    shopify-webhook-attribution.test.ts # 15 tests (order/landing attribution, consent freshness, catalog IDs)
+    shopify-webhook-attribution.test.ts # 20 tests (order/landing attribution, Google click time, consent freshness, catalog IDs)
     shopify-webhook-inbox.test.ts     # 12 tests (durable encrypted capture/claim/backoff/retention)
     shopify-webhook-inbox-worker.test.ts # 5 tests (internal replay and failure handling)
     shopify-checkout-webhook.test.ts  # 10 tests (checkout webhook InitiateCheckout, pixel-row enrichment/dedupe, no reopen, consent, toggles, orders/paid fallback)
@@ -902,7 +928,7 @@ Header: Content-Type: application/json
 - **Purchase identity write-back:** A guest checkout is usually the only moment the system learns who a shopper is, so the verified Shopify webhook also stores the purchaser's hashed email/phone into the session enrichment record under the order's durable aliases (session ID, checkout token, cart token, order ID/name, email key). A returning visitor on the same browser then matches on later funnel events instead of arriving anonymous. It runs before the empty-destination exits so a workspace without advertising credentials still builds identity, is gated on the same marketing consent decision used for delivery, and is erased by the existing denial tombstones.
 - **Session identity carry-forward:** When an event carries shopper email/phone and marketing consent allows it, ingest stores SHA-256 hashes (never raw identity) in the Redis enrichment record under the existing session/checkout/cart keys. A later event in that session that has no identity of its own, but does have an opaque anchor, recovers those hashes and sends them as Meta `em`/`ph` and TikTok `user.email`/`user.phone`. The values are already hashed, so normalizers must never hash them again, and an event's own identity always wins. Carried identity is a marketing-scoped field: it follows the same thirty-day staleness boundary as click IDs and is erased by a marketing or sale/sharing denial tombstone. Clients cannot inject it — the ingest schema is `.strict()` and the fields are server-derived only.
 - **Anonymous external_id:** Marketing-consented events carry `trackclearSessionId` through jobs and retry envelopes. Meta receives `external_id` as an array (hashed `customerId` plus hashed session ID); TikTok receives one `external_id`, preferring hashed `customerId` and falling back to the hashed session ID. This stitches anonymous funnel events to the identified webhook Purchase.
-- **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. The storefront Cart Attribution Helper (`/api/cart-helper/:workspaceId`) is the reliability layer for normal Shopify themes: it runs outside the Custom Pixel sandbox, loads Shopify's Customer Privacy API itself (`Shopify.loadFeatures`, `consent-tracking-api` 0.2) and waits for its answer or a `visitorConsentCollected` decision (at most 3 seconds) before its first write, writes through same-origin `/cart/update.js` only when its attributes, the cart token or a 30-minute-old verification call for it, verifies through `/cart.js`, retries once, ignores other scripts' attribute-only cart writes, stores local diagnostics, and never writes raw shopper PII. An explicit denial clears advertising identifiers in both modes; with no consent answer, LAX allows and STRICT leaves existing identifiers untouched. Generated and legacy pixels send the storefront country from Shopify's `localization` cookie as `userData.countryCode` on marketing-allowed events (checkout events prefer the checkout's own country). Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed.
+- **Shopify session/cart attribution:** Generated pixel scripts create a `_trackclear_session_id`, persist it in a first-party cookie, and best-effort write `_trackclear_session_id`, click IDs, UTMs, landing page, and consent markers into Shopify cart attributes on add-to-cart/checkout-start. The storefront Cart Attribution Helper (`/api/cart-helper/:workspaceId`) is the reliability layer for normal Shopify themes: it runs outside the Custom Pixel sandbox, loads Shopify's Customer Privacy API itself (`Shopify.loadFeatures`, `consent-tracking-api` 0.2) and waits for its answer or a `visitorConsentCollected` decision (at most 3 seconds) before its first write, writes through same-origin `/cart/update.js` only when its attributes, the cart token or a 30-minute-old verification call for it, verifies through `/cart.js`, retries once, ignores other scripts' attribute-only cart writes, stores local diagnostics, and never writes raw shopper PII. An explicit denial clears advertising identifiers in both modes; with no consent answer, LAX allows and STRICT leaves existing identifiers untouched. Generated and legacy pixels send the storefront country from Shopify's `localization` cookie as `userData.countryCode` on marketing-allowed events (checkout events prefer the checkout's own country). Ingest stores browser context under TrackClear session ID, checkout token, cart token, order ID/name, and email so Shopify webhook Purchases can recover attribution even when email is missing or delayed. Only click IDs in the page URL start a new touch, and a Google click (gclid/gbraid/wbraid) outlives later non-Google touches for 90 days from its own capture time (`_tc_google_click_at`), as Google's conversion linker does; see `docs/google-ads.md`.
 - **Controlled production QA artifacts:** Store real-order QA evidence under `docs/qa/` without raw PII or full webhook payloads. Dirava order `#5076` proved webhook Purchase flow and session enrichment for a controlled `0 EUR` order. Dirava order `#5077` proved the storefront Cart Attribution Helper and paid revenue propagation for one normal paid `0.5 EUR` order with `cart_attributes` attribution.
 - **Deterministic Purchase event IDs:** Snippet, generated pixel, and Shopify webhook Purchase events use deterministic Shopify identifiers when possible (`shopify-purchase:<workspaceId>:<order|checkout|cart>`). Order name is preferred over numeric order ID when both are present so browser checkout events and Shopify webhooks converge on the same order-based ID; numeric and GraphQL order IDs still normalize to the same fallback segment.
 - **Catalog content ID normalization:** Generated pixel, legacy script, ingest, and Shopify webhook Purchase payloads normalize Shopify product/variant content IDs through `content-id.ts`. Workspace settings control variant numeric, product numeric, GraphQL, SKU, prefix/suffix, and custom template modes from Settings.
@@ -912,7 +938,7 @@ Header: Content-Type: application/json
 - **Normal Shopify V1 install standard:** A normal Shopify workspace is not considered live until the Custom Pixel, Shopify webhook, Cart Attribution Helper, Meta credentials, TikTok credentials, test AddToCart, and test webhook Purchase are all verified. The Cart Helper is required for reliable purchase attribution, not optional dashboard polish.
 - **Tracking health:** `/tracking-health` gives operational readiness for normal Shopify V1: recent snippet event activity, webhook active/Purchase received, Meta/TikTok connected, dedup status, actionable cart-helper attribution status, attribution source breakdown, and recent errors. Duplicate delivery health counts only `SENT` Purchase rows and excludes `SUPERSEDED` aliases. It reports `cart_attributes` as excellent, session/landing-only attribution as warning, and missing attribution context as error. It is not a pixel-install heartbeat unless a heartbeat endpoint is added later.
 - **Diagnostics visibility:** `/diagnostics` resolves workspace mode with the same backend helper as ingest/webhooks. V1 workspaces show only allowed destinations, and event audit field counts include core fields plus optional click/UTM fields only when those values are actually captured and relevant to an allowed destination.
-- **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_trackclear_session_id`, `_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_gbraid`, `_wbraid`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`, `_landing_page`, consent markers) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, `contents`, and sanitized attribution-source metadata.
+- **Shopify webhook attribution recovery:** The `orders/paid` webhook parses Shopify cart/order attributes (`_trackclear_session_id`, `_fbp`, `_fbc`, `_fbclid`, `_gclid`, `_gbraid`, `_wbraid`, `_tc_google_click_at`, `_ttclid`, `_rdt_cid`, `_epik`, `utm_*`, `_landing_page`, consent markers) before falling back to Redis session enrichment or landing-site params. Landing-site `fbclid` is converted to `fbc` only when no stronger `fbc` exists. Relative `landing_site` values are normalized to absolute store URLs before becoming webhook Purchase `event_source_url`. Webhook Purchase custom data includes variant-first `content_ids`, `content_type`, `contents`, and sanitized attribution-source metadata.
 - **Webhook Purchase browser guard:** Browser `fbq("track", "Purchase")` is suppressed only after a signed `orders/paid` delivery sets `shopifyWebhookVerifiedAt`; secret/domain changes clear verification. Track Clear ingest remains a 90-second safety fallback after verification so the one-minute durable inbox normally establishes the canonical path first.
 - **Web Locks are optional, never load-bearing:** Shopify's custom-pixel sandbox has an opaque origin where `navigator.locks` exists but `request()` rejects with `SecurityError`. Feature-detecting the API is not enough — the generated `dk()` helper must also survive an asynchronous rejection and fall back to a direct call, and event delivery must never `await` the consent-revocation queue unguarded. Presence-checking an API without handling denial silently killed all Custom Pixel browser events between 2026-07-27 and 2026-08-03.
 - **Consent revocation:** Redis session enrichment stores field/category observation times, hashed-key alias links, and denial tombstones atomically. After API-key authentication and strict bounded validation, a privacy-minimized no-destination revocation must carry a session, checkout, or cart anchor and pass isolated 120/minute plus 5,000/day workspace budgets before it is persisted ahead of workspace-active, destination-credential, and generic delivery-rate gates. Exactly one opaque anchor starts alias traversal; predictable order aliases are never direct fast-path deletion keys. The request cannot enqueue an event or carry attribution/PII, and rate-limit failures remain queued client-side. Headless clients generate and reuse a fallback session anchor when none is configured. A newer denial propagates through previously associated session/checkout/cart/order/email keys and prevents delayed older events from resurrecting identifiers; webhook Purchase uses the newest bounded consent snapshot from cart attributes or Redis. Custom Pixel, legacy, and headless clients retain at most 20 privacy-minimized revocations for 30 days and retry from 5 seconds up to 5 minutes. A stable `trackclear-consent-revocation-v1` Web Lock serializes cross-tab sends where Web Locks exist; browsers without that API retain per-client serialization but cross-tab ordering is best-effort. Browser/headless touch context is capped at 90 days, Redis enrichment at 30 days, consent grants at 24 hours, and explicit denials at 30 days.

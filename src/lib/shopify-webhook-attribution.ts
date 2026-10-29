@@ -25,6 +25,8 @@ export interface OrderAttribution {
   landingPage: string | null;
   attributionTimestamp: number | null;
   attributionSource: string | null;
+  /** When the cart's Google click was captured; it outlives later non-Google touches. */
+  googleClickCapturedAt: number | null;
   consentAnalytics: string | null;
   consentMarketing: string | null;
   consentSaleOfData: string | null;
@@ -202,6 +204,18 @@ export function buildOrderAttribution(
     // Preserve the real click time for delayed checkouts. Falling back to the
     // webhook receipt time is only for legacy carts without touch metadata.
     synthesizeFbcFromFbclid(fbclid, attributionTimestamp ?? now);
+  const attributionSource = attributionTimestamp
+    ? readOrderAttribute(attrs, ["_tc_attribution_source", "tc_attribution_source"])
+    : null;
+  // Kept even when older than Google's 90 days, so delivery can leave that click
+  // out instead of treating it as one of unknown age. Carts written before
+  // _tc_google_click_at only know the last touch, which is the Google click when
+  // that touch was one.
+  const parsedGoogleClickAt = Number(readOrderAttribute(attrs, ["_tc_google_click_at"]));
+  const googleClickCapturedAt =
+    Number.isFinite(parsedGoogleClickAt) && parsedGoogleClickAt > 0 && parsedGoogleClickAt <= now + 5 * 60 * 1000
+      ? Math.trunc(parsedGoogleClickAt)
+      : attributionSource === "google" ? attributionTimestamp : null;
   const consentAnalytics = readOrderAttribute(attrs, ["_tc_consent_analytics", "tc_consent_analytics"]);
   const consentMarketing = readOrderAttribute(attrs, ["_tc_consent_marketing", "tc_consent_marketing"]);
   const consentSaleOfData = readOrderAttribute(attrs, [
@@ -238,15 +252,33 @@ export function buildOrderAttribution(
     utmTerm: readOrderAttribute(attrs, ["_utm_term", "utm_term"]),
     landingPage: readOrderAttribute(attrs, ["_landing_page", "landing_page"]),
     attributionTimestamp,
-    attributionSource: attributionTimestamp
-      ? readOrderAttribute(attrs, ["_tc_attribution_source", "tc_attribution_source"])
-      : null,
+    attributionSource,
+    googleClickCapturedAt,
     consentAnalytics,
     consentMarketing,
     consentSaleOfData,
     consentTimestamp,
     consentSource: readOrderAttribute(attrs, ["_tc_consent_source", "tc_consent_source"]),
   };
+}
+
+/**
+ * Capture time of the Google click a Purchase uploads. Order attributes win, as
+ * they do for the click ID. The session record only knows it when its last
+ * touch was that click, and a landing-site click has no time.
+ */
+export function googleClickCapturedAtForPurchase(
+  order: Pick<OrderAttribution, "gclid" | "gbraid" | "wbraid" | "googleClickCapturedAt">,
+  session: {
+    gclid?: string; gbraid?: string; wbraid?: string;
+    attributionTimestamp?: number; attributionSource?: string;
+  } | null | undefined
+): number | null {
+  if (order.gclid || order.gbraid || order.wbraid) return order.googleClickCapturedAt;
+  if (session && (session.gclid || session.gbraid || session.wbraid) && session.attributionSource === "google") {
+    return session.attributionTimestamp ?? null;
+  }
+  return null;
 }
 
 export function extractLandingSiteAttribution(
@@ -278,6 +310,7 @@ export function extractLandingSiteAttribution(
     landingPage: null,
     attributionTimestamp: null,
     attributionSource: null,
+    googleClickCapturedAt: null,
     consentAnalytics: null,
     consentMarketing: null,
     consentSaleOfData: null,

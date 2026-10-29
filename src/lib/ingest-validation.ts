@@ -20,6 +20,7 @@ const CONSENT_REVOCATION_FORBIDDEN_CONTEXT_FIELDS = [
   "ttp",
   "attributionTimestamp",
   "attributionSource",
+  "googleClickCapturedAt",
   "utmSource",
   "utmMedium",
   "utmCampaign",
@@ -301,6 +302,8 @@ export const IngestPayloadSchema = z
     ttp: nullableBoundedString(512),
     attributionTimestamp: z.number().finite().positive().nullable().optional(),
     attributionSource: nullableBoundedString(100),
+    // When the Google click ID was captured; it outlives later non-Google touches.
+    googleClickCapturedAt: z.number().finite().positive().nullable().optional(),
     utmSource: nullableBoundedString(1024),
     utmMedium: nullableBoundedString(1024),
     utmCampaign: nullableBoundedString(2048),

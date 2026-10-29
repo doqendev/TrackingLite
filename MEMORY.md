@@ -1,6 +1,6 @@
 # MEMORY.md
 
-## 2026-10-29 Google Ads six-hour click hold and new-account setup: branch only, not deployed
+## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: branch only, not deployed
 
 Branch `agent/google-ads-click-window-20261029`, cut from the live branch
 `agent/wetracked-learnings-20261025` (`d7572dd`), fixes a Google Ads delivery
@@ -31,21 +31,46 @@ documentation before connecting a newly created Google Ads account.
   which is every Track Clear upload, and `validateOnly` does not detect it. The
   success message names the hold. Six languages; `docs/google-ads.md` has the
   setup, the hold and Google's error reasons.
+- Google click kept through later visits. The Custom Pixel, legacy script and
+  Cart Helper treated any click ID or UTM in a URL as a new touch that replaced
+  every stored click ID, so a Google click followed by a Meta, TikTok or email
+  visit reached Google without its gclid; Google's own conversion linker keeps
+  it for 90 days. Google click IDs now persist on their own: only a newer Google
+  click replaces them, they expire 90 days after their own capture time (`ga`
+  in browser storage, `_tc_google_click_at` on the cart, `googleClickCapturedAt`
+  at ingest, the Redis field timestamp), and a marketing or sale-of-data denial
+  clears them. Last-touch source, time, UTMs, landing page and the other click
+  IDs are unchanged. The webhook takes the click time from the source that
+  supplied the click ID (`googleClickCapturedAtForPurchase`); carts and scripts
+  from before this change fall back to the last touch when it was the Google
+  click. The Custom Pixel also ran its consent re-initialisation (`ri()`) on
+  every page load and treated any visit with a stored click ID as a new touch,
+  resetting the attribution time and landing page on each page. Only click IDs
+  in the page URL start a touch now, as in the legacy script and Cart Helper.
+  Headless installs cannot use Google Ads, so `headless-sdk.ts` is unchanged.
 
-Verification: 856 unit tests pass across 67 files (5 new), `tsc` is clean and
-lint has only the existing `<img>` warnings. BullMQ 5.69's worker treats
+Verification: 876 unit tests pass across 68 files (25 new), `tsc` is clean, lint
+has only the existing `<img>` warnings and the production build passes. The new
+script tests fail against the previous pixel and legacy script. Loaded from the
+production build with a stubbed database, the pixel, legacy and Cart Helper
+routes serve scripts that parse; the built pixel, given a stored Google click
+and a Meta visit, sent the gclid with its original time and source `meta`. The
+Cart Helper's own code still has no backslash. BullMQ 5.69's worker treats
 `DelayedError` as a reschedule and `moveToDelayed` skips the attempt counter
 (checked in its source). Integration tests were not run (no local
 PostgreSQL/Redis). Google's documents checked: Data Manager `requestStatus`
 error reasons, the offline-conversion send-events guide, and Google Ads Help
 "Fix discrepancies and errors in offline conversion imports".
 
-Release notes: no migration. The worker (hold, recovery filter) and the web
-(Tracking Health, setup copy) both change, so follow the `docs/deploy.md` order
+Release notes: no migration. The worker (hold, recovery filter, webhook click
+time) and the web (scripts, ingest, Tracking Health, setup copy) both change, so follow the `docs/deploy.md` order
 used on 25 October: stop the old worker, deploy the web, start one new fleet.
 Purchases uploaded since 13 October within six hours of their click may show
-`TOO_RECENT_CLICK` in Tracking Health; they were not re-uploaded. Not merged or
-deployed.
+`TOO_RECENT_CLICK` in Tracking Health; they were not re-uploaded. The ingest
+schema gains `googleClickCapturedAt`, which the new scripts send, so the web must
+be deployed as one unit (it is), and shoppers' stored Google clicks carry over
+without a capture time until their next Google click: they are dated by their
+stored touch. Not merged or deployed.
 
 ## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: live, not on `main`
 

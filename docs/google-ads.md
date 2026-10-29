@@ -74,11 +74,21 @@ and legacy workspaces. Headless V1 installs are excluded, as for ChatGPT Ads.
   `deliveryTargetId = "<customerId>:<conversionActionId>"`. The encrypted retry
   envelope carries the same `googleAdsTargetId`, the click IDs and
   `googleClickCapturedAt`.
-- `googleClickCapturedAt` is the pixel's / cart helper's `attributionTimestamp`
-  when `attributionSource` is `google` (the moment a fresh Google click was
-  seen). Clicks known to be 90 or more days old are left out, as Google cannot
-  attribute them. The pixel keeps last-click attribution across platforms: a
-  later Meta or TikTok click replaces the stored Google click.
+- The storefront keeps a Google click (gclid, gbraid or wbraid) for Google's 90
+  days whatever touch follows, as Google's own conversion linker does. A later
+  Meta, TikTok or UTM-tagged visit changes the last-touch attribution (source,
+  time, UTMs, landing page, other click IDs) but not the Google click; only a
+  newer Google click replaces it. The Custom Pixel, legacy script and Cart Helper
+  store its capture time (`ga`) beside it and write it to the cart as
+  `_tc_google_click_at`; ingest receives it as `googleClickCapturedAt` and Redis
+  ages the click from it. `googleClickCapturedAt` on a Purchase comes from the
+  source that supplied the click ID (`googleClickCapturedAtForPurchase`); carts
+  and scripts from before this change fall back to the last touch when that touch
+  was the Google click. Clicks known to be 90 or more days old are left out, as
+  Google cannot attribute them. A marketing or sale-of-data denial clears the
+  click and its time. Before 29 October 2026 any later non-Google touch erased
+  the Google click, so a Google Ads purchase after a Meta, TikTok or email visit
+  reached Google without its click ID.
 - The worker (`src/workers/google-ads-event-processor.ts`) follows the ChatGPT
   Ads pattern: durable claim, encrypted envelope required, current workspace
   enablement, mode, Purchase toggle and target re-checked, original

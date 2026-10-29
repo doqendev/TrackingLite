@@ -146,6 +146,17 @@ describe("IngestPayloadSchema", () => {
     expect(() => IngestPayloadSchema.parse(validPayload({ unexpected: true }))).toThrow();
   });
 
+  it("accepts a Google click capture time, which a consent revocation may not carry", () => {
+    const clickedAt = Date.now() - 40 * 24 * 60 * 60 * 1000;
+    expect(IngestPayloadSchema.parse(validPayload({ gclid: "G1", googleClickCapturedAt: clickedAt }))
+      .googleClickCapturedAt).toBe(clickedAt);
+    expect(isPrivacyMinimizedConsentRevocation({
+      eventName: "PageView", eventId: "consent-revocation", timestamp: Date.now(), url: "", referrer: "",
+      trackclearSessionId: "session-123", consent: { marketingAllowed: false }, userData: {}, customData: {},
+      onlyDestinations: [], googleClickCapturedAt: clickedAt,
+    })).toBe(false);
+  });
+
   it("accepts TikTok browser identity", () => {
     const result = IngestPayloadSchema.parse(
       validPayload({

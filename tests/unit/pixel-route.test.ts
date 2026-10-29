@@ -156,7 +156,8 @@ describe("GET /api/pixel/[workspaceId]", () => {
     expect(js).toContain("visitorConsentCollected");
     expect(js).toContain("ttp:m?ttpVal:null");
     expect(js).toContain("attributionTimestamp:_ats");
-    expect(js).toContain("var _atn=Number(_ca[_ci].value);if(Number.isFinite(_atn))_ats=_atn");
+    // A cart touch time is used only inside the 90-day window ingest accepts.
+    expect(js).toContain("var _atn=gv(_ca[_ci].value);if(_atn)_ats=_atn");
     expect(js).toContain("var MB=false");
     expect(js).toContain("function bf(){return MB&&mk()");
     expect(js).toContain('if(typeof A.activate==="function")A.activate()');

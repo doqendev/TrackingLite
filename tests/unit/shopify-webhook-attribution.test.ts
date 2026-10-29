@@ -6,9 +6,48 @@ import {
   canonicalShopifyLineItemId,
   extractLandingSiteAttribution,
   extractOrderAttributes,
+  googleClickCapturedAtForPurchase,
   normalizeLandingPageUrl,
   resolveNewestConsentValue,
 } from "@/lib/shopify-webhook-attribution";
+
+describe("Google click capture time on a webhook Purchase", () => {
+  const now = 1700000000000;
+  const order = (attributes: Record<string, string>) =>
+    buildOrderAttribution({ note_attributes: Object.entries(attributes).map(([name, value]) => ({ name, value })) }, now);
+
+  it("reads the cart's Google click time even after a later Meta touch", () => {
+    const attribution = order({ _gclid: "G1", _tc_google_click_at: String(now - 40 * 86400000),
+      _tc_attribution_timestamp: String(now - 86400000), _tc_attribution_source: "meta" });
+    expect(attribution.googleClickCapturedAt).toBe(now - 40 * 86400000);
+    expect(attribution.attributionSource).toBe("meta");
+  });
+
+  it("keeps a time older than 90 days so delivery can leave that click out", () => {
+    expect(order({ _gclid: "G1", _tc_google_click_at: String(now - 95 * 86400000) }).googleClickCapturedAt)
+      .toBe(now - 95 * 86400000);
+  });
+
+  it("falls back to the last touch only when an older cart's last touch was the Google click", () => {
+    expect(order({ _gclid: "G1", _tc_attribution_timestamp: String(now - 86400000), _tc_attribution_source: "google" })
+      .googleClickCapturedAt).toBe(now - 86400000);
+    expect(order({ _gclid: "G1", _tc_attribution_timestamp: String(now - 86400000), _tc_attribution_source: "meta" })
+      .googleClickCapturedAt).toBeNull();
+    expect(order({ _gclid: "G1", _tc_google_click_at: "later" }).googleClickCapturedAt).toBeNull();
+  });
+
+  it("takes the time from the source that supplied the click ID", () => {
+    const fromCart = order({ _gclid: "G1", _tc_google_click_at: String(now - 5000) });
+    expect(googleClickCapturedAtForPurchase(fromCart, { gclid: "G2", attributionTimestamp: now - 9000,
+      attributionSource: "google" })).toBe(now - 5000);
+    const noCartClick = order({});
+    expect(googleClickCapturedAtForPurchase(noCartClick, { gclid: "G2", attributionTimestamp: now - 9000,
+      attributionSource: "google" })).toBe(now - 9000);
+    expect(googleClickCapturedAtForPurchase(noCartClick, { gclid: "G2", attributionTimestamp: now - 9000,
+      attributionSource: "meta" })).toBeNull();
+    expect(googleClickCapturedAtForPurchase(noCartClick, null)).toBeNull();
+  });
+});
 
 describe("shopify-webhook-attribution", () => {
   it("extracts Shopify order attributes from note_attributes arrays", () => {

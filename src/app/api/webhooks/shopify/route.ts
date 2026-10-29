@@ -36,6 +36,7 @@ import {
   buildLineItemContents,
   buildOrderAttribution,
   extractLandingSiteAttribution,
+  googleClickCapturedAtForPurchase,
   normalizeLandingPageUrl,
   resolveNewestConsentValue,
 } from "@/lib/shopify-webhook-attribution";
@@ -1297,9 +1298,9 @@ async function handleOrderPaid(
       consent: { analyticsAllowed: customerConsent.analytics, marketingAllowed: customerConsent.marketing,
         saleOfDataAllowed: customerConsent.saleOfData },
       openaiPixelId: workspace.openaiPixelId,
-      // The pixel and cart helper stamp the attribution time when they see a
-      // fresh ad click; for a Google click it bounds Google's 90-day window.
-      googleClickCapturedAt: finalAttributionSource === "google" ? finalAttributionTimestamp : null,
+      // The pixel and cart helper stamp when they saw the Google click; it
+      // bounds Google's 90-day window and outlives later non-Google touches.
+      googleClickCapturedAt: googleClickCapturedAtForPurchase(orderAttribution, sessionContext),
       googleAdsTargetId: googleAdsTarget,
       ttclid: orderAttribution.ttclid ?? sessionContext?.ttclid ?? landingAttribution.ttclid ?? null,
       ttp: orderAttribution.ttp ?? sessionContext?.ttp ?? landingAttribution.ttp ?? null,

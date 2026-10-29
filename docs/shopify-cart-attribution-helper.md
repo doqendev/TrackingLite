@@ -57,6 +57,7 @@ IDs/cookies/UTMs, and writes these Shopify cart attributes when available:
 - `_gclid`
 - `_gbraid`
 - `_wbraid`
+- `_tc_google_click_at`
 - `_ttclid`
 - `_rdt_cid`
 - `_epik`
@@ -73,6 +74,14 @@ IDs/cookies/UTMs, and writes these Shopify cart attributes when available:
 
 It does not write raw email, phone, name, address, customer ID, or other raw
 customer PII to cart attributes.
+
+A new click ID or UTM in the page URL starts a new touch and replaces the
+last-touch fields, except the Google click: `_gclid`, `_gbraid` and `_wbraid`
+stay until a newer Google click replaces them, for 90 days from
+`_tc_google_click_at`, as Google's own conversion linker keeps them. A marketing
+or sale-of-data denial clears them like every other advertising identifier.
+The generated Custom Pixel and legacy script follow the same rule, and only
+click IDs in the page URL start a new touch there too.
 
 The generated Custom Pixel and legacy pixel also persist explicit consent
 revocations under `_trackclear_pending_consent_v1` before sending them. A

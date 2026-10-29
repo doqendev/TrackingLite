@@ -155,6 +155,29 @@ describe("session-enrichment", () => {
     expect(String(mockEval.mock.calls[0][0])).toContain("incoming >= existing");
   });
 
+  it("ages a carried Google click from its own capture time, not the latest touch", async () => {
+    const clickedAt = Date.now() - 20 * 24 * 60 * 60 * 1000;
+    const metaTouch = Date.now() - 2 * 24 * 60 * 60 * 1000;
+
+    await storeSessionContextForIdentifiers(
+      "ws_123",
+      { trackclearSessionId: "tc-session-123" },
+      {
+        gclid: "G1",
+        fbc: "fb.1.1716300000000.META",
+        googleClickCapturedAt: clickedAt,
+        attributionTimestamp: metaTouch,
+        attributionSource: "meta",
+        observedAt: Date.now(),
+      }
+    );
+
+    const stored = JSON.parse(String(mockEval.mock.calls[0][3]));
+    expect(stored.gclid.timestamp).toBe(clickedAt);
+    expect(stored.fbc.timestamp).toBe(metaTouch);
+    expect(stored.attributionTimestamp.timestamp).toBe(metaTouch);
+  });
+
   it("writes ordered consent tombstones so stale denials cannot erase newer fields", async () => {
     const denialAt = Date.now() - 60_000;
 

@@ -795,6 +795,49 @@ describe("ingest attribution handling", () => {
     });
   });
 
+  it("keeps a Google click's own capture time when a later touch was not Google", async () => {
+    const clickedAt = Date.now() - 20 * 24 * 60 * 60 * 1000;
+    const metaTouchAt = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    mockLookupWorkspaceByApiKey.mockResolvedValue({
+      id: "ws_v1", userId: "user_123", isActive: true,
+      productMode: "SHOPIFY_META_TIKTOK_V1", installType: "SHOPIFY_CUSTOM_PIXEL", consentMode: "STRICT",
+      enablePageView: true, enableViewContent: true, enableAddToCart: true, enableInitiateCheckout: true,
+      enablePurchase: true, hasMetaCredentials: false, hasTikTokCredentials: false, hasGA4Credentials: false,
+      hasKlaviyoCredentials: false, hasRedditCredentials: false, hasPinterestCredentials: false,
+      hasGoogleAdsCredentials: true, googleAdsCustomerId: "1234567890", googleAdsConversionActionId: "987654321",
+      hasVerifiedShopifyWebhook: false,
+    });
+
+    const response = await postIngest(makeRequest({
+      eventName: "Purchase",
+      eventId: "google-purchase-after-meta",
+      timestamp: Date.now(),
+      url: "https://shop.example/checkouts/thank-you",
+      trackclearSessionId: "tc-session-123",
+      gclid: "Cj0KCQ-google-click",
+      fbclid: "META_CLICK",
+      attributionSource: "meta",
+      attributionTimestamp: metaTouchAt,
+      googleClickCapturedAt: clickedAt,
+      consent: { analyticsAllowed: true, marketingAllowed: true, saleOfDataAllowed: true },
+      userData: { email: "buyer@example.com" },
+      customData: { value: 39.99, currency: "EUR", numItems: 1, orderId: "5531", orderName: "#5531" },
+    }, { "X-TL-API-Key": "tl_test" }));
+
+    expect(response.status).toBe(200);
+    const created = mockEventLogCreate.mock.calls[0][0].data;
+    const { decryptEventRetryEnvelope } = await import("@/lib/event-retry-envelope");
+    expect(decryptEventRetryEnvelope(created)?.event).toMatchObject({
+      googleClickCapturedAt: clickedAt, gclid: "Cj0KCQ-google-click",
+    });
+    expect(mockStoreSessionContextForIdentifiers).toHaveBeenCalledWith(
+      "ws_v1",
+      expect.anything(),
+      expect.objectContaining({ gclid: "Cj0KCQ-google-click", googleClickCapturedAt: clickedAt,
+        attributionTimestamp: metaTouchAt, attributionSource: "meta" })
+    );
+  });
+
   it("preserves onlyDestinations for null-mode legacy workspaces", async () => {
     mockLookupWorkspaceByApiKey.mockResolvedValue({
       id: "ws_legacy",

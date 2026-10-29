@@ -9,6 +9,7 @@ export const TRACKCLEAR_CART_ATTRIBUTE_KEYS = [
   "_gclid",
   "_gbraid",
   "_wbraid",
+  "_tc_google_click_at",
   "_ttclid",
   "_ttp",
   "_rdt_cid",
@@ -375,6 +376,15 @@ export function extractShopifyCartAttribution({
     return values;
   }, {});
   const hasFreshTouch = Object.keys(currentValues).length > 0;
+  // Google keeps its own click for 90 days whatever touch follows, as its
+  // conversion linker does; only a newer Google click replaces it.
+  const freshGoogleClick = !!(currentValues.gclid || currentValues.gbraid || currentValues.wbraid);
+  const storedGoogleClickAt = Number.parseInt(context.googleClickCapturedAt || context.capturedAt || "", 10);
+  const storedGoogleClick = !freshGoogleClick && (context.gclid || context.gbraid || context.wbraid) &&
+    Number.isFinite(storedGoogleClickAt) && storedGoogleClickAt <= now + 5 * 60 * 1000 &&
+    now - storedGoogleClickAt < ATTRIBUTION_CONTEXT_MAX_AGE_MS
+    ? { gclid: context.gclid, gbraid: context.gbraid, wbraid: context.wbraid, googleClickCapturedAt: String(storedGoogleClickAt) }
+    : null;
   if (hasFreshTouch) {
     context = {
       ...currentValues,
@@ -388,13 +398,19 @@ export function extractShopifyCartAttribution({
         currentValues.utmSource?.toLowerCase().slice(0, 100) || "utm",
     };
   }
+  if (freshGoogleClick) {
+    context.googleClickCapturedAt = String(now);
+  } else {
+    for (const key of ["gclid", "gbraid", "wbraid", "googleClickCapturedAt"]) delete context[key];
+    for (const [key, value] of Object.entries(storedGoogleClick ?? {})) if (value) context[key] = value;
+  }
 
   if (!context.landingPage || hasFreshTouch) {
     context.landingPage = parsedUrl.toString();
   }
 
   if (marketingDenied) {
-    for (const key of ["fbclid", "gclid", "gbraid", "wbraid", "ttclid", "rdtCid", "epik"]) {
+    for (const key of ["fbclid", "gclid", "gbraid", "wbraid", "googleClickCapturedAt", "ttclid", "rdtCid", "epik"]) {
       delete context[key];
     }
     safeCookieSet(cookies, "_fbp", "");
@@ -445,6 +461,8 @@ export function extractShopifyCartAttribution({
     attributes._trackclear_oppref_captured_at = click ? String(click.capturedAt) : "";
   }
   setIfValue(attributes, "_trackclear_session_id", sessionId);
+  const googleClickAt = (context.gclid || context.gbraid || context.wbraid) && context.googleClickCapturedAt
+    ? context.googleClickCapturedAt : "";
   if (marketingAllowed) {
     setIfValue(attributes, "_fbp", fbp);
     setIfValue(attributes, "_fbc", fbc);
@@ -452,19 +470,20 @@ export function extractShopifyCartAttribution({
     setIfValue(attributes, "_gclid", context.gclid);
     setIfValue(attributes, "_gbraid", context.gbraid);
     setIfValue(attributes, "_wbraid", context.wbraid);
+    setIfValue(attributes, "_tc_google_click_at", googleClickAt);
     setIfValue(attributes, "_ttclid", context.ttclid);
     setIfValue(attributes, "_ttp", safeCookieGet(cookies, "_ttp"));
     setIfValue(attributes, "_rdt_cid", context.rdtCid);
     setIfValue(attributes, "_epik", context.epik);
   } else if (marketingDenied) {
-    for (const key of ["_fbp", "_fbc", "_fbclid", "_gclid", "_gbraid", "_wbraid", "_ttclid", "_ttp", "_rdt_cid", "_epik"] as const) {
+    for (const key of ["_fbp", "_fbc", "_fbclid", "_gclid", "_gbraid", "_wbraid", "_tc_google_click_at", "_ttclid", "_ttp", "_rdt_cid", "_epik"] as const) {
       attributes[key] = "";
     }
   }
   if (hasFreshTouch) {
     const touchKeys = [
       ["_fbclid", context.fbclid], ["_gclid", context.gclid], ["_gbraid", context.gbraid],
-      ["_wbraid", context.wbraid], ["_ttclid", context.ttclid], ["_rdt_cid", context.rdtCid],
+      ["_wbraid", context.wbraid], ["_tc_google_click_at", googleClickAt], ["_ttclid", context.ttclid], ["_rdt_cid", context.rdtCid],
       ["_epik", context.epik], ["_utm_source", context.utmSource], ["_utm_medium", context.utmMedium],
       ["_utm_campaign", context.utmCampaign], ["_utm_content", context.utmContent], ["_utm_term", context.utmTerm],
     ] as const;
@@ -638,13 +657,15 @@ function attrs(){
 var n=Date.now(),cn=cp(),st=resolveHelperMarketingState(M,cn),mk=st==="allowed",dn=st==="denied",c=js(ls(CTX)),ca=parseInt(c.ca||"",10);if(isFinite(ca)&&n-ca>7776000000)c={};else if(!isFinite(ca))c.ca=n;
 var has=false,ps=[["fbclid","fb","_fbclid"],["gclid","gl","_gclid"],["gbraid","gb","_gbraid"],["wbraid","wb","_wbraid"],["ttclid","tt","_ttclid"],["rdt_cid","rd","_rdt_cid"],["epik","ep","_epik"],["utm_source","us","_utm_source"],["utm_medium","um","_utm_medium"],["utm_campaign","uc","_utm_campaign"],["utm_content","un","_utm_content"],["utm_term","ut","_utm_term"]],nv={};
 for(var i=0;i<ps.length;i++){if(!mk&&ps[i][2].indexOf("_utm_")!==0)continue;var v=gp(ps[i][0]);if(v){nv[ps[i][1]]=v;has=true}}
+var gf=!!(nv.gl||nv.gb||nv.wb),gt=parseInt(c.ga||c.ca||"",10),gk=!gf&&(c.gl||c.gb||c.wb)&&isFinite(gt)&&gt<=n+300000&&n-gt<7776000000?{gl:c.gl,gb:c.gb,wb:c.wb,ga:gt}:null;
 if(has){c=nv;c.ca=n;c.so=c.fb?"meta":c.tt?"tiktok":(c.gl||c.gb||c.wb)?"google":c.rd?"reddit":c.ep?"pinterest":(c.us||"utm").toLowerCase().slice(0,100)}
-if(dn){delete c.fb;delete c.gl;delete c.gb;delete c.wb;delete c.tt;delete c.rd;delete c.ep;x("_fbp");x("_fbc");x("_ttp");x("_epik");if(c.us||c.um||c.uc||c.un||c.ut)c.so=(c.us||"utm").toLowerCase().slice(0,100);else{delete c.ca;delete c.so}}
+if(gf)c.ga=n;else{delete c.gl;delete c.gb;delete c.wb;delete c.ga;if(gk){if(gk.gl)c.gl=gk.gl;if(gk.gb)c.gb=gk.gb;if(gk.wb)c.wb=gk.wb;c.ga=gk.ga}}
+if(dn){delete c.fb;delete c.gl;delete c.gb;delete c.wb;delete c.ga;delete c.tt;delete c.rd;delete c.ep;x("_fbp");x("_fbc");x("_ttp");x("_epik");if(c.us||c.um||c.uc||c.un||c.ut)c.so=(c.us||"utm").toLowerCase().slice(0,100);else{delete c.ca;delete c.so}}
 if(!c.lp||has)c.lp=location.href;ss(CTX,JSON.stringify(c));
 var fbp=mk?vp(g("_fbp")||ls("_fbp")):null;if(mk&&!fbp){fbp="fb.1."+n+"."+Math.floor(1000000000+Math.random()*9000000000);s("_fbp",fbp);ss("_fbp",fbp)}
 var fbc=mk?vf(g("_fbc")||ls("_fbc")):null;if(mk&&c.fb&&(!fbc||xf(fbc)!==c.fb)){fbc="fb.1."+n+"."+c.fb;s("_fbc",fbc);ss("_fbc",fbc)}
-var o={};av(o,"_trackclear_session_id",id());if(mk){av(o,"_fbp",fbp);av(o,"_fbc",fbc);av(o,"_fbclid",c.fb);av(o,"_gclid",c.gl);av(o,"_gbraid",c.gb);av(o,"_wbraid",c.wb);av(o,"_ttclid",c.tt);av(o,"_ttp",g("_ttp"));av(o,"_rdt_cid",c.rd);av(o,"_epik",c.ep)}else if(dn){var ak=["_fbp","_fbc","_fbclid","_gclid","_gbraid","_wbraid","_ttclid","_ttp","_rdt_cid","_epik"];for(i=0;i<ak.length;i++)o[ak[i]]=""}
-if(has){for(i=0;i<ps.length;i++){if(mk||ps[i][2].indexOf("_utm_")===0)o[ps[i][2]]=c[ps[i][1]]||""}}
+var o={},ga=(c.gl||c.gb||c.wb)&&c.ga?String(c.ga):"";av(o,"_trackclear_session_id",id());if(mk){av(o,"_fbp",fbp);av(o,"_fbc",fbc);av(o,"_fbclid",c.fb);av(o,"_gclid",c.gl);av(o,"_gbraid",c.gb);av(o,"_wbraid",c.wb);av(o,"_tc_google_click_at",ga);av(o,"_ttclid",c.tt);av(o,"_ttp",g("_ttp"));av(o,"_rdt_cid",c.rd);av(o,"_epik",c.ep)}else if(dn){var ak=["_fbp","_fbc","_fbclid","_gclid","_gbraid","_wbraid","_tc_google_click_at","_ttclid","_ttp","_rdt_cid","_epik"];for(i=0;i<ak.length;i++)o[ak[i]]=""}
+if(has){for(i=0;i<ps.length;i++){if(mk||ps[i][2].indexOf("_utm_")===0)o[ps[i][2]]=c[ps[i][1]]||""}if(mk)o._tc_google_click_at=ga}
 av(o,"_utm_source",c.us);av(o,"_utm_medium",c.um);av(o,"_utm_campaign",c.uc);av(o,"_utm_content",c.un);av(o,"_utm_term",c.ut);av(o,"_landing_page",c.lp);av(o,"_tc_attribution_timestamp",c.ca);av(o,"_tc_attribution_source",c.so);
 if(cn.analyticsAllowed!==undefined)av(o,"_tc_consent_analytics",cn.analyticsAllowed);if(cn.marketingAllowed!==undefined)av(o,"_tc_consent_marketing",cn.marketingAllowed);if(cn.saleOfDataAllowed!==undefined)av(o,"_tc_consent_sale_of_data",cn.saleOfDataAllowed);if(cn.analyticsAllowed!==undefined||cn.marketingAllowed!==undefined||cn.saleOfDataAllowed!==undefined){av(o,"_tc_consent_timestamp",n);av(o,"_tc_consent_source","shopify_customer_privacy")}
 if(OE&&st!=="unknown"){var oc=updateOpenAIClickContext(js(ls("_tc_openai_click")),location.href,mk,n,OU!==location.href);OU=mk?location.href:null;ss("_tc_openai_click",JSON.stringify(oc));o._trackclear_oppref=oc?oc.value:"";o._trackclear_oppref_captured_at=oc?String(oc.capturedAt):""}

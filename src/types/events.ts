@@ -39,6 +39,7 @@ export interface SnippetEventPayload {
   ttp?: string | null;
   attributionTimestamp?: number | null;
   attributionSource?: string | null;
+  googleClickCapturedAt?: number | null;
   rdtCid?: string | null;
   epik?: string | null;
   utmSource?: string | null;

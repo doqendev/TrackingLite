@@ -298,6 +298,13 @@ export async function POST(request: NextRequest) {
       payload.consent.analyticsAllowed === true &&
       explicitlyDeniedAdvertising;
     const sharedContextAllowed = analyticsContextAllowed || marketingContextAllowed;
+    // When the Google click was captured; Google's 90-day window counts from it.
+    // Scripts older than googleClickCapturedAt only stamp the last touch, which
+    // is the Google click when that touch was one.
+    const googleClickCapturedAt = !marketingContextAllowed
+      ? null
+      : payload.googleClickCapturedAt ??
+        (payload.attributionSource === "google" ? payload.attributionTimestamp ?? null : null);
     const hasExplicitConsentDecision =
       payload.consent.analyticsAllowed !== undefined ||
       payload.consent.marketingAllowed !== undefined ||
@@ -365,6 +372,7 @@ export async function POST(request: NextRequest) {
         utmContent: sharedContextAllowed ? payload.utmContent : null,
         utmTerm: sharedContextAllowed ? payload.utmTerm : null,
         gclid: marketingContextAllowed ? payload.gclid : null,
+        googleClickCapturedAt,
         attributionTimestamp: sharedContextAllowed ? payload.attributionTimestamp : null,
         attributionSource: sharedContextAllowed ? payload.attributionSource : null,
         observedAt: payload.timestamp,
@@ -413,12 +421,7 @@ export async function POST(request: NextRequest) {
       gbraid: marketingContextAllowed ? payload.gbraid : null,
       wbraid: marketingContextAllowed ? payload.wbraid : null,
       ttclid: marketingContextAllowed ? payload.ttclid : null,
-      // The pixel stamps attributionTimestamp when it sees a fresh ad click; for a
-      // Google click that is the click time Google's 90-day window counts from.
-      googleClickCapturedAt:
-        marketingContextAllowed && payload.attributionSource === "google"
-          ? payload.attributionTimestamp ?? null
-          : null,
+      googleClickCapturedAt,
       ttp: marketingContextAllowed ? payload.ttp : null,
       gclid: marketingContextAllowed ? payload.gclid : null,
       rdtCid: marketingContextAllowed ? payload.rdtCid : null,
