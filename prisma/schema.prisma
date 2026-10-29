@@ -159,6 +159,16 @@ model Workspace {
   googleAdsConversionActionId String? // Numeric "Website (Import from clicks)" conversion action
   enableGoogleAds             Boolean @default(false)
 
+  // Google tag in the shopper's browser, run by Track Clear only when explicitly
+  // enabled. Its Purchase conversion action can also be the server destination
+  // above: Google merges both through multi-source, matched by the order ID.
+  googleTagId                  String? // "AW-" Google Ads tag ID
+  googleTagPurchaseLabel       String?
+  googleTagAddToCartLabel      String?
+  googleTagBeginCheckoutLabel  String?
+  googleTagPageViewLabel       String?
+  googleBrowserTrackingEnabled Boolean @default(false)
+
   // Deprecated browser-tag configuration. Server-side requests to the browser
   // conversion endpoint carried no shopper cookies and were never attributable.
   // Retained read-only until a later release drops the columns.

@@ -54,7 +54,8 @@ describe("Google Ads final delivery checks", () => {
     const request = mocks.send.mock.calls[0][0];
     expect(request.destinations[0]).toEqual({ operatingAccount: { accountType: "GOOGLE_ADS", accountId: "1234567890" },
       productDestinationId: "987654321" });
-    expect(request.events[0]).toMatchObject({ transactionId: "#5530", eventTimestamp: occurredAt.toISOString(),
+    // The row's numeric Shopify order ID, which Track Clear's Google tag sends too.
+    expect(request.events[0]).toMatchObject({ transactionId: "123", eventTimestamp: occurredAt.toISOString(),
       adIdentifiers: { gclid: "Cj0-click" }, conversionValue: 39.99, currency: "EUR" });
     expect(request.consent).toEqual({ adUserData: "CONSENT_GRANTED", adPersonalization: "CONSENT_GRANTED" });
     const [, receipt, acceptedAt, bookkeeping] = mocks.accepted.mock.calls[0];

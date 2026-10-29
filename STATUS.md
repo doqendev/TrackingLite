@@ -1,5 +1,56 @@
 # Track Clear --- Project Status & Audit
 
+## 2026-10-29 Track Clear Google tag and multi-source purchases: branch only, not deployed
+
+Branch `agent/google-tag-multisource-20261029`, cut from the live release branch
+`agent/google-ads-click-window-20261029` (`2c58732`), lets Track Clear run a
+store's Google Ads tag in the browser and send its server purchases into that
+tag's Website Purchase action. That is the shape SalesTracked uses (studied on
+29 October from its public script), through Google's official multi-source path
+instead of an unauthenticated tag ping.
+
+- Google tag. Off by default (`googleBrowserTrackingEnabled`). It needs the
+  `AW-` tag ID and the Purchase label; Add to cart, Begin checkout and Page view
+  labels are optional. Migration `20261029_google_tag_browser_ownership` adds
+  six Workspace columns (nullable, plus a false-by-default flag), and the schema
+  gate requires it. `src/lib/google-tag.ts` generates the browser code for the
+  Custom Pixel and the legacy script. It loads gtag.js only after marketing
+  consent, starts consent mode from Shopify's answers and updates it on change.
+  Every hit carries the stored Google click in `page_location`, since Shopify's
+  sandbox cannot keep Google's cookie. It sends `page_view` plus the labelled
+  conversions, and sets enhanced-conversion `user_data` on checkout and purchase.
+  The browser Purchase carries `transaction_id` = Shopify's numeric order ID and
+  is not suppressed after webhook verification. Headless V1 installs are excluded.
+- Server. Every Google upload now uses that numeric order ID as `transactionId`
+  (EventLog `orderId`, falling back to the order name), so Google merges the
+  browser and server copies within the tag's action. Uploading into a Website
+  action needs no other code change: on 29 October Track Clear's `validateOnly`
+  upload into Adelia London's Website Purchase action (7881898474) was accepted,
+  with and without a click ID, and the account shows the multi-source Beta box.
+- Settings. The Google Ads card has a "Google tag in the browser" section (six
+  languages) that accepts pasted `send_to` values. The API validates the tag ID
+  and labels, refuses to turn the tag on without a tag ID and Purchase label, and
+  turns it off when either is cleared. Step 1 explains both setups.
+  `docs/google-ads.md` has the setup and behavior. The privacy page now says the
+  tag hands checkout data to Google's tag, which hashes it in the browser.
+
+Verification: 894 unit tests pass across 69 files (18 new), `tsc` is clean, lint
+has only the existing `<img>` warnings, the production build passes, and Prisma
+validate and format pass the way CI runs them. Loaded from the build with the tag
+on, the pixel and legacy routes serve scripts that parse with no backslash in the
+tag code, and the compiled pixel sent the purchase conversion with the stored
+click, the numeric order ID and an E.164 phone. Integration tests were not run (no
+local PostgreSQL/Redis).
+
+Release notes: one additive migration, which the running release ignores, so
+apply it before the web build (Vercel's build asserts the schema); web and worker
+both change. Then configure Adelia London (`cmvrbe9vn0004dsebol88j81d`): tag ID
+`AW-18544016973`, labels Purchase `UPUGCOrzsK4dEM38vIpF`, Add to cart
+`RZs9CJ2mr64dEM38vIpF`, Begin checkout `7_X1CMDws64dEM38vIpF` and Page view
+`xOeaCOXfr64dEM38vIpF`, conversion action 7881898474 in place of the unused
+import action 7881446101, then Save and validate with delivery on. Not merged or
+deployed.
+
 ## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: live, not on `main`
 
 Branch `agent/google-ads-click-window-20261029`, cut from the live branch

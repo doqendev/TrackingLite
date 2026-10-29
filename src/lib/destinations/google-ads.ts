@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/core";
 import phoneMetadata from "libphonenumber-js/metadata.min.json";
 import { DESTINATION_EVENT_MAP } from "@/lib/destinations";
+import { numericShopifyId } from "@/lib/content-id";
 import { getGoogleDataManagerAccessToken, GoogleAuthError } from "@/lib/google-data-manager-auth";
 import type { DestinationEventJob } from "@/lib/queue";
 
@@ -179,8 +180,17 @@ export function googleUserIdentifiers(userData: Record<string, unknown>): Google
   return identifiers;
 }
 
-function transactionIdFor(event: DestinationEventJob["event"]): string {
+/**
+ * Shopify's numeric order ID, which Track Clear's Google tag also sends as
+ * transaction_id. Google deduplicates a multi-source conversion action only when
+ * both match, so it wins over the order name used before.
+ */
+function transactionIdFor(event: DestinationEventJob["event"], shopifyOrderId?: string | null): string {
   const cd = event.customData;
+  for (const candidate of [shopifyOrderId, cd.orderId, cd.order_id]) {
+    const numeric = numericShopifyId(candidate);
+    if (numeric && numeric.length <= TRANSACTION_ID_MAX_LENGTH) return numeric;
+  }
   for (const candidate of [cd.order_id, cd.orderId, event.eventId]) {
     const value = typeof candidate === "number" ? String(candidate) : text(candidate);
     if (value && value.length <= TRANSACTION_ID_MAX_LENGTH) return value;
@@ -199,10 +209,11 @@ function consentStatus(value: boolean | undefined): ConsentStatus | undefined {
 
 /**
  * Converts a durable Track Clear Purchase into one Data Manager event.
- * The caller supplies the original occurrence time from the EventLog row.
+ * The caller supplies the original occurrence time and the Shopify order ID
+ * from the EventLog row.
  */
 export function normalizeToGoogleAdsEvent(
-  event: DestinationEventJob["event"], now = Date.now()
+  event: DestinationEventJob["event"], now = Date.now(), shopifyOrderId?: string | null
 ): GoogleAdsEvent {
   const mapped = DESTINATION_EVENT_MAP.GOOGLE_ADS[event.eventName as keyof typeof DESTINATION_EVENT_MAP.GOOGLE_ADS];
   if (!mapped) throw new GoogleAdsApiError("Unsupported Google Ads event", 400);
@@ -216,7 +227,7 @@ export function normalizeToGoogleAdsEvent(
     throw new GoogleAdsApiError("No Google click ID or customer data to match this order", 400);
   }
   const normalized: GoogleAdsEvent = {
-    transactionId: transactionIdFor(event),
+    transactionId: transactionIdFor(event, shopifyOrderId),
     eventTimestamp: new Date(event.timestamp).toISOString(),
     eventSource: "WEB",
   };

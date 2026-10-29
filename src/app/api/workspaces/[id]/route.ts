@@ -15,6 +15,7 @@ import {
   normalizeGoogleAdsConversionActionId,
   normalizeGoogleAdsCustomerId,
 } from "@/lib/destinations/google-ads-ids";
+import { normalizeGoogleTagId, normalizeGoogleTagLabel } from "@/lib/google-tag";
 
 const log = createLogger({ component: "workspaces-id" });
 
@@ -74,6 +75,13 @@ const UpdateWorkspaceSchema = z.object({
   googleAdsLoginCustomerId: z.string().trim().max(32).optional().nullable(),
   googleAdsConversionActionId: z.string().trim().max(32).optional().nullable(),
   enableGoogleAds: z.boolean().optional(),
+  // Google tag Track Clear runs in the browser (public values, validated below).
+  googleTagId: z.string().trim().max(32).optional().nullable(),
+  googleTagPurchaseLabel: z.string().trim().max(64).optional().nullable(),
+  googleTagAddToCartLabel: z.string().trim().max(64).optional().nullable(),
+  googleTagBeginCheckoutLabel: z.string().trim().max(64).optional().nullable(),
+  googleTagPageViewLabel: z.string().trim().max(64).optional().nullable(),
+  googleBrowserTrackingEnabled: z.boolean().optional(),
   // Shopify webhook
   shopifyWebhookSecret: z.string().optional().nullable(),
 });
@@ -109,6 +117,12 @@ const GOOGLE_ADS_UPDATE_FIELDS = [
   "googleAdsLoginCustomerId",
   "googleAdsConversionActionId",
   "enableGoogleAds",
+  "googleTagId",
+  "googleTagPurchaseLabel",
+  "googleTagAddToCartLabel",
+  "googleTagBeginCheckoutLabel",
+  "googleTagPageViewLabel",
+  "googleBrowserTrackingEnabled",
 ] as const;
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -183,6 +197,12 @@ export async function GET(
         googleAdsLoginCustomerId: true,
         googleAdsConversionActionId: true,
         enableGoogleAds: true,
+        googleTagId: true,
+        googleTagPurchaseLabel: true,
+        googleTagAddToCartLabel: true,
+        googleTagBeginCheckoutLabel: true,
+        googleTagPageViewLabel: true,
+        googleBrowserTrackingEnabled: true,
         // Shopify webhook
         shopifyDomain: true,
         shopifyWebhookSecretEncrypted: true,
@@ -276,6 +296,11 @@ export async function PATCH(
       ["googleAdsCustomerId", normalizeGoogleAdsCustomerId, "Google Ads customer ID must be 10 digits"],
       ["googleAdsLoginCustomerId", normalizeGoogleAdsCustomerId, "Manager account ID must be 10 digits"],
       ["googleAdsConversionActionId", normalizeGoogleAdsConversionActionId, "Conversion action ID must be a number"],
+      ["googleTagId", normalizeGoogleTagId, "Google tag ID must look like AW-123456789"],
+      ["googleTagPurchaseLabel", normalizeGoogleTagLabel, "Purchase label must be the part after the slash in send_to"],
+      ["googleTagAddToCartLabel", normalizeGoogleTagLabel, "Add to cart label must be the part after the slash in send_to"],
+      ["googleTagBeginCheckoutLabel", normalizeGoogleTagLabel, "Begin checkout label must be the part after the slash in send_to"],
+      ["googleTagPageViewLabel", normalizeGoogleTagLabel, "Page view label must be the part after the slash in send_to"],
     ] as const) {
       const value = data[field];
       if (value === undefined || value === null) continue;
@@ -291,6 +316,13 @@ export async function PATCH(
         ? data.googleAdsConversionActionId : workspace.googleAdsConversionActionId,
     })) {
       return NextResponse.json({ error: "Google Ads requires a customer ID and a conversion action ID." }, { status: 422 });
+    }
+    // The browser tag cannot stay on once its tag ID or Purchase label is removed.
+    if (data.googleTagId === null || data.googleTagPurchaseLabel === null) data.googleBrowserTrackingEnabled = false;
+    if ((data.googleBrowserTrackingEnabled ?? workspace.googleBrowserTrackingEnabled) &&
+        (!(data.googleTagId !== undefined ? data.googleTagId : workspace.googleTagId) ||
+         !(data.googleTagPurchaseLabel !== undefined ? data.googleTagPurchaseLabel : workspace.googleTagPurchaseLabel))) {
+      return NextResponse.json({ error: "Track Clear's Google tag requires a tag ID and a Purchase label." }, { status: 422 });
     }
     if (data.enableMeta === false || data.metaPixelId === null) {
       // A browser pixel cannot remain an implicit owner after its Meta
@@ -538,6 +570,12 @@ export async function PATCH(
         googleAdsLoginCustomerId: true,
         googleAdsConversionActionId: true,
         enableGoogleAds: true,
+        googleTagId: true,
+        googleTagPurchaseLabel: true,
+        googleTagAddToCartLabel: true,
+        googleTagBeginCheckoutLabel: true,
+        googleTagPageViewLabel: true,
+        googleBrowserTrackingEnabled: true,
         // Shopify webhook
          shopifyDomain: true,
          shopifyWebhookSecretEncrypted: true,

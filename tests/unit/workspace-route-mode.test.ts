@@ -529,4 +529,59 @@ describe("workspace mode route guard", () => {
     expect(response.status).toBe(422);
     expect(mockWorkspaceUpdate).not.toHaveBeenCalled();
   });
+
+  it("stores the Google tag ID and labels and turns the tag on only when complete", async () => {
+    mockWorkspaceUpdate.mockResolvedValue(makeUpdatedWorkspace());
+
+    const response = await PATCH(makePatchRequest({ googleTagId: " aw-18544016973 ",
+      googleTagPurchaseLabel: "UPUGCOrzsK4dEM38vIpF", googleTagAddToCartLabel: "", googleBrowserTrackingEnabled: true }),
+    { params: Promise.resolve({ id: "ws_v1" }) });
+
+    expect(response.status).toBe(200);
+    expect(mockWorkspaceUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ googleTagId: "AW-18544016973", googleTagPurchaseLabel: "UPUGCOrzsK4dEM38vIpF",
+        googleTagAddToCartLabel: null, googleBrowserTrackingEnabled: true }),
+    }));
+  });
+
+  it.each([
+    [{ googleTagId: "G-ABC123" }, "Google tag ID must look like AW-123456789"],
+    [{ googleTagPurchaseLabel: "AW-18544016973/UPUGCOrzsK4dEM38vIpF" }, "Purchase label must be the part after the slash"],
+    [{ googleTagPageViewLabel: "bad label" }, "Page view label must be the part after the slash"],
+    [{ googleTagId: "AW-18544016973", googleBrowserTrackingEnabled: true }, "requires a tag ID and a Purchase label"],
+  ])("rejects incomplete or malformed Google tag settings %j", async (body, message) => {
+    const response = await PATCH(makePatchRequest(body), { params: Promise.resolve({ id: "ws_v1" }) });
+
+    expect(response.status).toBe(422);
+    expect((await response.json()).error).toContain(message);
+    expect(mockWorkspaceUpdate).not.toHaveBeenCalled();
+  });
+
+  it("turns the Google tag off when its tag ID or Purchase label is cleared", async () => {
+    mockWorkspaceFindFirst.mockResolvedValueOnce({
+      id: "ws_v1", userId: "user_123", apiKey: "tl_test", isActive: true,
+      productMode: "SHOPIFY_META_TIKTOK_V1", installType: "SHOPIFY_CUSTOM_PIXEL", catalogIdMode: "VARIANT_NUMERIC_ID",
+      googleTagId: "AW-18544016973", googleTagPurchaseLabel: "UPUGCOrzsK4dEM38vIpF", googleBrowserTrackingEnabled: true,
+    });
+    mockWorkspaceUpdate.mockResolvedValue(makeUpdatedWorkspace());
+
+    await PATCH(makePatchRequest({ googleTagPurchaseLabel: null }), { params: Promise.resolve({ id: "ws_v1" }) });
+
+    expect(mockWorkspaceUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ googleTagPurchaseLabel: null, googleBrowserTrackingEnabled: false }),
+    }));
+  });
+
+  it("keeps the Google tag off headless V1 installs", async () => {
+    mockWorkspaceFindFirst.mockResolvedValueOnce({
+      id: "ws_v1", userId: "user_123", apiKey: "tl_test", isActive: true,
+      productMode: "SHOPIFY_META_TIKTOK_V1", installType: "HEADLESS_CUSTOM",
+    });
+
+    const response = await PATCH(makePatchRequest({ googleBrowserTrackingEnabled: true }),
+      { params: Promise.resolve({ id: "ws_v1" }) });
+
+    expect(response.status).toBe(422);
+    expect(mockWorkspaceUpdate).not.toHaveBeenCalled();
+  });
 });

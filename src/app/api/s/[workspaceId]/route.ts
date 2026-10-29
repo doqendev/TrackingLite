@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contentIdOptionsFromWorkspace, type ContentIdOptions } from "@/lib/content-id";
 import { getWorkspaceIngestUrl } from "@/lib/custom-ingest-domain";
+import { googleTagForWorkspace, googleTagScript, type GoogleTagConfig } from "@/lib/google-tag";
 
 function sanitizeForJs(value: string): string {
   return value.replace(/[\\'"<>&`\n\r\0]/g, "");
@@ -17,7 +18,8 @@ function generateTrackingScript(
   metaBrowserTrackingEnabled: boolean,
   tiktokBrowserTrackingEnabled: boolean,
   consentMode: "STRICT" | "LAX",
-  contentIdOptions: ContentIdOptions = {}
+  contentIdOptions: ContentIdOptions = {},
+  googleTag: GoogleTagConfig | null = null
 ): string {
   return `(function(){
 var ctx=window.__tl||{},a=ctx.analytics||analytics,C=ctx.customerPrivacy||(typeof api!=="undefined"&&api.customerPrivacy)||null,PS=ctx.init&&ctx.init.customerPrivacy?ctx.init.customerPrivacy:(typeof init!=="undefined"&&init.customerPrivacy)||{};
@@ -41,7 +43,11 @@ function mf(){if(!MB||typeof P==="undefined"||!P||!mk()||MI)return;var R=window.
 function bf(){return MB&&mk()&&typeof window.fbq==="function"}
 function tf(){if(!TB||typeof TP==="undefined"||!TP||!mk()||TI)return;var R=window.__tcTikTokInitializedPixels||(window.__tcTikTokInitializedPixels={});if(R[TP]){TI=true;return}if(!window.ttq||typeof window.ttq.load!=="function"){(function(w,d,t){w.TiktokAnalyticsObject=t;var q=w[t]=w[t]||[];q.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"];q.setAndDefer=function(o,m){o[m]=function(){o.push([m].concat([].slice.call(arguments,0)))}};for(var i=0;i<q.methods.length;i++)q.setAndDefer(q,q.methods[i]);q.instance=function(e){var a=q._i[e]||[];for(var i=0;i<q.methods.length;i++)q.setAndDefer(a,q.methods[i]);return a};q.load=function(e,o){var u="https://analytics.tiktok.com/i18n/pixel/events.js";q._i=q._i||{};q._i[e]=[];q._i[e]._u=u;q._t=q._t||{};q._t[e]=+new Date;q._o=q._o||{};q._o[e]=o||{};var s=d.createElement("script"),x=d.getElementsByTagName("script")[0];s.type="text/javascript";s.async=true;s.src=u+"?sdkid="+e+"&lib="+t;x&&x.parentNode?x.parentNode.insertBefore(s,x):d.head.appendChild(s)}})(window,document,"ttq")}window.ttq.grantConsent();window.ttq.load(TP);R[TP]=true;TI=true}
 function bt(){return TB&&mk()&&window.ttq&&typeof window.ttq.track==="function"}
-function pc(){if(mk()){if(MB&&window.fbq)window.fbq("consent","grant");if(TB&&window.ttq&&typeof window.ttq.grantConsent==="function")window.ttq.grantConsent()}else{if(MB&&window.fbq)window.fbq("consent","revoke");if(TB&&window.ttq&&typeof window.ttq.revokeConsent==="function")window.ttq.revokeConsent()}}
+function pc(){if(mk()){if(MB&&window.fbq)window.fbq("consent","grant");if(TB&&window.ttq&&typeof window.ttq.grantConsent==="function")window.ttq.grantConsent()}else{if(MB&&window.fbq)window.fbq("consent","revoke");if(TB&&window.ttq&&typeof window.ttq.revokeConsent==="function")window.ttq.revokeConsent()}if(GT&&GI&&typeof window.gtag==="function")window.gtag("consent","update",gk())}
+${googleTagScript(googleTag, {
+  pageUrl: '((typeof location!=="undefined")?location.href:"")',
+  referrer: '((typeof document!=="undefined")?document.referrer:"")',
+})}
 function td(cd){cd=cd||{};var p={},a=[];if(Array.isArray(cd.contents)){for(var i=0;i<cd.contents.length;i++){var x=cd.contents[i]||{},z={content_id:String(x.id||"") ,content_type:"product",quantity:x.quantity||1};if(x.itemPrice!==undefined)z.price=x.itemPrice;else if(x.item_price!==undefined)z.price=x.item_price;if(z.content_id)a.push(z)}}else if(Array.isArray(cd.contentIds)){for(var j=0;j<cd.contentIds.length;j++)a.push({content_id:String(cd.contentIds[j]),content_type:"product",quantity:1})}if(a.length)p.contents=a;if(cd.contentType)p.content_type=cd.contentType;if(cd.contentName)p.content_name=cd.contentName;if(cd.value!==undefined)p.value=cd.value;if(cd.currency)p.currency=cd.currency;if(cd.numItems!==undefined)p.quantity=cd.numItems;return p}
 if(!mk()){cid.fb=null;cid.tt=null;cid.rd=null;cid.ep=null;cid.gl=null;cid.gb=null;cid.wb=null}
 var _now=Date.now(),_fresh=!!(cid.tt||cid.rd||cid.ep||cid.gl||cid.fb||cid.gb||cid.wb||utm.s||utm.m||utm.c||utm.n||utm.t),_gf=!!(cid.gl||cid.gb||cid.wb),_gca=null,_cx={};try{_cx=JSON.parse(localStorage.getItem("_tc")||"{}")}catch(e){}
@@ -74,7 +80,7 @@ function dq(p){return dk(function(){var m=dm(p),id=m.eventId+":"+m.timestamp,ref
 function dz(ref,ok){return dk(function(){var n=Date.now(),delay=0,q=dl().flatMap(function(x){if(x.id!==ref.id||x.generation!==ref.generation)return[x];if(ok)return[];var a=(x.attempts||0)+1,d=dj(a);delay=d;return[Object.assign({},x,{attempts:a,nextAttemptAt:n+d})]});dw(q);if(delay)dy(delay)})}
 async function rr(){if(DR)return DR;DR=(async function(){var q=await dk(function(){var x=dl();dw(x);return x}),n=Date.now();for(var i=0;i<q.length;i++){var x=q[i];if(x.nextAttemptAt>n){dy(x.nextAttemptAt-n);continue}try{var r=await dp(x.payload);await dz({id:x.id,generation:x.generation},r.ok)}catch(e){await dz({id:x.id,generation:x.generation},false)}}})();try{await DR}finally{DR=null}}
 rr().catch(function(){});
-try{if(C&&typeof C.subscribe==="function"){var _sub=C.subscribe("visitorConsentCollected",function(e){PS=(e&&e.customerPrivacy)||PS;pc();ri();sc();mf();tf();wa();var c=cn();if(dn(c))se("PageView",crypto.randomUUID(),{},{},[])});if(_sub&&typeof _sub.catch==="function")_sub.catch(function(){})}}catch(e){}
+try{if(C&&typeof C.subscribe==="function"){var _sub=C.subscribe("visitorConsentCollected",function(e){PS=(e&&e.customerPrivacy)||PS;pc();ri();sc();mf();tf();gi();wa();var c=cn();if(dn(c))se("PageView",crypto.randomUUID(),{},{},[])});if(_sub&&typeof _sub.catch==="function")_sub.catch(function(){})}}catch(e){}
 function av(o,k,v){if(v!==null&&v!==undefined&&String(v)!=="")o[k]=String(v)}
 function at(){rt();var c=cn(),m=mk(),o={},ga=m&&(cid.gl||cid.gb||cid.wb)&&_gca?String(_gca):"";av(o,"_trackclear_session_id",sid);if(m){av(o,"_fbp",fbpVal);av(o,"_fbc",fbcVal);av(o,"_fbclid",cid.fb);av(o,"_gclid",cid.gl);av(o,"_gbraid",cid.gb);av(o,"_wbraid",cid.wb);av(o,"_tc_google_click_at",ga);av(o,"_ttclid",cid.tt);av(o,"_ttp",ttpVal);av(o,"_rdt_cid",cid.rd);av(o,"_epik",cid.ep)}else{var ak=["_fbp","_fbc","_fbclid","_gclid","_gbraid","_wbraid","_tc_google_click_at","_ttclid","_ttp","_rdt_cid","_epik"];for(var i=0;i<ak.length;i++)o[ak[i]]=""}var tk=[["_fbclid",cid.fb],["_gclid",cid.gl],["_gbraid",cid.gb],["_wbraid",cid.wb],["_tc_google_click_at",ga],["_ttclid",cid.tt],["_rdt_cid",cid.rd],["_epik",cid.ep],["_utm_source",utm.s],["_utm_medium",utm.m],["_utm_campaign",utm.c],["_utm_content",utm.n],["_utm_term",utm.t]];if(_fresh){for(var j=0;j<tk.length;j++){if(m||tk[j][0].indexOf("_utm_")===0)o[tk[j][0]]=tk[j][1]||""}}else{for(var j=0;j<tk.length;j++)av(o,tk[j][0],tk[j][1])}av(o,"_landing_page",lp);av(o,"_tc_attribution_timestamp",_ats);av(o,"_tc_attribution_source",_as);if(c.analyticsAllowed!==undefined)av(o,"_tc_consent_analytics",c.analyticsAllowed);if(c.marketingAllowed!==undefined)av(o,"_tc_consent_marketing",c.marketingAllowed);if(c.saleOfDataAllowed!==undefined)av(o,"_tc_consent_sale_of_data",c.saleOfDataAllowed);if(c.analyticsAllowed!==undefined||c.marketingAllowed!==undefined||c.saleOfDataAllowed!==undefined){av(o,"_tc_consent_timestamp",Date.now());av(o,"_tc_consent_source","shopify_customer_privacy")}return o}
 function wa(){try{var o=at(),b=new URLSearchParams();for(var k in o)b.append("attributes["+k+"]",o[k]);if(!b.toString())return;fetch("/cart/update.js",{method:"POST",credentials:"include",keepalive:true,headers:{"Content-Type":"application/x-www-form-urlencoded"},body:b.toString()})}catch(e){}}
@@ -89,12 +95,12 @@ function ci(o){var id=fm(o);return id?[id]:[]}
 function lo(l){l=l||{};var v=l.variant||l.merchandise||{},p=v.product||l.product||{};return{variantId:v.id||v.variantId||l.variant_id,variantGraphqlId:v.id||v.admin_graphql_api_id,productId:p.id||p.productId||l.product_id,productGraphqlId:p.id||p.admin_graphql_api_id,sku:v.sku||l.sku}}
 function ckid(co){var n=ni(co&&(co.checkoutToken||co.token));return n?"shopify-checkout:"+W+":"+n:null}
 function pid(co){co=co||{};var o=co.order||{},id=ni(o.name||co.orderName||o.id||o.admin_graphql_api_id||co.checkoutToken||co.token||co.id||co.cartToken||co.cartId);return id?"shopify-purchase:"+W+":"+id:crypto.randomUUID()}
-mf();tf();
-a.subscribe("page_viewed",function(e){var id=crypto.randomUUID();se("PageView",id,{},{});if(bf())window.fbq("track","PageView",{},{eventID:id});if(bt())window.ttq.track("Pageview",{},{event_id:id})});
+mf();tf();gi();
+a.subscribe("page_viewed",function(e){var id=crypto.randomUUID();se("PageView",id,{},{});if(bf())window.fbq("track","PageView",{},{eventID:id});if(bt())window.ttq.track("Pageview",{},{event_id:id});gh("v",e)});
 a.subscribe("product_viewed",function(e){var id=crypto.randomUUID(),v=e.data.productVariant||{},cd={contentIds:ci({variantId:v.id,variantGraphqlId:v.id,productId:v.product&&v.product.id,productGraphqlId:v.product&&v.product.id,sku:v.sku}),contentType:"product",contentName:v.title||"",contentCategory:(v.product&&v.product.type)||"",value:v.price?parseFloat(v.price.amount):0,currency:v.price?v.price.currencyCode:"USD"};cd.contents=cd.contentIds.map(function(x){return{id:x,quantity:1,itemPrice:cd.value}});se("ViewContent",id,cd,{});if(bf())window.fbq("track","ViewContent",{content_ids:cd.contentIds,content_type:cd.contentType,content_name:cd.contentName,value:cd.value,currency:cd.currency,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("ViewContent",td(cd),{event_id:id})});
-a.subscribe("product_added_to_cart",function(e){var id=crypto.randomUUID(),cl=e.data.cartLine||{},m=cl.merchandise||{},t=(cl.cost||{}).totalAmount||{},cd={contentIds:ci({variantId:m.id,variantGraphqlId:m.id,productId:m.product&&m.product.id,productGraphqlId:m.product&&m.product.id,sku:m.sku}),contentType:"product",value:t.amount?parseFloat(t.amount):0,currency:t.currencyCode||"USD",numItems:cl.quantity||1};cd.contents=cd.contentIds.map(function(x){return{id:x,quantity:cl.quantity||1,itemPrice:m.price&&m.price.amount?parseFloat(m.price.amount):(t.amount?parseFloat(t.amount)/(cl.quantity||1):0)}});wa();se("AddToCart",id,cd,{});if(bf())window.fbq("track","AddToCart",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("AddToCart",td(cd),{event_id:id})});
-a.subscribe("checkout_started",function(e){var co=e.data.checkout||{},id=ckid(co)||crypto.randomUUID(),tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};wa();se("InitiateCheckout",id,cd,eu(co));if(bf())window.fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("InitiateCheckout",td(cd),{event_id:id})});
-a.subscribe("checkout_completed",function(e){var co=e.data.checkout||{},id=pid(co),tp=co.totalPrice||{},li=co.lineItems||[],o=co.order||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:o.id||o.name||co.orderName||null,orderName:o.name||co.orderName||null,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};se("Purchase",id,cd,eu(co));if(!H&&bf())window.fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(!H&&bt())window.ttq.track("CompletePayment",td(cd),{event_id:id})});
+a.subscribe("product_added_to_cart",function(e){var id=crypto.randomUUID(),cl=e.data.cartLine||{},m=cl.merchandise||{},t=(cl.cost||{}).totalAmount||{},cd={contentIds:ci({variantId:m.id,variantGraphqlId:m.id,productId:m.product&&m.product.id,productGraphqlId:m.product&&m.product.id,sku:m.sku}),contentType:"product",value:t.amount?parseFloat(t.amount):0,currency:t.currencyCode||"USD",numItems:cl.quantity||1};cd.contents=cd.contentIds.map(function(x){return{id:x,quantity:cl.quantity||1,itemPrice:m.price&&m.price.amount?parseFloat(m.price.amount):(t.amount?parseFloat(t.amount)/(cl.quantity||1):0)}});wa();se("AddToCart",id,cd,{});if(bf())window.fbq("track","AddToCart",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("AddToCart",td(cd),{event_id:id});gh("a",e,cd)});
+a.subscribe("checkout_started",function(e){var co=e.data.checkout||{},id=ckid(co)||crypto.randomUUID(),tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};wa();se("InitiateCheckout",id,cd,eu(co));if(bf())window.fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("InitiateCheckout",td(cd),{event_id:id});gh("c",e,cd,eu(co))});
+a.subscribe("checkout_completed",function(e){var co=e.data.checkout||{},id=pid(co),tp=co.totalPrice||{},li=co.lineItems||[],o=co.order||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:o.id||o.name||co.orderName||null,orderName:o.name||co.orderName||null,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};se("Purchase",id,cd,eu(co));if(!H&&bf())window.fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(!H&&bt())window.ttq.track("CompletePayment",td(cd),{event_id:id});gh("p",e,cd,eu(co),o)});
 })();`;
 }
 
@@ -108,6 +114,9 @@ export async function GET(
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, isActive: true },
     select: {
+      id: true,
+      productMode: true,
+      installType: true,
       apiKey: true,
       metaPixelId: true,
       enableMeta: true,
@@ -115,6 +124,12 @@ export async function GET(
       tiktokPixelId: true,
       enableTikTok: true,
       tiktokBrowserTrackingEnabled: true,
+      googleBrowserTrackingEnabled: true,
+      googleTagId: true,
+      googleTagPurchaseLabel: true,
+      googleTagAddToCartLabel: true,
+      googleTagBeginCheckoutLabel: true,
+      googleTagPageViewLabel: true,
       shopifyWebhookSecretEncrypted: true,
       shopifyWebhookVerifiedAt: true,
       consentMode: true,
@@ -146,7 +161,8 @@ export async function GET(
     workspace.metaBrowserTrackingEnabled && workspace.enableMeta,
     workspace.tiktokBrowserTrackingEnabled && workspace.enableTikTok,
     workspace.consentMode,
-    contentIdOptionsFromWorkspace(workspace)
+    contentIdOptionsFromWorkspace(workspace),
+    googleTagForWorkspace(workspace)
   );
 
   return new NextResponse(script, {

@@ -86,6 +86,14 @@ describe("Google Ads purchase event", () => {
       userData: { userIdentifiers: [{ emailAddress: hash("buyer@example.com") }] },
     });
   });
+  it("uses Shopify's numeric order ID as transaction ID, as the Google tag does", () => {
+    expect(normalizeToGoogleAdsEvent(event(), now, "9507925491976").transactionId).toBe("9507925491976");
+    expect(normalizeToGoogleAdsEvent(event(), now, "gid://shopify/Order/9507925491976").transactionId).toBe("9507925491976");
+    expect(normalizeToGoogleAdsEvent(event({ customData: { value: "1", currency: "EUR", orderId: "gid://shopify/Order/42" } }), now)
+      .transactionId).toBe("42");
+    // Without a numeric ID the order name still identifies the purchase.
+    expect(normalizeToGoogleAdsEvent(event(), now, null).transactionId).toBe("#5530");
+  });
   it("prefers gclid, then gbraid, then wbraid, and drops clicks older than 90 days", () => {
     expect(googleAdIdentifiers({ gclid: "g", gbraid: "b", wbraid: "w" }, now)).toEqual({ gclid: "g" });
     expect(googleAdIdentifiers({ gbraid: "b", wbraid: "w" }, now)).toEqual({ gbraid: "b" });

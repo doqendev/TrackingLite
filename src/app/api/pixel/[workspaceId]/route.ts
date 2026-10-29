@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contentIdOptionsFromWorkspace, type ContentIdOptions } from "@/lib/content-id";
 import { getWorkspaceIngestUrl } from "@/lib/custom-ingest-domain";
+import { googleTagForWorkspace, googleTagScript, type GoogleTagConfig } from "@/lib/google-tag";
 
 function sanitizeForJs(value: string): string {
   return value.replace(/[\\'"<>&`\n\r\0]/g, "");
@@ -19,7 +20,8 @@ function generatePixelCode(
   tiktokBrowserTrackingEnabled: boolean,
   consentMode: "STRICT" | "LAX",
   contentIdOptions: ContentIdOptions = {},
-  enableOpenAI = false
+  enableOpenAI = false,
+  googleTag: GoogleTagConfig | null = null
 ): string {
   return `// Track Clear v2 - Server-Side Event Tracking
 (async function(){
@@ -49,7 +51,8 @@ function mf(){if(!MB||typeof P==="undefined"||!P||!mk()||MI)return;var R=window.
 function bf(){return MB&&mk()&&typeof window.fbq==="function"}
 function tf(){if(!TB||typeof TP==="undefined"||!TP||!mk()||TI)return;var R=window.__tcTikTokInitializedPixels||(window.__tcTikTokInitializedPixels={});if(R[TP]){TI=true;return}if(!window.ttq||typeof window.ttq.load!=="function"){(function(w,d,t){w.TiktokAnalyticsObject=t;var q=w[t]=w[t]||[];q.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"];q.setAndDefer=function(o,m){o[m]=function(){o.push([m].concat([].slice.call(arguments,0)))}};for(var i=0;i<q.methods.length;i++)q.setAndDefer(q,q.methods[i]);q.instance=function(e){var a=q._i[e]||[];for(var i=0;i<q.methods.length;i++)q.setAndDefer(a,q.methods[i]);return a};q.load=function(e,o){var u="https://analytics.tiktok.com/i18n/pixel/events.js";q._i=q._i||{};q._i[e]=[];q._i[e]._u=u;q._t=q._t||{};q._t[e]=+new Date;q._o=q._o||{};q._o[e]=o||{};var s=d.createElement("script"),x=d.getElementsByTagName("script")[0];s.type="text/javascript";s.async=true;s.src=u+"?sdkid="+e+"&lib="+t;x&&x.parentNode?x.parentNode.insertBefore(s,x):d.head.appendChild(s)}})(window,document,"ttq")}window.ttq.grantConsent();window.ttq.load(TP);R[TP]=true;TI=true}
 function bt(){return TB&&mk()&&window.ttq&&typeof window.ttq.track==="function"}
-function pc(){if(mk()){if(MB&&window.fbq)window.fbq("consent","grant");if(TB&&window.ttq&&typeof window.ttq.grantConsent==="function")window.ttq.grantConsent()}else{if(MB&&window.fbq)window.fbq("consent","revoke");if(TB&&window.ttq&&typeof window.ttq.revokeConsent==="function")window.ttq.revokeConsent()}}
+function pc(){if(mk()){if(MB&&window.fbq)window.fbq("consent","grant");if(TB&&window.ttq&&typeof window.ttq.grantConsent==="function")window.ttq.grantConsent()}else{if(MB&&window.fbq)window.fbq("consent","revoke");if(TB&&window.ttq&&typeof window.ttq.revokeConsent==="function")window.ttq.revokeConsent()}if(GT&&GI&&typeof window.gtag==="function")window.gtag("consent","update",gk())}
+${googleTagScript(googleTag, { pageUrl: "pageUrl", referrer: "pageRef" })}
 function td(cd){cd=cd||{};var p={},a=[];if(Array.isArray(cd.contents)){for(var i=0;i<cd.contents.length;i++){var x=cd.contents[i]||{},z={content_id:String(x.id||"") ,content_type:"product",quantity:x.quantity||1};if(x.itemPrice!==undefined)z.price=x.itemPrice;else if(x.item_price!==undefined)z.price=x.item_price;if(z.content_id)a.push(z)}}else if(Array.isArray(cd.contentIds)){for(var j=0;j<cd.contentIds.length;j++)a.push({content_id:String(cd.contentIds[j]),content_type:"product",quantity:1})}if(a.length)p.contents=a;if(cd.contentType)p.content_type=cd.contentType;if(cd.contentName)p.content_name=cd.contentName;if(cd.value!==undefined)p.value=cd.value;if(cd.currency)p.currency=cd.currency;if(cd.numItems!==undefined)p.quantity=cd.numItems;return p}
 if(!mk()){cid.fb=null;cid.tt=null;cid.rd=null;cid.ep=null;cid.gl=null;cid.gb=null;cid.wb=null}
 var _now=Date.now(),_fresh=!!(cid.tt||cid.rd||cid.ep||cid.gl||cid.fb||cid.gb||cid.wb||utm.s||utm.m||utm.c||utm.n||utm.t),_gf=!!(cid.gl||cid.gb||cid.wb),_gca=null;
@@ -88,7 +91,7 @@ async function dq(p){return dk(async function(){var m=dm(p),id=m.eventId+":"+m.t
 async function dz(ref,ok){return dk(async function(){var n=Date.now(),delay=0,q=(await dl()).flatMap(function(x){if(x.id!==ref.id||x.generation!==ref.generation)return[x];if(ok)return[];var a=(x.attempts||0)+1,d=dj(a);delay=d;return[Object.assign({},x,{attempts:a,nextAttemptAt:n+d})]});await dw(q);if(delay)dy(delay)})}
 async function rr(){if(DR)return DR;DR=(async function(){var q=await dk(async function(){var x=await dl();await dw(x);return x}),n=Date.now();for(var i=0;i<q.length;i++){var x=q[i];if(x.nextAttemptAt>n){dy(x.nextAttemptAt-n);continue}try{var r=await dp(x.payload);await dz({id:x.id,generation:x.generation},r.ok)}catch(e){await dz({id:x.id,generation:x.generation},false)}}})();try{await DR}finally{DR=null}}
 rr().catch(function(){});
-try{if(C&&typeof C.subscribe==="function"){var _sub=C.subscribe("visitorConsentCollected",async function(e){EC={timestamp:new Date().toISOString()};PS=(e&&e.customerPrivacy)||PS;window.__tcPrivacyStatus=PS;pc();if(!ak())gaClientId=null;await ri();await sc();mf();tf();wa();var c=cn();if(dn(c))await se("PageView",crypto.randomUUID(),{},{},[]) });if(_sub&&typeof _sub.catch==="function")_sub.catch(function(){})}}catch(e){}
+try{if(C&&typeof C.subscribe==="function"){var _sub=C.subscribe("visitorConsentCollected",async function(e){EC={timestamp:new Date().toISOString()};PS=(e&&e.customerPrivacy)||PS;window.__tcPrivacyStatus=PS;pc();if(!ak())gaClientId=null;await ri();await sc();mf();tf();gi();wa();var c=cn();if(dn(c))await se("PageView",crypto.randomUUID(),{},{},[]) });if(_sub&&typeof _sub.catch==="function")_sub.catch(function(){})}}catch(e){}
 var su=null;var _ciId=null;
 var iu={};try{if(I&&I.data&&I.data.customer){var _ic=I.data.customer;iu={email:_ic.email||null,phone:_ic.phone||null,firstName:_ic.firstName||null,lastName:_ic.lastName||null,customerId:_ic.id||null}}}catch(e){}
 function mu(a,b){var r={};for(var k in a){if(a[k])r[k]=a[k]}for(var k in b){if(b[k])r[k]=b[k]}return r}
@@ -106,14 +109,14 @@ function ci(o){var id=fm(o);return id?[id]:[]}
 function lo(l){l=l||{};var v=l.variant||l.merchandise||{},p=v.product||l.product||{};return{variantId:v.id||v.variantId||l.variant_id,variantGraphqlId:v.id||v.admin_graphql_api_id,productId:p.id||p.productId||l.product_id,productGraphqlId:p.id||p.admin_graphql_api_id,sku:v.sku||l.sku}}
 function ckid(co){var n=ni(co&&(co.checkoutToken||co.token));return n?"shopify-checkout:"+W+":"+n:null}
 function pid(co){co=co||{};var o=co.order||{},id=ni(o.name||co.orderName||o.id||o.admin_graphql_api_id||co.checkoutToken||co.token||co.id||co.cartToken||co.cartId);return id?"shopify-purchase:"+W+":"+id:crypto.randomUUID()}
-mf();tf();
-A.subscribe("page_viewed",function(e){EC=e;var id=crypto.randomUUID();se("PageView",id,{},{});if(bf())window.fbq("track","PageView",{},{eventID:id});if(bt())window.ttq.track("Pageview",{},{event_id:id})});
+mf();tf();gi();
+A.subscribe("page_viewed",function(e){EC=e;var id=crypto.randomUUID();se("PageView",id,{},{});if(bf())window.fbq("track","PageView",{},{eventID:id});if(bt())window.ttq.track("Pageview",{},{event_id:id});gh("v",e)});
 A.subscribe("product_viewed",function(e){EC=e;var id=crypto.randomUUID(),v=e.data.productVariant||{},cd={contentIds:ci({variantId:v.id,variantGraphqlId:v.id,productId:v.product&&v.product.id,productGraphqlId:v.product&&v.product.id,sku:v.sku}),contentType:"product",contentName:v.title||"",contentCategory:(v.product&&v.product.type)||"",value:v.price?parseFloat(v.price.amount):0,currency:v.price?v.price.currencyCode:"USD"};cd.contents=cd.contentIds.map(function(x){return{id:x,quantity:1,itemPrice:cd.value}});se("ViewContent",id,cd,{});if(bf())window.fbq("track","ViewContent",{content_ids:cd.contentIds,content_type:cd.contentType,content_name:cd.contentName,value:cd.value,currency:cd.currency,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("ViewContent",td(cd),{event_id:id})});
-A.subscribe("product_added_to_cart",function(e){EC=e;var id=crypto.randomUUID(),cl=e.data.cartLine||{},m=cl.merchandise||{},t=(cl.cost||{}).totalAmount||{},cd={contentIds:ci({variantId:m.id,variantGraphqlId:m.id,productId:m.product&&m.product.id,productGraphqlId:m.product&&m.product.id,sku:m.sku}),contentType:"product",value:t.amount?parseFloat(t.amount):0,currency:t.currencyCode||"USD",numItems:cl.quantity||1};cd.contents=cd.contentIds.map(function(x){return{id:x,quantity:cl.quantity||1,itemPrice:m.price&&m.price.amount?parseFloat(m.price.amount):(t.amount?parseFloat(t.amount)/(cl.quantity||1):0)}});wa();se("AddToCart",id,cd,{});if(bf())window.fbq("track","AddToCart",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("AddToCart",td(cd),{event_id:id})});
-A.subscribe("checkout_started",function(e){EC=e;var co=e.data.checkout||{},id=ckid(co)||crypto.randomUUID();_ciId=id;CIOrigin=e;var tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};wa();se("InitiateCheckout",id,cd,eu(co),null,["KLAVIYO"]);if(bf())window.fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("InitiateCheckout",td(cd),{event_id:id})});
+A.subscribe("product_added_to_cart",function(e){EC=e;var id=crypto.randomUUID(),cl=e.data.cartLine||{},m=cl.merchandise||{},t=(cl.cost||{}).totalAmount||{},cd={contentIds:ci({variantId:m.id,variantGraphqlId:m.id,productId:m.product&&m.product.id,productGraphqlId:m.product&&m.product.id,sku:m.sku}),contentType:"product",value:t.amount?parseFloat(t.amount):0,currency:t.currencyCode||"USD",numItems:cl.quantity||1};cd.contents=cd.contentIds.map(function(x){return{id:x,quantity:cl.quantity||1,itemPrice:m.price&&m.price.amount?parseFloat(m.price.amount):(t.amount?parseFloat(t.amount)/(cl.quantity||1):0)}});wa();se("AddToCart",id,cd,{});if(bf())window.fbq("track","AddToCart",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("AddToCart",td(cd),{event_id:id});gh("a",e,cd)});
+A.subscribe("checkout_started",function(e){EC=e;var co=e.data.checkout||{},id=ckid(co)||crypto.randomUUID();_ciId=id;CIOrigin=e;var tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};wa();se("InitiateCheckout",id,cd,eu(co),null,["KLAVIYO"]);if(bf())window.fbq("track","InitiateCheckout",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(bt())window.ttq.track("InitiateCheckout",td(cd),{event_id:id});gh("c",e,cd,eu(co))});
 A.subscribe("checkout_contact_info_submitted",function(e){EC=e;var co=e.data.checkout||{},ud=eu(co);su=mu(su||{},ud);if(ud.email||ud.phone){var tp=co.totalPrice||{},li=co.lineItems||[],cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};se("InitiateCheckout",_ciId||ckid(co)||crypto.randomUUID(),cd,ud,OE?["META","TIKTOK","OPENAI"]:["META","TIKTOK"]);var id=crypto.randomUUID();se("InitiateCheckout",id,cd,ud,["KLAVIYO"])}});
 A.subscribe("checkout_address_info_submitted",function(e){EC=e;var co=e.data.checkout||{},ud=eu(co);su=mu(su||{},ud)});
-A.subscribe("checkout_completed",function(e){EC=e;var co=e.data.checkout||{},id=pid(co),tp=co.totalPrice||{},li=co.lineItems||[],o=co.order||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:o.id||o.name||co.orderName||null,orderName:o.name||co.orderName||null,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};var pud=eu(co);se("Purchase",id,cd,{email:pud.email||((su)&&su.email)||null,phone:pud.phone||((su)&&su.phone)||null,firstName:pud.firstName||((su)&&su.firstName)||null,lastName:pud.lastName||((su)&&su.lastName)||null,city:pud.city||((su)&&su.city)||null,state:pud.state||((su)&&su.state)||null,zip:pud.zip||((su)&&su.zip)||null,countryCode:pud.countryCode||((su)&&su.countryCode)||null});if(!H&&bf())window.fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(!H&&bt())window.ttq.track("CompletePayment",td(cd),{event_id:id})});
+A.subscribe("checkout_completed",function(e){EC=e;var co=e.data.checkout||{},id=pid(co),tp=co.totalPrice||{},li=co.lineItems||[],o=co.order||{},cd={value:tp.amount?parseFloat(tp.amount):0,currency:tp.currencyCode||"USD",contentIds:li.map(function(l){return fm(lo(l))}).filter(Boolean),contentType:"product",contents:li.map(function(l){return{id:fm(lo(l)),quantity:l.quantity||1,itemPrice:l.variant&&l.variant.price?parseFloat(l.variant.price.amount):0}}).filter(function(x){return x.id}),numItems:li.reduce(function(s,l){return s+(l.quantity||1)},0),orderId:o.id||o.name||co.orderName||null,orderName:o.name||co.orderName||null,checkoutToken:co.checkoutToken||co.token||co.id||null,cartToken:co.cartToken||co.cartId||null};var pud=eu(co),pu={email:pud.email||((su)&&su.email)||null,phone:pud.phone||((su)&&su.phone)||null,firstName:pud.firstName||((su)&&su.firstName)||null,lastName:pud.lastName||((su)&&su.lastName)||null,city:pud.city||((su)&&su.city)||null,state:pud.state||((su)&&su.state)||null,zip:pud.zip||((su)&&su.zip)||null,countryCode:pud.countryCode||((su)&&su.countryCode)||null};se("Purchase",id,cd,pu);if(!H&&bf())window.fbq("track","Purchase",{content_ids:cd.contentIds,content_type:cd.contentType,value:cd.value,currency:cd.currency,num_items:cd.numItems,contents:cd.contents},{eventID:id});if(!H&&bt())window.ttq.track("CompletePayment",td(cd),{event_id:id});gh("p",e,cd,pu,o)});
 if(typeof A.activate==="function")A.activate();
 })();`;
 }
@@ -137,6 +140,9 @@ export async function GET(
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, isActive: true },
     select: {
+      id: true,
+      productMode: true,
+      installType: true,
       apiKey: true,
       metaPixelId: true,
       enableMeta: true,
@@ -145,6 +151,12 @@ export async function GET(
       enableTikTok: true,
       enableOpenAI: true,
       tiktokBrowserTrackingEnabled: true,
+      googleBrowserTrackingEnabled: true,
+      googleTagId: true,
+      googleTagPurchaseLabel: true,
+      googleTagAddToCartLabel: true,
+      googleTagBeginCheckoutLabel: true,
+      googleTagPageViewLabel: true,
       shopifyWebhookSecretEncrypted: true,
       shopifyWebhookVerifiedAt: true,
       consentMode: true,
@@ -177,7 +189,8 @@ export async function GET(
     workspace.tiktokBrowserTrackingEnabled && workspace.enableTikTok,
     workspace.consentMode,
     contentIdOptionsFromWorkspace(workspace),
-    workspace.enableOpenAI
+    workspace.enableOpenAI,
+    googleTagForWorkspace(workspace)
   );
 
   return new Response(js, {

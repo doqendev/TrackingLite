@@ -476,7 +476,7 @@
     "notConfigured": "Not configured",
     "notAvailable": "Google Ads delivery is not available yet: Track Clear's Google connection is not set up on this server.",
     "accountStep": "In Google Ads, keep auto-tagging on (Admin > Account settings) and accept the customer data terms (Goals > Settings). Without the terms, Google rejects every upload.",
-    "step1": "In Google Ads, open Goals > Conversions and create a conversion action: Import > Other data sources or CRMs > Track conversions from clicks, category Purchase, count Every (One rejects clicks from iPhone apps). Open it and copy the number after ctId= in the address bar.",
+    "step1": "In Google Ads, open Goals > Conversions and create a Purchase conversion action with count Every (One rejects clicks from iPhone apps). With Track Clear's Google tag below, create it as Website, set up manually with code; without the tag, use Import > Other data sources or CRMs > Track conversions from clicks. Open it and copy the number after ctId= in the address bar.",
     "step2": "In Admin > Access and security, add this address as a user with Standard access:",
     "step3": "Enter your 10-digit customer ID (top right in Google Ads) and the conversion action ID below. Install the Track Clear Custom Pixel, Cart Helper, and Shopify orders/paid webhook.",
     "customerId": "Customer ID",
@@ -496,6 +496,19 @@
     "validatedMessage": "Connection validated. Delivery is disabled.",
     "disabledMessage": "Delivery disabled.",
     "verifyNote": "Purchases only. Check upload results and consent before relying on campaign reporting.",
-    "trackingHealth": "Tracking Health"
+    "trackingHealth": "Tracking Health",
+    "tagTitle": "Google tag in the browser",
+    "tagDescription": "Track Clear can also run your Google Ads tag on the store, once the shopper allows marketing. Google then records purchases with its own cookies, plus the checkout steps you add. Copy the values from each conversion action's event code: in send_to, the tag ID is the part before the slash and the label the part after. You can paste the whole send_to value.",
+    "tagId": "Google tag ID",
+    "purchaseLabel": "Purchase label",
+    "addToCartLabel": "Add to cart label (optional)",
+    "beginCheckoutLabel": "Begin checkout label (optional)",
+    "pageViewLabel": "Page view label (optional)",
+    "tagEnable": "Run this Google tag from Track Clear",
+    "tagNote": "Turn it on only if no other Google tag reports purchases to this account, such as Shopify's Google & YouTube app. Then use this Purchase action's ID as the conversion action ID above, so Google merges Track Clear's server copy into the same action.",
+    "tagSave": "Save Google tag",
+    "tagSaved": "Google tag saved. It runs on the store within a minute.",
+    "tagSavedOff": "Google tag saved. It is not running.",
+    "tagMissing": "Enter the Google tag ID and the Purchase label."
   }
 }

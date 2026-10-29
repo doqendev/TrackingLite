@@ -476,7 +476,7 @@
     "notConfigured": "Non configuré",
     "notAvailable": "Google Ads n’est pas encore disponible : la connexion Google de Track Clear n’est pas configurée sur ce serveur.",
     "accountStep": "Dans Google Ads, laissez le marquage automatique activé (Administration > Paramètres du compte) et acceptez les conditions d’utilisation des données client (Objectifs > Paramètres). Sans ces conditions, Google refuse chaque import.",
-    "step1": "Dans Google Ads, ouvrez Objectifs > Conversions et créez une action de conversion : Importer > Autres sources de données ou CRM > Suivre les conversions à partir des clics, catégorie Achat, comptabilisation Toutes (Une refuse les clics provenant d’applications iPhone). Ouvrez-la et copiez le nombre après ctId= dans la barre d’adresse.",
+    "step1": "Dans Google Ads, ouvrez Objectifs > Conversions et créez une action de conversion de catégorie Achat avec la comptabilisation Toutes (Une refuse les clics provenant d’applications iPhone). Avec la balise Google de Track Clear ci-dessous, créez-la en tant que Site Web, configurée manuellement avec du code ; sans la balise, utilisez Importer > Autres sources de données ou CRM > Suivre les conversions à partir des clics. Ouvrez-la et copiez le nombre après ctId= dans la barre d’adresse.",
     "step2": "Dans Administration > Accès et sécurité, ajoutez cette adresse comme utilisateur avec un accès standard :",
     "step3": "Saisissez ci-dessous votre numéro client à 10 chiffres (en haut à droite dans Google Ads) et l’ID de l’action de conversion. Installez le Custom Pixel, le Cart Helper et le webhook Shopify orders/paid de Track Clear.",
     "customerId": "Numéro client",
@@ -496,6 +496,19 @@
     "validatedMessage": "Connexion validée. La livraison est désactivée.",
     "disabledMessage": "Livraison désactivée.",
     "verifyNote": "Achats uniquement. Vérifiez les résultats des imports et le consentement avant de vous fier aux rapports.",
-    "trackingHealth": "État du suivi"
+    "trackingHealth": "État du suivi",
+    "tagTitle": "Balise Google dans le navigateur",
+    "tagDescription": "Track Clear peut aussi exécuter votre balise Google Ads sur la boutique, dès que l’acheteur autorise le marketing. Google enregistre alors les achats avec ses propres cookies, ainsi que les étapes du paiement que vous ajoutez. Copiez les valeurs depuis le code d’événement de chaque action de conversion : dans send_to, l’ID de la balise se trouve avant la barre oblique et le libellé après. Vous pouvez coller la valeur send_to entière.",
+    "tagId": "ID de la balise Google",
+    "purchaseLabel": "Libellé Achat",
+    "addToCartLabel": "Libellé Ajout au panier (facultatif)",
+    "beginCheckoutLabel": "Libellé Début du paiement (facultatif)",
+    "pageViewLabel": "Libellé Page vue (facultatif)",
+    "tagEnable": "Exécuter cette balise Google depuis Track Clear",
+    "tagNote": "Activez-la seulement si aucune autre balise Google ne transmet les achats à ce compte, comme l’application Google & YouTube de Shopify. Utilisez ensuite l’ID de cette action Achat comme ID d’action de conversion ci-dessus, pour que Google fusionne la copie serveur de Track Clear dans la même action.",
+    "tagSave": "Enregistrer la balise Google",
+    "tagSaved": "Balise Google enregistrée. Elle s’exécute sur la boutique d’ici une minute.",
+    "tagSavedOff": "Balise Google enregistrée. Elle n’est pas exécutée.",
+    "tagMissing": "Saisissez l’ID de la balise Google et le libellé Achat."
   }
 }

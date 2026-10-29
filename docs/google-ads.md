@@ -1,11 +1,19 @@
 # Google Ads conversions (Data Manager API)
 
-Track Clear uploads Shopify Purchases to Google Ads as offline click conversions
-through Google's Data Manager API. One merchant conversion action of type
-"Website (Import from clicks)" receives every Purchase with the Google click ID
-(gclid, gbraid or wbraid) when one exists, plus normalized, SHA-256 hashed
-customer data for matching. Google processes each upload asynchronously; Track
-Clear stores the request ID and later records Google's final processing result.
+Track Clear uploads Shopify Purchases to Google Ads through Google's Data Manager
+API, with the Google click ID (gclid, gbraid or wbraid) when one exists plus
+normalized, SHA-256 hashed customer data for matching. Google processes each
+upload asynchronously; Track Clear stores the request ID and later records
+Google's final processing result.
+
+The upload goes to one merchant conversion action, in one of two setups:
+
+- **Google tag and multi-source (recommended).** Track Clear also runs the
+  store's Google tag in the browser, reporting a Website Purchase action and
+  optional funnel steps, and uploads each purchase into that same action. Google
+  merges the two copies by transaction ID. See "Google tag and multi-source".
+- **Server only.** The upload goes to a "Website (Import from clicks)" action,
+  with no Google tag from Track Clear.
 
 ## Why the previous Google Ads destination was replaced
 
@@ -67,6 +75,65 @@ manager account and enter its ID as the manager (login) account.
 Google Ads is available to standard Shopify workspaces (`SHOPIFY_CUSTOM_PIXEL`)
 and legacy workspaces. Headless V1 installs are excluded, as for ChatGPT Ads.
 
+## Google tag and multi-source
+
+Track Clear can run the store's Google Ads tag (`gtag.js`) in the Custom Pixel
+and the legacy script, as it can run the Meta and TikTok browser pixels. It is
+off by default (`googleBrowserTrackingEnabled`) and needs the tag ID
+(`googleTagId`, `AW-...`) and the Purchase label; the Add to cart, Begin
+checkout and Page view labels are optional (`googleTag*Label`, migration
+`20261029_google_tag_browser_ownership`). Headless V1 installs are excluded, as
+for the server upload. The settings live in a "Google tag in the browser" section
+of the Google Ads card, which also accepts a pasted `send_to` value.
+
+Merchant setup in Google Ads, in addition to the account steps above:
+
+1. Goals > Conversions > Create conversion action > Purchase > the website, set
+   up manually with code (not from page URLs, which cannot take a second data
+   source). Count Every, value "use different values", enhanced conversions on
+   through the Google tag. Note the action's conversion type ID (the `ctId` in
+   its address): it is the Track Clear conversion action ID.
+2. Copy `send_to` from its event snippet: `AW-<tag ID>/<label>`.
+3. Optionally create Add to cart, Begin checkout and Page view the same way, set
+   each to Secondary, and copy their labels.
+4. On the Purchase action, a Beta box offering to connect a data source shows
+   that the account has multi-source conversions. Do not connect anything there:
+   the Data Manager API upload names the action as its destination.
+5. No other Google tag may report purchases to the account (for example the
+   Google & YouTube app); set any such action to Secondary.
+
+Browser behavior (`src/lib/google-tag.ts`, shared by both scripts):
+
+- The tag loads only once the shopper allows marketing (basic consent mode), so
+  consent mode starts `granted` (`ad_personalization` follows sale of data,
+  `analytics_storage` the analytics choice) and a later change sends
+  `consent update`; after a refusal nothing more is sent. In STRICT mode a page
+  view seen before consent is sent once consent arrives.
+- Shopify's pixel sandbox cannot keep Google's own click cookie, so every hit
+  first sets `config` with `page_location` carrying the stored Google click
+  (gclid, then gbraid, then wbraid) when the page address has none, and
+  `send_page_view: false`.
+- Page view sends `page_view` to the tag (audiences) plus the Page view
+  conversion when labelled. Add to cart and Begin checkout send their conversions
+  with value and currency. Purchase sends value, currency and `transaction_id`
+  = Shopify's numeric order ID. Checkout and purchase set `user_data` for
+  enhanced conversions: lower-cased email, a phone only in E.164, an address only
+  with first name, last name, postal code and country.
+- Unlike the Meta browser Purchase, the Google browser Purchase is not
+  suppressed after the Shopify webhook is verified: Google merges it with the
+  server copy instead.
+
+Server behavior: every Google upload, in either setup, now uses Shopify's
+numeric order ID as `transactionId` (the EventLog `orderId`, the same value the
+tag sends), falling back to the order name. Within the tag's action Google
+deduplicates the two copies by that ID: a matched upload only adds what the tag
+lacked, and an upload whose tag hit never arrived (ad blocker) counts on its own.
+For an action's first 14 days, uploaded conversions are reported but not used
+for bidding, and value updates are off. Google asks for uploads within 24
+hours; the six-hour hold stays inside that. On 29 October 2026 Track Clear's
+`validateOnly` upload was accepted for Adelia London's Website Purchase action
+(7881898474), with and without a click ID.
+
 ## Delivery path
 
 - Ingest and the Shopify orders/paid webhook create a `GOOGLE_ADS` EventLog only
@@ -109,7 +176,7 @@ and legacy workspaces. Headless V1 installs are excluded, as for ChatGPT Ads.
   Google recommends uploading within 24 hours, so the hold stays well inside that.
 - Request (`src/lib/destinations/google-ads.ts`): operating account,
   optional login account, `productDestinationId` = conversion action ID,
-  `encoding: HEX`, `transactionId` = Shopify order name (Google's dedupe key),
+  `encoding: HEX`, `transactionId` = Shopify's numeric order ID, else the order name (Google's dedupe key),
   `eventTimestamp`, `eventSource: WEB`, `conversionValue` in currency units,
   `currency`, one ad identifier (gclid, then gbraid, then wbraid) and user
   identifiers: Google-normalized email (Gmail dots and +suffix removed), E.164

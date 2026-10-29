@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 export const REQUIRED_TRACKING_MIGRATIONS = [
+  "20261029_google_tag_browser_ownership",
   "20261014_google_ads_data_manager",
   "20261014_google_ads_data_manager_idx01_request_status",
   "20261013_event_retention_summaries",

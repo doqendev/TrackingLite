@@ -476,7 +476,7 @@
     "notConfigured": "Nicht konfiguriert",
     "notAvailable": "Google Ads ist noch nicht verfügbar: Die Google-Verbindung von Track Clear ist auf diesem Server nicht eingerichtet.",
     "accountStep": "Lassen Sie in Google Ads die automatische Tag-Kennzeichnung aktiviert (Verwaltung > Kontoeinstellungen) und akzeptieren Sie die Nutzungsbedingungen für Kundendaten (Zielvorhaben > Einstellungen). Ohne diese Bedingungen lehnt Google jeden Upload ab.",
-    "step1": "Öffnen Sie in Google Ads Zielvorhaben > Conversions und erstellen Sie eine Conversion-Aktion: Importieren > Andere Datenquellen oder CRMs > Conversions aus Klicks erfassen, Kategorie Kauf, Zählung Jede (Eine lehnt Klicks aus iPhone-Apps ab). Öffnen Sie sie und kopieren Sie die Zahl nach ctId= in der Adresszeile.",
+    "step1": "Öffnen Sie in Google Ads Zielvorhaben > Conversions und erstellen Sie eine Conversion-Aktion der Kategorie Kauf mit Zählung Jede (Eine lehnt Klicks aus iPhone-Apps ab). Mit dem Google-Tag von Track Clear unten legen Sie sie als Website an, manuell mit Code eingerichtet; ohne das Tag verwenden Sie Importieren > Andere Datenquellen oder CRMs > Conversions aus Klicks erfassen. Öffnen Sie sie und kopieren Sie die Zahl nach ctId= in der Adresszeile.",
     "step2": "Fügen Sie unter Verwaltung > Zugriff und Sicherheit diese Adresse als Nutzer mit Standardzugriff hinzu:",
     "step3": "Geben Sie unten Ihre 10-stellige Kundennummer (oben rechts in Google Ads) und die ID der Conversion-Aktion ein. Installieren Sie Custom Pixel, Cart Helper und Shopify-Webhook orders/paid von Track Clear.",
     "customerId": "Kundennummer",
@@ -496,6 +496,19 @@
     "validatedMessage": "Verbindung validiert. Zustellung ist deaktiviert.",
     "disabledMessage": "Zustellung deaktiviert.",
     "verifyNote": "Nur Käufe. Prüfen Sie Upload-Ergebnisse und Einwilligung, bevor Sie sich auf Berichte verlassen.",
-    "trackingHealth": "Tracking-Status"
+    "trackingHealth": "Tracking-Status",
+    "tagTitle": "Google-Tag im Browser",
+    "tagDescription": "Track Clear kann Ihr Google-Ads-Tag auch im Shop ausführen, sobald der Käufer Marketing erlaubt. Google erfasst Käufe dann mit seinen eigenen Cookies, dazu die Checkout-Schritte, die Sie hinzufügen. Kopieren Sie die Werte aus dem Ereignis-Code jeder Conversion-Aktion: In send_to steht die Tag-ID vor dem Schrägstrich und das Label danach. Sie können den ganzen send_to-Wert einfügen.",
+    "tagId": "Google-Tag-ID",
+    "purchaseLabel": "Label für Kauf",
+    "addToCartLabel": "Label für In den Warenkorb (optional)",
+    "beginCheckoutLabel": "Label für Checkout-Beginn (optional)",
+    "pageViewLabel": "Label für Seitenaufruf (optional)",
+    "tagEnable": "Dieses Google-Tag über Track Clear ausführen",
+    "tagNote": "Aktivieren Sie es nur, wenn kein anderes Google-Tag Käufe an dieses Konto meldet, etwa die Shopify-App Google & YouTube. Verwenden Sie dann die ID dieser Kauf-Aktion oben als Conversion-Aktions-ID, damit Google die Server-Kopie von Track Clear in dieselbe Aktion übernimmt.",
+    "tagSave": "Google-Tag speichern",
+    "tagSaved": "Google-Tag gespeichert. Es läuft innerhalb einer Minute im Shop.",
+    "tagSavedOff": "Google-Tag gespeichert. Es läuft nicht.",
+    "tagMissing": "Geben Sie die Google-Tag-ID und das Label für Kauf ein."
   }
 }

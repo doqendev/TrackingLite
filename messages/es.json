@@ -476,7 +476,7 @@
     "notConfigured": "No configurado",
     "notAvailable": "Google Ads aún no está disponible: la conexión de Track Clear con Google no está configurada en este servidor.",
     "accountStep": "En Google Ads, mantén activado el etiquetado automático (Administrador > Configuración de la cuenta) y acepta las condiciones de los datos de clientes (Objetivos > Configuración). Sin ellas, Google rechaza todas las subidas.",
-    "step1": "En Google Ads, abre Objetivos > Conversiones y crea una acción de conversión: Importar > Otras fuentes de datos o CRM > Registrar conversiones de clics, categoría Compra, recuento Todas (Una rechaza los clics desde apps de iPhone). Ábrela y copia el número que sigue a ctId= en la barra de direcciones.",
+    "step1": "En Google Ads, abre Objetivos > Conversiones y crea una acción de conversión de categoría Compra con recuento Todas (Una rechaza los clics desde apps de iPhone). Con la etiqueta de Google de Track Clear de abajo, créala como Sitio web, configurada manualmente con código; sin la etiqueta, usa Importar > Otras fuentes de datos o CRM > Registrar conversiones de clics. Ábrela y copia el número que sigue a ctId= en la barra de direcciones.",
     "step2": "En Administrador > Acceso y seguridad, añade esta dirección como usuario con acceso estándar:",
     "step3": "Introduce abajo tu ID de cliente de 10 dígitos (arriba a la derecha en Google Ads) y el ID de la acción de conversión. Instala el Custom Pixel, Cart Helper y webhook orders/paid de Shopify de Track Clear.",
     "customerId": "ID de cliente",
@@ -496,6 +496,19 @@
     "validatedMessage": "Conexión validada. La entrega está desactivada.",
     "disabledMessage": "Entrega desactivada.",
     "verifyNote": "Solo compras. Revisa los resultados de las subidas y el consentimiento antes de confiar en los informes.",
-    "trackingHealth": "Estado del seguimiento"
+    "trackingHealth": "Estado del seguimiento",
+    "tagTitle": "Etiqueta de Google en el navegador",
+    "tagDescription": "Track Clear también puede ejecutar tu etiqueta de Google Ads en la tienda, en cuanto el comprador permite el marketing. Google registra entonces las compras con sus propias cookies, además de los pasos del pago que añadas. Copia los valores del código de evento de cada acción de conversión: en send_to, el ID de la etiqueta va antes de la barra y la etiqueta de conversión después. Puedes pegar el valor send_to completo.",
+    "tagId": "ID de la etiqueta de Google",
+    "purchaseLabel": "Etiqueta de Compra",
+    "addToCartLabel": "Etiqueta de Añadir al carrito (opcional)",
+    "beginCheckoutLabel": "Etiqueta de Inicio del pago (opcional)",
+    "pageViewLabel": "Etiqueta de Vista de página (opcional)",
+    "tagEnable": "Ejecutar esta etiqueta de Google desde Track Clear",
+    "tagNote": "Actívala solo si ninguna otra etiqueta de Google informa de compras a esta cuenta, como la app Google & YouTube de Shopify. Después usa el ID de esta acción de Compra como ID de la acción de conversión de arriba, para que Google una la copia del servidor de Track Clear a la misma acción.",
+    "tagSave": "Guardar etiqueta de Google",
+    "tagSaved": "Etiqueta de Google guardada. Se ejecutará en la tienda en menos de un minuto.",
+    "tagSavedOff": "Etiqueta de Google guardada. No se está ejecutando.",
+    "tagMissing": "Introduce el ID de la etiqueta de Google y la etiqueta de Compra."
   }
 }

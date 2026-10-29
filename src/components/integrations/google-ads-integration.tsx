@@ -8,10 +8,19 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
+/** Accepts a label or a whole send_to value ("AW-123/label") pasted from the event code. */
+function splitSendTo(value: string): { id: string | null; label: string } {
+  const slash = value.indexOf("/");
+  return slash > 0 ? { id: value.slice(0, slash).trim(), label: value.slice(slash + 1).trim() } : { id: null, label: value.trim() };
+}
+
 export function GoogleAdsIntegration({ workspace, serviceAccountEmail }: {
   workspace: {
     id: string; googleAdsCustomerId?: string | null; googleAdsLoginCustomerId?: string | null;
     googleAdsConversionActionId?: string | null; enableGoogleAds?: boolean;
+    googleTagId?: string | null; googleTagPurchaseLabel?: string | null; googleTagAddToCartLabel?: string | null;
+    googleTagBeginCheckoutLabel?: string | null; googleTagPageViewLabel?: string | null;
+    googleBrowserTrackingEnabled?: boolean;
   };
   serviceAccountEmail: string | null;
 }) {
@@ -25,6 +34,42 @@ export function GoogleAdsIntegration({ workspace, serviceAccountEmail }: {
   const [message, setMessage] = useState("");
   const [validated, setValidated] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [tagId, setTagId] = useState(workspace.googleTagId ?? "");
+  const [tagLabels, setTagLabels] = useState({
+    googleTagPurchaseLabel: workspace.googleTagPurchaseLabel ?? "",
+    googleTagAddToCartLabel: workspace.googleTagAddToCartLabel ?? "",
+    googleTagBeginCheckoutLabel: workspace.googleTagBeginCheckoutLabel ?? "",
+    googleTagPageViewLabel: workspace.googleTagPageViewLabel ?? "",
+  });
+  const [tagEnabled, setTagEnabled] = useState(!!workspace.googleBrowserTrackingEnabled);
+  const [tagMessage, setTagMessage] = useState("");
+
+  async function saveTag() {
+    setBusy(true); setTagMessage("");
+    try {
+      let id = tagId.trim();
+      const labels: Record<string, string | null> = {};
+      for (const [field, value] of Object.entries(tagLabels)) {
+        const parsed = splitSendTo(value);
+        if (parsed.id && !id) id = parsed.id;
+        labels[field] = parsed.label || null;
+      }
+      if (tagEnabled && (!id || !labels.googleTagPurchaseLabel)) throw new Error(t("tagMissing"));
+      const response = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ googleTagId: id || null, ...labels, googleBrowserTrackingEnabled: tagEnabled }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(typeof body?.error === "string" ? body.error : t("saveFailed"));
+      }
+      setTagId(id);
+      setTagLabels(Object.fromEntries(Object.entries(labels).map(([field, label]) => [field, label ?? ""])) as typeof tagLabels);
+      setTagMessage(tagEnabled ? t("tagSaved") : t("tagSavedOff"));
+    } catch (error) {
+      setTagMessage(error instanceof Error ? error.message : t("saveFailed"));
+    } finally { setBusy(false); }
+  }
 
   async function save() {
     setBusy(true); setMessage(""); setValidated(false);
@@ -114,6 +159,27 @@ export function GoogleAdsIntegration({ workspace, serviceAccountEmail }: {
     <div className="flex flex-wrap gap-3"><Button onClick={save} disabled={busy || !serviceAccountEmail || !customerId.trim() || !conversionActionId.trim()}>{busy ? t("saving") : t("saveValidate")}</Button>
       <Button variant="outline" onClick={disable} disabled={busy}>{t("disable")}</Button></div>
     {message && <p role="status" className="text-sm">{message}</p>}
+    <div className="space-y-4 border-t border-white/[0.06] pt-4">
+      <div><h4 className="text-sm font-semibold">{t("tagTitle")}</h4>
+        <p className="mt-1 text-sm text-muted-foreground">{t("tagDescription")}</p></div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2"><Label htmlFor="google-tag-id">{t("tagId")}</Label>
+          <Input id="google-tag-id" value={tagId} disabled={busy} placeholder="AW-123456789" autoComplete="off"
+            onChange={e => setTagId(e.target.value)} /></div>
+        {([
+          ["googleTagPurchaseLabel", "purchaseLabel"], ["googleTagAddToCartLabel", "addToCartLabel"],
+          ["googleTagBeginCheckoutLabel", "beginCheckoutLabel"], ["googleTagPageViewLabel", "pageViewLabel"],
+        ] as const).map(([field, labelKey]) => <div key={field} className="space-y-2">
+          <Label htmlFor={`google-tag-${field}`}>{t(labelKey)}</Label>
+          <Input id={`google-tag-${field}`} value={tagLabels[field]} disabled={busy} autoComplete="off"
+            onChange={e => setTagLabels(labels => ({ ...labels, [field]: e.target.value }))} /></div>)}
+      </div>
+      <div className="flex items-center gap-3"><Switch id="google-tag-enabled" checked={tagEnabled} disabled={busy} onCheckedChange={setTagEnabled} />
+        <Label htmlFor="google-tag-enabled">{t("tagEnable")}</Label></div>
+      <p className="text-xs text-muted-foreground">{t("tagNote")}</p>
+      <Button variant="outline" onClick={saveTag} disabled={busy}>{t("tagSave")}</Button>
+      {tagMessage && <p role="status" className="text-sm">{tagMessage}</p>}
+    </div>
     <p className="text-xs text-muted-foreground">{t("verifyNote")} <a href="/tracking-health" className="underline">{t("trackingHealth")}</a></p>
   </section>;
 }

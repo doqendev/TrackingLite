@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         <article>
           <header className="mb-10 border-b border-border pb-8">
             <h1 className="text-3xl font-bold tracking-wider text-foreground font-display">Privacy Policy</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Last updated: February 21, 2026</p>
+            <p className="mt-2 text-sm text-muted-foreground">Last updated: October 29, 2026</p>
             <p className="mt-4 text-base text-muted-foreground leading-relaxed">
               Track Clear (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) operates the Track Clear service
               (&quot;Service&quot;), accessible at trackclear.io. This Privacy Policy explains what information we
@@ -107,6 +107,12 @@ export default function PrivacyPage() {
                 is transmitted to Klaviyo&apos;s servers.
               </p>
               <p className="mt-3 text-muted-foreground leading-relaxed">
+                When a merchant turns on the Google tag that Track Clear can run on their store, it loads
+                only after the store visitor allows marketing. At checkout the visitor&apos;s browser passes
+                the email address, phone number, name and address to Google&apos;s tag, which normalizes
+                and hashes them before sending them to Google for enhanced conversions.
+              </p>
+              <p className="mt-3 text-muted-foreground leading-relaxed">
                 To recover from temporary destination failures, Track Clear may keep the original event
                 delivery data in an AES-256-GCM encrypted retry envelope for up to 72 hours. The envelope
                 is removed after successful delivery or when it expires; the normal event-log payload
@@ -166,7 +172,7 @@ export default function PrivacyPage() {
                     </tr>
                     <tr>
                       <td className="px-4 py-3 text-foreground font-medium">Google LLC</td>
-                      <td className="px-4 py-3 text-muted-foreground">Google Ads enhanced conversions and GA4 Measurement Protocol</td>
+                      <td className="px-4 py-3 text-muted-foreground">Google Ads conversion uploads with hashed customer identifiers, the optional Google tag a merchant runs through Track Clear, and GA4 Measurement Protocol</td>
                       <td className="px-4 py-3 text-muted-foreground">United States</td>
                     </tr>
                     <tr>

@@ -89,7 +89,7 @@ export async function processGoogleAdsEvent(job: Job<DestinationEventJob>, token
         latest?.consent?.marketing === false || latest?.consent?.saleOfData === false) {
       throw new GoogleAdsApiError("Google Ads delivery blocked by consent", 400);
     }
-    const normalized = normalizeToGoogleAdsEvent({ ...event, timestamp: row.occurredAt.getTime() });
+    const normalized = normalizeToGoogleAdsEvent({ ...event, timestamp: row.occurredAt.getTime() }, Date.now(), row.orderId);
     const request = buildGoogleAdsIngestRequest({
       customerId, conversionActionId,
       loginCustomerId: normalizeGoogleAdsCustomerId(workspace.googleAdsLoginCustomerId),

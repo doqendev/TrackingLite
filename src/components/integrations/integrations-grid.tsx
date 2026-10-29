@@ -52,6 +52,12 @@ export interface IntegrationWorkspace {
   googleAdsLoginCustomerId: string | null;
   googleAdsConversionActionId: string | null;
   enableGoogleAds: boolean;
+  googleTagId: string | null;
+  googleTagPurchaseLabel: string | null;
+  googleTagAddToCartLabel: string | null;
+  googleTagBeginCheckoutLabel: string | null;
+  googleTagPageViewLabel: string | null;
+  googleBrowserTrackingEnabled: boolean;
   // Shopify Webhook
   hasShopifyWebhookSecret: boolean;
   isShopifyWebhookVerified: boolean;

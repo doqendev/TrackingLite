@@ -1,5 +1,56 @@
 # AGENTS.md
 
+## 2026-10-29 Track Clear Google tag and multi-source purchases: branch only, not deployed
+
+Branch `agent/google-tag-multisource-20261029`, cut from the live release branch
+`agent/google-ads-click-window-20261029` (`2c58732`), lets Track Clear run a
+store's Google Ads tag in the browser and send its server purchases into that
+tag's Website Purchase action. That is the shape SalesTracked uses (studied on
+29 October from its public script), through Google's official multi-source path
+instead of an unauthenticated tag ping.
+
+- Google tag. Off by default (`googleBrowserTrackingEnabled`). It needs the
+  `AW-` tag ID and the Purchase label; Add to cart, Begin checkout and Page view
+  labels are optional. Migration `20261029_google_tag_browser_ownership` adds
+  six Workspace columns (nullable, plus a false-by-default flag), and the schema
+  gate requires it. `src/lib/google-tag.ts` generates the browser code for the
+  Custom Pixel and the legacy script. It loads gtag.js only after marketing
+  consent, starts consent mode from Shopify's answers and updates it on change.
+  Every hit carries the stored Google click in `page_location`, since Shopify's
+  sandbox cannot keep Google's cookie. It sends `page_view` plus the labelled
+  conversions, and sets enhanced-conversion `user_data` on checkout and purchase.
+  The browser Purchase carries `transaction_id` = Shopify's numeric order ID and
+  is not suppressed after webhook verification. Headless V1 installs are excluded.
+- Server. Every Google upload now uses that numeric order ID as `transactionId`
+  (EventLog `orderId`, falling back to the order name), so Google merges the
+  browser and server copies within the tag's action. Uploading into a Website
+  action needs no other code change: on 29 October Track Clear's `validateOnly`
+  upload into Adelia London's Website Purchase action (7881898474) was accepted,
+  with and without a click ID, and the account shows the multi-source Beta box.
+- Settings. The Google Ads card has a "Google tag in the browser" section (six
+  languages) that accepts pasted `send_to` values. The API validates the tag ID
+  and labels, refuses to turn the tag on without a tag ID and Purchase label, and
+  turns it off when either is cleared. Step 1 explains both setups.
+  `docs/google-ads.md` has the setup and behavior. The privacy page now says the
+  tag hands checkout data to Google's tag, which hashes it in the browser.
+
+Verification: 894 unit tests pass across 69 files (18 new), `tsc` is clean, lint
+has only the existing `<img>` warnings, the production build passes, and Prisma
+validate and format pass the way CI runs them. Loaded from the build with the tag
+on, the pixel and legacy routes serve scripts that parse with no backslash in the
+tag code, and the compiled pixel sent the purchase conversion with the stored
+click, the numeric order ID and an E.164 phone. Integration tests were not run (no
+local PostgreSQL/Redis).
+
+Release notes: one additive migration, which the running release ignores, so
+apply it before the web build (Vercel's build asserts the schema); web and worker
+both change. Then configure Adelia London (`cmvrbe9vn0004dsebol88j81d`): tag ID
+`AW-18544016973`, labels Purchase `UPUGCOrzsK4dEM38vIpF`, Add to cart
+`RZs9CJ2mr64dEM38vIpF`, Begin checkout `7_X1CMDws64dEM38vIpF` and Page view
+`xOeaCOXfr64dEM38vIpF`, conversion action 7881898474 in place of the unused
+import action 7881446101, then Save and validate with delivery on. Not merged or
+deployed.
+
 ## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: live, not on `main`
 
 Branch `agent/google-ads-click-window-20261029`, cut from the live branch
@@ -619,6 +670,7 @@ src/
     env-validation.ts                 # Validates required env vars at startup, warns for optional
     extract-custom-data.ts            # Extract value/currency/numItems/orderId from customData
     google-data-manager-auth.ts       # Track Clear service-account JWT -> OAuth token for the Data Manager API (cached, no new deps)
+    google-tag.ts                     # Optional Track Clear-run Google tag: settings normalizers and the browser code shared by both scripts
     google-ads-request-status.ts      # Polls Google's async processing result for SENT Google Ads rows (30 min, 1.3x, 24 h)
     destinations/
       index.ts                        # DESTINATION_EVENT_MAP for all 7 platforms
@@ -685,11 +737,12 @@ tests/
     event-retry-envelope.test.ts      # 3 tests (encrypted short-lived replay payload)
     events-page-mode.test.ts          # 1 test (Events page failed-count respects workspace destination allowlist)
     extract-custom-data.test.ts       # 29 tests (bounded customData extraction)
-    google-ads.test.ts                # 48 tests (IDs, Google normalization/hashing, consent, request shape, six-hour hold time, API errors, request status)
+    google-ads.test.ts                # 49 tests (IDs, Google normalization/hashing, consent, request shape, six-hour hold time, numeric order transaction ID, API errors, request status)
     google-ads-event-processor.test.ts # 23 tests (six-hour hold, worker ownership, target, toggles, consent, retries, bookkeeping)
     google-ads-request-status.test.ts # 9 tests (status polling, backoff, timeout, safe details)
     google-data-manager-auth.test.ts  # 14 tests (key parsing, RS256 assertion, token caching, safe errors)
     google-click-persistence.test.ts  # 10 tests (generated pixel/legacy script keep a dated Google click through later touches)
+    google-tag.test.ts                # 10 tests (tag settings; generated pixel/legacy Google tag: consent, stored click, labels, user_data, order ID)
     hash-pii.test.ts                  # 24 tests
     headless-sdk.test.ts              # 20 tests (consent, revocation replay/serialization, fallback session anchors, attribution, cookies/session, cart attributes, ingest client)
     ingest-attribution.test.ts        # 37 tests (outbox, attribution, Google click time, explicit internal-only consent path, tombstones, billing aliases, fallback delay, checkout enrichment)
@@ -723,7 +776,7 @@ tests/
     worker-health.test.ts             # 10 tests (startup latch, 11-listener readiness, dependency health, exact commit)
     workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
-    workspace-route-mode.test.ts      # 12 tests (mode guards, catalog/domain validation, browser owner flags)
+    workspace-route-mode.test.ts      # 26 tests (mode guards, catalog/domain validation, browser owner flags, Google Ads IDs, Google tag settings)
 prisma/
   schema.prisma                       # 12 models, 11 enums (see Data Model below)
 docs/
@@ -949,13 +1002,13 @@ Header: Content-Type: application/json
 - **Webhook Purchase browser guard:** Browser `fbq("track", "Purchase")` is suppressed only after a signed `orders/paid` delivery sets `shopifyWebhookVerifiedAt`; secret/domain changes clear verification. Track Clear ingest remains a 90-second safety fallback after verification so the one-minute durable inbox normally establishes the canonical path first.
 - **Web Locks are optional, never load-bearing:** Shopify's custom-pixel sandbox has an opaque origin where `navigator.locks` exists but `request()` rejects with `SecurityError`. Feature-detecting the API is not enough — the generated `dk()` helper must also survive an asynchronous rejection and fall back to a direct call, and event delivery must never `await` the consent-revocation queue unguarded. Presence-checking an API without handling denial silently killed all Custom Pixel browser events between 2026-07-27 and 2026-08-03.
 - **Consent revocation:** Redis session enrichment stores field/category observation times, hashed-key alias links, and denial tombstones atomically. After API-key authentication and strict bounded validation, a privacy-minimized no-destination revocation must carry a session, checkout, or cart anchor and pass isolated 120/minute plus 5,000/day workspace budgets before it is persisted ahead of workspace-active, destination-credential, and generic delivery-rate gates. Exactly one opaque anchor starts alias traversal; predictable order aliases are never direct fast-path deletion keys. The request cannot enqueue an event or carry attribution/PII, and rate-limit failures remain queued client-side. Headless clients generate and reuse a fallback session anchor when none is configured. A newer denial propagates through previously associated session/checkout/cart/order/email keys and prevents delayed older events from resurrecting identifiers; webhook Purchase uses the newest bounded consent snapshot from cart attributes or Redis. Custom Pixel, legacy, and headless clients retain at most 20 privacy-minimized revocations for 30 days and retry from 5 seconds up to 5 minutes. A stable `trackclear-consent-revocation-v1` Web Lock serializes cross-tab sends where Web Locks exist; browsers without that API retain per-client serialization but cross-tab ordering is best-effort. Browser/headless touch context is capped at 90 days, Redis enrichment at 30 days, consent grants at 24 hours, and explicit denials at 30 days.
-- **Browser pixel ownership:** `metaBrowserTrackingEnabled` and `tiktokBrowserTrackingEnabled` are independent from server-destination enables and default to false. When explicitly enabled, generated scripts load the standard SDK once, honor grant/revoke updates, avoid TikTok auto-PageView, and pair browser/server sends with the exact same event ID. Public scripts use browser revalidation plus a 30-second shared cache. Disable the old browser owner, wait at least 30 seconds, and start a fresh session before enabling a replacement for the same dataset/Pixel ID.
+- **Browser pixel ownership:** `metaBrowserTrackingEnabled`, `tiktokBrowserTrackingEnabled` and `googleBrowserTrackingEnabled` are independent from server-destination enables and default to false. The Google tag reports conversion labels rather than events and keeps its Purchase even after webhook verification, because Google merges it with the server upload by transaction ID (`docs/google-ads.md`). When explicitly enabled, generated scripts load the standard SDK once, honor grant/revoke updates, avoid TikTok auto-PageView, and pair browser/server sends with the exact same event ID. Public scripts use browser revalidation plus a 30-second shared cache. Disable the old browser owner, wait at least 30 seconds, and start a fresh session before enabling a replacement for the same dataset/Pixel ID.
 - **Delivery ownership and recovery:** Every destination worker takes a final database claim before outbound I/O and writes SENT/FAILED with claim-token compare-and-set semantics. A five-minute scheduler repairs stale PENDING/RETRYING rows and scheduled transient FAILED rows with deterministic job IDs; terminal configuration failures are not retried forever.
 - **Billing idempotency:** Purchase usage uses hashed Redis seen-keys plus an atomic Lua reservation keyed by workspace and every normalized event/order/checkout/cart alias. Hourly reconciliation builds transitive workspace-scoped components from durable rows, covers users without Subscription rows, and restores the non-decreasing count floor plus every marker atomically. Duplicate concurrent ingests are allowed without another increment, while unseen events at the plan limit remain blocked. The rare UTC month-rollover double-unit edge needs persisted billing-period ownership and must not be "fixed" by decrementing a live counter.
 - **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.
 - **Reddit click ID (rdtCid):** Snippet captures `rdt_cid` URL param and passes as `rdtCid`. Forwarded to Reddit Conversions API for attribution matching.
 - **Pinterest click ID (epik):** Snippet captures `epik` URL param and passes as `epik`. Pinterest Conversions API requires `value` as a string (not number) — normalizer handles the conversion.
-- **Google Ads (Data Manager API):** Purchases only, uploaded as click conversions to one "Website (Import from clicks)" conversion action with gclid/gbraid/wbraid and hashed customer data. Track Clear's service account (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`, Railway + Vercel) authenticates; merchants add its email to Google Ads; no developer token. SENT means accepted; `destinationRequestStatus` holds Google's async result, polled from the 5-minute recovery cycle. Google rejects a click conversion while its click is under six hours old (`TOO_RECENT_CLICK`) and does not keep it, so the worker holds every upload until six hours and fifteen minutes after the purchase (a delayed BullMQ job plus the PENDING row's `nextRetryAt`, which stale recovery skips until due). Merchants need auto-tagging, accepted customer data terms and a conversion action that counts Every. The old server-side GET to the browser conversion endpoint had no shopper cookies and could not attribute; its columns are retained read-only. See `docs/google-ads.md`.
+- **Google Ads (Data Manager API):** Purchases only, uploaded to one conversion action with gclid/gbraid/wbraid and hashed customer data: either the Website Purchase action of the Google tag Track Clear runs (multi-source, merged by the numeric Shopify order ID as transaction ID) or a "Website (Import from clicks)" action. Track Clear's service account (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`, Railway + Vercel) authenticates; merchants add its email to Google Ads; no developer token. SENT means accepted; `destinationRequestStatus` holds Google's async result, polled from the 5-minute recovery cycle. Google rejects a click conversion while its click is under six hours old (`TOO_RECENT_CLICK`) and does not keep it, so the worker holds every upload until six hours and fifteen minutes after the purchase (a delayed BullMQ job plus the PENDING row's `nextRetryAt`, which stale recovery skips until due). Merchants need auto-tagging, accepted customer data terms and a conversion action that counts Every. The old server-side GET to the browser conversion endpoint had no shopper cookies and could not attribute; its columns are retained read-only. See `docs/google-ads.md`.
 - **Vercel hosting:** Web app runs on Vercel (serverless). Workers stay on Railway. Redis and PostgreSQL on Railway with public TCP proxies for Vercel connectivity. Railway-specific code (keepalive, self-ping, cgroup reader, signal handlers) conditionally disabled via `process.env.VERCEL`.
 
 ## Style Rules
