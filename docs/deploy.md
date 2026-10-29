@@ -1,6 +1,69 @@
 # Deployment Runbook
 
-## Current deployment: 2026-10-25 server-side InitiateCheckout, Cart Helper consent and funnel country
+## Current deployment: 2026-10-29 Google Ads six-hour hold and persistent Google click
+
+Release `3d222c5a0297ff4d6720a9fafd04c7bde6f15113` on branch
+`agent/google-ads-click-window-20261029`, two commits on top of the 25 October
+branch (`d7572dd`): Google Ads uploads wait until Google accepts the click, six
+hours and fifteen minutes after the purchase; the Google Ads card asks for count
+Every, auto-tagging and the customer data terms; and the storefront keeps a
+Google click through later non-Google visits with its own capture time. No
+migration and no schema change. Details: the 2026-10-29 section of `AGENTS.md`.
+
+Deployed from the branch, not `main`, for the same reason as 25 October: `main`
+requires GitHub Actions checks and there is no Actions allowance. Production now
+runs a commit two unmerged release branches ahead of `main`; merge both through
+pull requests once Actions can run, and do not deploy `main` before that.
+
+Cutover (UTC), in this runbook's drained order:
+
+1. Pre-release state: Vercel `dpl_4DuoCsF4SpdXEnGNF1QkJjqDKmiD` (`f87dbac`) and
+   Railway `c58250ea-f3b8-4ca1-b5f9-d8b93bbcc2fb` (`44afc85`). Worker config
+   `/railway.worker.toml` (predeploy release gate, `/health`, 60 s drain, 0 s
+   overlap), no deployment triggers, one active deployment, no Railway web
+   service. All 12 queues had one worker and nothing waiting or active.
+2. 14:18 encrypted restore point `E:/backups/trackclear/2026-10-29-google-ads-click-release`:
+   writable primary matching the pinned identity (PostgreSQL 17.11), custom dump
+   (24.0 MB), Redis RDB (60.8 MB; RDB snapshots, last save 28 s earlier, no AOF)
+   and both providers' configuration, each AES-256-GCM with round-trip
+   verification through the DPAPI-unwrapped key.
+3. 14:20:58 `railway down` on the worker; `c58250ea` was REMOVED at 14:22:02.
+   All 12 queues then showed 0 workers and 0 active jobs, with live events
+   waiting.
+4. 14:22:37 release pin rotated on Railway (`--skip-deploys`, no deployment
+   created, value read back) and at 14:22:43 on Vercel.
+5. 14:22:55 Vercel deployment from GitHub source (`gitSource.sha`)
+   `dpl_AJtBicK8tnyUJekfUEcUpEAmpXb1`, READY and aliased at 14:23:54 after the
+   build's read-only schema gate (22 migrations, schema up to date, 12/12
+   indexes). Health JSON: `status: ok`, `release: approved`, database
+   connected, schema ready, Redis connected, commit `3d222c5a...`. No request
+   reached the old build during a 40-second watch ending 14:25:07.
+6. 14:25:23 Railway worker deployment `3a3536fb-1871-44aa-9c5b-5047fa6de6b2`
+   from the exact commit (`serviceInstanceDeployV2`). Predeploy: production
+   environment and release SHA approved, 22 migrations with none pending, schema
+   up to date, 12/12 required indexes valid. 12 listeners ready at 14:26:18,
+   deployment SUCCESS at 14:26:22, and the waiting events were delivered. Only
+   `3a3536fb` is active.
+7. 14:27 checks: every queue one worker, 0 waiting and 0 active; all 52 EventLog
+   rows created since 14:18 were SENT (Meta 26, ChatGPT 22, TikTok 4). The live
+   pixel, legacy script and Cart Helper of all eight active workspaces return 200
+   and parse, and each live pixel, run with a stored Google click and a Meta
+   visit, sent the gclid with its original time (ingest stubbed, nothing sent).
+
+Google Ads at release: Infinite Layers (867-880-1549, action 7843158220) had 300
+uploads since 13 October, all `SUCCESS`; the 106 not yet compacted carried no
+click ID, so the six-hour rule had not yet cost a click. Adelia London has customer
+906-218-7764 and action 7881446101 saved with delivery off. Dirava has Google Ads
+enabled with no account saved, which Tracking Health reports as an error.
+
+Rollback: restore the Vercel pin to `f87dbac` and the worker pin to `44afc85`,
+redeploy Vercel `dpl_4DuoCsF4SpdXEnGNF1QkJjqDKmiD` and the worker at `44afc85`
+with zero overlap. The older worker does not honour the Google Ads hold, so held
+purchases would upload at once and risk `TOO_RECENT_CLICK`; carts keep
+`_tc_google_click_at`, which older code ignores. Never roll the web back further
+than `dpl_4DuoCsF4SpdXEnGNF1QkJjqDKmiD` (see 25 October).
+
+## Previous deployment: 2026-10-25 server-side InitiateCheckout, Cart Helper consent and funnel country
 
 Release `44afc8557a0d764913e7dcbcc7c5581a8db1b7db` on branch
 `agent/wetracked-learnings-20261025` (two commits on top of `42cb4f9`): signed

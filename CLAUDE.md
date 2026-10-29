@@ -17,16 +17,16 @@ documentation is worse than no duplicated documentation.
 
 ## Current Release Boundary
 
-- Production runs branch `agent/wetracked-learnings-20261025` (2026-10-25
-  server-side InitiateCheckout), ahead of `main` (`42cb4f9`): the web at
-  exact SHA `f87dbac3ca38e12ce153a78315618b600b68fc35` and the worker at
-  `44afc8557a0d764913e7dcbcc7c5581a8db1b7db`; the later commit only fixes
-  the Cart Helper script the web serves. It is not merged because `main` requires the GitHub Actions
-  checks and there is no Actions allowance. Merge it through a pull request
-  before deploying `main` again: `main` alone would drop it, and once
-  checkout webhooks are registered an older worker hands their inbox rows to
-  the refund handler. All 22 repository migrations are applied; none is
-  pending.
+- Production runs branch `agent/google-ads-click-window-20261029` (2026-10-29
+  Google Ads six-hour hold and persistent Google click) at exact SHA
+  `3d222c5a0297ff4d6720a9fafd04c7bde6f15113` on both the web and the worker.
+  It sits on the 2026-10-25 branch `agent/wetracked-learnings-20261025`, and
+  both are ahead of `main` (`42cb4f9`). Neither is merged because `main`
+  requires the GitHub Actions checks and there is no Actions allowance. Merge
+  both through pull requests before deploying `main` again: `main` alone
+  would drop them, and once checkout webhooks are registered an older worker
+  hands their inbox rows to the refund handler. All 22 repository migrations
+  are applied; none is pending.
 - `main` is the source branch. Vercel Git deployment and Railway GitHub auto
   deploy are both disabled, so merging to `main` never deploys on its own.
   Deploying is always an explicit step. Note that `railway variables --set`

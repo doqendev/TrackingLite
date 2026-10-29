@@ -1,6 +1,6 @@
 # MEMORY.md
 
-## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: branch only, not deployed
+## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: live, not on `main`
 
 Branch `agent/google-ads-click-window-20261029`, cut from the live branch
 `agent/wetracked-learnings-20261025` (`d7572dd`), fixes a Google Ads delivery
@@ -47,7 +47,9 @@ documentation before connecting a newly created Google Ads account.
   every page load and treated any visit with a stored click ID as a new touch,
   resetting the attribution time and landing page on each page. Only click IDs
   in the page URL start a touch now, as in the legacy script and Cart Helper.
-  Headless installs cannot use Google Ads, so `headless-sdk.ts` is unchanged.
+  `headless-sdk.ts` is unchanged: headless V1 installs cannot use Google Ads, and
+  Mizoke, a legacy headless workspace that can, still drops the Google click on
+  later touches until its vendored SDK gets the same rule.
 
 Verification: 876 unit tests pass across 68 files (25 new), `tsc` is clean, lint
 has only the existing `<img>` warnings and the production build passes. The new
@@ -62,15 +64,20 @@ PostgreSQL/Redis). Google's documents checked: Data Manager `requestStatus`
 error reasons, the offline-conversion send-events guide, and Google Ads Help
 "Fix discrepancies and errors in offline conversion imports".
 
-Release notes: no migration. The worker (hold, recovery filter, webhook click
-time) and the web (scripts, ingest, Tracking Health, setup copy) both change, so follow the `docs/deploy.md` order
-used on 25 October: stop the old worker, deploy the web, start one new fleet.
-Purchases uploaded since 13 October within six hours of their click may show
-`TOO_RECENT_CLICK` in Tracking Health; they were not re-uploaded. The ingest
-schema gains `googleClickCapturedAt`, which the new scripts send, so the web must
-be deployed as one unit (it is), and shoppers' stored Google clicks carry over
-without a capture time until their next Google click: they are dated by their
-stored touch. Not merged or deployed.
+Release: live since 29 October 2026 at `3d222c5a0297ff4d6720a9fafd04c7bde6f15113`
+on both hosts (Vercel `dpl_AJtBicK8tnyUJekfUEcUpEAmpXb1`, Railway worker
+`3a3536fb-1871-44aa-9c5b-5047fa6de6b2`), after the encrypted restore point
+`E:/backups/trackclear/2026-10-29-google-ads-click-release`; cutover record in
+`docs/deploy.md`. Like 25 October it was deployed from the branch, which sits on
+the unmerged 25 October branch: merge both through pull requests once Actions can
+run, and do not deploy `main` before that. No migration. Purchases now reach
+Google Ads about six hours after the order. Google clicks stored before the
+release carry no capture time and are dated by their stored touch until the
+shopper's next Google click. At release, Infinite Layers' 300 uploads since
+13 October were all `SUCCESS`, and the 106 not yet compacted carried no click
+ID. Adelia London has customer 906-218-7764 and action 7881446101 saved with
+delivery off; Dirava has Google Ads enabled with no account saved, which
+Tracking Health reports as an error.
 
 ## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: live, not on `main`
 
