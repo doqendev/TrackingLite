@@ -55,9 +55,12 @@ once Actions can run, and do not deploy `main` before that. Adelia London
 Website Purchase action 7881898474 instead of the unused import action
 7881446101, after a `validateOnly` upload was accepted. Its live pixel sends
 nothing to Google before strict consent, then the page view and the purchase
-with the numeric order ID. No other store serves the tag. Remove the unused
-import action in Google Ads when convenient. For an action's first 14 days
-Google reports uploaded purchases without bidding on them.
+with the numeric order ID. No other store serves the tag. The owner removed
+the unused import action the same day, so Website Purchase (Primary, count
+Every, 90-day click window, matching Track Clear's 90-day Google click) is the
+account's only purchase action; Add to cart, Begin checkout and Page view are
+Secondary. For an action's first 14 days Google reports uploaded purchases
+without bidding on them.
 
 ## 2026-10-29 Google Ads six-hour hold, persistent Google click and new-account setup: live, not on `main`
 
