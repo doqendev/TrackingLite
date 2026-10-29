@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import {
   buildGoogleAdsIngestRequest, googleAdIdentifiers, googleAdsDeliveryTargetId, googleAdsTargetForWorkspace,
-  googleUserIdentifiers, normalizeEmailForGoogle, normalizeGoogleAdsConversionActionId, normalizeGoogleAdsCustomerId,
-  normalizePhoneForGoogle, normalizeToGoogleAdsEvent, retrieveGoogleAdsRequestStatus, sendToGoogleAds,
-  toGoogleConversionValue, GOOGLE_CLICK_TTL_MS, GoogleAdsApiError,
+  googleAdsUploadNotBefore, googleUserIdentifiers, normalizeEmailForGoogle, normalizeGoogleAdsConversionActionId,
+  normalizeGoogleAdsCustomerId, normalizePhoneForGoogle, normalizeToGoogleAdsEvent, retrieveGoogleAdsRequestStatus,
+  sendToGoogleAds, toGoogleConversionValue, GOOGLE_CLICK_TTL_MS, GoogleAdsApiError,
 } from "@/lib/destinations/google-ads";
 import { resetGoogleDataManagerAuthCache } from "@/lib/google-data-manager-auth";
 import type { DestinationEventJob } from "@/lib/queue";
@@ -93,6 +93,10 @@ describe("Google Ads purchase event", () => {
     expect(googleAdIdentifiers({ gclid: "g", googleClickCapturedAt: now - GOOGLE_CLICK_TTL_MS + 1000 }, now)).toEqual({ gclid: "g" });
     expect(googleAdIdentifiers({ gclid: "g", googleClickCapturedAt: now - GOOGLE_CLICK_TTL_MS }, now)).toBeUndefined();
     expect(googleAdIdentifiers({ gclid: "bad value<script>" }, now)).toBeUndefined();
+  });
+  it("uploads no earlier than six hours after the purchase, when Google accepts its click", () => {
+    const purchase = new Date("2026-10-29T10:00:00.000Z");
+    expect(googleAdsUploadNotBefore(purchase).toISOString()).toBe("2026-10-29T16:15:00.000Z");
   });
   it("still sends a customer-matched purchase without a click, but not an anonymous one", () => {
     expect(normalizeToGoogleAdsEvent(event(), now)).not.toHaveProperty("adIdentifiers");

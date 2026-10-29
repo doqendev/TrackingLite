@@ -1,5 +1,52 @@
 # MEMORY.md
 
+## 2026-10-29 Google Ads six-hour click hold and new-account setup: branch only, not deployed
+
+Branch `agent/google-ads-click-window-20261029`, cut from the live branch
+`agent/wetracked-learnings-20261025` (`d7572dd`), fixes a Google Ads delivery
+defect found while checking the integration against Google's Data Manager
+documentation before connecting a newly created Google Ads account.
+
+- Six-hour hold. Google rejects a click conversion while its click is under six
+  hours old (`PROCESSING_ERROR_REASON_TOO_RECENT_CLICK`; Google Ads Help: "retry
+  after 6 hours have passed") and does not keep it. The worker uploaded at
+  purchase time, so a purchase made within six hours of a Google ad click, such
+  as one in the same visit, was accepted, then rejected, and never uploaded again:
+  a FAILED request status is final. The worker now holds every upload until the purchase's
+  `occurredAt` plus 6 h 15 min (`GOOGLE_CLICK_SETTLE_MS`). Before claiming the
+  row it moves the BullMQ job back to delayed (`DelayedError`; BullMQ does not
+  count an attempt) and sets the PENDING row's `nextRetryAt`. `requeueStalePending`
+  skips PENDING rows whose `nextRetryAt` is still ahead, so a held row is not
+  re-queued as stale nor spends the 12 automatic retries; if Redis loses the
+  delayed job, recovery queues the row once the hold ends. Every terminal path
+  already clears `nextRetryAt`, so retention is unaffected. Tracking Health shows a
+  held purchase as expected, with its upload time in UTC.
+- Setup copy. The card told merchants to count One. Google rejects gbraid and
+  wbraid (iPhone app) clicks for one-per-click actions
+  (`ONE_PER_CLICK_CONVERSION_ACTION_NOT_PERMITTED_WITH_BRAID`), and One drops a
+  shopper's repeat purchases, so it now says Every (Infinite Layers' live action
+  already counts Every). A new first step asks for auto-tagging and the customer
+  data terms (Goals > Settings). Without the terms Google rejects every upload
+  carrying customer data (`DESTINATION_ACCOUNT_ENHANCED_CONVERSIONS_TERMS_NOT_SIGNED`),
+  which is every Track Clear upload, and `validateOnly` does not detect it. The
+  success message names the hold. Six languages; `docs/google-ads.md` has the
+  setup, the hold and Google's error reasons.
+
+Verification: 856 unit tests pass across 67 files (5 new), `tsc` is clean and
+lint has only the existing `<img>` warnings. BullMQ 5.69's worker treats
+`DelayedError` as a reschedule and `moveToDelayed` skips the attempt counter
+(checked in its source). Integration tests were not run (no local
+PostgreSQL/Redis). Google's documents checked: Data Manager `requestStatus`
+error reasons, the offline-conversion send-events guide, and Google Ads Help
+"Fix discrepancies and errors in offline conversion imports".
+
+Release notes: no migration. The worker (hold, recovery filter) and the web
+(Tracking Health, setup copy) both change, so follow the `docs/deploy.md` order
+used on 25 October: stop the old worker, deploy the web, start one new fleet.
+Purchases uploaded since 13 October within six hours of their click may show
+`TOO_RECENT_CLICK` in Tracking Health; they were not re-uploaded. Not merged or
+deployed.
+
 ## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: live, not on `main`
 
 Branch `agent/wetracked-learnings-20261025` applies the findings of the 24-25

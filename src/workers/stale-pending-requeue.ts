@@ -548,13 +548,16 @@ export async function requeueEvents(
   return { requeued, failed };
 }
 
-async function requeueStalePending(): Promise<void> {
-  const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS);
+export async function requeueStalePending(): Promise<void> {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - STALE_THRESHOLD_MS);
 
   const staleEvents = await db.eventLog.findMany({
     where: {
       status: "PENDING",
       createdAt: { lt: cutoff },
+      // A Google Ads upload held until Google accepts its click is not stale before then.
+      OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }],
     },
     take: 100,
     select: {

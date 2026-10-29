@@ -89,6 +89,7 @@ export function GoogleAdsIntegration({ workspace, serviceAccountEmail }: {
     <p className="text-xs text-muted-foreground">{validated ? t("validated") : saved ? t("saved") : t("notConfigured")}</p>
     {!serviceAccountEmail && <p role="status" className="text-sm text-amber-400">{t("notAvailable")}</p>}
     <ol className="list-decimal pl-5 text-sm text-muted-foreground space-y-2">
+      <li>{t("accountStep")}</li>
       <li>{t("step1")}</li>
       <li>{t("step2")}{serviceAccountEmail && <span className="mt-1 flex flex-wrap items-center gap-2">
         <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-foreground break-all">{serviceAccountEmail}</code>

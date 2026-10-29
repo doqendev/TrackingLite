@@ -118,6 +118,17 @@ describe("tracking health Google Ads delivery check", () => {
       lastProblem: { destinationRequestStatus: "FAILED", destinationStatusDetail: { errors: [{ reason: "INVALID_GCLID", recordCount: 1 }] } } });
     expect(check).toMatchObject({ severity: "warning", detail: expect.stringContaining("FAILED for a recent upload (INVALID_GCLID)") });
   });
+  it("treats a purchase held for Google's six-hour click window as expected", () => {
+    const now = new Date("2026-10-29T12:00:00.000Z");
+    const held = buildGoogleAdsDeliveryCheck({ configured: true, uploadCounts: { SUCCESS: 2 }, lastProblem: null, now,
+      lastEvent: lastEvent({ status: "PENDING", destinationRequestStatus: null,
+        nextRetryAt: new Date("2026-10-29T17:30:00.000Z") }) });
+    expect(held).toMatchObject({ severity: "ok", detail: expect.stringContaining("uploads at 2026-10-29 17:30 UTC") });
+    const overdue = buildGoogleAdsDeliveryCheck({ configured: true, uploadCounts: {}, lastProblem: null, now,
+      lastEvent: lastEvent({ status: "PENDING", destinationRequestStatus: null,
+        nextRetryAt: new Date("2026-10-29T11:00:00.000Z") }) });
+    expect(overdue.severity).toBe("warning");
+  });
   it("warns when the last upload was rejected before Google accepted it", () => {
     expect(buildGoogleAdsDeliveryCheck({ configured: true, uploadCounts: {}, lastProblem: null,
       lastEvent: lastEvent({ status: "FAILED", errorMessage: "Google Ads conversion upload rejected (HTTP 403 PERMISSION_DENIED)", destinationRequestStatus: null }) }))

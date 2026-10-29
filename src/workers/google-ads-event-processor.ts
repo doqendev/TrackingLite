@@ -1,8 +1,8 @@
-import { Worker, Job, UnrecoverableError } from "bullmq";
+import { Worker, Job, UnrecoverableError, DelayedError } from "bullmq";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import {
-  buildGoogleAdsIngestRequest, googleAdsDeliveryTargetId, normalizeGoogleAdsConversionActionId,
+  buildGoogleAdsIngestRequest, googleAdsDeliveryTargetId, googleAdsUploadNotBefore, normalizeGoogleAdsConversionActionId,
   normalizeGoogleAdsCustomerId, normalizeToGoogleAdsEvent, sendToGoogleAds, GoogleAdsApiError,
 } from "@/lib/destinations/google-ads";
 import { GOOGLE_STATUS_FIRST_CHECK_MS } from "@/lib/google-ads-request-status";
@@ -19,7 +19,24 @@ import type { DestinationEventJob } from "@/lib/queue";
 import { claimEventDelivery, completeEventDeliveryClaim, failEventDeliveryClaim,
   isEventDeliverySuperseded, markEventDeliveryAccepted, type EventDeliveryClaim } from "@/lib/event-delivery-guard";
 
-export async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Promise<void> {
+/**
+ * Holds an upload until Google accepts its click (see GOOGLE_CLICK_SETTLE_MS).
+ * The job is moved back to delayed, and the row's nextRetryAt keeps durable
+ * recovery from treating the held row as stale until it is due.
+ */
+async function holdUntilGoogleAcceptsClick(
+  job: Job<DestinationEventJob>, eventLogId: string, token: string | undefined
+): Promise<boolean> {
+  const row = await db.eventLog.findUnique({ where: { id: eventLogId }, select: { occurredAt: true } });
+  if (!row?.occurredAt) return false;
+  const notBefore = googleAdsUploadNotBefore(row.occurredAt);
+  if (notBefore.getTime() <= Date.now()) return false;
+  await db.eventLog.updateMany({ where: { id: eventLogId, status: "PENDING" }, data: { nextRetryAt: notBefore } });
+  await job.moveToDelayed(notBefore.getTime(), token);
+  return true;
+}
+
+export async function processGoogleAdsEvent(job: Job<DestinationEventJob>, token?: string): Promise<void> {
   const { workspaceId, eventLogId } = job.data;
   let claim: EventDeliveryClaim | null = null;
   let outboundStarted = false;
@@ -27,6 +44,7 @@ export async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Prom
   try {
     if (!eventLogId) throw new GoogleAdsApiError("Google Ads requires a durable delivery record", 400);
     if (await isEventDeliverySuperseded(eventLogId)) return;
+    if (await holdUntilGoogleAcceptsClick(job, eventLogId, token)) throw new DelayedError();
     if (!await isCircuitClosed("GOOGLE_ADS", workspaceId)) throw new CircuitOpenError("GOOGLE_ADS", workspaceId);
     const ownership = await claimEventDelivery(eventLogId);
     if (ownership.action === "skip") return;
@@ -91,6 +109,8 @@ export async function processGoogleAdsEvent(job: Job<DestinationEventJob>): Prom
     await recordSuccess("GOOGLE_ADS", workspaceId).catch(() => {});
     await completeEventDeliveryClaim(claim, receipt);
   } catch (error) {
+    // A held upload has been rescheduled; it is neither failed nor retried.
+    if (error instanceof DelayedError) throw error;
     const terminal = error instanceof GoogleAdsApiError && !shouldRetryDeliveryFailure(error);
     const transient = !terminal;
     if (shouldRecordCircuitFailure(error)) await recordFailure("GOOGLE_ADS", workspaceId).catch(() => {});

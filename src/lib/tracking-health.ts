@@ -128,18 +128,21 @@ function firstGoogleErrorReason(detail: unknown): string | null {
 /**
  * Google Ads accepts an upload first (EventLog SENT) and reports whether the
  * conversion was usable about 30 minutes later (destinationRequestStatus).
- * Both stages are surfaced, since a SENT row alone proves nothing.
+ * Both stages are surfaced, since a SENT row alone proves nothing. A purchase
+ * waits about six hours before upload, until Google accepts its click.
  */
 export function buildGoogleAdsDeliveryCheck(input: {
   configured: boolean;
   lastEvent: {
     createdAt: Date; status: string; errorMessage: string | null;
     destinationRequestStatus: string | null; destinationStatusDetail: unknown;
+    nextRetryAt?: Date | null;
   } | null;
   uploadCounts: GoogleUploadStatusCounts;
   lastProblem: { destinationRequestStatus: string | null; destinationStatusDetail: unknown } | null;
+  now?: Date;
 }): TrackingHealthCheck {
-  const { configured, lastEvent, uploadCounts, lastProblem } = input;
+  const { configured, lastEvent, uploadCounts, lastProblem, now = new Date() } = input;
   if (!configured) {
     return { key: "google_ads", label: "Google Ads delivery", severity: "error",
       detail: "Google Ads customer ID or conversion action ID is missing." };
@@ -160,6 +163,11 @@ export function buildGoogleAdsDeliveryCheck(input: {
     return { key: "google_ads", label: "Google Ads delivery", severity: "warning", timestamp: lastEvent.createdAt,
       detail: `Google reported ${lastProblem?.destinationRequestStatus ?? "a problem"} for a recent upload` +
         `${reason ? ` (${reason})` : ""}. ${summary}` };
+  }
+  if (lastEvent.status === "PENDING" && lastEvent.nextRetryAt && lastEvent.nextRetryAt > now) {
+    const due = lastEvent.nextRetryAt.toISOString().slice(0, 16).replace("T", " ");
+    return { key: "google_ads", label: "Google Ads delivery", severity: "ok", timestamp: lastEvent.createdAt,
+      detail: `Latest purchase uploads at ${due} UTC: Google only accepts a click once it is 6 hours old. ${summary}` };
   }
   return {
     key: "google_ads", label: "Google Ads delivery",
@@ -228,7 +236,7 @@ export async function getTrackingHealth(
         where: { workspaceId, destination: "GOOGLE_ADS", status: { not: "SUPERSEDED" } },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true, status: true, errorMessage: true,
-          destinationRequestStatus: true, destinationStatusDetail: true },
+          destinationRequestStatus: true, destinationStatusDetail: true, nextRetryAt: true },
       }),
       db.eventLog.groupBy({
         by: ["destinationRequestStatus"],

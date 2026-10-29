@@ -4,10 +4,12 @@ import type { DestinationEventJob } from "@/lib/queue";
 
 const mocks = vi.hoisted(() => ({ workspace: vi.fn(), row: vi.fn(), latest: vi.fn(),
   claim: vi.fn(), complete: vi.fn(), fail: vi.fn(), accepted: vi.fn(), superseded: vi.fn(), send: vi.fn(),
-  closed: vi.fn(), success: vi.fn(), failure: vi.fn() }));
+  closed: vi.fn(), success: vi.fn(), failure: vi.fn(), hold: vi.fn(), delay: vi.fn() }));
 vi.mock("ioredis", () => ({ default: class { on() {} } }));
-vi.mock("bullmq", () => ({ Worker: class { on() {} }, UnrecoverableError: class extends Error {} }));
-vi.mock("@/lib/db", () => ({ db: { workspace: { findUnique: mocks.workspace }, eventLog: { findUnique: mocks.row } } }));
+vi.mock("bullmq", () => ({ Worker: class { on() {} }, UnrecoverableError: class extends Error {},
+  DelayedError: class extends Error {} }));
+vi.mock("@/lib/db", () => ({ db: { workspace: { findUnique: mocks.workspace },
+  eventLog: { findUnique: mocks.row, updateMany: mocks.hold } } }));
 vi.mock("@/lib/session-enrichment", () => ({ lookupSessionContextByIdentifiers: mocks.latest }));
 vi.mock("@/lib/event-delivery-guard", () => ({ claimEventDelivery: mocks.claim, completeEventDeliveryClaim: mocks.complete,
   failEventDeliveryClaim: mocks.fail, markEventDeliveryAccepted: mocks.accepted, isEventDeliverySuperseded: mocks.superseded }));
@@ -15,11 +17,14 @@ vi.mock("@/lib/circuit-breaker", async importOriginal => ({ ...await importOrigi
   isCircuitClosed: mocks.closed, recordSuccess: mocks.success, recordFailure: mocks.failure }));
 vi.mock("@/lib/destinations/google-ads", async importOriginal => ({
   ...await importOriginal<typeof import("@/lib/destinations/google-ads")>(), sendToGoogleAds: mocks.send }));
-import { GoogleAdsApiError } from "@/lib/destinations/google-ads";
+import { DelayedError } from "bullmq";
+import { GOOGLE_CLICK_SETTLE_MS, GoogleAdsApiError } from "@/lib/destinations/google-ads";
 import { GOOGLE_STATUS_FIRST_CHECK_MS } from "@/lib/google-ads-request-status";
 import { processGoogleAdsEvent } from "@/workers/google-ads-event-processor";
 
 const now = Date.now();
+// Old enough that Google accepts the click; newer purchases are held.
+const occurredAt = new Date(now - 7 * 3600000);
 const target = "1234567890:987654321";
 const event: DestinationEventJob["event"] = { eventName: "Purchase", eventId: "canonical", timestamp: now,
   url: "https://shop.example/checkout", referrer: "", clientIp: "203.0.113.1", userAgent: "test",
@@ -27,11 +32,11 @@ const event: DestinationEventJob["event"] = { eventName: "Purchase", eventId: "c
   gclid: "Cj0-click", googleAdsTargetId: target,
   consent: { marketingAllowed: true, saleOfDataAllowed: true }, trackclearSessionId: "session" };
 function job() { return { data: { workspaceId: "store", eventLogId: "row", destination: "GOOGLE_ADS", event },
-  attemptsMade: 0, opts: { attempts: 3 } } as Job<DestinationEventJob>; }
+  attemptsMade: 0, opts: { attempts: 3 }, moveToDelayed: mocks.delay } as unknown as Job<DestinationEventJob>; }
 const workspace = () => ({ id: "store", productMode: "SHOPIFY_META_TIKTOK_V1", installType: "SHOPIFY_CUSTOM_PIXEL",
   isActive: true, enableGoogleAds: true, enablePurchase: true, consentMode: "STRICT",
   googleAdsCustomerId: "1234567890", googleAdsConversionActionId: "987654321", googleAdsLoginCustomerId: null });
-const row = () => ({ workspaceId: "store", destination: "GOOGLE_ADS", occurredAt: new Date(now - 60000), deliveryTargetId: target,
+const row = () => ({ workspaceId: "store", destination: "GOOGLE_ADS", occurredAt, deliveryTargetId: target,
   orderId: "123", orderName: "#5530", checkoutToken: "checkout", cartToken: "cart" });
 
 describe("Google Ads final delivery checks", () => {
@@ -49,7 +54,7 @@ describe("Google Ads final delivery checks", () => {
     const request = mocks.send.mock.calls[0][0];
     expect(request.destinations[0]).toEqual({ operatingAccount: { accountType: "GOOGLE_ADS", accountId: "1234567890" },
       productDestinationId: "987654321" });
-    expect(request.events[0]).toMatchObject({ transactionId: "#5530", eventTimestamp: new Date(now - 60000).toISOString(),
+    expect(request.events[0]).toMatchObject({ transactionId: "#5530", eventTimestamp: occurredAt.toISOString(),
       adIdentifiers: { gclid: "Cj0-click" }, conversionValue: 39.99, currency: "EUR" });
     expect(request.consent).toEqual({ adUserData: "CONSENT_GRANTED", adPersonalization: "CONSENT_GRANTED" });
     const [, receipt, acceptedAt, bookkeeping] = mocks.accepted.mock.calls[0];
@@ -59,6 +64,28 @@ describe("Google Ads final delivery checks", () => {
       destinationStatusNextCheckAt: new Date(acceptedAt.getTime() + GOOGLE_STATUS_FIRST_CHECK_MS) });
     expect(mocks.accepted).toHaveBeenCalledBefore(mocks.complete);
     expect(mocks.latest).toHaveBeenCalledWith("store", expect.objectContaining({ cartToken: "cart" }), { failClosed: true });
+    expect(mocks.delay).not.toHaveBeenCalled();
+  });
+  it("holds a recent purchase until Google accepts its click, without claiming or failing the row", async () => {
+    const recent = new Date(now - 60000);
+    mocks.row.mockResolvedValue({ ...row(), occurredAt: recent });
+    await expect(processGoogleAdsEvent(job(), "lock")).rejects.toBeInstanceOf(DelayedError);
+    const notBefore = recent.getTime() + GOOGLE_CLICK_SETTLE_MS;
+    expect(notBefore - recent.getTime()).toBeGreaterThanOrEqual(6 * 3600000);
+    expect(mocks.delay).toHaveBeenCalledWith(notBefore, "lock");
+    expect(mocks.hold).toHaveBeenCalledWith({ where: { id: "row", status: "PENDING" },
+      data: { nextRetryAt: new Date(notBefore) } });
+    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(mocks.fail).not.toHaveBeenCalled();
+    expect(mocks.failure).not.toHaveBeenCalled();
+  });
+  it("does not hold a superseded row", async () => {
+    mocks.superseded.mockResolvedValue(true);
+    mocks.row.mockResolvedValue({ ...row(), occurredAt: new Date(now - 60000) });
+    await processGoogleAdsEvent(job(), "lock");
+    expect(mocks.delay).not.toHaveBeenCalled();
+    expect(mocks.send).not.toHaveBeenCalled();
   });
   it("logs in through a manager account when one is configured", async () => {
     mocks.workspace.mockResolvedValue({ ...workspace(), googleAdsLoginCustomerId: "1111111111" });

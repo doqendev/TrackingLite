@@ -1,5 +1,52 @@
 # AGENTS.md
 
+## 2026-10-29 Google Ads six-hour click hold and new-account setup: branch only, not deployed
+
+Branch `agent/google-ads-click-window-20261029`, cut from the live branch
+`agent/wetracked-learnings-20261025` (`d7572dd`), fixes a Google Ads delivery
+defect found while checking the integration against Google's Data Manager
+documentation before connecting a newly created Google Ads account.
+
+- Six-hour hold. Google rejects a click conversion while its click is under six
+  hours old (`PROCESSING_ERROR_REASON_TOO_RECENT_CLICK`; Google Ads Help: "retry
+  after 6 hours have passed") and does not keep it. The worker uploaded at
+  purchase time, so a purchase made within six hours of a Google ad click, such
+  as one in the same visit, was accepted, then rejected, and never uploaded again:
+  a FAILED request status is final. The worker now holds every upload until the purchase's
+  `occurredAt` plus 6 h 15 min (`GOOGLE_CLICK_SETTLE_MS`). Before claiming the
+  row it moves the BullMQ job back to delayed (`DelayedError`; BullMQ does not
+  count an attempt) and sets the PENDING row's `nextRetryAt`. `requeueStalePending`
+  skips PENDING rows whose `nextRetryAt` is still ahead, so a held row is not
+  re-queued as stale nor spends the 12 automatic retries; if Redis loses the
+  delayed job, recovery queues the row once the hold ends. Every terminal path
+  already clears `nextRetryAt`, so retention is unaffected. Tracking Health shows a
+  held purchase as expected, with its upload time in UTC.
+- Setup copy. The card told merchants to count One. Google rejects gbraid and
+  wbraid (iPhone app) clicks for one-per-click actions
+  (`ONE_PER_CLICK_CONVERSION_ACTION_NOT_PERMITTED_WITH_BRAID`), and One drops a
+  shopper's repeat purchases, so it now says Every (Infinite Layers' live action
+  already counts Every). A new first step asks for auto-tagging and the customer
+  data terms (Goals > Settings). Without the terms Google rejects every upload
+  carrying customer data (`DESTINATION_ACCOUNT_ENHANCED_CONVERSIONS_TERMS_NOT_SIGNED`),
+  which is every Track Clear upload, and `validateOnly` does not detect it. The
+  success message names the hold. Six languages; `docs/google-ads.md` has the
+  setup, the hold and Google's error reasons.
+
+Verification: 856 unit tests pass across 67 files (5 new), `tsc` is clean and
+lint has only the existing `<img>` warnings. BullMQ 5.69's worker treats
+`DelayedError` as a reschedule and `moveToDelayed` skips the attempt counter
+(checked in its source). Integration tests were not run (no local
+PostgreSQL/Redis). Google's documents checked: Data Manager `requestStatus`
+error reasons, the offline-conversion send-events guide, and Google Ads Help
+"Fix discrepancies and errors in offline conversion imports".
+
+Release notes: no migration. The worker (hold, recovery filter) and the web
+(Tracking Health, setup copy) both change, so follow the `docs/deploy.md` order
+used on 25 October: stop the old worker, deploy the web, start one new fleet.
+Purchases uploaded since 13 October within six hours of their click may show
+`TOO_RECENT_CLICK` in Tracking Health; they were not re-uploaded. Not merged or
+deployed.
+
 ## 2026-10-25 Server-side InitiateCheckout, Cart Helper consent, cart writes and funnel country: live, not on `main`
 
 Branch `agent/wetracked-learnings-20261025` applies the findings of the 24-25
@@ -606,8 +653,8 @@ tests/
     event-retry-envelope.test.ts      # 3 tests (encrypted short-lived replay payload)
     events-page-mode.test.ts          # 1 test (Events page failed-count respects workspace destination allowlist)
     extract-custom-data.test.ts       # 29 tests (bounded customData extraction)
-    google-ads.test.ts                # 47 tests (IDs, Google normalization/hashing, consent, request shape, API errors, request status)
-    google-ads-event-processor.test.ts # 21 tests (worker ownership, target, toggles, consent, retries, bookkeeping)
+    google-ads.test.ts                # 48 tests (IDs, Google normalization/hashing, consent, request shape, six-hour hold time, API errors, request status)
+    google-ads-event-processor.test.ts # 23 tests (six-hour hold, worker ownership, target, toggles, consent, retries, bookkeeping)
     google-ads-request-status.test.ts # 9 tests (status polling, backoff, timeout, safe details)
     google-data-manager-auth.test.ts  # 14 tests (key parsing, RS256 assertion, token caching, safe errors)
     hash-pii.test.ts                  # 24 tests
@@ -635,11 +682,11 @@ tests/
     shopify-checkout-webhook.test.ts  # 10 tests (checkout webhook InitiateCheckout, pixel-row enrichment/dedupe, no reopen, consent, toggles, orders/paid fallback)
     shopify-webhook-route-mode.test.ts # 21 tests (capture-only ACK, canonical reconciliation, explicit-consent internal attribution, allowlists/catalogs)
     snippet-route.test.ts             # 5 tests (verified host and bounded ordered bridge-v1 startup)
-    stale-pending-requeue.test.ts     # 8 tests (deterministic retries and alias-aware usage reconciliation)
+    stale-pending-requeue.test.ts     # 9 tests (deterministic retries, held rows skipped until due, alias-aware usage reconciliation)
     tiktok.test.ts                    # 3 tests (external_id hashing and rich contents)
     tiktok-event-processor.test.ts    # 7 tests (claim-token settlement and retry semantics)
     tracking-context.test.ts          # 6 tests (fbc synthesis and proxy headers)
-    tracking-health.test.ts           # 4 tests (attribution states and SENT-only duplicate health)
+    tracking-health.test.ts           # 10 tests (attribution states, SENT-only duplicate health, Google Ads upload and hold states)
     worker-health.test.ts             # 10 tests (startup latch, 11-listener readiness, dependency health, exact commit)
     workspace-create-mode.test.ts     # 1 test (new workspace V1/custom-pixel defaults)
     workspace-mode.test.ts            # 3 tests (null legacy fallback, V1 destination allowlist, env bypass)
@@ -875,7 +922,7 @@ Header: Content-Type: application/json
 - **enableMeta toggle:** Added for consistency with other destinations. Defaults to `true` for backward compatibility with existing workspaces.
 - **Reddit click ID (rdtCid):** Snippet captures `rdt_cid` URL param and passes as `rdtCid`. Forwarded to Reddit Conversions API for attribution matching.
 - **Pinterest click ID (epik):** Snippet captures `epik` URL param and passes as `epik`. Pinterest Conversions API requires `value` as a string (not number) — normalizer handles the conversion.
-- **Google Ads (Data Manager API):** Purchases only, uploaded as click conversions to one "Website (Import from clicks)" conversion action with gclid/gbraid/wbraid and hashed customer data. Track Clear's service account (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`, Railway + Vercel) authenticates; merchants add its email to Google Ads; no developer token. SENT means accepted; `destinationRequestStatus` holds Google's async result, polled from the 5-minute recovery cycle. The old server-side GET to the browser conversion endpoint had no shopper cookies and could not attribute; its columns are retained read-only. See `docs/google-ads.md`.
+- **Google Ads (Data Manager API):** Purchases only, uploaded as click conversions to one "Website (Import from clicks)" conversion action with gclid/gbraid/wbraid and hashed customer data. Track Clear's service account (`GOOGLE_DATA_MANAGER_SERVICE_ACCOUNT_KEY`, Railway + Vercel) authenticates; merchants add its email to Google Ads; no developer token. SENT means accepted; `destinationRequestStatus` holds Google's async result, polled from the 5-minute recovery cycle. Google rejects a click conversion while its click is under six hours old (`TOO_RECENT_CLICK`) and does not keep it, so the worker holds every upload until six hours and fifteen minutes after the purchase (a delayed BullMQ job plus the PENDING row's `nextRetryAt`, which stale recovery skips until due). Merchants need auto-tagging, accepted customer data terms and a conversion action that counts Every. The old server-side GET to the browser conversion endpoint had no shopper cookies and could not attribute; its columns are retained read-only. See `docs/google-ads.md`.
 - **Vercel hosting:** Web app runs on Vercel (serverless). Workers stay on Railway. Redis and PostgreSQL on Railway with public TCP proxies for Vercel connectivity. Railway-specific code (keepalive, self-ping, cgroup reader, signal handlers) conditionally disabled via `process.env.VERCEL`.
 
 ## Style Rules

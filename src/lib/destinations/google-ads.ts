@@ -27,6 +27,11 @@ export const GOOGLE_CLICK_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 // Google recommends uploading within a day; clicks older than 90 days and
 // conversions far in the past are not attributable anyway.
 export const GOOGLE_EVENT_TTL_MS = 60 * 24 * 60 * 60 * 1000;
+// Google rejects a click conversion while its click is under six hours old
+// (TOO_RECENT_CLICK, "retry after 6 hours") and does not keep it. The click
+// always precedes the purchase, so an upload waits until six hours after the
+// purchase, plus a margin for clock differences between Shopify and Google.
+export const GOOGLE_CLICK_SETTLE_MS = (6 * 60 + 15) * 60 * 1000;
 const TRANSACTION_ID_MAX_LENGTH = 64;
 const currencies = new Set([...Intl.supportedValuesOf("currency"), "CLF", "UYW"]);
 
@@ -181,6 +186,11 @@ function transactionIdFor(event: DestinationEventJob["event"]): string {
     if (value && value.length <= TRANSACTION_ID_MAX_LENGTH) return value;
   }
   throw new GoogleAdsApiError("Missing Google Ads transaction ID", 400);
+}
+
+/** Earliest time Google accepts this purchase's click, whenever the click happened. */
+export function googleAdsUploadNotBefore(occurredAt: Date): Date {
+  return new Date(occurredAt.getTime() + GOOGLE_CLICK_SETTLE_MS);
 }
 
 function consentStatus(value: boolean | undefined): ConsentStatus | undefined {

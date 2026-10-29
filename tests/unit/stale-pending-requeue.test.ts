@@ -57,6 +57,7 @@ import {
   isRetryableDeliveryFailure,
   reconcileOrderCounts,
   requeueEvents,
+  requeueStalePending,
 } from "@/workers/stale-pending-requeue";
 
 const workspace = {
@@ -187,6 +188,15 @@ describe("automatic stale event requeue", () => {
         }),
       })
     );
+  });
+
+  it("leaves a PENDING row alone until its hold ends", async () => {
+    await requeueStalePending();
+
+    const { where } = mocks.eventFindMany.mock.calls[0][0];
+    expect(where).toMatchObject({ status: "PENDING", createdAt: { lt: expect.any(Date) } });
+    expect(where.OR).toEqual([{ nextRetryAt: null }, { nextRetryAt: { lte: expect.any(Date) } }]);
+    expect(where.OR[1].nextRetryAt.lte.getTime()).toBeGreaterThan(where.createdAt.lt.getTime());
   });
 });
 
